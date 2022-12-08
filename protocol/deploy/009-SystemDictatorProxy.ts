@@ -7,7 +7,7 @@ const deployFn: DeployFunction = async (hre) => {
 
   await deploy({
     hre,
-    name: 'L1ERC721BridgeProxy',
+    name: 'SystemDictatorProxy',
     contract: 'Proxy',
     args: [deployer],
     postDeployAction: async (contract) => {
@@ -16,6 +16,6 @@ const deployFn: DeployFunction = async (hre) => {
   })
 }
 
-deployFn.tags = ['L1ERC721BridgeProxy']
+deployFn.tags = ['SystemDictatorProxy']
 
 export default deployFn

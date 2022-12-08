@@ -1,22 +1,95 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import { L2OutputOracle } from "../L1/L2OutputOracle.sol";
 import { OptimismPortal } from "../L1/OptimismPortal.sol";
 import { L1CrossDomainMessenger } from "../L1/L1CrossDomainMessenger.sol";
+import { L1ERC721Bridge } from "../L1/L1ERC721Bridge.sol";
+import { L1StandardBridge } from "../L1/L1StandardBridge.sol";
 import { L1ChugSplashProxy } from "../legacy/L1ChugSplashProxy.sol";
+import { AddressManager } from "../legacy/AddressManager.sol";
+import { Proxy } from "../universal/Proxy.sol";
 import { ProxyAdmin } from "../universal/ProxyAdmin.sol";
+import { OptimismMintableERC20Factory } from "../universal/OptimismMintableERC20Factory.sol";
 import { PortalSender } from "./PortalSender.sol";
 import { SystemConfig } from "../L1/SystemConfig.sol";
-import { BaseSystemDictator } from "./BaseSystemDictator.sol";
 
 /**
- * @title MigrationSystemDictator
- * @notice The MigrationSystemDictator is responsible for coordinating the migration and
- *         initialization of an existing deployment of the Optimism System. We expect that all
- *         proxies and implementations already be deployed before this contract is used.
+ * @title SystemDictator
+ * @notice The SystemDictator is responsible for coordinating the deployment of a full Bedrock
+ *         system. The SystemDictator is designed to support both fresh network deployments and
+ *         upgrades to existing pre-Bedrock systems.
  */
-contract MigrationSystemDictator is BaseSystemDictator {
+contract SystemDictator is OwnableUpgradeable {
+    /**
+     * @notice Basic system configuration.
+     */
+    struct GlobalConfig {
+        AddressManager addressManager;
+        ProxyAdmin proxyAdmin;
+        address controller;
+        address finalOwner;
+    }
+
+    /**
+     * @notice Set of proxy addresses.
+     */
+    struct ProxyAddressConfig {
+        address l2OutputOracleProxy;
+        address optimismPortalProxy;
+        address l1CrossDomainMessengerProxy;
+        address l1StandardBridgeProxy;
+        address optimismMintableERC20FactoryProxy;
+        address l1ERC721BridgeProxy;
+        address systemConfigProxy;
+    }
+
+    /**
+     * @notice Set of implementation addresses.
+     */
+    struct ImplementationAddressConfig {
+        L2OutputOracle l2OutputOracleImpl;
+        OptimismPortal optimismPortalImpl;
+        L1CrossDomainMessenger l1CrossDomainMessengerImpl;
+        L1StandardBridge l1StandardBridgeImpl;
+        OptimismMintableERC20Factory optimismMintableERC20FactoryImpl;
+        L1ERC721Bridge l1ERC721BridgeImpl;
+        PortalSender portalSenderImpl;
+        SystemConfig systemConfigImpl;
+    }
+
+    /**
+     * @notice Dynamic L2OutputOracle config.
+     */
+    struct L2OutputOracleDynamicConfig {
+        uint256 l2OutputOracleStartingBlockNumber;
+        uint256 l2OutputOracleStartingTimestamp;
+    }
+
+    /**
+     * @notice Values for the system config contract.
+     */
+    struct SystemConfigConfig {
+        address owner;
+        uint256 overhead;
+        uint256 scalar;
+        bytes32 batcherHash;
+        uint64 gasLimit;
+    }
+
+    /**
+     * @notice Combined system configuration.
+     */
+    struct DeployConfig {
+        GlobalConfig globalConfig;
+        ProxyAddressConfig proxyAddressConfig;
+        ImplementationAddressConfig implementationAddressConfig;
+        SystemConfigConfig systemConfigConfig;
+    }
+
     /**
      * @notice Step after which exit 1 can no longer be used.
      */
@@ -26,6 +99,26 @@ contract MigrationSystemDictator is BaseSystemDictator {
      * @notice Step where proxy ownership is transferred.
      */
     uint8 public constant PROXY_TRANSFER_STEP = 4;
+
+    /**
+     * @notice System configuration.
+     */
+    DeployConfig public config;
+
+    /**
+     * @notice Dynamic configuration for the L2OutputOracle.
+     */
+    L2OutputOracleDynamicConfig public l2OutputOracleDynamicConfig;
+
+    /**
+     * @notice Current step;
+     */
+    uint8 public currentStep;
+
+    /**
+     * @notice Whether or not dynamic config has been set.
+     */
+    bool public dynamicConfigSet;
 
     /**
      * @notice Whether or not the deployment is finalized.
@@ -38,9 +131,37 @@ contract MigrationSystemDictator is BaseSystemDictator {
     address public oldL1CrossDomainMessenger;
 
     /**
+     * @notice Checks that the current step is the expected step, then bumps the current step.
+     *
+     * @param _step Current step.
+     */
+    modifier step(uint8 _step) {
+        require(currentStep == _step, "BaseSystemDictator: incorrect step");
+        _;
+        currentStep++;
+    }
+
+    /**
      * @param _config System configuration.
      */
-    constructor(DeployConfig memory _config) BaseSystemDictator(_config) {}
+    function initialize(DeployConfig memory _config) public initializer {
+        config = _config;
+        currentStep = 1;
+        __Ownable_init();
+        _transferOwnership(config.globalConfig.controller);
+    }
+
+    /**
+     * @notice Allows the owner to update dynamic L2OutputOracle config.
+     *
+     * @param _l2OutputOracleDynamicConfig Dynamic L2OutputOracle config.
+     */
+    function updateL2OutputOracleDynamicConfig(
+        L2OutputOracleDynamicConfig memory _l2OutputOracleDynamicConfig
+    ) external onlyOwner {
+        l2OutputOracleDynamicConfig = _l2OutputOracleDynamicConfig;
+        dynamicConfigSet = true;
+    }
 
     /**
      * @notice Configures the ProxyAdmin contract.
@@ -137,6 +258,11 @@ contract MigrationSystemDictator is BaseSystemDictator {
         L1ChugSplashProxy(payable(config.proxyAddressConfig.l1StandardBridgeProxy)).setOwner(
             address(config.globalConfig.proxyAdmin)
         );
+
+        // Transfer ownership of the L1ERC721Bridge to the ProxyAdmin.
+        Proxy(payable(config.proxyAddressConfig.l1ERC721BridgeProxy)).changeAdmin(
+            address(config.globalConfig.proxyAdmin)
+        );
     }
 
     /**
@@ -144,10 +270,7 @@ contract MigrationSystemDictator is BaseSystemDictator {
      */
     function step5() external onlyOwner step(5) {
         // Dynamic config must be set before we can initialize the L2OutputOracle.
-        require(
-            dynamicConfigSet,
-            "MigrationSystemDictator: dynamic oracle config is not yet initialized"
-        );
+        require(dynamicConfigSet, "SystemDictator: dynamic oracle config is not yet initialized");
 
         // Upgrade and initialize the L2OutputOracle.
         config.globalConfig.proxyAdmin.upgradeAndCall(
@@ -156,11 +279,8 @@ contract MigrationSystemDictator is BaseSystemDictator {
             abi.encodeCall(
                 L2OutputOracle.initialize,
                 (
-                    l2OutputOracleDynamicConfig.l2OutputOracleStartingL2Output,
                     l2OutputOracleDynamicConfig.l2OutputOracleStartingBlockNumber,
-                    l2OutputOracleDynamicConfig.l2OutputOracleStartingTimestamp,
-                    config.l2OutputOracleConfig.l2OutputOracleProposer,
-                    config.l2OutputOracleConfig.l2OutputOracleOwner
+                    l2OutputOracleDynamicConfig.l2OutputOracleStartingTimestamp
                 )
             )
         );
@@ -191,13 +311,10 @@ contract MigrationSystemDictator is BaseSystemDictator {
             require(
                 keccak256(abi.encodePacked(reason)) ==
                     keccak256("Initializable: contract is already initialized"),
-                string.concat(
-                    "MigrationSystemDictator: unexpected error initializing L1XDM: ",
-                    reason
-                )
+                string.concat("SystemDictator: unexpected error initializing L1XDM: ", reason)
             );
         } catch {
-            revert("MigrationSystemDictator: unexpected error initializing L1XDM (no reason)");
+            revert("SystemDictator: unexpected error initializing L1XDM (no reason)");
         }
 
         // Transfer ETH from the L1StandardBridge to the OptimismPortal.
@@ -276,6 +393,11 @@ contract MigrationSystemDictator is BaseSystemDictator {
             L1ChugSplashProxy(payable(config.proxyAddressConfig.l1StandardBridgeProxy)).setOwner(
                 address(config.globalConfig.finalOwner)
             );
+
+            // Transfer ownership of the L1ERC721Bridge to the final owner.
+            Proxy(payable(config.proxyAddressConfig.l1ERC721BridgeProxy)).changeAdmin(
+                address(config.globalConfig.finalOwner)
+            );
         }
 
         finalized = true;
@@ -287,7 +409,7 @@ contract MigrationSystemDictator is BaseSystemDictator {
     function exit1() external onlyOwner {
         require(
             currentStep == EXIT_1_NO_RETURN_STEP,
-            "MigrationSystemDictator: can only exit1 before step 3 is executed"
+            "SystemDictator: can only exit1 before step 3 is executed"
         );
 
         // Reset the L1CrossDomainMessenger to the old implementation.

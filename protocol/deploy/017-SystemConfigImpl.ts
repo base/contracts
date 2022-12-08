@@ -1,22 +1,18 @@
 import { DeployFunction } from 'hardhat-deploy/dist/types'
 import '@eth-optimism/hardhat-deploy-config'
 
-import {
-  assertContractVariable,
-  deployAndVerifyAndThen,
-} from '../src/deploy-utils'
+import { assertContractVariable, deploy } from '../src/deploy-utils'
 
 const deployFn: DeployFunction = async (hre) => {
-  const batcherHash = hre.ethers.utils.hexZeroPad(
-    hre.deployConfig.batchSenderAddress,
-    32
-  )
+  const batcherHash = hre.ethers.utils
+    .hexZeroPad(hre.deployConfig.batchSenderAddress, 32)
+    .toLowerCase()
 
-  await deployAndVerifyAndThen({
+  await deploy({
     hre,
     name: 'SystemConfig',
     args: [
-      hre.deployConfig.systemConfigOwner,
+      hre.deployConfig.finalSystemOwner,
       hre.deployConfig.gasPriceOracleOverhead,
       hre.deployConfig.gasPriceOracleScalar,
       batcherHash,
@@ -26,7 +22,7 @@ const deployFn: DeployFunction = async (hre) => {
       await assertContractVariable(
         contract,
         'owner',
-        hre.deployConfig.systemConfigOwner
+        hre.deployConfig.finalSystemOwner
       )
       await assertContractVariable(
         contract,
@@ -38,11 +34,7 @@ const deployFn: DeployFunction = async (hre) => {
         'scalar',
         hre.deployConfig.gasPriceOracleScalar
       )
-      await assertContractVariable(
-        contract,
-        'batcherHash',
-        batcherHash.toLowerCase()
-      )
+      await assertContractVariable(contract, 'batcherHash', batcherHash)
     },
   })
 }
