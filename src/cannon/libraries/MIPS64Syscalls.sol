@@ -58,6 +58,7 @@ library MIPS64Syscalls {
     uint32 internal constant SYS_PRLIMIT64 = 5297;
     uint32 internal constant SYS_CLOSE = 5003;
     uint32 internal constant SYS_PREAD64 = 5016;
+    uint32 internal constant SYS_STAT = 5004;
     uint32 internal constant SYS_FSTAT = 5005;
     //uint32 internal constant SYS_FSTAT64 = 0xFFFFFFFF;  // UndefinedSysNr - not supported by MIPS64
     uint32 internal constant SYS_OPENAT = 5247;
