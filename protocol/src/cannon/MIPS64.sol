@@ -64,8 +64,8 @@ contract MIPS64 is ISemver {
     }
 
     /// @notice The semantic version of the MIPS64 contract.
-    /// @custom:semver 1.0.0-beta.3
-    string public constant version = "1.0.0-beta.3";
+    /// @custom:semver 1.0.0-beta.4
+    string public constant version = "1.0.0-beta.4";
 
     /// @notice The preimage oracle contract.
     IPreimageOracle internal immutable ORACLE;
@@ -106,7 +106,39 @@ contract MIPS64 is ISemver {
     /// the current thread stack.
     /// @param _localContext The local key context for the preimage oracle. Optional, can be set as a constant
     ///                      if the caller only requires one set of local keys.
-    function step(bytes calldata _stateData, bytes calldata _proof, bytes32 _localContext) public returns (bytes32) {
+    /// @return postState_ The hash of the post state witness after the state transition.
+    function step(
+        bytes calldata _stateData,
+        bytes calldata _proof,
+        bytes32 _localContext
+    )
+        public
+        returns (bytes32 postState_)
+    {
+        postState_ = doStep(_stateData, _proof, _localContext);
+        assertPostStateChecks();
+    }
+
+    function assertPostStateChecks() internal pure {
+        State memory state;
+        assembly {
+            state := STATE_MEM_OFFSET
+        }
+
+        bytes32 activeStack = state.traverseRight ? state.rightThreadStack : state.leftThreadStack;
+        if (activeStack == EMPTY_THREAD_ROOT) {
+            revert("MIPS64: post-state active thread stack is empty");
+        }
+    }
+
+    function doStep(
+        bytes calldata _stateData,
+        bytes calldata _proof,
+        bytes32 _localContext
+    )
+        internal
+        returns (bytes32)
+    {
         unchecked {
             State memory state;
             ThreadState memory thread;
