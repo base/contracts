@@ -7,10 +7,11 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 
 // Libraries
 import { Predeploys } from "src/libraries/Predeploys.sol";
-import { IERC20Solady as IERC20 } from "src/vendor/interfaces/IERC20Solady.sol";
 
 import { Initializable } from "@openzeppelin/contracts-v5/proxy/utils/Initializable.sol";
 import { IERC165 } from "@openzeppelin/contracts-v5/utils/introspection/IERC165.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC7802 } from "src/L2/interfaces/IERC7802.sol";
 import { IBeacon } from "@openzeppelin/contracts-v5/proxy/beacon/IBeacon.sol";
 import { BeaconProxy } from "@openzeppelin/contracts-v5/proxy/beacon/BeaconProxy.sol";
 import { Unauthorized } from "src/libraries/errors/CommonErrors.sol";
@@ -248,6 +249,8 @@ contract OptimismSuperchainERC20Test is Test {
     /// @notice Tests that the `supportsInterface` function returns true for the `ISuperchainERC20` interface.
     function test_supportInterface_succeeds() public view {
         assertTrue(optimismSuperchainERC20.supportsInterface(type(IERC165).interfaceId));
+        assertTrue(optimismSuperchainERC20.supportsInterface(type(IERC20).interfaceId));
+        assertTrue(optimismSuperchainERC20.supportsInterface(type(IERC7802).interfaceId));
         assertTrue(optimismSuperchainERC20.supportsInterface(type(IOptimismSuperchainERC20).interfaceId));
     }
 
@@ -255,6 +258,8 @@ contract OptimismSuperchainERC20Test is Test {
     /// `ISuperchainERC20` one.
     function testFuzz_supportInterface_returnFalse(bytes4 _interfaceId) public view {
         vm.assume(_interfaceId != type(IERC165).interfaceId);
+        vm.assume(_interfaceId != type(IERC20).interfaceId);
+        vm.assume(_interfaceId != type(IERC7802).interfaceId);
         vm.assume(_interfaceId != type(IOptimismSuperchainERC20).interfaceId);
         assertFalse(optimismSuperchainERC20.supportsInterface(_interfaceId));
     }
