@@ -5,7 +5,6 @@ pragma solidity 0.8.15;
 import { Bridge_Initializer } from "test/setup/Bridge_Initializer.sol";
 
 // Scripts
-import { Executables } from "scripts/libraries/Executables.sol";
 import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
 import { Process } from "scripts/libraries/Process.sol";
 
@@ -432,21 +431,14 @@ contract Initializer_Test is Bridge_Initializer {
             }
 
             // Construct the query for the initialize function in the contract's ABI.
-            string[] memory command = new string[](3);
-            command[0] = Executables.bash;
-            command[1] = "-c";
-            command[2] = string.concat(
-                Executables.echo,
-                " '",
+            string memory cmd = string.concat(
+                "echo '",
                 ForgeArtifacts.getAbi(contractName),
-                "'",
-                " | ",
-                Executables.jq,
-                " '.[] | select(.name == \"initialize\" and .type == \"function\")'"
+                "' | jq '.[] | select(.name == \"initialize\" and .type == \"function\")'"
             );
 
             // If the contract does not have an `initialize()` function, skip it.
-            if (Process.run(command).length == 0) {
+            if (bytes(Process.bash(cmd)).length == 0) {
                 continue;
             }
 
