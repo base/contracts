@@ -102,7 +102,7 @@ contract OptimismSuperchainERC20Test is Test {
     }
 
     /// @notice Tests the `initialize` function reverts when the contract is already initialized.
-    function testFuzz_initializer_reverts(
+    function testFuzz_initializer_invalidInitialization_reverts(
         address _remoteToken,
         string memory _name,
         string memory _symbol,
@@ -256,7 +256,7 @@ contract OptimismSuperchainERC20Test is Test {
 
     /// @notice Tests that the `supportsInterface` function returns false for any other interface than the
     /// `ISuperchainERC20` one.
-    function testFuzz_supportInterface_returnFalse(bytes4 _interfaceId) public view {
+    function testFuzz_supportInterface_returnFalse_works(bytes4 _interfaceId) public view {
         vm.assume(_interfaceId != type(IERC165).interfaceId);
         vm.assume(_interfaceId != type(IERC20).interfaceId);
         vm.assume(_interfaceId != type(IERC7802).interfaceId);

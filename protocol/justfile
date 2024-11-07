@@ -165,9 +165,12 @@ semver-diff-check: build semver-diff-check-no-build
 semgrep-test-validity-check:
   forge fmt ../../.semgrep/tests/sol-rules.t.sol --check
 
+# Checks that forge test names are correctly formatted. Does not build contracts.
+lint-forge-tests-check-no-build:
+  go run ./scripts/checks/test-names
+
 # Checks that forge test names are correctly formatted.
-lint-forge-tests-check:
-  go run ./scripts/checks/names
+lint-forge-tests-check: build lint-forge-tests-check-no-build
 
 # Checks that contracts are properly linted.
 lint-check:
@@ -216,7 +219,8 @@ check:
   semver-diff-check-no-build \
   validate-deploy-configs \
   validate-spacers-no-build \
-  interfaces-check-no-build
+  interfaces-check-no-build \
+  lint-forge-tests-check-no-build
 
 ########################################################
 #                      DEV TOOLS                       #
