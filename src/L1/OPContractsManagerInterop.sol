@@ -41,12 +41,15 @@ contract OPContractsManagerInterop is OPContractsManager {
 
         return abi.encodeWithSelector(
             _selector,
-            _input.roles.systemConfigOwner,
+            ISystemConfig.Roles({
+                owner: _input.roles.systemConfigOwner,
+                feeAdmin: _input.roles.systemConfigFeeAdmin,
+                unsafeBlockSigner: _input.roles.unsafeBlockSigner,
+                batcherHash: bytes32(uint256(uint160(_input.roles.batcher)))
+            }),
             _input.basefeeScalar,
             _input.blobBasefeeScalar,
-            bytes32(uint256(uint160(_input.roles.batcher))), // batcherHash
             _input.gasLimit,
-            _input.roles.unsafeBlockSigner,
             referenceResourceConfig,
             chainIdToBatchInboxAddress(_input.l2ChainId),
             opChainAddrs,
