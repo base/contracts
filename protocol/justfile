@@ -96,7 +96,7 @@ deploy:
 
 # Generates a gas snapshot without building.
 gas-snapshot-no-build:
-  forge snapshot --match-contract GasBenchMark
+  forge snapshot --match-contract GasBenchMark --snap snapshots/.gas-snapshot
 
 # Generates a gas snapshot.
 gas-snapshot: build-go-ffi gas-snapshot-no-build
@@ -116,9 +116,9 @@ kontrol-summary-full: kontrol-summary kontrol-summary-fp
 snapshots-abi-storage:
   go run ./scripts/autogen/generate-snapshots .
 
-# Updates the semver-lock.json file.
+# Updates the snapshots/semver-lock.json file.
 semver-lock:
-  forge script scripts/autogen/SemverLock.s.sol
+  go run scripts/autogen/generate-semver-lock/main.go
 
 # Generates core snapshots without building contracts. Currently just an alias for
 # snapshots-abi-storage because we no longer run Kontrol snapshots here. Run
@@ -135,7 +135,7 @@ snapshots: build snapshots-no-build
 
 # Checks that the gas snapshot is up to date without building.
 gas-snapshot-check-no-build:
-  forge snapshot --match-contract GasBenchMark --check
+  forge snapshot --match-contract GasBenchMark --snap snapshots/.gas-snapshot --check
 
 # Checks that the gas snapshot is up to date.
 gas-snapshot-check: build-go-ffi gas-snapshot-check-no-build
