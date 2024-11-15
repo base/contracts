@@ -16,6 +16,7 @@ import { IOptimismPortal } from "src/L1/interfaces/IOptimismPortal.sol";
 import { IOptimismPortal2 } from "src/L1/interfaces/IOptimismPortal2.sol";
 import { IOptimismPortalInterop } from "src/L1/interfaces/IOptimismPortalInterop.sol";
 import { ISystemConfig } from "src/L1/interfaces/ISystemConfig.sol";
+import { ISystemConfigInterop } from "src/L1/interfaces/ISystemConfigInterop.sol";
 import { IDataAvailabilityChallenge } from "src/L1/interfaces/IDataAvailabilityChallenge.sol";
 import { IProtocolVersions } from "src/L1/interfaces/IProtocolVersions.sol";
 
@@ -479,36 +480,37 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("gasLimit()") });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("eip1559Denominator()") });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("eip1559Elasticity()") });
+        _addSpec({ _name: "SystemConfigInterop", _sel: ISystemConfigInterop.initialize.selector });
         _addSpec({ _name: "SystemConfigInterop", _sel: ISystemConfig.initialize.selector });
-        _addSpec({ _name: "SystemConfigInterop", _sel: ISystemConfig.minimumGasLimit.selector });
+        _addSpec({ _name: "SystemConfigInterop", _sel: ISystemConfigInterop.minimumGasLimit.selector });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("overhead()") });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("owner()") });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("renounceOwnership()"), _auth: Role.SYSTEMCONFIGOWNER });
-        _addSpec({ _name: "SystemConfigInterop", _sel: ISystemConfig.resourceConfig.selector });
+        _addSpec({ _name: "SystemConfigInterop", _sel: ISystemConfigInterop.resourceConfig.selector });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("scalar()") });
         _addSpec({
             _name: "SystemConfigInterop",
-            _sel: ISystemConfig.setBatcherHash.selector,
+            _sel: ISystemConfigInterop.setBatcherHash.selector,
             _auth: Role.SYSTEMCONFIGOWNER
         });
         _addSpec({
             _name: "SystemConfigInterop",
-            _sel: ISystemConfig.setGasConfig.selector,
+            _sel: ISystemConfigInterop.setGasConfig.selector,
             _auth: Role.SYSTEMCONFIGOWNER
         });
         _addSpec({
             _name: "SystemConfigInterop",
-            _sel: ISystemConfig.setGasLimit.selector,
+            _sel: ISystemConfigInterop.setGasLimit.selector,
             _auth: Role.SYSTEMCONFIGOWNER
         });
         _addSpec({
             _name: "SystemConfigInterop",
-            _sel: ISystemConfig.setEIP1559Params.selector,
+            _sel: ISystemConfigInterop.setEIP1559Params.selector,
             _auth: Role.SYSTEMCONFIGOWNER
         });
         _addSpec({
             _name: "SystemConfigInterop",
-            _sel: ISystemConfig.setUnsafeBlockSigner.selector,
+            _sel: ISystemConfigInterop.setUnsafeBlockSigner.selector,
             _auth: Role.SYSTEMCONFIGOWNER
         });
         _addSpec({
@@ -516,7 +518,7 @@ contract Specification_Test is CommonTest {
             _sel: _getSel("transferOwnership(address)"),
             _auth: Role.SYSTEMCONFIGOWNER
         });
-        _addSpec({ _name: "SystemConfigInterop", _sel: ISystemConfig.unsafeBlockSigner.selector });
+        _addSpec({ _name: "SystemConfigInterop", _sel: ISystemConfigInterop.unsafeBlockSigner.selector });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("version()") });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("l1CrossDomainMessenger()") });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("l1ERC721Bridge()") });
@@ -552,12 +554,6 @@ contract Specification_Test is CommonTest {
             _auth: Role.DEPENDENCYMANAGER
         });
         _addSpec({ _name: "SystemConfigInterop", _sel: _getSel("dependencyManager()") });
-        _addSpec({
-            _name: "SystemConfigInterop",
-            _sel: _getSel(
-                "initialize(address,uint32,uint32,bytes32,uint64,address,(uint32,uint8,uint8,uint32,uint32,uint128),address,(address,address,address,address,address,address,address),address)"
-            )
-        });
 
         // ProxyAdmin
         _addSpec({ _name: "ProxyAdmin", _sel: _getSel("addressManager()") });
@@ -841,27 +837,25 @@ contract Specification_Test is CommonTest {
         _addSpec({ _name: "OPContractsManager", _sel: _getSel("version()") });
         _addSpec({ _name: "OPContractsManager", _sel: _getSel("superchainConfig()") });
         _addSpec({ _name: "OPContractsManager", _sel: _getSel("protocolVersions()") });
-        _addSpec({ _name: "OPContractsManager", _sel: _getSel("latestRelease()") });
-        _addSpec({ _name: "OPContractsManager", _sel: _getSel("implementations(string,string)") });
+        _addSpec({ _name: "OPContractsManager", _sel: _getSel("l1ContractsRelease()") });
         _addSpec({ _name: "OPContractsManager", _sel: _getSel("systemConfigs(uint256)") });
         _addSpec({ _name: "OPContractsManager", _sel: _getSel("OUTPUT_VERSION()") });
-        _addSpec({ _name: "OPContractsManager", _sel: OPContractsManager.initialize.selector });
         _addSpec({ _name: "OPContractsManager", _sel: OPContractsManager.deploy.selector });
         _addSpec({ _name: "OPContractsManager", _sel: OPContractsManager.blueprints.selector });
         _addSpec({ _name: "OPContractsManager", _sel: OPContractsManager.chainIdToBatchInboxAddress.selector });
+        _addSpec({ _name: "OPContractsManager", _sel: OPContractsManager.implementations.selector });
 
         // OPContractsManagerInterop
         _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("version()") });
         _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("superchainConfig()") });
         _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("protocolVersions()") });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("latestRelease()") });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("implementations(string,string)") });
+        _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("l1ContractsRelease()") });
         _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("systemConfigs(uint256)") });
         _addSpec({ _name: "OPContractsManagerInterop", _sel: _getSel("OUTPUT_VERSION()") });
-        _addSpec({ _name: "OPContractsManagerInterop", _sel: OPContractsManager.initialize.selector });
         _addSpec({ _name: "OPContractsManagerInterop", _sel: OPContractsManager.deploy.selector });
         _addSpec({ _name: "OPContractsManagerInterop", _sel: OPContractsManager.blueprints.selector });
         _addSpec({ _name: "OPContractsManagerInterop", _sel: OPContractsManager.chainIdToBatchInboxAddress.selector });
+        _addSpec({ _name: "OPContractsManagerInterop", _sel: OPContractsManager.implementations.selector });
 
         // DeputyGuardianModule
         _addSpec({
