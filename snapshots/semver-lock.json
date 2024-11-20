@@ -183,22 +183,6 @@
     "initCodeHash": "0xefc6ed9e325c2d614ea0d28c3eabfff1b345f7c6054e90253c6a091c29508267",
     "sourceCodeHash": "0xaa08a61448f485b277af57251d2089cc6a80ce0a763bf7184d48ffed5034ef69"
   },
-  "src/periphery/op-nft/AttestationStation.sol": {
-    "initCodeHash": "0x2e665d9ee554430980f64bcb6d2611a1cb03dbacfd58bb0d6f5d32951a267bde",
-    "sourceCodeHash": "0xe0bc805b22c7d04b5a9444cddd4c0e1bcb3006c69c03610494277ab2cc83f553"
-  },
-  "src/periphery/op-nft/Optimist.sol": {
-    "initCodeHash": "0x8fccdef5fb6e6d51215b39acc449faad8ba15416699c9b3af77866f4297805a3",
-    "sourceCodeHash": "0xfa9354827b642803e10415ed30ca789be1bd23d88fac14f7adaa65c6eb1c1643"
-  },
-  "src/periphery/op-nft/OptimistAllowlist.sol": {
-    "initCodeHash": "0x166dd3fc18cb238895f2faa7fdd635af48ce2c54e21ed2d6dae857c3731c4d6c",
-    "sourceCodeHash": "0x3a5f61046f729c9a70274b8b2a739382987ec5eb77705b259e8a3210a5f43462"
-  },
-  "src/periphery/op-nft/OptimistInviter.sol": {
-    "initCodeHash": "0x28dfa6676702a7abd19609cc773158d1f958210bc0a38c008d67a002dc1df862",
-    "sourceCodeHash": "0x3a0a294932d6deba043f6a2b46b4e8477ee96e7fb054d7e7229a43ce4352c68d"
-  },
   "src/safe/DeputyGuardianModule.sol": {
     "initCodeHash": "0xd95e562f395d4eb6e332f4474dffab660ada9e9da7c79f58fb6052278e0904df",
     "sourceCodeHash": "0x45daabe094de0287e244e6fea4f1887b9adc09b07c47dc77361b1678645a1470"
