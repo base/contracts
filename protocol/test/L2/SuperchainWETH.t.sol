@@ -28,10 +28,10 @@ contract SuperchainWETH_Test is CommonTest {
     event Withdrawal(address indexed src, uint256 wad);
 
     /// @notice Emitted when a crosschain transfer mints tokens.
-    event CrosschainMint(address indexed to, uint256 amount);
+    event CrosschainMint(address indexed to, uint256 amount, address indexed sender);
 
     /// @notice Emitted when a crosschain transfer burns tokens.
-    event CrosschainBurn(address indexed from, uint256 amount);
+    event CrosschainBurn(address indexed from, uint256 amount, address indexed sender);
 
     address internal constant ZERO_ADDRESS = address(0);
 
@@ -162,7 +162,7 @@ contract SuperchainWETH_Test is CommonTest {
 
         // Look for the emit of the `CrosschainMint` event
         vm.expectEmit(address(superchainWeth));
-        emit CrosschainMint(_to, _amount);
+        emit CrosschainMint(_to, _amount, Predeploys.SUPERCHAIN_TOKEN_BRIDGE);
 
         // Mock the `isCustomGasToken` function to return false
         _mockAndExpect(address(l1Block), abi.encodeCall(l1Block.isCustomGasToken, ()), abi.encode(false));
@@ -195,7 +195,7 @@ contract SuperchainWETH_Test is CommonTest {
 
         // Look for the emit of the `CrosschainMint` event
         vm.expectEmit(address(superchainWeth));
-        emit CrosschainMint(_to, _amount);
+        emit CrosschainMint(_to, _amount, Predeploys.SUPERCHAIN_TOKEN_BRIDGE);
 
         // Mock the `isCustomGasToken` function to return false
         _mockAndExpect(address(l1Block), abi.encodeCall(l1Block.isCustomGasToken, ()), abi.encode(true));
@@ -248,7 +248,7 @@ contract SuperchainWETH_Test is CommonTest {
 
         // Look for the emit of the `CrosschainBurn` event
         vm.expectEmit(address(superchainWeth));
-        emit CrosschainBurn(_from, _amount);
+        emit CrosschainBurn(_from, _amount, Predeploys.SUPERCHAIN_TOKEN_BRIDGE);
 
         // Mock the `isCustomGasToken` function to return false
         _mockAndExpect(address(l1Block), abi.encodeCall(l1Block.isCustomGasToken, ()), abi.encode(false));
@@ -290,7 +290,7 @@ contract SuperchainWETH_Test is CommonTest {
 
         // Look for the emit of the `CrosschainBurn` event
         vm.expectEmit(address(superchainWeth));
-        emit CrosschainBurn(_from, _amount);
+        emit CrosschainBurn(_from, _amount, Predeploys.SUPERCHAIN_TOKEN_BRIDGE);
 
         // Expect to not call the `burn` function in the `ETHLiquidity` contract
         vm.expectCall(Predeploys.ETH_LIQUIDITY, abi.encodeCall(IETHLiquidity.burn, ()), 0);

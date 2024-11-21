@@ -13,9 +13,9 @@ import { Unauthorized } from "src/libraries/errors/CommonErrors.sol";
 ///         the Superchain. Allows the SuperchainTokenBridge to mint and burn tokens as needed.
 abstract contract SuperchainERC20 is ERC20, IERC7802, ISemver {
     /// @notice Semantic version.
-    /// @custom:semver 1.0.0-beta.5
+    /// @custom:semver 1.0.0-beta.6
     function version() external view virtual returns (string memory) {
-        return "1.0.0-beta.5";
+        return "1.0.0-beta.6";
     }
 
     /// @notice Allows the SuperchainTokenBridge to mint tokens.
@@ -26,7 +26,7 @@ abstract contract SuperchainERC20 is ERC20, IERC7802, ISemver {
 
         _mint(_to, _amount);
 
-        emit CrosschainMint(_to, _amount);
+        emit CrosschainMint(_to, _amount, msg.sender);
     }
 
     /// @notice Allows the SuperchainTokenBridge to burn tokens.
@@ -37,7 +37,7 @@ abstract contract SuperchainERC20 is ERC20, IERC7802, ISemver {
 
         _burn(_from, _amount);
 
-        emit CrosschainBurn(_from, _amount);
+        emit CrosschainBurn(_from, _amount, msg.sender);
     }
 
     /// @inheritdoc IERC165
