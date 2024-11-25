@@ -181,28 +181,6 @@ contract Deploy is Deployer {
     }
 
     ////////////////////////////////////////////////////////////////
-    //            State Changing Helper Functions                 //
-    ////////////////////////////////////////////////////////////////
-
-    /// @notice Transfer ownership of the ProxyAdmin contract to the final system owner
-    function transferProxyAdminOwnership() public broadcast {
-        // Get the ProxyAdmin contract.
-        IProxyAdmin proxyAdmin = IProxyAdmin(mustGetAddress("ProxyAdmin"));
-
-        // Transfer ownership to the final system owner if necessary.
-        address owner = proxyAdmin.owner();
-        address finalSystemOwner = cfg.finalSystemOwner();
-        if (owner != finalSystemOwner) {
-            proxyAdmin.transferOwnership(finalSystemOwner);
-            console.log("ProxyAdmin ownership transferred to final system owner at: %s", finalSystemOwner);
-        }
-
-        // Make sure the ProxyAdmin owner is set to the final system owner.
-        owner = proxyAdmin.owner();
-        require(owner == finalSystemOwner, "Deploy: ProxyAdmin ownership not transferred to final system owner");
-    }
-
-    ////////////////////////////////////////////////////////////////
     //                    SetUp and Run                           //
     ////////////////////////////////////////////////////////////////
 
@@ -304,7 +282,7 @@ contract Deploy is Deployer {
             bytes32 typeHash = keccak256(bytes(cfg.daCommitmentType()));
             bytes32 keccakHash = keccak256(bytes("KeccakCommitment"));
             if (typeHash == keccakHash) {
-                setupOpAltDA();
+                deployOpAltDA();
             }
         }
 
@@ -488,7 +466,7 @@ contract Deploy is Deployer {
     }
 
     /// @notice Add AltDA setup to the OP chain
-    function setupOpAltDA() public {
+    function deployOpAltDA() public {
         console.log("Deploying OP AltDA");
         deployDataAvailabilityChallengeProxy();
         deployDataAvailabilityChallenge();
@@ -729,6 +707,61 @@ contract Deploy is Deployer {
         ChainAssertions.checkOptimismPortal({ _contracts: _proxies(), _cfg: cfg, _isProxy: true });
     }
 
+    /// @notice Initialize the DataAvailabilityChallenge
+    function initializeDataAvailabilityChallenge() public broadcast {
+        console.log("Upgrading and initializing DataAvailabilityChallenge proxy");
+        address dataAvailabilityChallengeProxy = mustGetAddress("DataAvailabilityChallengeProxy");
+        address dataAvailabilityChallenge = mustGetAddress("DataAvailabilityChallenge");
+
+        address finalSystemOwner = cfg.finalSystemOwner();
+        uint256 daChallengeWindow = cfg.daChallengeWindow();
+        uint256 daResolveWindow = cfg.daResolveWindow();
+        uint256 daBondSize = cfg.daBondSize();
+        uint256 daResolverRefundPercentage = cfg.daResolverRefundPercentage();
+
+        IProxyAdmin proxyAdmin = IProxyAdmin(payable(mustGetAddress("ProxyAdmin")));
+        proxyAdmin.upgradeAndCall({
+            _proxy: payable(dataAvailabilityChallengeProxy),
+            _implementation: dataAvailabilityChallenge,
+            _data: abi.encodeCall(
+                IDataAvailabilityChallenge.initialize,
+                (finalSystemOwner, daChallengeWindow, daResolveWindow, daBondSize, daResolverRefundPercentage)
+            )
+        });
+
+        IDataAvailabilityChallenge dac = IDataAvailabilityChallenge(payable(dataAvailabilityChallengeProxy));
+        string memory version = dac.version();
+        console.log("DataAvailabilityChallenge version: %s", version);
+
+        require(dac.owner() == finalSystemOwner);
+        require(dac.challengeWindow() == daChallengeWindow);
+        require(dac.resolveWindow() == daResolveWindow);
+        require(dac.bondSize() == daBondSize);
+        require(dac.resolverRefundPercentage() == daResolverRefundPercentage);
+    }
+
+    ////////////////////////////////////////////////////////////////
+    //         Ownership Transfer Helper Functions                //
+    ////////////////////////////////////////////////////////////////
+
+    /// @notice Transfer ownership of the ProxyAdmin contract to the final system owner
+    function transferProxyAdminOwnership() public broadcast {
+        // Get the ProxyAdmin contract.
+        IProxyAdmin proxyAdmin = IProxyAdmin(mustGetAddress("ProxyAdmin"));
+
+        // Transfer ownership to the final system owner if necessary.
+        address owner = proxyAdmin.owner();
+        address finalSystemOwner = cfg.finalSystemOwner();
+        if (owner != finalSystemOwner) {
+            proxyAdmin.transferOwnership(finalSystemOwner);
+            console.log("ProxyAdmin ownership transferred to final system owner at: %s", finalSystemOwner);
+        }
+
+        // Make sure the ProxyAdmin owner is set to the final system owner.
+        owner = proxyAdmin.owner();
+        require(owner == finalSystemOwner, "Deploy: ProxyAdmin ownership not transferred to final system owner");
+    }
+
     /// @notice Transfer ownership of the DisputeGameFactory contract to the final system owner
     function transferDisputeGameFactoryOwnership() public broadcast {
         console.log("Transferring DisputeGameFactory ownership to Safe");
@@ -784,6 +817,10 @@ contract Deploy is Deployer {
             _expectedOwner: finalSystemOwner
         });
     }
+
+    ///////////////////////////////////////////////////////////
+    //         Proofs setup helper functions                 //
+    ///////////////////////////////////////////////////////////
 
     /// @notice Load the appropriate mips absolute prestate for devenets depending on config environment.
     function loadMipsAbsolutePrestate() internal returns (Claim mipsAbsolutePrestate_) {
@@ -982,39 +1019,6 @@ contract Deploy is Deployer {
             gameTypeString,
             vm.toString(rawGameType)
         );
-    }
-
-    /// @notice Initialize the DataAvailabilityChallenge
-    function initializeDataAvailabilityChallenge() public broadcast {
-        console.log("Upgrading and initializing DataAvailabilityChallenge proxy");
-        address dataAvailabilityChallengeProxy = mustGetAddress("DataAvailabilityChallengeProxy");
-        address dataAvailabilityChallenge = mustGetAddress("DataAvailabilityChallenge");
-
-        address finalSystemOwner = cfg.finalSystemOwner();
-        uint256 daChallengeWindow = cfg.daChallengeWindow();
-        uint256 daResolveWindow = cfg.daResolveWindow();
-        uint256 daBondSize = cfg.daBondSize();
-        uint256 daResolverRefundPercentage = cfg.daResolverRefundPercentage();
-
-        IProxyAdmin proxyAdmin = IProxyAdmin(payable(mustGetAddress("ProxyAdmin")));
-        proxyAdmin.upgradeAndCall({
-            _proxy: payable(dataAvailabilityChallengeProxy),
-            _implementation: dataAvailabilityChallenge,
-            _data: abi.encodeCall(
-                IDataAvailabilityChallenge.initialize,
-                (finalSystemOwner, daChallengeWindow, daResolveWindow, daBondSize, daResolverRefundPercentage)
-            )
-        });
-
-        IDataAvailabilityChallenge dac = IDataAvailabilityChallenge(payable(dataAvailabilityChallengeProxy));
-        string memory version = dac.version();
-        console.log("DataAvailabilityChallenge version: %s", version);
-
-        require(dac.owner() == finalSystemOwner);
-        require(dac.challengeWindow() == daChallengeWindow);
-        require(dac.resolveWindow() == daResolveWindow);
-        require(dac.bondSize() == daBondSize);
-        require(dac.resolverRefundPercentage() == daResolverRefundPercentage);
     }
 
     /// @notice Get the DeployInput struct to use for testing
