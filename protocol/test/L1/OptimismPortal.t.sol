@@ -532,6 +532,8 @@ contract OptimismPortal_Test is CommonTest {
 
     /// @dev Tests that `depositERC20Transaction` reverts when the gas paying token is ether.
     function test_depositERC20Transaction_noCustomGasToken_reverts() external {
+        // TODO(opcm upgrades): remove skip once upgrade path is implemented
+        skipIfForkTest("OptimismPortal_Test: gas paying token functionality DNE on op mainnet");
         // Check that the gas paying token is set to ether
         (address token,) = systemConfig.gasPayingToken();
         assertEq(token, Constants.ETHER);
@@ -541,6 +543,8 @@ contract OptimismPortal_Test is CommonTest {
     }
 
     function test_depositERC20Transaction_balanceOverflow_reverts() external {
+        // TODO(opcm upgrades): remove skip once upgrade path is implemented
+        skipIfForkTest("OptimismPortal_Test: custom gas token DNE on op mainnet");
         vm.mockCall(address(systemConfig), abi.encodeCall(systemConfig.gasPayingToken, ()), abi.encode(address(42), 18));
 
         // The balance slot
@@ -1338,7 +1342,9 @@ contract OptimismPortal_FinalizeWithdrawal_Test is CommonTest {
 
 contract OptimismPortalUpgradeable_Test is CommonTest {
     /// @dev Tests that the proxy is initialized correctly.
-    function test_params_initValuesOnProxy_succeeds() external view {
+    function test_params_initValuesOnProxy_succeeds() external {
+        // TODO(opcm upgrades): remove skip once upgrade path is implemented
+        skipIfForkTest("OptimismPortal_Test: resource config varies on mainnet");
         (uint128 prevBaseFee, uint64 prevBoughtGas, uint64 prevBlockNum) = optimismPortal.params();
         IResourceMetering.ResourceConfig memory rcfg = systemConfig.resourceConfig();
 
@@ -1759,6 +1765,8 @@ contract OptimismPortalWithMockERC20_Test is OptimismPortal_FinalizeWithdrawal_T
     )
         external
     {
+        // TODO(opcm upgrades): remove skip once upgrade path is implemented
+        skipIfForkTest("OptimismPortal_Test: gas paying token functionality DNE on op mainnet");
         // Ensure that msg.sender == tx.origin
         vm.startPrank(address(this), address(this));
 
@@ -1782,6 +1790,8 @@ contract OptimismPortalWithMockERC20_Test is OptimismPortal_FinalizeWithdrawal_T
     )
         external
     {
+        // TODO(opcm upgrades): remove skip once upgrade path is implemented
+        skipIfForkTest("OptimismPortal_Test: gas paying token functionality DNE on op mainnet");
         // Ensure that msg.sender != tx.origin
         vm.startPrank(address(this), address(1));
 
@@ -1797,6 +1807,8 @@ contract OptimismPortalWithMockERC20_Test is OptimismPortal_FinalizeWithdrawal_T
 
     /// @dev Tests that `depositTransaction` fails when a custom gas token is used and msg.value is non-zero.
     function test_depositTransaction_customGasTokenWithValue_reverts() external {
+        // TODO(opcm upgrades): remove skip once upgrade path is implemented
+        skipIfForkTest("OptimismPortal_Test: gas paying token functionality DNE on op mainnet");
         // Mock the gas paying token to be the ERC20 token
         vm.mockCall(
             address(systemConfig), abi.encodeCall(systemConfig.gasPayingToken, ()), abi.encode(address(token), 18)

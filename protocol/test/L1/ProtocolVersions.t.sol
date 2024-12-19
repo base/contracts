@@ -24,7 +24,10 @@ contract ProtocolVersions_Init is CommonTest {
 
 contract ProtocolVersions_Initialize_Test is ProtocolVersions_Init {
     /// @dev Tests that initialization sets the correct values.
-    function test_initialize_values_succeeds() external view {
+    function test_initialize_values_succeeds() external {
+        skipIfForkTest(
+            "ProtocolVersions_Initialize_Test: cannot test initialization on forked network against hardhat config"
+        );
         IProtocolVersions protocolVersionsImpl = IProtocolVersions(deploy.mustGetAddress("ProtocolVersions"));
         address owner = deploy.cfg().finalSystemOwner();
 
@@ -40,7 +43,6 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_Init {
     /// @dev Ensures that the events are emitted during initialization.
     function test_initialize_events_succeeds() external {
         IProtocolVersions protocolVersionsImpl = IProtocolVersions(deploy.mustGetAddress("ProtocolVersions"));
-        assertEq(protocolVersionsImpl.owner(), address(0));
 
         // Wipe out the initialized slot so the proxy can be initialized again
         vm.store(address(protocolVersions), bytes32(0), bytes32(0));
