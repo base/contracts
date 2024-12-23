@@ -131,34 +131,43 @@ contract Setup {
     ///      This is a hack as we are pushing solidity to the edge.
     function setUp() public virtual {
         console.log("Setup: L1 setup start!");
-        if (vm.envOr("FORK_TEST", false)) {
-            string memory forkUrl = vm.envString("FORK_RPC_URL");
-            _isForkTest = true;
-            vm.createSelectFork(forkUrl, vm.envUint("FORK_BLOCK_NUMBER"));
+
+        // Optimistically etch, label and allow cheatcodes for the Deploy.s.sol contract
+        vm.etch(address(deploy), vm.getDeployedCode("Deploy.s.sol:Deploy"));
+        vm.label(address(deploy), "Deploy");
+        vm.allowCheatcodes(address(deploy));
+
+        _isForkTest = vm.envOr("FORK_TEST", false);
+        if (_isForkTest) {
+            vm.createSelectFork(vm.envString("FORK_RPC_URL"), vm.envUint("FORK_BLOCK_NUMBER"));
             require(
                 block.chainid == Chains.Sepolia || block.chainid == Chains.Mainnet,
                 "Setup: ETH_RPC_URL must be set to a production (Sepolia or Mainnet) RPC URL"
             );
 
+            // Overwrite the Deploy.s.sol contract with the ForkLive.s.sol contract
             vm.etch(address(deploy), vm.getDeployedCode("ForkLive.s.sol:ForkLive"));
-        } else {
-            vm.etch(address(deploy), vm.getDeployedCode("Deploy.s.sol:Deploy"));
+            vm.label(address(deploy), "ForkLive");
         }
 
-        vm.allowCheatcodes(address(deploy));
+        // deploy.setUp() will either:
+        // 1. deploy a fresh system or
+        // 2. fork from L1
+        // It will then save the appropriate name/address pairs to disk using Artifacts.save()
         deploy.setUp();
-
         console.log("Setup: L1 setup done!");
 
+        // Return early if this is a fork test
         if (_isForkTest) {
-            console.log("Setup: fork test detected, skipping L2 setup");
-        } else {
-            console.log("Setup: L2 setup start!");
-            vm.etch(address(l2Genesis), vm.getDeployedCode("L2Genesis.s.sol:L2Genesis"));
-            vm.allowCheatcodes(address(l2Genesis));
-            l2Genesis.setUp();
-            console.log("Setup: L2 setup done!");
+            console.log("Setup: fork test detected, skipping L2 genesis generation");
+            return;
         }
+
+        console.log("Setup: L2 setup start!");
+        vm.etch(address(l2Genesis), vm.getDeployedCode("L2Genesis.s.sol:L2Genesis"));
+        vm.allowCheatcodes(address(l2Genesis));
+        l2Genesis.setUp();
+        console.log("Setup: L2 setup done!");
     }
 
     /// @dev Skips tests when running against a forked production network.
