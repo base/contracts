@@ -197,7 +197,7 @@ contract CommonTest is Test, Setup, Events {
         if (!(alice == address(0) && bob == address(0))) {
             revert("CommonTest: Cannot enable custom gas token after deployment. Consider overriding `setUp`.");
         }
-        require(_token != Constants.ETHER);
+        require(_token != Constants.ETHER, "CommonTest: Cannot set gas token to ETHER");
 
         customGasToken = _token;
     }

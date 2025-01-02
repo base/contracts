@@ -450,7 +450,7 @@ contract Deploy is Deployer {
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxy.__constructor__, (_proxyOwner)))
             })
         );
-        require(EIP1967Helper.getAdmin(address(proxy)) == _proxyOwner);
+        require(EIP1967Helper.getAdmin(address(proxy)) == _proxyOwner, "Deploy: EIP1967Proxy admin not set");
         addr_ = address(proxy);
     }
 
@@ -466,7 +466,9 @@ contract Deploy is Deployer {
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxy.__constructor__, (proxyAdmin)))
             })
         );
-        require(EIP1967Helper.getAdmin(address(proxy)) == proxyAdmin);
+        require(
+            EIP1967Helper.getAdmin(address(proxy)) == proxyAdmin, "Deploy: DataAvailabilityChallengeProxy admin not set"
+        );
         addr_ = address(proxy);
     }
 
@@ -565,11 +567,16 @@ contract Deploy is Deployer {
         string memory version = dac.version();
         console.log("DataAvailabilityChallenge version: %s", version);
 
-        require(dac.owner() == finalSystemOwner);
-        require(dac.challengeWindow() == daChallengeWindow);
-        require(dac.resolveWindow() == daResolveWindow);
-        require(dac.bondSize() == daBondSize);
-        require(dac.resolverRefundPercentage() == daResolverRefundPercentage);
+        require(dac.owner() == finalSystemOwner, "Deploy: DataAvailabilityChallenge owner not set");
+        require(
+            dac.challengeWindow() == daChallengeWindow, "Deploy: DataAvailabilityChallenge challenge window not set"
+        );
+        require(dac.resolveWindow() == daResolveWindow, "Deploy: DataAvailabilityChallenge resolve window not set");
+        require(dac.bondSize() == daBondSize, "Deploy: DataAvailabilityChallenge bond size not set");
+        require(
+            dac.resolverRefundPercentage() == daResolverRefundPercentage,
+            "Deploy: DataAvailabilityChallenge resolver refund percentage not set"
+        );
     }
 
     ////////////////////////////////////////////////////////////////
