@@ -698,8 +698,26 @@ contract L1CrossDomainMessenger_Test is CommonTest {
         assertEq(l1CrossDomainMessenger.paused(), superchainConfig.paused());
     }
 
+    /// @dev Temporary test that checks that correct calls to sendMessage when using a custom gas token revert with the
+    /// expected error.
+    /// @dev Should be removed when/if Custom Gas Token functionality is allowed again.
+    function test_sendMessage_customGasToken_reverts() external {
+        skipIfForkTest("Custom gas token is still supported on forked tests");
+
+        // Mock the gasPayingToken function to return a custom gas token
+        vm.mockCall(
+            address(systemConfig), abi.encodeCall(systemConfig.gasPayingToken, ()), abi.encode(address(1), uint8(18))
+        );
+
+        vm.prank(alice);
+        vm.expectRevert(IOptimismPortal2.CustomGasTokenNotSupported.selector);
+        l1CrossDomainMessenger.sendMessage(recipient, hex"ff", uint32(100));
+    }
+
     /// @dev Tests that sendMessage succeeds with a custom gas token when the call value is zero.
     function test_sendMessage_customGasTokenButNoValue_succeeds() external {
+        vm.skip(true, "Custom gas token not supported");
+
         // Mock the gasPayingToken function to return a custom gas token
         vm.mockCall(
             address(systemConfig), abi.encodeCall(systemConfig.gasPayingToken, ()), abi.encode(address(1), uint8(18))
