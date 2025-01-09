@@ -6,7 +6,7 @@ import { stdJson } from "forge-std/StdJson.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Config } from "scripts/libraries/Config.sol";
-import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
+import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
 import { Process } from "scripts/libraries/Process.sol";
 
 /// @notice Represents a deployment. Is serialized to JSON as a key/value
@@ -196,34 +196,5 @@ contract Artifacts {
     /// @notice Adds a deployment to the temp deployments file
     function _appendDeployment(string memory _name, address _deployed) internal {
         vm.writeJson({ json: stdJson.serialize("", _name, _deployed), path: deploymentOutfile });
-    }
-
-    /// @notice Stubs a deployment retrieved through `get`.
-    /// @param _name The name of the deployment.
-    /// @param _addr The mock address of the deployment.
-    function prankDeployment(string memory _name, address _addr) public {
-        if (bytes(_name).length == 0) {
-            revert InvalidDeployment("EmptyName");
-        }
-
-        Deployment memory deployment = Deployment({ name: _name, addr: payable(_addr) });
-        _namedDeployments[_name] = deployment;
-    }
-
-    /// @notice Returns the value of the internal `_initialized` storage slot for a given contract.
-    /// @param _sourceName The name of the contract in the source code
-    /// @param _deploymentName The name used to save() the deployed contract
-    function loadInitializedSlot(
-        string memory _sourceName,
-        string memory _deploymentName
-    )
-        public
-        returns (uint8 initialized_)
-    {
-        address contractAddress = mustGetAddress(_deploymentName);
-
-        StorageSlot memory slot = ForgeArtifacts.getInitializedSlot(_sourceName);
-        bytes32 slotVal = vm.load(contractAddress, bytes32(slot.slot));
-        initialized_ = uint8((uint256(slotVal) >> (slot.offset * 8)) & 0xFF);
     }
 }
