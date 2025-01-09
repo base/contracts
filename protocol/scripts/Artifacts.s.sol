@@ -6,8 +6,7 @@ import { stdJson } from "forge-std/StdJson.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Config } from "scripts/libraries/Config.sol";
-import { StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
-import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
+import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
 import { Process } from "scripts/libraries/Process.sol";
 
 /// @notice Represents a deployment. Is serialized to JSON as a key/value
@@ -21,7 +20,7 @@ struct Deployment {
 /// @notice Useful for accessing deployment artifacts from within scripts.
 ///         When a contract is deployed, call the `save` function to write its name and
 ///         contract address to disk. Inspired by `forge-deploy`.
-abstract contract Artifacts {
+contract Artifacts {
     /// @notice Foundry cheatcode VM.
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
