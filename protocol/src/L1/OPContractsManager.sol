@@ -138,8 +138,8 @@ contract OPContractsManager is ISemver {
 
     // -------- Constants and Variables --------
 
-    /// @custom:semver 1.0.0-beta.28
-    string public constant version = "1.0.0-beta.28";
+    /// @custom:semver 1.0.0-beta.29
+    string public constant version = "1.0.0-beta.29";
 
     /// @notice Represents the interface version so consumers know how to decode the DeployOutput struct
     /// that's emitted in the `Deployed` event. Whenever that struct changes, a new version should be used.
@@ -750,8 +750,7 @@ contract OPContractsManager is ISemver {
             l1StandardBridge: address(_output.l1StandardBridgeProxy),
             disputeGameFactory: address(_output.disputeGameFactoryProxy),
             optimismPortal: address(_output.optimismPortalProxy),
-            optimismMintableERC20Factory: address(_output.optimismMintableERC20FactoryProxy),
-            gasPayingToken: Constants.ETHER
+            optimismMintableERC20Factory: address(_output.optimismMintableERC20FactoryProxy)
         });
 
         assertValidContractAddress(opChainAddrs_.l1CrossDomainMessenger);
