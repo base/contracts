@@ -100,6 +100,8 @@ contract OPContractsManager is ISemver {
 
     /// @notice The latest implementation contracts for the OP Stack.
     struct Implementations {
+        address superchainConfigImpl;
+        address protocolVersionsImpl;
         address l1ERC721BridgeImpl;
         address optimismPortalImpl;
         address systemConfigImpl;
@@ -141,9 +143,9 @@ contract OPContractsManager is ISemver {
 
     // -------- Constants and Variables --------
 
-    /// @custom:semver 1.0.0-beta.35
+    /// @custom:semver 1.0.0-beta.36
     function version() public pure virtual returns (string memory) {
-        return "1.0.0-beta.35";
+        return "1.0.0-beta.36";
     }
 
     /// @notice Address of the SuperchainConfig contract shared by all chains.
@@ -226,6 +228,9 @@ contract OPContractsManager is ISemver {
 
     /// @notice Thrown when the SuperchainConfig of the chain does not match the SuperchainConfig of this OPCM.
     error SuperchainConfigMismatch(ISystemConfig systemConfig);
+
+    /// @notice Thrown when the SuperchainProxyAdmin does not match the SuperchainConfig's admin.
+    error SuperchainProxyAdminMismatch();
 
     // -------- Methods --------
 
@@ -427,9 +432,10 @@ contract OPContractsManager is ISemver {
     }
 
     /// @notice Upgrades a set of chains to the latest implementation contracts
+    /// @param _superchainProxyAdmin The proxy admin that owns all of the proxies
     /// @param _opChains Array of OpChain structs, one per chain to upgrade
     /// @dev This function is intended to be called via DELEGATECALL from the Upgrade Controller Safe
-    function upgrade(OpChain[] memory _opChains) external {
+    function upgrade(IProxyAdmin _superchainProxyAdmin, OpChain[] memory _opChains) external {
         if (address(this) == address(thisOPCM)) revert OnlyDelegatecall();
 
         // If this is delegatecalled by the upgrade controller, set isRC to false first, else, continue execution.
@@ -441,7 +447,12 @@ contract OPContractsManager is ISemver {
 
         Implementations memory impls = thisOPCM.implementations();
         Blueprints memory bps = thisOPCM.blueprints();
-        // TODO: upgrading the SuperchainConfig and ProtocolVersions (in a new function)
+
+        if (address(_superchainProxyAdmin) != address(0)) {
+            // Attempt to upgrade. If the ProxyAdmin is not the SuperchainConfig's admin, this will revert.
+            upgradeTo(_superchainProxyAdmin, address(superchainConfig), impls.superchainConfigImpl);
+            upgradeTo(_superchainProxyAdmin, address(protocolVersions), impls.protocolVersionsImpl);
+        }
 
         for (uint256 i = 0; i < _opChains.length; i++) {
             // After Upgrade 13, we will be able to use systemConfigProxy.getAddresses() here.
@@ -509,7 +520,8 @@ contract OPContractsManager is ISemver {
                 // 3. getting the anchor root for the respected game type from the Anchor State Registry.
                 {
                     GameType gameType = IOptimismPortal2(payable(opChainAddrs.optimismPortal)).respectedGameType();
-                    (Hash root, uint256 l2BlockNumber) = permissionedDisputeGame.anchorStateRegistry().anchors(gameType);
+                    (Hash root, uint256 l2BlockNumber) =
+                        getAnchorStateRegistry(IFaultDisputeGame(address(permissionedDisputeGame))).anchors(gameType);
                     OutputRoot memory startingAnchorRoot = OutputRoot({ root: root, l2BlockNumber: l2BlockNumber });
 
                     upgradeToAndCall(
@@ -633,7 +645,7 @@ contract OPContractsManager is ISemver {
                                 gameConfig.disputeMaxClockDuration,
                                 gameConfig.vm,
                                 outputs[i].delayedWETH,
-                                pdg.anchorStateRegistry(),
+                                getAnchorStateRegistry(IFaultDisputeGame(address(pdg))),
                                 l2ChainId
                             ),
                             pdg.proposer(),
@@ -657,7 +669,7 @@ contract OPContractsManager is ISemver {
                                 gameConfig.disputeMaxClockDuration,
                                 gameConfig.vm,
                                 outputs[i].delayedWETH,
-                                fdg.anchorStateRegistry(),
+                                getAnchorStateRegistry(fdg),
                                 l2ChainId
                             )
                         )
@@ -965,6 +977,7 @@ contract OPContractsManager is ISemver {
         isRC = _isRC;
     }
 
+    /// @notice Retrieves the constructor params for a given game.
     function getGameConstructorParams(IFaultDisputeGame _disputeGame)
         internal
         view
@@ -983,6 +996,11 @@ contract OPContractsManager is ISemver {
             l2ChainId: _disputeGame.l2ChainId()
         });
         return params;
+    }
+
+    /// @notice Retrieves the Anchor State Registry for a given game
+    function getAnchorStateRegistry(IFaultDisputeGame _disputeGame) internal view returns (IAnchorStateRegistry) {
+        return _disputeGame.anchorStateRegistry();
     }
 
     /// @notice For a given game type, does the following:
