@@ -26,6 +26,8 @@ contract DeployOPCMInput is BaseDeployIO {
     address internal _permissionedDisputeGame1Blueprint;
     address internal _permissionedDisputeGame2Blueprint;
 
+    address internal _superchainConfigImpl;
+    address internal _protocolVersionsImpl;
     address internal _l1ERC721BridgeImpl;
     address internal _optimismPortalImpl;
     address internal _systemConfigImpl;
@@ -43,6 +45,8 @@ contract DeployOPCMInput is BaseDeployIO {
 
         if (_sel == this.superchainConfig.selector) _superchainConfig = ISuperchainConfig(_addr);
         else if (_sel == this.protocolVersions.selector) _protocolVersions = IProtocolVersions(_addr);
+        else if (_sel == this.superchainConfigImpl.selector) _superchainConfigImpl = _addr;
+        else if (_sel == this.protocolVersionsImpl.selector) _protocolVersionsImpl = _addr;
         else if (_sel == this.upgradeController.selector) _upgradeController = _addr;
         else if (_sel == this.addressManagerBlueprint.selector) _addressManagerBlueprint = _addr;
         else if (_sel == this.proxyBlueprint.selector) _proxyBlueprint = _addr;
@@ -167,6 +171,16 @@ contract DeployOPCMInput is BaseDeployIO {
         return _anchorStateRegistryImpl;
     }
 
+    function superchainConfigImpl() public view returns (address) {
+        require(_superchainConfigImpl != address(0), "DeployOPCMInput: not set");
+        return _superchainConfigImpl;
+    }
+
+    function protocolVersionsImpl() public view returns (address) {
+        require(_protocolVersionsImpl != address(0), "DeployOPCMInput: not set");
+        return _protocolVersionsImpl;
+    }
+
     function delayedWETHImpl() public view returns (address) {
         require(_delayedWETHImpl != address(0), "DeployOPCMInput: not set");
         return _delayedWETHImpl;
@@ -209,6 +223,8 @@ contract DeployOPCM is Script {
             permissionlessDisputeGame2: address(0)
         });
         IOPContractsManager.Implementations memory implementations = IOPContractsManager.Implementations({
+            superchainConfigImpl: address(_doi.superchainConfigImpl()),
+            protocolVersionsImpl: address(_doi.protocolVersionsImpl()),
             l1ERC721BridgeImpl: address(_doi.l1ERC721BridgeImpl()),
             optimismPortalImpl: address(_doi.optimismPortalImpl()),
             systemConfigImpl: address(_doi.systemConfigImpl()),
