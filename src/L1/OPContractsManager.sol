@@ -144,9 +144,9 @@ contract OPContractsManager is ISemver {
 
     // -------- Constants and Variables --------
 
-    /// @custom:semver 1.2.1
+    /// @custom:semver 1.2.2
     function version() public pure virtual returns (string memory) {
-        return "1.2.1";
+        return "1.2.2";
     }
 
     /// @notice Address of the SuperchainConfig contract shared by all chains.
@@ -529,7 +529,8 @@ contract OPContractsManager is ISemver {
                         _l2ChainId: l2ChainId,
                         _proxyAdmin: _opChainConfigs[i].proxyAdmin,
                         _saltMixer: string.concat(
-                            "v2.0.0-", string(bytes.concat(bytes20(address(_opChainConfigs[i].systemConfigProxy))))
+                            "v2.0.0-",
+                            string(bytes.concat(bytes32(uint256(uint160(address(_opChainConfigs[i].systemConfigProxy))))))
                         ),
                         _contractName: "AnchorStateRegistry"
                     })
