@@ -28,6 +28,7 @@ import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.s
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
+import { IHasSuperchainConfig } from "interfaces/L1/IHasSuperchainConfig.sol";
 
 contract OPContractsManager is ISemver {
     // -------- Structs --------
@@ -144,9 +145,9 @@ contract OPContractsManager is ISemver {
 
     // -------- Constants and Variables --------
 
-    /// @custom:semver 1.3.0
+    /// @custom:semver 1.4.0
     function version() public pure virtual returns (string memory) {
-        return "1.3.0";
+        return "1.4.0";
     }
 
     /// @notice Address of the SuperchainConfig contract shared by all chains.
@@ -449,6 +450,12 @@ contract OPContractsManager is ISemver {
         return output;
     }
 
+    /// @notice Verifies that all OpChainConfig inputs are valid and reverts if any are invalid.
+    function assertValidOpChainConfig(OpChainConfig memory _config) internal view {
+        assertValidContractAddress(address(_config.systemConfigProxy));
+        assertValidContractAddress(address(_config.proxyAdmin));
+    }
+
     /// @notice Upgrades a set of chains to the latest implementation contracts
     /// @param _opChainConfigs Array of OpChain structs, one per chain to upgrade
     /// @dev This function is intended to be called via DELEGATECALL from the Upgrade Controller Safe
@@ -477,6 +484,8 @@ contract OPContractsManager is ISemver {
         }
 
         for (uint256 i = 0; i < _opChainConfigs.length; i++) {
+            assertValidOpChainConfig(_opChainConfigs[i]);
+
             // After Upgrade 13, we will be able to use systemConfigProxy.getAddresses() here.
             ISystemConfig.Addresses memory opChainAddrs = ISystemConfig.Addresses({
                 l1CrossDomainMessenger: _opChainConfigs[i].systemConfigProxy.l1CrossDomainMessenger(),
@@ -487,7 +496,13 @@ contract OPContractsManager is ISemver {
                 optimismMintableERC20Factory: _opChainConfigs[i].systemConfigProxy.optimismMintableERC20Factory()
             });
 
-            if (IOptimismPortal2(payable(opChainAddrs.optimismPortal)).superchainConfig() != superchainConfig) {
+            // Check that all contracts have the correct superchainConfig
+            if (
+                getSuperchainConfig(opChainAddrs.optimismPortal) != superchainConfig
+                    || getSuperchainConfig(opChainAddrs.l1CrossDomainMessenger) != superchainConfig
+                    || getSuperchainConfig(opChainAddrs.l1ERC721Bridge) != superchainConfig
+                    || getSuperchainConfig(opChainAddrs.l1StandardBridge) != superchainConfig
+            ) {
                 revert SuperchainConfigMismatch(_opChainConfigs[i].systemConfigProxy);
             }
 
@@ -756,6 +771,7 @@ contract OPContractsManager is ISemver {
         if (_input.roles.challenger == address(0)) revert InvalidRoleAddress("challenger");
 
         if (_input.startingAnchorRoot.length == 0) revert InvalidStartingAnchorRoot();
+        if (bytes32(_input.startingAnchorRoot) == bytes32(0)) revert InvalidStartingAnchorRoot();
     }
 
     /// @notice Maps an L2 chain ID to an L1 batch inbox address as defined by the standard
@@ -1056,6 +1072,11 @@ contract OPContractsManager is ISemver {
             l2ChainId: getL2ChainId(_disputeGame)
         });
         return params;
+    }
+
+    /// @notice Retrieves the Superchain Config for a bridge contract
+    function getSuperchainConfig(address _hasSuperchainConfig) internal view returns (ISuperchainConfig) {
+        return IHasSuperchainConfig(_hasSuperchainConfig).superchainConfig();
     }
 
     /// @notice Retrieves the Anchor State Registry for a given game
