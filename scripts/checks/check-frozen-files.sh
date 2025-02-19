@@ -54,8 +54,8 @@ ALLOWED_FILES=(
   # "src/L1/L1StandardBridge.sol"
   # "src/L1/OPContractsManager.sol"
   # "src/L1/OPContractsManagerInterop.sol"
-  "src/L1/OptimismPortal2.sol"
-  "src/L1/OptimismPortalInterop.sol"
+  # "src/L1/OptimismPortal2.sol"
+  # "src/L1/OptimismPortalInterop.sol"
   # "src/L1/ProtocolVersions.sol"
   # "src/L1/SuperchainConfig.sol"
   # "src/L1/SystemConfig.sol"
@@ -87,14 +87,11 @@ ALLOWED_FILES=(
   # "src/cannon/MIPS2.sol"
   # "src/cannon/MIPS64.sol"
   "src/cannon/PreimageOracle.sol"
-  # TODO(#14146): Remove when fixes are finished
-  "src/dispute/AnchorStateRegistry.sol"
+  # "src/dispute/AnchorStateRegistry.sol"
   # "src/dispute/DelayedWETH.sol"
   # "src/dispute/DisputeGameFactory.sol"
-  # TODO(#14146): Remove when fixes are finished
-  "src/dispute/FaultDisputeGame.sol"
-  # TODO(#14146): Remove when fixes are finished
-  "src/dispute/PermissionedDisputeGame.sol"
+  # "src/dispute/FaultDisputeGame.sol"
+  # "src/dispute/PermissionedDisputeGame.sol"
   "src/dispute/SuperFaultDisputeGame.sol"
   "src/dispute/SuperPermissionedDisputeGame.sol"
   "src/legacy/DeployerWhitelist.sol"
