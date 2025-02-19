@@ -95,6 +95,8 @@ ALLOWED_FILES=(
   "src/dispute/FaultDisputeGame.sol"
   # TODO(#14146): Remove when fixes are finished
   "src/dispute/PermissionedDisputeGame.sol"
+  "src/dispute/SuperFaultDisputeGame.sol"
+  "src/dispute/SuperPermissionedDisputeGame.sol"
   "src/legacy/DeployerWhitelist.sol"
   "src/legacy/L1BlockNumber.sol"
   "src/legacy/LegacyMessagePasser.sol"
