@@ -180,10 +180,10 @@ func (_FeeDisburser *FeeDisburserTransactorRaw) Transact(opts *bind.TransactOpts
 	return _FeeDisburser.Contract.contract.Transact(opts, method, params...)
 }
 
-// BASISPOINTSCALE is a free data retrieval call binding the contract method 0x5b201d83.
+// BASIS_POINT_SCALE is a free data retrieval call binding the contract method 0x5b201d83.
 //
 // Solidity: function BASIS_POINT_SCALE() view returns(uint32)
-func (_FeeDisburser *FeeDisburserCaller) BASISPOINTSCALE(opts *bind.CallOpts) (uint32, error) {
+func (_FeeDisburser *FeeDisburserCaller) BASIS_POINT_SCALE(opts *bind.CallOpts) (uint32, error) {
 	var out []interface{}
 	err := _FeeDisburser.contract.Call(opts, &out, "BASIS_POINT_SCALE")
 
@@ -197,18 +197,18 @@ func (_FeeDisburser *FeeDisburserCaller) BASISPOINTSCALE(opts *bind.CallOpts) (u
 
 }
 
-// BASISPOINTSCALE is a free data retrieval call binding the contract method 0x5b201d83.
+// BASIS_POINT_SCALE is a free data retrieval call binding the contract method 0x5b201d83.
 //
 // Solidity: function BASIS_POINT_SCALE() view returns(uint32)
-func (_FeeDisburser *FeeDisburserSession) BASISPOINTSCALE() (uint32, error) {
-	return _FeeDisburser.Contract.BASISPOINTSCALE(&_FeeDisburser.CallOpts)
+func (_FeeDisburser *FeeDisburserSession) BASIS_POINT_SCALE() (uint32, error) {
+	return _FeeDisburser.Contract.BASIS_POINT_SCALE(&_FeeDisburser.CallOpts)
 }
 
-// BASISPOINTSCALE is a free data retrieval call binding the contract method 0x5b201d83.
+// BASIS_POINT_SCALE is a free data retrieval call binding the contract method 0x5b201d83.
 //
 // Solidity: function BASIS_POINT_SCALE() view returns(uint32)
-func (_FeeDisburser *FeeDisburserCallerSession) BASISPOINTSCALE() (uint32, error) {
-	return _FeeDisburser.Contract.BASISPOINTSCALE(&_FeeDisburser.CallOpts)
+func (_FeeDisburser *FeeDisburserCallerSession) BASIS_POINT_SCALE() (uint32, error) {
+	return _FeeDisburser.Contract.BASIS_POINT_SCALE(&_FeeDisburser.CallOpts)
 }
 
 // FEEDISBURSEMENTINTERVAL is a free data retrieval call binding the contract method 0x54664de5.
