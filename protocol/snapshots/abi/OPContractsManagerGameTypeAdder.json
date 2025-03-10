@@ -246,6 +246,11 @@
           },
           {
             "internalType": "address",
+            "name": "ethLockboxImpl",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
             "name": "systemConfigImpl",
             "type": "address"
           },
@@ -311,6 +316,11 @@
             "internalType": "Claim",
             "name": "absolutePrestate",
             "type": "bytes32"
+          },
+          {
+            "internalType": "bool",
+            "name": "disputeGameUsesSuperRoots",
+            "type": "bool"
           }
         ],
         "internalType": "struct OPContractsManager.OpChainConfig[]",
