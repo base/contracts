@@ -24,6 +24,9 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
+import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
+import { IOPContractsManagerLegacyUpgrade } from "interfaces/L1/IOPContractsManagerLegacyUpgrade.sol";
 
 /// @title ForkLive
 /// @notice This script is called by Setup.sol as a preparation step for the foundry test suite, and is run as an
@@ -34,6 +37,7 @@ import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.so
 ///         Therefore this script can only be run against a fork of a production network which is listed in the
 ///         superchain-registry.
 ///         This contract must not have constructor logic because it is set into state using `etch`.
+
 contract ForkLive is Deployer {
     using stdToml for string;
 
@@ -116,6 +120,15 @@ contract ForkLive is Deployer {
         artifacts.save("OptimismPortalProxy", optimismPortal);
         artifacts.save("OptimismPortal2Impl", EIP1967Helper.getImplementation(optimismPortal));
 
+        // Get the lockbox address from the portal, and save it
+        /// NOTE: Using try catch because this function could be called before or after the upgrade.
+        try IOptimismPortal2(payable(optimismPortal)).ethLockbox() returns (IETHLockbox ethLockbox_) {
+            console.log("ForkLive: ETHLockboxProxy found: %s", address(ethLockbox_));
+            artifacts.save("ETHLockboxProxy", address(ethLockbox_));
+        } catch {
+            console.log("ForkLive: ETHLockboxProxy not found");
+        }
+
         address addressManager = vm.parseTomlAddress(opToml, ".addresses.AddressManager");
         artifacts.save("AddressManager", addressManager);
         artifacts.save(
@@ -177,17 +190,42 @@ contract ForkLive is Deployer {
         opChains[0] = IOPContractsManager.OpChainConfig({
             systemConfigProxy: systemConfig,
             proxyAdmin: proxyAdmin,
-            absolutePrestate: Claim.wrap(bytes32(keccak256("absolutePrestate")))
+            absolutePrestate: Claim.wrap(bytes32(keccak256("absolutePrestate"))),
+            disputeGameUsesSuperRoots: false
         });
 
         // Temporarily replace the upgrader with a DelegateCaller so we can test the upgrade,
         // then reset its code to the original code.
         bytes memory upgraderCode = address(upgrader).code;
         vm.etch(upgrader, vm.getDeployedCode("test/mocks/Callers.sol:DelegateCaller"));
+
+        // Some upgrades require the legacy format.
+        IOPContractsManagerLegacyUpgrade.OpChainConfig[] memory legacyConfigs =
+            new IOPContractsManagerLegacyUpgrade.OpChainConfig[](opChains.length);
+        for (uint256 i = 0; i < opChains.length; i++) {
+            legacyConfigs[i] = IOPContractsManagerLegacyUpgrade.OpChainConfig({
+                systemConfigProxy: opChains[i].systemConfigProxy,
+                proxyAdmin: opChains[i].proxyAdmin,
+                absolutePrestate: opChains[i].absolutePrestate
+            });
+        }
+
+        // Start by doing Upgrade 13.
         DelegateCaller(upgrader).dcForward(
-            address(0x026b2F158255Beac46c1E7c6b8BbF29A4b6A7B76), abi.encodeCall(IOPContractsManager.upgrade, (opChains))
+            address(0x026b2F158255Beac46c1E7c6b8BbF29A4b6A7B76),
+            abi.encodeCall(IOPContractsManagerLegacyUpgrade.upgrade, (legacyConfigs))
         );
+
+        // Then do Upgrade 14.
+        DelegateCaller(upgrader).dcForward(
+            address(0x3A1f523a4bc09cd344A2745a108Bb0398288094F),
+            abi.encodeCall(IOPContractsManagerLegacyUpgrade.upgrade, (legacyConfigs))
+        );
+
+        // Then do the final upgrade.
         DelegateCaller(upgrader).dcForward(address(opcm), abi.encodeCall(IOPContractsManager.upgrade, (opChains)));
+
+        // Reset the upgrader to the original code.
         vm.etch(upgrader, upgraderCode);
 
         console.log("ForkLive: Saving newly deployed contracts");
@@ -205,6 +243,11 @@ contract ForkLive is Deployer {
         IAnchorStateRegistry newAnchorStateRegistry =
             IPermissionedDisputeGame(permissionedDisputeGame).anchorStateRegistry();
         artifacts.save("AnchorStateRegistryProxy", address(newAnchorStateRegistry));
+
+        // Get the lockbox address from the portal, and save it
+        IOptimismPortal2 portal = IOptimismPortal2(artifacts.mustGetAddress("OptimismPortalProxy"));
+        address lockboxAddress = address(portal.ethLockbox());
+        artifacts.save("ETHLockboxProxy", lockboxAddress);
     }
 
     /// @notice Saves the proxy and implementation addresses for a contract name
