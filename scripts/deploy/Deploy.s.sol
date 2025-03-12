@@ -20,7 +20,6 @@ import { DeploySuperchainInput, DeploySuperchain, DeploySuperchainOutput } from 
 import {
     DeployImplementationsInput,
     DeployImplementations,
-    DeployImplementationsInterop,
     DeployImplementationsOutput
 } from "scripts/deploy/DeployImplementations.s.sol";
 
@@ -297,9 +296,6 @@ contract Deploy is Deployer {
         // I think this was a bug
         dii.set(dii.upgradeController.selector, superchainProxyAdmin.owner());
 
-        if (_isInterop) {
-            di = DeployImplementations(new DeployImplementationsInterop());
-        }
         di.run(dii, dio);
 
         // Save the implementation addresses which are needed outside of this function or script.
@@ -349,11 +345,7 @@ contract Deploy is Deployer {
             _mips: IMIPS(address(dio.mipsSingleton())),
             _superchainProxyAdmin: superchainProxyAdmin
         });
-        if (_isInterop) {
-            ChainAssertions.checkSystemConfigInterop({ _contracts: impls, _cfg: cfg, _isProxy: false });
-        } else {
-            ChainAssertions.checkSystemConfig({ _contracts: impls, _cfg: cfg, _isProxy: false });
-        }
+        ChainAssertions.checkSystemConfig({ _contracts: impls, _cfg: cfg, _isProxy: false });
     }
 
     /// @notice Deploy all of the OP Chain specific contracts
