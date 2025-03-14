@@ -63,7 +63,6 @@ ALLOWED_FILES=(
   "src/L2/ETHLiquidity.sol:ETHLiquidity"
   "src/L2/GasPriceOracle.sol:GasPriceOracle"
   "src/L2/L1Block.sol:L1Block"
-  "src/L2/L1BlockInterop.sol:L1BlockInterop"
   "src/L2/L1FeeVault.sol:L1FeeVault"
   "src/L2/L2CrossDomainMessenger.sol:L2CrossDomainMessenger"
   "src/L2/L2ERC721Bridge.sol:L2ERC721Bridge"
