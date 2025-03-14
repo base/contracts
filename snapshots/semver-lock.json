@@ -44,8 +44,8 @@
     "sourceCodeHash": "0xfa56426153227e798150f6becc30a33fd20a3c6e0d73c797a3922dd631acbb57"
   },
   "src/L2/CrossL2Inbox.sol:CrossL2Inbox": {
-    "initCodeHash": "0x1308d4d3ebd857c6df9901fccc1d2ffc10f1d17b0cc1b14f58135f9ea9cad7a3",
-    "sourceCodeHash": "0xb397f483d1d1e5bd15ab0184e9d994f662393c51e9f6d524bfc45e5f1d935601"
+    "initCodeHash": "0xa7d89c648e0dd2f0a95780feb7ce7674dbd35a1c2de354a0222da7cef8b596c6",
+    "sourceCodeHash": "0xe001c9d4cf55e90c227459573b7eaac6015dea6cd9622ebf117e9ecba54cb4cc"
   },
   "src/L2/ETHLiquidity.sol:ETHLiquidity": {
     "initCodeHash": "0xfcb50f32bbbd7e426f83c5c320ea655b896c026324a5e51983c1b15041ef88ca",
@@ -58,10 +58,6 @@
   "src/L2/L1Block.sol:L1Block": {
     "initCodeHash": "0xa1f984b8ea199574261c19122b5a9c8c7dbd3633980b1e7aaf6b7af24af60478",
     "sourceCodeHash": "0xd04d64355dcf55247ac937748518e7f9620ae3f9eabe80fae9a82c0115ed77bc"
-  },
-  "src/L2/L1BlockInterop.sol:L1BlockInterop": {
-    "initCodeHash": "0xa19bc53228445924ae016d499e42ad5bcc33f45e7a3b0c51e2f930ffb8dacd7a",
-    "sourceCodeHash": "0xe959a150ea9ef814b13cdba6b9e9a4bf991e5c1325aa22c49795ce06cc35a8cd"
   },
   "src/L2/L1FeeVault.sol:L1FeeVault": {
     "initCodeHash": "0x6745b7be3895a5e8d373df0066d931bae29c47672ac46c2f5829bd0052cc6d9e",
@@ -88,8 +84,8 @@
     "sourceCodeHash": "0xaef8ea36c5b78cd12e0e62811d51db627ccf0dfd2cc5479fb707a10ef0d42048"
   },
   "src/L2/L2ToL2CrossDomainMessenger.sol:L2ToL2CrossDomainMessenger": {
-    "initCodeHash": "0x2a6f9f717ca67d7920af1135a048e6cc3f1f655edc9aa72b6e00f23730319695",
-    "sourceCodeHash": "0x21590b7204311d006de0044a7c8f1c92e5468276e6db29e13c6103454c39c6d1"
+    "initCodeHash": "0x7ad26c308c506ca65e080c8a33eceac48201221cd291030844021cf1cfde4871",
+    "sourceCodeHash": "0xe59eec8a64d6c42d9cc2a67aa649718cad590961f92787d62435bf8cde93f7f3"
   },
   "src/L2/OperatorFeeVault.sol:OperatorFeeVault": {
     "initCodeHash": "0x3d8c0d7736e8767f2f797da1c20c5fe30bd7f48a4cf75f376290481ad7c0f91f",
