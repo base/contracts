@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Types } from "src/libraries/Types.sol";
-import { Claim, Position, Clock, Hash, Duration, BondDistributionMode } from "src/dispute/lib/Types.sol";
-
-import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
-import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
-import { IBigStepper } from "interfaces/dispute/IBigStepper.sol";
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
+import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
+import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IBigStepper } from "interfaces/dispute/IBigStepper.sol";
+import { GameType, Claim, Position, Clock, Hash, Duration, BondDistributionMode } from "src/dispute/lib/Types.sol";
 
-interface IPermissionedDisputeGame is IDisputeGame {
+interface ISuperFaultDisputeGame is IDisputeGame {
     struct ClaimData {
         uint32 parentIndex;
         address counteredBy;
@@ -28,9 +25,21 @@ interface IPermissionedDisputeGame is IDisputeGame {
         address counteredBy;
     }
 
+    struct GameConstructorParams {
+        GameType gameType;
+        Claim absolutePrestate;
+        uint256 maxGameDepth;
+        uint256 splitDepth;
+        Duration clockExtension;
+        Duration maxClockDuration;
+        IBigStepper vm;
+        IDelayedWETH weth;
+        IAnchorStateRegistry anchorStateRegistry;
+        uint256 l2ChainId;
+    }
+
     error AlreadyInitialized();
     error AnchorRootNotFound();
-    error BlockNumberMatches();
     error BondTransferFailed();
     error CannotDefendRootClaim();
     error ClaimAboveSplit();
@@ -38,30 +47,23 @@ interface IPermissionedDisputeGame is IDisputeGame {
     error ClaimAlreadyResolved();
     error ClockNotExpired();
     error ClockTimeExceeded();
-    error ContentLengthMismatch();
     error DuplicateStep();
-    error EmptyItem();
     error GameDepthExceeded();
     error GameNotInProgress();
     error IncorrectBondAmount();
     error InvalidChallengePeriod();
     error InvalidClockExtension();
-    error InvalidDataRemainder();
     error InvalidDisputedClaimIndex();
-    error InvalidHeader();
-    error InvalidHeaderRLP();
     error InvalidLocalIdent();
-    error InvalidOutputRootProof();
     error InvalidParent();
     error InvalidPrestate();
     error InvalidSplitDepth();
-    error L2BlockNumberChallenged();
     error MaxDepthTooLarge();
     error NoCreditToClaim();
+    error NoChainIdNeeded();
     error OutOfOrderResolution();
-    error UnexpectedList();
+    error SuperFaultDisputeGameInvalidRootClaim();
     error UnexpectedRootClaim(Claim rootClaim);
-    error UnexpectedString();
     error ValidStep();
     error InvalidBondDistributionMode();
     error GameNotFinalized();
@@ -76,7 +78,6 @@ interface IPermissionedDisputeGame is IDisputeGame {
     function anchorStateRegistry() external view returns (IAnchorStateRegistry registry_);
     function attack(Claim _disputed, uint256 _parentIndex, Claim _claim) external payable;
     function bondDistributionMode() external view returns (BondDistributionMode);
-    function challengeRootL2Block(Types.OutputRootProof memory _outputRootProof, bytes memory _headerRLP) external;
     function claimCredit(address _recipient) external;
     function claimData(uint256)
         external
@@ -100,15 +101,11 @@ interface IPermissionedDisputeGame is IDisputeGame {
     function getNumToResolve(uint256 _claimIndex) external view returns (uint256 numRemainingChildren_);
     function getRequiredBond(Position _position) external view returns (uint256 requiredBond_);
     function hasUnlockedCredit(address) external view returns (bool);
-    function initialize() external payable;
-    function l2BlockNumber() external pure returns (uint256 l2BlockNumber_);
-    function l2BlockNumberChallenged() external view returns (bool);
-    function l2BlockNumberChallenger() external view returns (address);
-    function l2ChainId() external view returns (uint256 l2ChainId_);
     function maxClockDuration() external view returns (Duration maxClockDuration_);
     function maxGameDepth() external view returns (uint256 maxGameDepth_);
     function move(Claim _disputed, uint256 _challengeIndex, Claim _claim, bool _isAttack) external payable;
     function normalModeCredit(address) external view returns (uint256);
+    function l2SequenceNumber() external pure returns (uint256 l2SequenceNumber_);
     function refundModeCredit(address) external view returns (uint256);
     function resolutionCheckpoints(uint256)
         external
@@ -117,8 +114,8 @@ interface IPermissionedDisputeGame is IDisputeGame {
     function resolveClaim(uint256 _claimIndex, uint256 _numToResolve) external;
     function resolvedSubgames(uint256) external view returns (bool);
     function splitDepth() external view returns (uint256 splitDepth_);
-    function startingBlockNumber() external view returns (uint256 startingBlockNumber_);
-    function startingOutputRoot() external view returns (Hash root, uint256 l2SequenceNumber); // nosemgrep
+    function startingSequenceNumber() external view returns (uint256 startingSequenceNumber_);
+    function startingProposal() external view returns (Hash root, uint256 l2SequenceNumber); // nosemgrep
     function startingRootHash() external view returns (Hash startingRootHash_);
     function step(uint256 _claimIndex, bool _isAttack, bytes memory _stateData, bytes memory _proof) external;
     function subgames(uint256, uint256) external view returns (uint256);
@@ -127,15 +124,5 @@ interface IPermissionedDisputeGame is IDisputeGame {
     function wasRespectedGameTypeWhenCreated() external view returns (bool);
     function weth() external view returns (IDelayedWETH weth_);
 
-    error BadAuth();
-
-    function proposer() external view returns (address proposer_);
-    function challenger() external view returns (address challenger_);
-
-    function __constructor__(
-        IFaultDisputeGame.GameConstructorParams memory _params,
-        address _proposer,
-        address _challenger
-    )
-        external;
+    function __constructor__(GameConstructorParams memory _params) external;
 }
