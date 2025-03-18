@@ -5,7 +5,7 @@ import {IMulticall3} from "forge-std/interfaces/IMulticall3.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {IGnosisSafe} from "./IGnosisSafe.sol";
-import {NestedMultisigBase} from "./NestedMultisigBase.sol";
+import {NestedMultisigBuilder} from "./NestedMultisigBuilder.sol";
 import {Simulation} from "./Simulation.sol";
 
 /**
@@ -19,7 +19,7 @@ import {Simulation} from "./Simulation.sol";
  * 3. Signer safes, which are signers for the intermediate safes.
  * There should be at least one signer safe per intermediate safe.
  */
-abstract contract DoubleNestedMultisigBuilder is NestedMultisigBase {
+abstract contract DoubleNestedMultisigBuilder is NestedMultisigBuilder {
     /**
      * Step 1
      * ======
@@ -91,25 +91,6 @@ abstract contract DoubleNestedMultisigBuilder is NestedMultisigBase {
         bytes memory signatures;
         _executeTransaction(intermediateSafe, calls, signatures, true);
         _postRunInit(intermediateSafe);
-    }
-
-    /**
-     * Step 4
-     * ======
-     * Execute the final transaction. This method should be called by a facilitator (non-signer), after
-     * all of the intermediate safe approval transactions have been submitted onchain (see step 3).
-     */
-    function run() public {
-        IMulticall3.Call3[] memory calls = _buildCalls();
-
-        // signatures is empty, because `_executeTransaction` internally collects all of the approvedHash addresses
-        bytes memory signatures;
-
-        (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _executeTransaction(_ownerSafe(), calls, signatures, true);
-
-        _postRun(accesses, simPayload);
-        _postCheck(accesses, simPayload);
     }
 
     /**
