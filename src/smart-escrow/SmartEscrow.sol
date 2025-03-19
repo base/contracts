@@ -124,7 +124,8 @@ contract SmartEscrow is AccessControlDefaultAdminRules {
     /// @param _benefactorOwner Address which represents the benefactor entity.
     /// @param _beneficiaryOwner Address which represents the beneficiary entity.
     /// @param _escrowOwner Address which represents both the benefactor and the beneficiary entities.
-    /// @param _start Timestamp of the start of vesting period (or the cliff, if there is one).
+    /// @param _start Timestamp of the start of vesting period.
+    /// @param _cliffStart Timestamp when tokens start to vest (must be >= _start).
     /// @param _end Timestamp of the end of the vesting period.
     /// @param _vestingPeriodSeconds Period of time between each vesting event in seconds.
     /// @param _initialTokens Number of OP tokens which vest at start time.
