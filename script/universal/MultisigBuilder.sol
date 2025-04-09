@@ -30,7 +30,7 @@ abstract contract MultisigBuilder is MultisigBase {
     /**
      * @notice Creates the calldata for both signatures (`sign`) and execution (`run`)
      */
-    function _buildCalls() internal view virtual returns (IMulticall3.Call3[] memory);
+    function _buildCalls() internal view virtual returns (IMulticall3.Call3Value[] memory);
 
     /**
      * @notice Follow up assertions to ensure that the script ran to completion.
@@ -71,7 +71,7 @@ abstract contract MultisigBuilder is MultisigBase {
         // would increment the nonce.
         uint256 _nonce = _getNonce(safe);
 
-        IMulticall3.Call3[] memory calls = _buildCalls();
+        IMulticall3.Call3Value[] memory calls = _buildCalls();
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) = _simulateForSigner(safe, calls);
         _postSign(accesses, simPayload);
         _postCheck(accesses, simPayload);
@@ -140,11 +140,11 @@ abstract contract MultisigBuilder is MultisigBase {
         return true;
     }
 
-    function _simulateForSigner(address _safe, IMulticall3.Call3[] memory _calls)
+    function _simulateForSigner(address _safe, IMulticall3.Call3Value[] memory _calls)
         internal
         returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
     {
-        bytes memory data = abi.encodeCall(IMulticall3.aggregate3, (_calls));
+        bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, (_calls));
 
         Simulation.StateOverride[] memory overrides = _overrides(_safe);
 

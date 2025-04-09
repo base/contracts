@@ -60,6 +60,15 @@ abstract contract MultisigBase is CommonBase {
 
     function _printDataToSign(address _safe, IMulticall3.Call3[] memory _calls) internal {
         bytes memory data = abi.encodeCall(IMulticall3.aggregate3, (_calls));
+        _printDataToSign(_safe, data);
+    }
+
+    function _printDataToSign(address _safe, IMulticall3.Call3Value[] memory _calls) internal {
+        bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, (_calls));
+        _printDataToSign(_safe, data);
+    }
+
+    function _printDataToSign(address _safe, bytes memory data) private {
         bytes memory txData = _encodeTransactionData(_safe, data);
         bytes32 hash = _getTransactionHash(_safe, data);
 
@@ -87,10 +96,22 @@ abstract contract MultisigBase is CommonBase {
         view
     {
         bytes memory data = abi.encodeCall(IMulticall3.aggregate3, (_calls));
-        bytes32 hash = _getTransactionHash(_safe, data);
+        _checkSignatures(_safe, data, _signatures);
+    }
+
+    function _checkSignatures(address _safe, IMulticall3.Call3Value[] memory _calls, bytes memory _signatures)
+        internal
+        view
+    {
+        bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, (_calls));
+        _checkSignatures(_safe, data, _signatures);
+    }
+
+    function _checkSignatures(address _safe, bytes memory _data, bytes memory _signatures) internal view {
+        bytes32 hash = _getTransactionHash(_safe, _data);
         _signatures = Signatures.prepareSignatures(_safe, hash, _signatures);
 
-        IGnosisSafe(_safe).checkSignatures({dataHash: hash, data: data, signatures: _signatures});
+        IGnosisSafe(_safe).checkSignatures({dataHash: hash, data: _data, signatures: _signatures});
     }
 
     function _executeTransaction(
@@ -100,14 +121,31 @@ abstract contract MultisigBase is CommonBase {
         bool _broadcast
     ) internal returns (Vm.AccountAccess[] memory, Simulation.Payload memory) {
         bytes memory data = abi.encodeCall(IMulticall3.aggregate3, (_calls));
-        bytes32 hash = _getTransactionHash(_safe, data);
+        return _executeTransaction(_safe, data, _signatures, _broadcast);
+    }
+
+    function _executeTransaction(
+        address _safe,
+        IMulticall3.Call3Value[] memory _calls,
+        bytes memory _signatures,
+        bool _broadcast
+    ) internal returns (Vm.AccountAccess[] memory, Simulation.Payload memory) {
+        bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, (_calls));
+        return _executeTransaction(_safe, data, _signatures, _broadcast);
+    }
+
+    function _executeTransaction(address _safe, bytes memory _data, bytes memory _signatures, bool _broadcast)
+        internal
+        returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
+    {
+        bytes32 hash = _getTransactionHash(_safe, _data);
         _signatures = Signatures.prepareSignatures(_safe, hash, _signatures);
 
-        bytes memory simData = _execTransationCalldata(_safe, data, _signatures);
+        bytes memory simData = _execTransationCalldata(_safe, _data, _signatures);
         Simulation.logSimulationLink({_to: _safe, _from: msg.sender, _data: simData});
 
         vm.startStateDiffRecording();
-        bool success = _execTransaction(_safe, data, _signatures, _broadcast);
+        bool success = _execTransaction(_safe, _data, _signatures, _broadcast);
         Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
         require(success, "MultisigBase::_executeTransaction: Transaction failed");
         require(accesses.length > 0, "MultisigBase::_executeTransaction: No state changes");
@@ -125,6 +163,15 @@ abstract contract MultisigBase is CommonBase {
 
     function _getTransactionHash(address _safe, IMulticall3.Call3[] memory calls) internal view returns (bytes32) {
         bytes memory data = abi.encodeCall(IMulticall3.aggregate3, (calls));
+        return _getTransactionHash(_safe, data);
+    }
+
+    function _getTransactionHash(address _safe, IMulticall3.Call3Value[] memory calls)
+        internal
+        view
+        returns (bytes32)
+    {
+        bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, (calls));
         return _getTransactionHash(_safe, data);
     }
 

@@ -109,7 +109,7 @@ abstract contract DoubleNestedMultisigBuilder is NestedMultisigBuilder {
      * @dev Follow up assertions on state and simulation after an `init` call.
      */
     function _postRunInit(address intermediateSafe) private view {
-        bytes memory data = abi.encodeCall(IMulticall3.aggregate3, _buildCalls());
+        bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, _buildCalls());
         bytes32 approvedHash = _getTransactionHash(_ownerSafe(), data);
 
         uint256 isApproved = IGnosisSafe(_ownerSafe()).approvedHashes(intermediateSafe, approvedHash);
@@ -127,7 +127,7 @@ abstract contract DoubleNestedMultisigBuilder is NestedMultisigBuilder {
     }
 
     function _generateTopSafeApprovalCall() private view returns (IMulticall3.Call3[] memory) {
-        IMulticall3.Call3[] memory dstCalls = _buildCalls();
+        IMulticall3.Call3Value[] memory dstCalls = _buildCalls();
         IMulticall3.Call3 memory topSafeApprovalCall = _generateApproveCall(_ownerSafe(), dstCalls);
         return _toArray(topSafeApprovalCall);
     }

@@ -23,9 +23,9 @@ contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
 
     bytes internal dataToSign1 =
     // solhint-disable max-line-length
-        hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280c3afd48ea8b0056e1028951ba44695d612396f4a1c3851f4b8a262c53ee1f2503";
+        hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280c5f51d24161b7d5dfddfd10cad9118e4e37e6fde740a81d2d84dc35a401b0f74c";
     bytes internal dataToSign2 =
-        hex"190132640243d7aade8c72f3d90d2dbf359e9897feba5fce1453bc8d9e7ba10d17153afd48ea8b0056e1028951ba44695d612396f4a1c3851f4b8a262c53ee1f2503";
+        hex"190132640243d7aade8c72f3d90d2dbf359e9897feba5fce1453bc8d9e7ba10d17155f51d24161b7d5dfddfd10cad9118e4e37e6fde740a81d2d84dc35a401b0f74c";
 
     function setUp() public {
         bytes memory safeCode = Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid);
@@ -54,13 +54,14 @@ contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
         require(counterValue == 1, "Counter value is not 1");
     }
 
-    function _buildCalls() internal view override returns (IMulticall3.Call3[] memory) {
-        IMulticall3.Call3[] memory calls = new IMulticall3.Call3[](1);
+    function _buildCalls() internal view override returns (IMulticall3.Call3Value[] memory) {
+        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
 
-        calls[0] = IMulticall3.Call3({
+        calls[0] = IMulticall3.Call3Value({
             target: address(counter),
             allowFailure: false,
-            callData: abi.encodeCall(Counter.increment, ())
+            callData: abi.encodeCall(Counter.increment, ()),
+            value: 0
         });
 
         return calls;

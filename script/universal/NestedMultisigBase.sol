@@ -26,7 +26,7 @@ abstract contract NestedMultisigBase is MultisigBase {
     /**
      * @notice Creates the calldata for both signatures (`sign`) and execution (`run`)
      */
-    function _buildCalls() internal view virtual returns (IMulticall3.Call3[] memory);
+    function _buildCalls() internal view virtual returns (IMulticall3.Call3Value[] memory);
 
     /**
      * @notice Follow up assertions to ensure that the script ran to completion.
@@ -53,29 +53,41 @@ abstract contract NestedMultisigBase is MultisigBase {
         view
         returns (IMulticall3.Call3 memory)
     {
-        bytes32 hash = _getTransactionHash(_safe, _calls);
+        bytes32 txHash = _getTransactionHash(_safe, _calls);
+        return _generateApproveCall(_safe, txHash);
+    }
 
+    function _generateApproveCall(address _safe, IMulticall3.Call3Value[] memory _calls)
+        internal
+        view
+        returns (IMulticall3.Call3 memory)
+    {
+        bytes32 txHash = _getTransactionHash(_safe, _calls);
+        return _generateApproveCall(_safe, txHash);
+    }
+
+    function _generateApproveCall(address _safe, bytes32 _txHash) internal pure returns (IMulticall3.Call3 memory) {
         console.log("---\nNested hash:");
-        console.logBytes32(hash);
+        console.logBytes32(_txHash);
 
         return IMulticall3.Call3({
             target: _safe,
             allowFailure: false,
-            callData: abi.encodeCall(IGnosisSafe(_safe).approveHash, (hash))
+            callData: abi.encodeCall(IGnosisSafe(_safe).approveHash, (_txHash))
         });
     }
 
-    function _simulateForSigner(address _signerSafe, address _safe, IMulticall3.Call3[] memory _calls)
+    function _simulateForSigner(address _signerSafe, address _safe, IMulticall3.Call3Value[] memory _calls)
         internal
         returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
     {
-        bytes memory data = abi.encodeCall(IMulticall3.aggregate3, (_calls));
-        IMulticall3.Call3[] memory calls = _simulateForSignerCalls(_signerSafe, _safe, data);
+        bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, (_calls));
+        IMulticall3.Call3Value[] memory calls = _simulateForSignerCalls(_signerSafe, _safe, data);
 
         // Now define the state overrides for the simulation.
         Simulation.StateOverride[] memory overrides = _overrides(_signerSafe, _safe);
 
-        bytes memory txData = abi.encodeCall(IMulticall3.aggregate3, (calls));
+        bytes memory txData = abi.encodeCall(IMulticall3.aggregate3Value, (calls));
         console.log("---\nSimulation link:");
         // solhint-disable max-line-length
         Simulation.logSimulationLink({_to: MULTICALL3_ADDRESS, _data: txData, _from: msg.sender, _overrides: overrides});
@@ -91,9 +103,9 @@ abstract contract NestedMultisigBase is MultisigBase {
     function _simulateForSignerCalls(address _signerSafe, address _safe, bytes memory _data)
         internal
         view
-        returns (IMulticall3.Call3[] memory)
+        returns (IMulticall3.Call3Value[] memory)
     {
-        IMulticall3.Call3[] memory calls = new IMulticall3.Call3[](2);
+        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](2);
         bytes32 hash = _getTransactionHash(_safe, _data);
 
         // simulate an approveHash, so that signer can verify the data they are signing
@@ -112,11 +124,12 @@ abstract contract NestedMultisigBase is MultisigBase {
         bytes memory approveHashExec = _execTransationCalldata(
             _signerSafe, approveHashData, Signatures.genPrevalidatedSignature(MULTICALL3_ADDRESS)
         );
-        calls[0] = IMulticall3.Call3({target: _signerSafe, allowFailure: false, callData: approveHashExec});
+        calls[0] =
+            IMulticall3.Call3Value({target: _signerSafe, allowFailure: false, callData: approveHashExec, value: 0});
 
         // simulate the final state changes tx, so that signer can verify the final results
         bytes memory finalExec = _execTransationCalldata(_safe, _data, Signatures.genPrevalidatedSignature(_signerSafe));
-        calls[1] = IMulticall3.Call3({target: _safe, allowFailure: false, callData: finalExec});
+        calls[1] = IMulticall3.Call3Value({target: _safe, allowFailure: false, callData: finalExec, value: 0});
 
         return calls;
     }
