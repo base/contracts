@@ -27,6 +27,9 @@ contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
     bytes internal dataToSign2 =
         hex"190132640243d7aade8c72f3d90d2dbf359e9897feba5fce1453bc8d9e7ba10d17155f51d24161b7d5dfddfd10cad9118e4e37e6fde740a81d2d84dc35a401b0f74c";
 
+    bool allowEthTransfer;
+    function() view returns (IMulticall3.Call3Value[] memory) buildCallsFn;
+
     function setUp() public {
         bytes memory safeCode = Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid);
         vm.etch(safe1, safeCode);
@@ -46,6 +49,13 @@ contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
         owners3[0] = safe1;
         owners3[1] = safe2;
         IGnosisSafe(safe3).setup(owners3, 2, address(0), "", address(0), address(0), 0, address(0));
+
+        allowEthTransfer = false;
+        buildCallsFn = _buildCallsNoValue;
+    }
+
+    function _allowEthTransfer() internal view override returns (bool) {
+        return allowEthTransfer;
     }
 
     function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal view override {
@@ -55,16 +65,7 @@ contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
     }
 
     function _buildCalls() internal view override returns (IMulticall3.Call3Value[] memory) {
-        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
-
-        calls[0] = IMulticall3.Call3Value({
-            target: address(counter),
-            allowFailure: false,
-            callData: abi.encodeCall(Counter.increment, ()),
-            value: 0
-        });
-
-        return calls;
+        return buildCallsFn();
     }
 
     function _ownerSafe() internal view override returns (address) {
@@ -118,5 +119,55 @@ contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
         (bool success, bytes memory result) = address(this).call(data);
         assertFalse(success);
         assertEq(result, abi.encodeWithSignature("Error(string)", "not enough signatures"));
+    }
+
+    function testRevert_buildCalls() external {
+        allowEthTransfer = false;
+        buildCallsFn = _buildCallsWithValue;
+        _test_buildCalls("_buildCallsChecked: ETH transfer not allowed");
+
+        allowEthTransfer = true;
+        buildCallsFn = _buildCallsNoValue;
+        _test_buildCalls("_buildCallsChecked: ETH transfer not necessary");
+    }
+
+    function _buildCallsWithValue() private view returns (IMulticall3.Call3Value[] memory) {
+        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
+
+        calls[0] = IMulticall3.Call3Value({
+            target: address(counter),
+            allowFailure: false,
+            callData: abi.encodeCall(Counter.increment, ()),
+            value: 1
+        });
+
+        return calls;
+    }
+
+    function _buildCallsNoValue() private view returns (IMulticall3.Call3Value[] memory) {
+        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
+
+        calls[0] = IMulticall3.Call3Value({
+            target: address(counter),
+            allowFailure: false,
+            callData: abi.encodeCall(Counter.increment, ()),
+            value: 0
+        });
+
+        return calls;
+    }
+
+    function _test_buildCalls(bytes memory revertData) internal {
+        vm.expectRevert(revertData);
+        this.sign(safe1);
+
+        vm.expectRevert(revertData, 2);
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, keccak256(dataToSign1));
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, keccak256(dataToSign2));
+        approve(safe1, abi.encodePacked(r1, s1, v1));
+        approve(safe2, abi.encodePacked(r2, s2, v2));
+
+        vm.expectRevert(revertData);
+        this.run();
     }
 }

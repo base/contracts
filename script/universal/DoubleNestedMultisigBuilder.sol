@@ -39,7 +39,7 @@ abstract contract DoubleNestedMultisigBuilder is NestedMultisigBuilder {
         uint256 originalSignerNonce = _getNonce(signerSafe);
 
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _simulateForSigner(intermediateSafe, topSafe, _buildCalls());
+            _simulateForSigner(intermediateSafe, topSafe, _buildCallsChecked());
 
         _postSign(accesses, simPayload);
         _postCheck(accesses, simPayload);
@@ -97,7 +97,7 @@ abstract contract DoubleNestedMultisigBuilder is NestedMultisigBuilder {
      * @dev Follow up assertions on state and simulation after an `approve` call.
      */
     function _postApprove(address signerSafe, address intermediateSafe) private view {
-        IMulticall3.Call3 memory topSafeApprovalCall = _generateApproveCall(_ownerSafe(), _buildCalls());
+        IMulticall3.Call3 memory topSafeApprovalCall = _generateApproveCall(_ownerSafe(), _buildCallsChecked());
         bytes memory data = abi.encodeCall(IMulticall3.aggregate3, _toArray(topSafeApprovalCall));
         bytes32 approvedHash = _getTransactionHash(intermediateSafe, data);
 
@@ -109,7 +109,7 @@ abstract contract DoubleNestedMultisigBuilder is NestedMultisigBuilder {
      * @dev Follow up assertions on state and simulation after an `init` call.
      */
     function _postRunInit(address intermediateSafe) private view {
-        bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, _buildCalls());
+        bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, _buildCallsChecked());
         bytes32 approvedHash = _getTransactionHash(_ownerSafe(), data);
 
         uint256 isApproved = IGnosisSafe(_ownerSafe()).approvedHashes(intermediateSafe, approvedHash);
@@ -127,7 +127,7 @@ abstract contract DoubleNestedMultisigBuilder is NestedMultisigBuilder {
     }
 
     function _generateTopSafeApprovalCall() private view returns (IMulticall3.Call3[] memory) {
-        IMulticall3.Call3Value[] memory dstCalls = _buildCalls();
+        IMulticall3.Call3Value[] memory dstCalls = _buildCallsChecked();
         IMulticall3.Call3 memory topSafeApprovalCall = _generateApproveCall(_ownerSafe(), dstCalls);
         return _toArray(topSafeApprovalCall);
     }

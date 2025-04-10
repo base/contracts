@@ -50,7 +50,7 @@ abstract contract NestedMultisigBuilder is NestedMultisigBase {
         uint256 originalNonce = _getNonce(nestedSafe);
         uint256 originalSignerNonce = _getNonce(_signerSafe);
 
-        IMulticall3.Call3Value[] memory nestedCalls = _buildCalls();
+        IMulticall3.Call3Value[] memory nestedCalls = _buildCallsChecked();
         IMulticall3.Call3 memory call = _generateApproveCall(nestedSafe, nestedCalls);
 
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
@@ -72,7 +72,7 @@ abstract contract NestedMultisigBuilder is NestedMultisigBase {
      * This allow transactions to be pre-signed and stored safely before execution.
      */
     function verify(address _signerSafe, bytes memory _signatures) public view {
-        IMulticall3.Call3Value[] memory nestedCalls = _buildCalls();
+        IMulticall3.Call3Value[] memory nestedCalls = _buildCallsChecked();
         IMulticall3.Call3 memory call = _generateApproveCall(_ownerSafe(), nestedCalls);
         _checkSignatures(_signerSafe, _toArray(call), _signatures);
     }
@@ -85,7 +85,7 @@ abstract contract NestedMultisigBuilder is NestedMultisigBase {
      * after collecting a threshold of signatures for each multisig (see step 1).
      */
     function approve(address _signerSafe, bytes memory _signatures) public {
-        IMulticall3.Call3Value[] memory nestedCalls = _buildCalls();
+        IMulticall3.Call3Value[] memory nestedCalls = _buildCallsChecked();
         IMulticall3.Call3 memory call = _generateApproveCall(_ownerSafe(), nestedCalls);
 
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
@@ -101,7 +101,7 @@ abstract contract NestedMultisigBuilder is NestedMultisigBase {
      * all of the approval transactions have been submitted onchain (see step 2).
      */
     function run() public {
-        IMulticall3.Call3Value[] memory nestedCalls = _buildCalls();
+        IMulticall3.Call3Value[] memory nestedCalls = _buildCallsChecked();
 
         // signatures is empty, because `_executeTransaction` internally collects all of the approvedHash addresses
         bytes memory signatures;
@@ -111,5 +111,26 @@ abstract contract NestedMultisigBuilder is NestedMultisigBase {
 
         _postRun(accesses, simPayload);
         _postCheck(accesses, simPayload);
+    }
+
+    function _buildCallsChecked() internal view returns (IMulticall3.Call3Value[] memory) {
+        IMulticall3.Call3Value[] memory calls = _buildCalls();
+
+        if (_allowEthTransfer() == false) {
+            for (uint256 i; i < calls.length; i++) {
+                require(calls[i].value == 0, "_buildCallsChecked: ETH transfer not allowed");
+            }
+        } else {
+            bool hasEthTransfer = false;
+            for (uint256 i; i < calls.length; i++) {
+                if (calls[i].value > 0) {
+                    hasEthTransfer = true;
+                    break;
+                }
+            }
+            require(hasEthTransfer, "_buildCallsChecked: ETH transfer not necessary");
+        }
+
+        return calls;
     }
 }

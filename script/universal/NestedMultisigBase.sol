@@ -24,6 +24,13 @@ abstract contract NestedMultisigBase is MultisigBase {
     function _ownerSafe() internal view virtual returns (address);
 
     /**
+     * @notice Returns whether ETH transfers are allowed to be performed by the Multicall calls.
+     */
+    function _allowEthTransfer() internal view virtual returns (bool) {
+        return false;
+    }
+
+    /**
      * @notice Creates the calldata for both signatures (`sign`) and execution (`run`)
      */
     function _buildCalls() internal view virtual returns (IMulticall3.Call3Value[] memory);
