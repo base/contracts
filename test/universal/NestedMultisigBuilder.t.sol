@@ -161,11 +161,11 @@ contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
         vm.expectRevert(revertData);
         this.sign(safe1);
 
-        vm.expectRevert(revertData, 2);
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, keccak256(dataToSign1));
         (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, keccak256(dataToSign2));
-        approve(safe1, abi.encodePacked(r1, s1, v1));
-        approve(safe2, abi.encodePacked(r2, s2, v2));
+        vm.expectRevert(revertData, 2);
+        this.approve(safe1, abi.encodePacked(r1, s1, v1));
+        this.approve(safe2, abi.encodePacked(r2, s2, v2));
 
         vm.expectRevert(revertData);
         this.run();

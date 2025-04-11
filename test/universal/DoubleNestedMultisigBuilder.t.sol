@@ -177,9 +177,9 @@ contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
         vm.expectRevert(revertData);
         this.sign(safe1, safe3);
 
-        vm.expectRevert(revertData, 2);
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, keccak256(dataToSign1));
         (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, keccak256(dataToSign2));
+        vm.expectRevert(revertData, 2);
         this.approveOnBehalfOfSignerSafe(safe1, safe3, abi.encodePacked(r1, s1, v1));
         this.approveOnBehalfOfSignerSafe(safe2, safe3, abi.encodePacked(r2, s2, v2));
 

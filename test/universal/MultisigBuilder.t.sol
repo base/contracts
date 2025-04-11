@@ -111,10 +111,10 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
         vm.expectRevert(revertData);
         this.sign();
 
-        vm.expectRevert(revertData);
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, keccak256(dataToSign));
         (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, keccak256(dataToSign));
         bytes memory signatures = abi.encodePacked(r1, s1, v1, r2, s2, v2);
+        vm.expectRevert(revertData);
         this.run(signatures);
     }
 }
