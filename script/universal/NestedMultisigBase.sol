@@ -89,12 +89,12 @@ abstract contract NestedMultisigBase is MultisigBase {
         returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
     {
         bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, (_calls));
-        IMulticall3.Call3Value[] memory calls = _simulateForSignerCalls(_signerSafe, _safe, data);
+        IMulticall3.Call3[] memory calls = _simulateForSignerCalls(_signerSafe, _safe, data);
 
         // Now define the state overrides for the simulation.
         Simulation.StateOverride[] memory overrides = _overrides(_signerSafe, _safe);
 
-        bytes memory txData = abi.encodeCall(IMulticall3.aggregate3Value, (calls));
+        bytes memory txData = abi.encodeCall(IMulticall3.aggregate3, (calls));
         console.log("---\nSimulation link:");
         // solhint-disable max-line-length
         Simulation.logSimulationLink({_to: MULTICALL3_ADDRESS, _data: txData, _from: msg.sender, _overrides: overrides});
@@ -110,9 +110,9 @@ abstract contract NestedMultisigBase is MultisigBase {
     function _simulateForSignerCalls(address _signerSafe, address _safe, bytes memory _data)
         internal
         view
-        returns (IMulticall3.Call3Value[] memory)
+        returns (IMulticall3.Call3[] memory)
     {
-        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](2);
+        IMulticall3.Call3[] memory calls = new IMulticall3.Call3[](2);
         bytes32 hash = _getTransactionHash(_safe, _data);
 
         // simulate an approveHash, so that signer can verify the data they are signing
@@ -131,12 +131,11 @@ abstract contract NestedMultisigBase is MultisigBase {
         bytes memory approveHashExec = _execTransationCalldata(
             _signerSafe, approveHashData, Signatures.genPrevalidatedSignature(MULTICALL3_ADDRESS)
         );
-        calls[0] =
-            IMulticall3.Call3Value({target: _signerSafe, allowFailure: false, callData: approveHashExec, value: 0});
+        calls[0] = IMulticall3.Call3({target: _signerSafe, allowFailure: false, callData: approveHashExec});
 
         // simulate the final state changes tx, so that signer can verify the final results
         bytes memory finalExec = _execTransationCalldata(_safe, _data, Signatures.genPrevalidatedSignature(_signerSafe));
-        calls[1] = IMulticall3.Call3Value({target: _safe, allowFailure: false, callData: finalExec, value: 0});
+        calls[1] = IMulticall3.Call3({target: _safe, allowFailure: false, callData: finalExec});
 
         return calls;
     }
