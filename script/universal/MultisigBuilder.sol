@@ -150,11 +150,7 @@ abstract contract MultisigBuilder is MultisigBase {
     function _buildCallsChecked() private view returns (IMulticall3.Call3Value[] memory) {
         IMulticall3.Call3Value[] memory calls = _buildCalls();
 
-        if (_allowEthTransfer() == false) {
-            for (uint256 i; i < calls.length; i++) {
-                require(calls[i].value == 0, "_buildCallsChecked: ETH transfer not allowed");
-            }
-        } else {
+        if (_allowEthTransfer()) {
             bool hasEthTransfer = false;
             for (uint256 i; i < calls.length; i++) {
                 if (calls[i].value > 0) {
@@ -163,6 +159,10 @@ abstract contract MultisigBuilder is MultisigBase {
                 }
             }
             require(hasEthTransfer, "_buildCallsChecked: ETH transfer not necessary");
+        } else {
+            for (uint256 i; i < calls.length; i++) {
+                require(calls[i].value == 0, "_buildCallsChecked: ETH transfer not allowed");
+            }
         }
 
         return calls;
