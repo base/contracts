@@ -28,9 +28,16 @@ abstract contract MultisigBuilder is MultisigBase {
     function _ownerSafe() internal view virtual returns (address);
 
     /**
+     * @notice Returns whether ETH transfers are allowed to be performed by the Multicall calls.
+     */
+    function _allowEthTransfer() internal view virtual returns (bool) {
+        return false;
+    }
+
+    /**
      * @notice Creates the calldata for both signatures (`sign`) and execution (`run`)
      */
-    function _buildCalls() internal view virtual returns (IMulticall3.Call3[] memory);
+    function _buildCalls() internal view virtual returns (IMulticall3.Call3Value[] memory);
 
     /**
      * @notice Follow up assertions to ensure that the script ran to completion.
@@ -71,7 +78,7 @@ abstract contract MultisigBuilder is MultisigBase {
         // would increment the nonce.
         uint256 _nonce = _getNonce(safe);
 
-        IMulticall3.Call3[] memory calls = _buildCalls();
+        IMulticall3.Call3Value[] memory calls = _buildCallsChecked();
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) = _simulateForSigner(safe, calls);
         _postSign(accesses, simPayload);
         _postCheck(accesses, simPayload);
@@ -89,7 +96,7 @@ abstract contract MultisigBuilder is MultisigBase {
      * This allows transactions to be pre-signed and stored safely before execution.
      */
     function verify(bytes memory _signatures) public view {
-        _checkSignatures(_ownerSafe(), _buildCalls(), _signatures);
+        _checkSignatures(_ownerSafe(), _buildCallsChecked(), _signatures);
     }
 
     /**
@@ -105,7 +112,7 @@ abstract contract MultisigBuilder is MultisigBase {
         vm.store(safe, SAFE_NONCE_SLOT, bytes32(_getNonce(safe)));
 
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _executeTransaction(safe, _buildCalls(), _signatures, false);
+            _executeTransaction(safe, _buildCallsChecked(), _signatures, false);
 
         _postRun(accesses, simPayload);
         _postCheck(accesses, simPayload);
@@ -122,7 +129,7 @@ abstract contract MultisigBuilder is MultisigBase {
      */
     function run(bytes memory _signatures) public {
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _executeTransaction(_ownerSafe(), _buildCalls(), _signatures, true);
+            _executeTransaction(_ownerSafe(), _buildCallsChecked(), _signatures, true);
 
         _postRun(accesses, simPayload);
         _postCheck(accesses, simPayload);
@@ -140,11 +147,32 @@ abstract contract MultisigBuilder is MultisigBase {
         return true;
     }
 
-    function _simulateForSigner(address _safe, IMulticall3.Call3[] memory _calls)
+    function _buildCallsChecked() private view returns (IMulticall3.Call3Value[] memory) {
+        IMulticall3.Call3Value[] memory calls = _buildCalls();
+
+        if (_allowEthTransfer()) {
+            bool hasEthTransfer = false;
+            for (uint256 i; i < calls.length; i++) {
+                if (calls[i].value > 0) {
+                    hasEthTransfer = true;
+                    break;
+                }
+            }
+            require(hasEthTransfer, "_buildCallsChecked: ETH transfer not necessary");
+        } else {
+            for (uint256 i; i < calls.length; i++) {
+                require(calls[i].value == 0, "_buildCallsChecked: ETH transfer not allowed");
+            }
+        }
+
+        return calls;
+    }
+
+    function _simulateForSigner(address _safe, IMulticall3.Call3Value[] memory _calls)
         internal
         returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
     {
-        bytes memory data = abi.encodeCall(IMulticall3.aggregate3, (_calls));
+        bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, (_calls));
 
         Simulation.StateOverride[] memory overrides = _overrides(_safe);
 

@@ -24,9 +24,16 @@ abstract contract NestedMultisigBase is MultisigBase {
     function _ownerSafe() internal view virtual returns (address);
 
     /**
+     * @notice Returns whether ETH transfers are allowed to be performed by the Multicall calls.
+     */
+    function _allowEthTransfer() internal view virtual returns (bool) {
+        return false;
+    }
+
+    /**
      * @notice Creates the calldata for both signatures (`sign`) and execution (`run`)
      */
-    function _buildCalls() internal view virtual returns (IMulticall3.Call3[] memory);
+    function _buildCalls() internal view virtual returns (IMulticall3.Call3Value[] memory);
 
     /**
      * @notice Follow up assertions to ensure that the script ran to completion.
@@ -53,23 +60,35 @@ abstract contract NestedMultisigBase is MultisigBase {
         view
         returns (IMulticall3.Call3 memory)
     {
-        bytes32 hash = _getTransactionHash(_safe, _calls);
+        bytes32 txHash = _getTransactionHash(_safe, _calls);
+        return _generateApproveCall(_safe, txHash);
+    }
 
+    function _generateApproveCall(address _safe, IMulticall3.Call3Value[] memory _calls)
+        internal
+        view
+        returns (IMulticall3.Call3 memory)
+    {
+        bytes32 txHash = _getTransactionHash(_safe, _calls);
+        return _generateApproveCall(_safe, txHash);
+    }
+
+    function _generateApproveCall(address _safe, bytes32 _txHash) internal pure returns (IMulticall3.Call3 memory) {
         console.log("---\nNested hash:");
-        console.logBytes32(hash);
+        console.logBytes32(_txHash);
 
         return IMulticall3.Call3({
             target: _safe,
             allowFailure: false,
-            callData: abi.encodeCall(IGnosisSafe(_safe).approveHash, (hash))
+            callData: abi.encodeCall(IGnosisSafe(_safe).approveHash, (_txHash))
         });
     }
 
-    function _simulateForSigner(address _signerSafe, address _safe, IMulticall3.Call3[] memory _calls)
+    function _simulateForSigner(address _signerSafe, address _safe, IMulticall3.Call3Value[] memory _calls)
         internal
         returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
     {
-        bytes memory data = abi.encodeCall(IMulticall3.aggregate3, (_calls));
+        bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, (_calls));
         IMulticall3.Call3[] memory calls = _simulateForSignerCalls(_signerSafe, _safe, data);
 
         // Now define the state overrides for the simulation.

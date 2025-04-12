@@ -24,9 +24,12 @@ contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
 
     bytes internal dataToSign1 =
     // solhint-disable max-line-length
-        hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280c32a807b9689901dd0dbb7352e9e6c5265e3f6a68667de4be988f03f6a88511f7";
+        hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280c79f9c7295573dc135fa98d1fc9f5a01ae7e7caad046143376e34f9945288b7a0";
     bytes internal dataToSign2 =
-        hex"190132640243d7aade8c72f3d90d2dbf359e9897feba5fce1453bc8d9e7ba10d171532a807b9689901dd0dbb7352e9e6c5265e3f6a68667de4be988f03f6a88511f7";
+        hex"190132640243d7aade8c72f3d90d2dbf359e9897feba5fce1453bc8d9e7ba10d171579f9c7295573dc135fa98d1fc9f5a01ae7e7caad046143376e34f9945288b7a0";
+
+    bool allowEthTransfer;
+    function() view returns (IMulticall3.Call3Value[] memory) buildCallsFn;
 
     function setUp() public {
         bytes memory safeCode = Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid);
@@ -52,6 +55,13 @@ contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
         address[] memory owners4 = new address[](1);
         owners4[0] = safe3;
         IGnosisSafe(safe4).setup(owners4, 1, address(0), "", address(0), address(0), 0, address(0));
+
+        allowEthTransfer = false;
+        buildCallsFn = _buildCallsNoValue;
+    }
+
+    function _allowEthTransfer() internal view override returns (bool) {
+        return allowEthTransfer;
     }
 
     function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal view override {
@@ -60,16 +70,8 @@ contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
         require(counterValue == 1, "Counter value is not 1");
     }
 
-    function _buildCalls() internal view override returns (IMulticall3.Call3[] memory) {
-        IMulticall3.Call3[] memory calls = new IMulticall3.Call3[](1);
-
-        calls[0] = IMulticall3.Call3({
-            target: address(counter),
-            allowFailure: false,
-            callData: abi.encodeCall(Counter.increment, ())
-        });
-
-        return calls;
+    function _buildCalls() internal view override returns (IMulticall3.Call3Value[] memory) {
+        return buildCallsFn();
     }
 
     function _ownerSafe() internal view override returns (address) {
@@ -133,5 +135,58 @@ contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
         approveOnBehalfOfIntermediateSafe(safe3);
 
         run();
+    }
+
+    function testRevert_buildCalls() external {
+        allowEthTransfer = false;
+        buildCallsFn = _buildCallsWithValue;
+        _test_buildCalls("_buildCallsChecked: ETH transfer not allowed");
+
+        allowEthTransfer = true;
+        buildCallsFn = _buildCallsNoValue;
+        _test_buildCalls("_buildCallsChecked: ETH transfer not necessary");
+    }
+
+    function _buildCallsWithValue() private view returns (IMulticall3.Call3Value[] memory) {
+        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
+
+        calls[0] = IMulticall3.Call3Value({
+            target: address(counter),
+            allowFailure: false,
+            callData: abi.encodeCall(Counter.increment, ()),
+            value: 1
+        });
+
+        return calls;
+    }
+
+    function _buildCallsNoValue() private view returns (IMulticall3.Call3Value[] memory) {
+        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
+
+        calls[0] = IMulticall3.Call3Value({
+            target: address(counter),
+            allowFailure: false,
+            callData: abi.encodeCall(Counter.increment, ()),
+            value: 0
+        });
+
+        return calls;
+    }
+
+    function _test_buildCalls(bytes memory revertData) internal {
+        vm.expectRevert(revertData);
+        this.sign(safe1, safe3);
+
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, keccak256(dataToSign1));
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, keccak256(dataToSign2));
+        vm.expectRevert(revertData, 2);
+        this.approveOnBehalfOfSignerSafe(safe1, safe3, abi.encodePacked(r1, s1, v1));
+        this.approveOnBehalfOfSignerSafe(safe2, safe3, abi.encodePacked(r2, s2, v2));
+
+        vm.expectRevert(revertData);
+        this.approveOnBehalfOfIntermediateSafe(safe3);
+
+        vm.expectRevert(revertData);
+        this.run();
     }
 }
