@@ -93,7 +93,7 @@ abstract contract MultisigBuilder is MultisigBase {
      * Step 1.1 (optional)
      * ======
      * Verify the signatures generated from step 1 are valid.
-     * This allow transactions to be pre-signed and stored safely before execution.
+     * This allows transactions to be pre-signed and stored safely before execution.
      */
     function verify(bytes memory _signatures) public view {
         _checkSignatures(_ownerSafe(), _buildCallsChecked(), _signatures);
@@ -176,7 +176,7 @@ abstract contract MultisigBuilder is MultisigBase {
 
         Simulation.StateOverride[] memory overrides = _overrides(_safe);
 
-        bytes memory txData = _execTransationCalldata(_safe, data, Signatures.genPrevalidatedSignature(msg.sender));
+        bytes memory txData = _execTransactionCalldata(_safe, data, Signatures.genPrevalidatedSignature(msg.sender));
         Simulation.logSimulationLink({_to: _safe, _data: txData, _from: msg.sender, _overrides: overrides});
 
         // Forge simulation of the data logged in the link. If the simulation fails

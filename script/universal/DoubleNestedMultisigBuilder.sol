@@ -56,7 +56,7 @@ abstract contract DoubleNestedMultisigBuilder is NestedMultisigBuilder {
      * Step 1.1 (optional)
      * ======
      * Verify the signatures generated from step 1 are valid.
-     * This allow transactions to be pre-signed and stored safely before execution.
+     * This allows transactions to be pre-signed and stored safely before execution.
      */
     function verify(address signerSafe, address intermediateSafe, bytes memory signatures) public view {
         IMulticall3.Call3[] memory calls = _generateIntermediateSafeApprovalCall(intermediateSafe);

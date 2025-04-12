@@ -34,3 +34,12 @@ checkout-op-commit:
 	git remote add origin https://github.com/ethereum-optimism/optimism.git; \
 	git fetch --depth=1 origin $(OP_COMMIT); \
 	git reset --hard FETCH_HEAD
+
+.PHONY: bindings
+bindings:
+	go install github.com/ethereum/go-ethereum/cmd/abigen@v1.15.8
+	forge build
+	mkdir -p bindings
+	abigen --abi out/BalanceTracker.sol/BalanceTracker.abi.json --pkg bindings --type BalanceTracker --out bindings/balance_tracker.go
+	abigen --abi out/FeeDisburser.sol/FeeDisburser.abi.json --pkg bindings --type FeeDisburser --out bindings/fee_disburser.go
+	cd bindings && go mod tidy
