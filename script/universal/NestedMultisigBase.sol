@@ -115,7 +115,8 @@ abstract contract NestedMultisigBase is MultisigBase {
         calls[0] = IMulticall3.Call3({target: _signerSafe, allowFailure: false, callData: approveHashExec});
 
         // simulate the final state changes tx, so that signer can verify the final results
-        bytes memory finalExec = _execTransactionCalldata(_safe, _data, Signatures.genPrevalidatedSignature(_signerSafe));
+        bytes memory finalExec =
+            _execTransactionCalldata(_safe, _data, Signatures.genPrevalidatedSignature(_signerSafe));
         calls[1] = IMulticall3.Call3({target: _safe, allowFailure: false, callData: finalExec});
 
         return calls;
