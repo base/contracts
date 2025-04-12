@@ -69,7 +69,7 @@ abstract contract NestedMultisigBuilder is NestedMultisigBase {
      * Step 1.1 (optional)
      * ======
      * Verify the signatures generated from step 1 are valid.
-     * This allow transactions to be pre-signed and stored safely before execution.
+     * This allows transactions to be pre-signed and stored safely before execution.
      */
     function verify(address _signerSafe, bytes memory _signatures) public view {
         IMulticall3.Call3[] memory nestedCalls = _buildCalls();
