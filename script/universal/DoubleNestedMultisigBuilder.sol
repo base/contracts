@@ -6,7 +6,10 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {IGnosisSafe} from "./IGnosisSafe.sol";
 import {NestedMultisigBuilder} from "./NestedMultisigBuilder.sol";
+import {Signatures} from "./Signatures.sol";
 import {Simulation} from "./Simulation.sol";
+
+import {console} from "forge-std/console.sol";
 
 /**
  * @title DoubleNestedMultisigBuilder
@@ -39,7 +42,7 @@ abstract contract DoubleNestedMultisigBuilder is NestedMultisigBuilder {
         uint256 originalSignerNonce = _getNonce(signerSafe);
 
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _simulateForSigner(intermediateSafe, topSafe, _buildCalls());
+            _simulateForSigner(signerSafe, intermediateSafe, topSafe, _buildCalls());
 
         _postSign(accesses, simPayload);
         _postCheck(accesses, simPayload);
@@ -130,5 +133,78 @@ abstract contract DoubleNestedMultisigBuilder is NestedMultisigBuilder {
         IMulticall3.Call3[] memory dstCalls = _buildCalls();
         IMulticall3.Call3 memory topSafeApprovalCall = _generateApproveCall(_ownerSafe(), dstCalls);
         return _toArray(topSafeApprovalCall);
+    }
+
+    function _simulateForSigner(
+        address _signerSafe,
+        address _intermediateSafe,
+        address _safe,
+        IMulticall3.Call3[] memory _calls
+    ) internal returns (Vm.AccountAccess[] memory, Simulation.Payload memory) {
+        bytes memory data = abi.encodeCall(IMulticall3.aggregate3, (_calls));
+        IMulticall3.Call3[] memory calls = _simulateForSignerCalls(_signerSafe, _intermediateSafe, _safe, data);
+
+        // Now define the state overrides for the simulation.
+        Simulation.StateOverride[] memory overrides = _overrides(_signerSafe, _intermediateSafe, _safe);
+
+        bytes memory txData = abi.encodeCall(IMulticall3.aggregate3, (calls));
+        console.log("---\nSimulation link:");
+        // solhint-disable max-line-length
+        Simulation.logSimulationLink({_to: MULTICALL3_ADDRESS, _data: txData, _from: msg.sender, _overrides: overrides});
+
+        // Forge simulation of the data logged in the link. If the simulation fails
+        // we revert to make it explicit that the simulation failed.
+        Simulation.Payload memory simPayload =
+            Simulation.Payload({to: MULTICALL3_ADDRESS, data: txData, from: msg.sender, stateOverrides: overrides});
+        Vm.AccountAccess[] memory accesses = Simulation.simulateFromSimPayload(simPayload);
+        return (accesses, simPayload);
+    }
+
+    function _simulateForSignerCalls(address _signerSafe, address _intermediateSafe, address _safe, bytes memory _data)
+        internal
+        view
+        returns (IMulticall3.Call3[] memory)
+    {
+        IMulticall3.Call3[] memory calls = new IMulticall3.Call3[](3);
+        IMulticall3.Call3[] memory firstApproval = _generateIntermediateSafeApprovalCall(_intermediateSafe);
+
+        // simulate an approveHash, so that signer can verify the data they are signing
+        bytes memory firstApprovalHashData = abi.encodeCall(IMulticall3.aggregate3, (firstApproval));
+        bytes memory firstApproveHashExec = _execTransactionCalldata(
+            _signerSafe, firstApprovalHashData, Signatures.genPrevalidatedSignature(MULTICALL3_ADDRESS)
+        );
+
+        calls[0] = IMulticall3.Call3({target: _signerSafe, allowFailure: false, callData: firstApproveHashExec});
+
+        IMulticall3.Call3[] memory secondApproval = _generateTopSafeApprovalCall();
+        bytes memory secondApprovalHashData = abi.encodeCall(IMulticall3.aggregate3, (secondApproval));
+        bytes memory secondApproveHashExec = _execTransactionCalldata(
+            _intermediateSafe, secondApprovalHashData, Signatures.genPrevalidatedSignature(_signerSafe)
+        );
+
+        calls[1] = IMulticall3.Call3({target: _intermediateSafe, allowFailure: false, callData: secondApproveHashExec});
+
+        // simulate the final state changes tx, so that signer can verify the final results
+        bytes memory finalExec =
+            _execTransactionCalldata(_safe, _data, Signatures.genPrevalidatedSignature(_intermediateSafe));
+        calls[2] = IMulticall3.Call3({target: _safe, allowFailure: false, callData: finalExec});
+
+        return calls;
+    }
+
+    function _overrides(address _signerSafe, address _intermediateSafe, address _safe)
+        internal
+        view
+        returns (Simulation.StateOverride[] memory)
+    {
+        Simulation.StateOverride[] memory simOverrides = _simulationOverrides();
+        Simulation.StateOverride[] memory overrides = new Simulation.StateOverride[](3 + simOverrides.length);
+        overrides[0] = _safeOverrides(_signerSafe, MULTICALL3_ADDRESS);
+        overrides[1] = _safeOverrides(_intermediateSafe, address(0));
+        overrides[2] = _safeOverrides(_safe, address(0));
+        for (uint256 i = 0; i < simOverrides.length; i++) {
+            overrides[i + 3] = simOverrides[i];
+        }
+        return overrides;
     }
 }
