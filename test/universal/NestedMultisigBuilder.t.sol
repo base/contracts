@@ -7,12 +7,12 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Preinstalls} from "@eth-optimism-bedrock/src/libraries/Preinstalls.sol";
 
-import {NestedMultisigBuilder} from "../../script/universal/NestedMultisigBuilder.sol";
+import {MultisigBuilder} from "../../script/universal/MultisigBuilder.sol";
 import {Simulation} from "../../script/universal/Simulation.sol";
 import {IGnosisSafe} from "../../script/universal/IGnosisSafe.sol";
 import {Counter} from "./Counter.sol";
 
-contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
+contract NestedMultisigBuilderTest is Test, MultisigBuilder {
     Vm.Wallet internal wallet1 = vm.createWallet("1");
     Vm.Wallet internal wallet2 = vm.createWallet("2");
 
@@ -96,7 +96,8 @@ contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
 
     function test_approve_notOwner() external {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(wallet1, keccak256(dataToSign1));
-        bytes memory data = abi.encodeCall(this.approve, (safe2, abi.encodePacked(r, s, v)));
+        bytes memory data =
+            abi.encodeWithSelector(bytes4(keccak256("approve(address,bytes)")), safe2, abi.encodePacked(r, s, v));
         (bool success, bytes memory result) = address(this).call(data);
         assertFalse(success);
         assertEq(result, abi.encodeWithSignature("Error(string)", "not enough signatures"));
@@ -113,7 +114,7 @@ contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
     function test_run_notApproved() external {
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, keccak256(dataToSign1));
         approve(safe1, abi.encodePacked(r1, s1, v1));
-        bytes memory data = abi.encodeCall(this.run, ());
+        bytes memory data = abi.encodeWithSelector(bytes4(keccak256("run()")));
         (bool success, bytes memory result) = address(this).call(data);
         assertFalse(success);
         assertEq(result, abi.encodeWithSignature("Error(string)", "not enough signatures"));
