@@ -241,21 +241,30 @@ abstract contract MultisigBuilder is Script {
     }
 
     /*
-     * Same as `sign()` for a double layer of nesting.
+     * Same as `sign()` for a double layer of nesting. Provided for backwards compatibility with
+     * the old `DoubleNestedMultisigBuilder`.
+     *
+     * @custom:deprecated Use `sign(address[] memory _safes)` instead.
      */
     function sign(address _signerSafe, address _intermediateSafe) public {
         sign(_toArray(_signerSafe, _intermediateSafe));
     }
 
     /*
-     * Same as `sign()` for a single layer of nesting.
+     * Same as `sign()` for a single layer of nesting. Provided for backwards compatibility with
+     * the old `NestedMultisigBuilder`.
+     *
+     * @custom:deprecated Use `sign(address[] memory _safes)` instead.
      */
     function sign(address _signerSafe) public {
         sign(_toArray(_signerSafe));
     }
 
     /*
-     * Same as `sign()` for non-nested safes.
+     * Same as `sign()` for non-nested safes. Provided for backwards compatibility with
+     * the old `MultisigBuilder`.
+     *
+     * @custom:deprecated Use `sign(address[] memory _safes)` instead.
      */
     function sign() public {
         sign(new address[](0));
@@ -277,21 +286,30 @@ abstract contract MultisigBuilder is Script {
     }
 
     /*
-     * Same as `verify()` for a double layer of nesting.
+     * Same as `verify()` for a double layer of nesting. Provided for backwards compatibility with
+     * the old `DoubleNestedMultisigBuilder`.
+     *
+     * @custom:deprecated Use `verify(address[] memory _safes, bytes memory _signatures)` instead.
      */
     function verify(address _signerSafe, address _intermediateSafe, bytes memory _signatures) public view {
         verify(_toArray(_signerSafe, _intermediateSafe), _signatures);
     }
 
     /*
-     * Same as `verify()` for a single layer of nesting.
+     * Same as `verify()` for a single layer of nesting. Provided for backwards compatibility with
+     * the old `NestedMultisigBuilder`.
+     *
+     * @custom:deprecated Use `verify(address[] memory _safes, bytes memory _signatures)` instead.
      */
     function verify(address _signerSafe, bytes memory _signatures) public view {
         verify(_toArray(_signerSafe), _signatures);
     }
 
     /*
-     * Same as `verify()` for non-nested safes.
+     * Same as `verify()` for non-nested safes. Provided for backwards compatibility with
+     * the old `MultisigBuilder`.
+     *
+     * @custom:deprecated Use `verify(address[] memory _safes, bytes memory _signatures)` instead.
      */
     function verify(bytes memory _signatures) public view {
         verify(new address[](0), _signatures);
@@ -320,14 +338,20 @@ abstract contract MultisigBuilder is Script {
     }
 
     /*
-     * Same as `approve()` for a double layer of nesting.
+     * Same as `approve()` for a double layer of nesting. Provided for backwards compatibility with
+     * the old `DoubleNestedMultisigBuilder`.
+     *
+     * @custom:deprecated Use `approve(address[] memory _safes, bytes memory _signatures)` instead.
      */
     function approve(address _signerSafe, address _intermediateSafe, bytes memory _signatures) public {
         approve(_toArray(_signerSafe, _intermediateSafe), _signatures);
     }
 
     /*
-     * Same as `approve()` for a single layer of nesting.
+     * Same as `approve()` for a single layer of nesting. Provided for backwards compatibility with
+     * the old `NestedMultisigBuilder`.
+     *
+     * @custom:deprecated Use `approve(address[] memory _safes, bytes memory _signatures)` instead.
      */
     function approve(address _signerSafe, bytes memory _signatures) public {
         approve(_toArray(_signerSafe), _signatures);
@@ -335,9 +359,34 @@ abstract contract MultisigBuilder is Script {
 
     /*
      * Same as `approve()` for a double layer of nesting, with the signatures already approved.
+     * Provided for backwards compatibility with the old `DoubleNestedMultisigBuilder`.
+     *
+     * @custom:deprecated Use `approve(address[] memory _safes, bytes memory _signatures)` instead.
      */
     function approve(address _intermediateSafe) public {
-        approve(_intermediateSafe, "");
+        approve(_toArray(_intermediateSafe), "");
+    }
+
+    /*
+     * Same as `approve()` for a double layer of nesting. Provided for backwards compatibility with
+     * the old `DoubleNestedMultisigBuilder`.
+     *
+     * @custom:deprecated Use `approve(address[] memory _safes, bytes memory _signatures)` instead.
+     */
+    function approveOnBehalfOfSignerSafe(address _signerSafe, address _intermediateSafe, bytes memory _signatures)
+        public
+    {
+        approve(_toArray(_signerSafe, _intermediateSafe), _signatures);
+    }
+
+    /*
+     * Same as `approve()` for a double layer of nesting, with the signatures already approved.
+     * Provided for backwards compatibility with the old `DoubleNestedMultisigBuilder`.
+     *
+     * @custom:deprecated Use `approve(address[] memory _safes, bytes memory _signatures)` instead.
+     */
+    function approveOnBehalfOfIntermediateSafe(address _intermediateSafe) public {
+        approve(_toArray(_intermediateSafe), "");
     }
 
     /**
@@ -363,7 +412,10 @@ abstract contract MultisigBuilder is Script {
     }
 
     /*
-     * Same as `simulate()` for nested setups (that have been approved in step 2).
+     * Same as `simulate()` for nested setups (that have been approved in step 2). Provided for
+     * backwards compatibility with the old `NestedMultisigBuilder` and `DoubleNestedMultisigBuilder`.
+     *
+     * @custom:deprecated Use `simulate(bytes memory _signatures)` instead, with empty `_signatures`.
      */
     function simulate() public {
         simulate("");
@@ -388,7 +440,10 @@ abstract contract MultisigBuilder is Script {
     }
 
     /*
-     * Same as `run()` for nested setups (that have been approved in step 2).
+     * Same as `run()` for nested setups (that have been approved in step 2). Provided for
+     * backwards compatibility with the old `NestedMultisigBuilder` and `DoubleNestedMultisigBuilder`.
+     *
+     * @custom:deprecated Use `run(bytes memory _signatures)` instead, with empty `_signatures`.
      */
     function run() public {
         run("");
