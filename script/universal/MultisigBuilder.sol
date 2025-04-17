@@ -279,14 +279,14 @@ abstract contract MultisigBuilder is Script {
     /*
      * Same as `verify()` for a double layer of nesting.
      */
-    function verify(address _signerSafe, address _intermediateSafe, bytes memory _signatures) public {
+    function verify(address _signerSafe, address _intermediateSafe, bytes memory _signatures) public view {
         verify(_toArray(_signerSafe, _intermediateSafe), _signatures);
     }
 
     /*
      * Same as `verify()` for a single layer of nesting.
      */
-    function verify(address _signerSafe, bytes memory _signatures) public {
+    function verify(address _signerSafe, bytes memory _signatures) public view {
         verify(_toArray(_signerSafe), _signatures);
     }
 
