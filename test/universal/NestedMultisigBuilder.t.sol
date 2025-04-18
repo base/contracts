@@ -7,12 +7,12 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Preinstalls} from "@eth-optimism-bedrock/src/libraries/Preinstalls.sol";
 
-import {MultisigBuilder} from "../../script/universal/MultisigBuilder.sol";
+import {NestedMultisigBuilder} from "../../script/universal/NestedMultisigBuilder.sol";
 import {Simulation} from "../../script/universal/Simulation.sol";
 import {IGnosisSafe} from "../../script/universal/IGnosisSafe.sol";
 import {Counter} from "./Counter.sol";
 
-contract NestedMultisigBuilderTest is Test, MultisigBuilder {
+contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
     Vm.Wallet internal wallet1 = vm.createWallet("1");
     Vm.Wallet internal wallet2 = vm.createWallet("2");
 

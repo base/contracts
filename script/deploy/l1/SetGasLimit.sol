@@ -2,10 +2,10 @@
 pragma solidity 0.8.15;
 
 import {SystemConfig} from "@eth-optimism-bedrock/src/L1/SystemConfig.sol";
-import {MultisigBuilder, IMulticall3, IGnosisSafe, Simulation} from "../../universal/MultisigBuilder.sol";
+import {MultisigScript, IMulticall3, IGnosisSafe, Simulation} from "../../universal/MultisigScript.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-contract SetGasLimit is MultisigBuilder {
+contract SetGasLimit is MultisigScript {
     address internal SYSTEM_CONFIG_OWNER = vm.envAddress("SYSTEM_CONFIG_OWNER");
     address internal L1_SYSTEM_CONFIG = vm.envAddress("L1_SYSTEM_CONFIG_ADDRESS");
 
