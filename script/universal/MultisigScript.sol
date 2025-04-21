@@ -12,7 +12,7 @@ import {Signatures} from "./Signatures.sol";
 import {Simulation} from "./Simulation.sol";
 
 /**
- * @title MultisigBuilder
+ * @title MultisigScript
  * @notice Script builder for Forge scripts that require signatures from Safes. Supports both non-nested
  *         Safes, as well as nested Safes of arbitrary depth (Safes where the signers are other Safes).
  *
@@ -30,9 +30,9 @@ import {Simulation} from "./Simulation.sol";
  * └──────────┘
  *
  * Sequence:
- * ┌───────┐┌───────┐┌───────────┐┌───────────────┐
- * │Signer1││Signer2││Facilitator││MultisigBuilder│
- * └───┬───┘└───┬───┘└─────┬─────┘└───────┬───────┘
+ * ┌───────┐┌───────┐┌───────────┐┌──────────────┐
+ * │Signer1││Signer2││Facilitator││MultisigScript│
+ * └───┬───┘└───┬───┘└─────┬─────┘└───────┬──────┘
  *     │        │     sign()              │
  *     │─────────────────────────────────>│
  *     │      <sig1>       │              │
@@ -62,9 +62,9 @@ import {Simulation} from "./Simulation.sol";
  * └──────────┘
  *
  * Sequence:
- * ┌───────┐┌───────┐┌───────┐┌───────┐┌───────────┐          ┌───────────────┐
- * │Signer1││Signer2││Signer3││Signer4││Facilitator│          │MultisigBuilder│
- * └───┬───┘└───┬───┘└───┬───┘└───┬───┘└─────┬─────┘          └───────┬───────┘
+ * ┌───────┐┌───────┐┌───────┐┌───────┐┌───────────┐          ┌──────────────┐
+ * │Signer1││Signer2││Signer3││Signer4││Facilitator│          │MultisigScript│
+ * └───┬───┘└───┬───┘└───┬───┘└───┬───┘└─────┬─────┘          └───────┬──────┘
  *     │        │        │       sign(Safe1) │                        │
  *     │─────────────────────────────────────────────────────────────>│
  *     │        │      <sig1>     │          │                        │
@@ -109,9 +109,9 @@ import {Simulation} from "./Simulation.sol";
  * └──────────┘
  *
  * Sequence:
- * ┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────────┐                ┌───────────────┐
- * │Signer1││Signer2││Signer3││Signer4││Signer5││Signer6││Facilitator│                │MultisigBuilder│
- * └───┬───┘└───┬───┘└───┬───┘└───┬───┘└───┬───┘└───┬───┘└─────┬─────┘                └───────┬───────┘
+ * ┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────────┐                ┌──────────────┐
+ * │Signer1││Signer2││Signer3││Signer4││Signer5││Signer6││Facilitator│                │MultisigScript│
+ * └───┬───┘└───┬───┘└───┬───┘└───┬───┘└───┬───┘└───┬───┘└─────┬─────┘                └───────┬──────┘
  *     │        │        │        │       sign(Safe1,Safe4)    │                              │
  *     │─────────────────────────────────────────────────────────────────────────────────────>│
  *     │        │        │      <sig1>     │        │          │                              │
