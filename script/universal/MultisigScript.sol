@@ -169,7 +169,7 @@ abstract contract MultisigScript is Script {
     /**
      * @notice Creates the calldata for signatures (`sign`), approvals (`approve`), and execution (`run`)
      */
-    function _buildCalls() internal view virtual returns (IMulticall3.Call3[] memory);
+    function _buildCalls() internal view virtual returns (IMulticall3.Call3Value[] memory);
 
     /**
      * @notice Follow up assertions to ensure that the script ran to completion.
@@ -332,15 +332,19 @@ abstract contract MultisigScript is Script {
     }
 
     function _transactionDatas(address[] memory _safes) private view returns (bytes[] memory) {
-        IMulticall3.Call3[] memory calls = _buildCalls();
+        IMulticall3.Call3Value[] memory calls = _buildCalls();
+
         bytes[] memory datas = new bytes[](_safes.length);
-        for (uint256 i = _safes.length; i > 0; i--) {
-            if (i < _safes.length) {
-                // all outer safes should generate an approval for the inner safe:
-                calls = new IMulticall3.Call3[](1);
-                calls[0] = _generateApproveCall(_safes[i], datas[i]);
-            }
-            datas[i - 1] = abi.encodeCall(IMulticall3.aggregate3, (calls));
+        datas[datas.length - 1] = abi.encodeCall(IMulticall3.aggregate3Value, (calls));
+
+        for (uint256 i = _safes.length - 1; i > 0; i--) {
+            address targetSafe = _safes[i];
+            bytes memory callToApprove = datas[i];
+
+            IMulticall3.Call3[] memory approvalCall = new IMulticall3.Call3[](1);
+            approvalCall[0] = _generateApproveCall(targetSafe, callToApprove);
+
+            datas[i - 1] = abi.encodeCall(IMulticall3.aggregate3, (approvalCall));
         }
         return datas;
     }

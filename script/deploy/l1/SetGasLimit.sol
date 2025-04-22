@@ -26,13 +26,14 @@ contract SetGasLimit is MultisigScript {
         assert(SystemConfig(L1_SYSTEM_CONFIG).gasLimit() == _toGasLimit());
     }
 
-    function _buildCalls() internal view override returns (IMulticall3.Call3[] memory) {
-        IMulticall3.Call3[] memory calls = new IMulticall3.Call3[](1);
+    function _buildCalls() internal view override returns (IMulticall3.Call3Value[] memory) {
+        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
 
-        calls[0] = IMulticall3.Call3({
+        calls[0] = IMulticall3.Call3Value({
             target: L1_SYSTEM_CONFIG,
             allowFailure: false,
-            callData: abi.encodeCall(SystemConfig.setGasLimit, (_toGasLimit()))
+            callData: abi.encodeCall(SystemConfig.setGasLimit, (_toGasLimit())),
+            value: 0
         });
 
         return calls;
