@@ -21,7 +21,7 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
 
     bytes internal dataToSign =
     // solhint-disable-next-line max-line-length
-        hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280c41dcff2c17a271265df60d1612a7387110475b6fc5178add5518196db5dba6bd";
+        hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280cd0722aa57d06d71497c199147817c38ae160e5b355d3fb5ccbe34c3dbadeae6d";
 
     function setUp() public {
         vm.etch(safe, Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid));
@@ -39,13 +39,14 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
         require(counterValue == 1, "Counter value is not 1");
     }
 
-    function _buildCalls() internal view override returns (IMulticall3.Call3[] memory) {
-        IMulticall3.Call3[] memory calls = new IMulticall3.Call3[](1);
+    function _buildCalls() internal view override returns (IMulticall3.Call3Value[] memory) {
+        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
 
-        calls[0] = IMulticall3.Call3({
+        calls[0] = IMulticall3.Call3Value({
             target: address(counter),
             allowFailure: false,
-            callData: abi.encodeCall(Counter.increment, ())
+            callData: abi.encodeCall(Counter.increment, ()),
+            value: 0
         });
 
         return calls;
