@@ -9,7 +9,7 @@ For contract deployment artifacts, see [base-org/contract-deployments](https://g
 <!-- Badge row 1 - status -->
 
 [![GitHub contributors](https://img.shields.io/github/contributors/base-org/contracts)](https://github.com/base-org/contracts/graphs/contributors)
-[![GitHub commit activity](https://img.shields.io/github/commit-activity/w/base-org/contracts)](https://github.com/base-org/contracts/graphs/contributors)
+[![GitHub commit activity](https://img.shields.io/github/commit-activity/w/base-org/contracts)](https://github.com/base-org/contracts/commits/main)
 [![GitHub Stars](https://img.shields.io/github/stars/base-org/contracts.svg)](https://github.com/base-org/contracts/stargazers)
 ![GitHub repo size](https://img.shields.io/github/repo-size/base-org/contracts)
 [![GitHub](https://img.shields.io/github/license/base-org/contracts?color=blue)](https://github.com/base-org/contracts/blob/main/LICENSE)
