@@ -347,7 +347,6 @@ contract DeployOPChain_TestBase is Test {
         dsi.set(dsi.superchainProxyAdminOwner.selector, superchainProxyAdminOwner);
         dsi.set(dsi.protocolVersionsOwner.selector, protocolVersionsOwner);
         dsi.set(dsi.guardian.selector, guardian);
-        dsi.set(dsi.paused.selector, paused);
         dsi.set(dsi.requiredProtocolVersion.selector, requiredProtocolVersion);
         dsi.set(dsi.recommendedProtocolVersion.selector, recommendedProtocolVersion);
 
