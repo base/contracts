@@ -221,7 +221,6 @@ contract Deploy is Deployer {
         dsi.set(dsi.protocolVersionsOwner.selector, cfg.finalSystemOwner());
         dsi.set(dsi.superchainProxyAdminOwner.selector, cfg.finalSystemOwner());
         dsi.set(dsi.guardian.selector, cfg.superchainConfigGuardian());
-        dsi.set(dsi.paused.selector, false);
         dsi.set(dsi.requiredProtocolVersion.selector, ProtocolVersion.wrap(cfg.requiredProtocolVersion()));
         dsi.set(dsi.recommendedProtocolVersion.selector, ProtocolVersion.wrap(cfg.recommendedProtocolVersion()));
 
@@ -236,7 +235,7 @@ contract Deploy is Deployer {
         // First run assertions for the ProtocolVersions and SuperchainConfig proxy contracts.
         Types.ContractSet memory contracts = _proxies();
         ChainAssertions.checkProtocolVersions({ _contracts: contracts, _cfg: cfg, _isProxy: true });
-        ChainAssertions.checkSuperchainConfig({ _contracts: contracts, _cfg: cfg, _isProxy: true, _isPaused: false });
+        ChainAssertions.checkSuperchainConfig({ _contracts: contracts, _cfg: cfg, _isProxy: true });
 
         // Then replace the ProtocolVersions proxy with the implementation address and run assertions on it.
         contracts.ProtocolVersions = artifacts.mustGetAddress("ProtocolVersionsImpl");
@@ -244,7 +243,7 @@ contract Deploy is Deployer {
 
         // Finally replace the SuperchainConfig proxy with the implementation address and run assertions on it.
         contracts.SuperchainConfig = artifacts.mustGetAddress("SuperchainConfigImpl");
-        ChainAssertions.checkSuperchainConfig({ _contracts: contracts, _cfg: cfg, _isPaused: false, _isProxy: false });
+        ChainAssertions.checkSuperchainConfig({ _contracts: contracts, _cfg: cfg, _isProxy: false });
     }
 
     /// @notice Deploy all of the implementations
@@ -333,7 +332,6 @@ contract Deploy is Deployer {
         console.log("Deploying OP Chain");
 
         // Ensure that the requisite contracts are deployed
-        address superchainConfigProxy = artifacts.mustGetAddress("SuperchainConfigProxy");
         IOPContractsManager opcm = IOPContractsManager(artifacts.mustGetAddress("OPContractsManager"));
 
         IOPContractsManager.DeployInput memory deployInput = getDeployInput();
@@ -367,11 +365,12 @@ contract Deploy is Deployer {
             "Deploy: The PermissionlessDelayedWETH is already set by the OPCM, it is no longer necessary to deploy it separately."
         );
         address delayedWETHImpl = artifacts.mustGetAddress("DelayedWETHImpl");
-        address delayedWETHPermissionlessGameProxy = deployERC1967ProxyWithOwner("DelayedWETHProxy", msg.sender);
-        vm.broadcast(msg.sender);
+        address delayedWETHPermissionlessGameProxy =
+            deployERC1967ProxyWithOwner("DelayedWETHProxy", address(deployOutput.opChainProxyAdmin));
+        vm.broadcast(address(deployOutput.opChainProxyAdmin));
         IProxy(payable(delayedWETHPermissionlessGameProxy)).upgradeToAndCall({
             _implementation: delayedWETHImpl,
-            _data: abi.encodeCall(IDelayedWETH.initialize, (msg.sender, ISuperchainConfig(superchainConfigProxy)))
+            _data: abi.encodeCall(IDelayedWETH.initialize, (deployOutput.systemConfigProxy))
         });
 
         setAlphabetFaultGameImplementation();
@@ -381,8 +380,6 @@ contract Deploy is Deployer {
         setCannonFaultGameImplementation();
 
         transferDisputeGameFactoryOwnership();
-        transferDelayedWETHOwnership();
-        transferPermissionedDelayedWETHOwnership();
     }
 
     /// @notice Add AltDA setup to the OP chain
@@ -499,7 +496,8 @@ contract Deploy is Deployer {
                         optimismPortal: artifacts.mustGetAddress("OptimismPortalProxy"),
                         optimismMintableERC20Factory: artifacts.mustGetAddress("OptimismMintableERC20FactoryProxy")
                     }),
-                    cfg.l2ChainID()
+                    cfg.l2ChainID(),
+                    ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"))
                 )
             )
         });
@@ -587,44 +585,6 @@ contract Deploy is Deployer {
             _contracts: _proxies(),
             _expectedOwner: finalSystemOwner,
             _isProxy: true
-        });
-    }
-
-    /// @notice Transfer ownership of the DelayedWETH contract to the final system owner
-    function transferDelayedWETHOwnership() public broadcast {
-        console.log("Transferring DelayedWETH ownership to Safe");
-        IDelayedWETH weth = IDelayedWETH(artifacts.mustGetAddress("DelayedWETHProxy"));
-        address owner = weth.owner();
-
-        address finalSystemOwner = cfg.finalSystemOwner();
-        if (owner != finalSystemOwner) {
-            weth.transferOwnership(finalSystemOwner);
-            console.log("DelayedWETH ownership transferred to final system owner at: %s", finalSystemOwner);
-        }
-        ChainAssertions.checkDelayedWETH({
-            _contracts: _proxies(),
-            _cfg: cfg,
-            _isProxy: true,
-            _expectedOwner: finalSystemOwner
-        });
-    }
-
-    /// @notice Transfer ownership of the permissioned DelayedWETH contract to the final system owner
-    function transferPermissionedDelayedWETHOwnership() public broadcast {
-        console.log("Transferring permissioned DelayedWETH ownership to Safe");
-        IDelayedWETH weth = IDelayedWETH(artifacts.mustGetAddress("PermissionedDelayedWETHProxy"));
-        address owner = weth.owner();
-
-        address finalSystemOwner = cfg.finalSystemOwner();
-        if (owner != finalSystemOwner) {
-            weth.transferOwnership(finalSystemOwner);
-            console.log("DelayedWETH ownership transferred to final system owner at: %s", finalSystemOwner);
-        }
-        ChainAssertions.checkPermissionedDelayedWETH({
-            _contracts: _proxies(),
-            _cfg: cfg,
-            _isProxy: true,
-            _expectedOwner: finalSystemOwner
         });
     }
 
