@@ -442,8 +442,9 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
     bytes32 _withdrawalHash;
     bytes[] _withdrawalProof;
     Types.OutputRootProof internal _outputRootProof;
-
+    GameType internal respectedGameType;
     // Use a constructor to set the storage vars above, so as to minimize the number of ffi calls.
+
     constructor() {
         super.setUp();
 
@@ -490,7 +491,7 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
         // Warp forward in time to ensure that the game is created after the retirement timestamp.
         vm.warp(anchorStateRegistry.retirementTimestamp() + 1);
 
-        GameType respectedGameType = optimismPortal2.respectedGameType();
+        respectedGameType = optimismPortal2.respectedGameType();
         game = IFaultDisputeGame(
             payable(
                 address(
@@ -646,9 +647,9 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
         });
 
         // Create a new dispute game, and mock both games to be CHALLENGER_WINS.
-        IDisputeGame game2 = disputeGameFactory.create(
-            optimismPortal2.respectedGameType(), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1)
-        );
+        IDisputeGame game2 = disputeGameFactory.create{
+            value: disputeGameFactory.initBonds(optimismPortal2.respectedGameType())
+        }(optimismPortal2.respectedGameType(), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1));
         _proposedGameIndex = disputeGameFactory.gameCount() - 1;
         vm.mockCall(address(game), abi.encodeCall(game.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
         vm.mockCall(address(game2), abi.encodeCall(game.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
@@ -735,8 +736,8 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
         vm.mockCall(address(game), abi.encodeCall(game.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
 
         // Create a new game to re-prove against
-        disputeGameFactory.create(
-            optimismPortal2.respectedGameType(), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1)
+        disputeGameFactory.create{ value: disputeGameFactory.initBonds(respectedGameType) }(
+            respectedGameType, Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1)
         );
         _proposedGameIndex = disputeGameFactory.gameCount() - 1;
 
@@ -771,8 +772,9 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
         });
 
         // Create a new game.
-        IDisputeGame newGame =
-            disputeGameFactory.create(GameType.wrap(0), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1));
+        IDisputeGame newGame = disputeGameFactory.create{
+            value: disputeGameFactory.initBonds(optimismPortal2.respectedGameType())
+        }(GameType.wrap(0), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1));
 
         // Update the respected game type to 0xbeef.
         vm.prank(optimismPortal2.guardian());
@@ -1118,10 +1120,8 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
         IFaultDisputeGame game_noData = IFaultDisputeGame(
             payable(
                 address(
-                    disputeGameFactory.create(
-                        optimismPortal2.respectedGameType(),
-                        Claim.wrap(_outputRoot_noData),
-                        abi.encode(_proposedBlockNumber)
+                    disputeGameFactory.create{ value: disputeGameFactory.initBonds(respectedGameType) }(
+                        respectedGameType, Claim.wrap(_outputRoot_noData), abi.encode(_proposedBlockNumber)
                     )
                 )
             )
@@ -1191,9 +1191,9 @@ contract OptimismPortal2_FinalizeWithdrawal_Test is CommonTest {
         uint256 bobBalanceBefore = address(bob).balance;
 
         // Create a secondary dispute game.
-        IDisputeGame secondGame = disputeGameFactory.create(
-            optimismPortal2.respectedGameType(), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1)
-        );
+        IDisputeGame secondGame = disputeGameFactory.create{
+            value: disputeGameFactory.initBonds(optimismPortal2.respectedGameType())
+        }(optimismPortal2.respectedGameType(), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1));
 
         // Warp 1 second into the future so that the proof is submitted after the timestamp of game creation.
         vm.warp(block.timestamp + 1);
