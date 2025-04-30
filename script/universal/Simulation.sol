@@ -24,6 +24,7 @@ library Simulation {
     struct Payload {
         address from;
         address to;
+        uint256 value;
         bytes data;
         StateOverride[] stateOverrides;
     }
@@ -47,7 +48,7 @@ library Simulation {
         // Execute the call in forge and return the state diff.
         vm.startStateDiffRecording();
         vm.prank(simPayload.from);
-        (bool ok, bytes memory returnData) = address(simPayload.to).call(simPayload.data);
+        (bool ok, bytes memory returnData) = address(simPayload.to).call{value: simPayload.value}(simPayload.data);
         Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
         require(ok, string.concat("Simulator::simulateFromSimPayload failed: ", vm.toString(returnData)));
         require(accesses.length > 0, "Simulator::simulateFromSimPayload: No state changes");
@@ -140,14 +141,17 @@ library Simulation {
         return StateOverride({contractAddress: _state.contractAddress, overrides: overrides});
     }
 
-    function logSimulationLink(address _to, bytes memory _data, address _from) internal view {
-        logSimulationLink(_to, _data, _from, new StateOverride[](0));
+    function logSimulationLink(address _to, bytes memory _data, uint256 _value, address _from) internal view {
+        logSimulationLink(_to, _data, _value, _from, new StateOverride[](0));
     }
 
-    function logSimulationLink(address _to, bytes memory _data, address _from, StateOverride[] memory _overrides)
-        internal
-        view
-    {
+    function logSimulationLink(
+        address _to,
+        bytes memory _data,
+        uint256 _value,
+        address _from,
+        StateOverride[] memory _overrides
+    ) internal view {
         string memory proj = vm.envOr("TENDERLY_PROJECT", string("TENDERLY_PROJECT"));
         string memory username = vm.envOr("TENDERLY_USERNAME", string("TENDERLY_USERNAME"));
 
@@ -188,6 +192,8 @@ library Simulation {
             vm.toString(_to),
             "&from=",
             vm.toString(_from),
+            "&value=",
+            vm.toString(_value),
             "&stateOverrides=",
             stateOverrides
         );
