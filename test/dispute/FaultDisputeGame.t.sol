@@ -1988,6 +1988,17 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
         assertEq(bob.balance, bobBalanceBefore + secondBond);
     }
 
+    /// @dev Tests that claimCredit reverts if the game is paused.
+    function test_claimCredit_gamePaused_reverts() public {
+        // Pause the system with the Superchain-wide identifier (address(0)).
+        vm.prank(superchainConfig.guardian());
+        superchainConfig.pause(address(0));
+
+        // Attempting to claim credit should now revert.
+        vm.expectRevert(GamePaused.selector);
+        gameProxy.claimCredit(address(0));
+    }
+
     /// @dev Static unit test asserting that credit may not be drained past allowance through reentrancy.
     function test_claimCredit_claimAlreadyResolved_reverts() public {
         ClaimCreditReenter reenter = new ClaimCreditReenter(gameProxy, vm);
@@ -2412,6 +2423,17 @@ contract FaultDisputeGame_Test is FaultDisputeGame_Init {
     /// @dev Tests that closeGame reverts if the game is not resolved
     function test_closeGame_gameNotResolved_reverts() public {
         vm.expectRevert(GameNotResolved.selector);
+        gameProxy.closeGame();
+    }
+
+    /// @dev Tests that closeGame reverts if the game is paused
+    function test_closeGame_gamePaused_reverts() public {
+        // Pause the system with the Superchain-wide identifier (address(0)).
+        vm.prank(superchainConfig.guardian());
+        superchainConfig.pause(address(0));
+
+        // Attempting to close the game should now revert.
+        vm.expectRevert(GamePaused.selector);
         gameProxy.closeGame();
     }
 
