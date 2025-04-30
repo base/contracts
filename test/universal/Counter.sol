@@ -9,8 +9,14 @@ contract Counter {
         OWNER = owner;
     }
 
-    function increment() external {
+    function increment() external payable {
         require(msg.sender == OWNER, "only owner can increment");
+
+        count += 1;
+    }
+
+    function incrementPayable() external payable {
+        require(msg.value != 0, "value must be greater than 0");
         count += 1;
     }
 }
