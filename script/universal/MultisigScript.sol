@@ -226,8 +226,10 @@ abstract contract MultisigScript is Script {
             originalNonces[i] = _getNonce(_safes[i]);
         }
 
-        bytes[] memory datas = _transactionDatas(_safes);
-        (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) = _simulateForSigner(_safes, datas);
+        (bytes[] memory datas, uint256 value) = _transactionDatas(_safes);
+
+        (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
+            _simulateForSigner(_safes, datas, value);
 
         _postSign(accesses, simPayload);
         _postCheck(accesses, simPayload);
@@ -236,8 +238,7 @@ abstract contract MultisigScript is Script {
         for (uint256 i = 0; i < _safes.length; i++) {
             vm.store(_safes[i], SAFE_NONCE_SLOT, bytes32(originalNonces[i]));
         }
-
-        _printDataToSign(_safes[0], datas[0]);
+        _printDataToSign(_safes[0], datas[0], value);
     }
 
     /**
@@ -251,8 +252,8 @@ abstract contract MultisigScript is Script {
      */
     function verify(address[] memory _safes, bytes memory _signatures) public view {
         _safes = _appendOwnerSafe(_safes);
-        bytes[] memory datas = _transactionDatas(_safes);
-        _checkSignatures(_safes[0], datas[0], _signatures);
+        (bytes[] memory datas, uint256 value) = _transactionDatas(_safes);
+        _checkSignatures(_safes[0], datas[0], value, _signatures);
     }
 
     /**
@@ -271,9 +272,9 @@ abstract contract MultisigScript is Script {
      */
     function approve(address[] memory _safes, bytes memory _signatures) public {
         _safes = _appendOwnerSafe(_safes);
-        bytes[] memory datas = _transactionDatas(_safes);
+        (bytes[] memory datas, uint256 value) = _transactionDatas(_safes);
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _executeTransaction(_safes[0], datas[0], _signatures, true);
+            _executeTransaction(_safes[0], datas[0], value, _signatures, true);
         _postApprove(accesses, simPayload);
     }
 
@@ -288,12 +289,12 @@ abstract contract MultisigScript is Script {
      */
     function simulate(bytes memory _signatures) public {
         address ownerSafe = _ownerSafe();
-        bytes[] memory datas = _transactionDatas(_toArray(ownerSafe));
+        (bytes[] memory datas, uint256 value) = _transactionDatas(_toArray(ownerSafe));
 
         vm.store(ownerSafe, SAFE_NONCE_SLOT, bytes32(_getNonce(ownerSafe)));
 
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _executeTransaction(ownerSafe, datas[0], _signatures, false);
+            _executeTransaction(ownerSafe, datas[0], value, _signatures, false);
 
         _postRun(accesses, simPayload);
         _postCheck(accesses, simPayload);
@@ -308,10 +309,10 @@ abstract contract MultisigScript is Script {
      */
     function run(bytes memory _signatures) public {
         address ownerSafe = _ownerSafe();
-        bytes[] memory datas = _transactionDatas(_toArray(ownerSafe));
+        (bytes[] memory datas, uint256 value) = _transactionDatas(_toArray(ownerSafe));
 
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _executeTransaction(ownerSafe, datas[0], _signatures, true);
+            _executeTransaction(ownerSafe, datas[0], value, _signatures, true);
 
         _postRun(accesses, simPayload);
         _postCheck(accesses, simPayload);
@@ -331,26 +332,37 @@ abstract contract MultisigScript is Script {
         return safes;
     }
 
-    function _transactionDatas(address[] memory _safes) private view returns (bytes[] memory) {
+    function _transactionDatas(address[] memory _safes) private view returns (bytes[] memory datas, uint256 value) {
+        // Build the calls and sum the values
         IMulticall3.Call3Value[] memory calls = _buildCalls();
+        for (uint256 i = 0; i < calls.length; i++) {
+            value += calls[i].value;
+        }
 
-        bytes[] memory datas = new bytes[](_safes.length);
+        // The very last call is the actual (aggregated) call to execute
+        datas = new bytes[](_safes.length);
         datas[datas.length - 1] = abi.encodeCall(IMulticall3.aggregate3Value, (calls));
 
+        // The first n-1 calls are the nested approval calls
+        uint256 valueForCallToApprove = value;
         for (uint256 i = _safes.length - 1; i > 0; i--) {
             address targetSafe = _safes[i];
             bytes memory callToApprove = datas[i];
 
             IMulticall3.Call3[] memory approvalCall = new IMulticall3.Call3[](1);
-            approvalCall[0] = _generateApproveCall(targetSafe, callToApprove);
-
+            approvalCall[0] = _generateApproveCall(targetSafe, callToApprove, valueForCallToApprove);
             datas[i - 1] = abi.encodeCall(IMulticall3.aggregate3, (approvalCall));
+
+            valueForCallToApprove = 0;
         }
-        return datas;
     }
 
-    function _generateApproveCall(address _safe, bytes memory _data) internal view returns (IMulticall3.Call3 memory) {
-        bytes32 hash = _getTransactionHash(_safe, _data);
+    function _generateApproveCall(address _safe, bytes memory _data, uint256 _value)
+        internal
+        view
+        returns (IMulticall3.Call3 memory)
+    {
+        bytes32 hash = _getTransactionHash(_safe, _data, _value);
 
         console.log("---\nNested hash for safe %s:", _safe);
         console.logBytes32(hash);
@@ -362,9 +374,9 @@ abstract contract MultisigScript is Script {
         });
     }
 
-    function _printDataToSign(address _safe, bytes memory _data) internal {
-        bytes memory txData = _encodeTransactionData(_safe, _data);
-        bytes32 hash = _getTransactionHash(_safe, _data);
+    function _printDataToSign(address _safe, bytes memory _data, uint256 _value) internal {
+        bytes memory txData = _encodeTransactionData(_safe, _data, _value);
+        bytes32 hash = _getTransactionHash(_safe, _data, _value);
 
         emit DataToSign(txData);
 
@@ -385,18 +397,21 @@ abstract contract MultisigScript is Script {
         console.log("###############################");
     }
 
-    function _executeTransaction(address _safe, bytes memory _data, bytes memory _signatures, bool _broadcast)
-        internal
-        returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
-    {
-        bytes32 hash = _getTransactionHash(_safe, _data);
+    function _executeTransaction(
+        address _safe,
+        bytes memory _data,
+        uint256 _value,
+        bytes memory _signatures,
+        bool _broadcast
+    ) internal returns (Vm.AccountAccess[] memory, Simulation.Payload memory) {
+        bytes32 hash = _getTransactionHash(_safe, _data, _value);
         _signatures = Signatures.prepareSignatures(_safe, hash, _signatures);
 
-        bytes memory simData = _execTransactionCalldata(_safe, _data, _signatures);
-        Simulation.logSimulationLink({_to: _safe, _from: msg.sender, _data: simData});
+        bytes memory simData = _execTransactionCalldata(_safe, _data, _value, _signatures);
+        Simulation.logSimulationLink({_to: _safe, _data: simData, _from: msg.sender});
 
         vm.startStateDiffRecording();
-        bool success = _execTransaction(_safe, _data, _signatures, _broadcast);
+        bool success = _execTransaction(_safe, _data, _value, _signatures, _broadcast);
         Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
         require(success, "MultisigBase::_executeTransaction: Transaction failed");
         require(accesses.length > 0, "MultisigBase::_executeTransaction: No state changes");
@@ -412,11 +427,11 @@ abstract contract MultisigScript is Script {
         return (accesses, simPayload);
     }
 
-    function _simulateForSigner(address[] memory _safes, bytes[] memory _datas)
+    function _simulateForSigner(address[] memory _safes, bytes[] memory _datas, uint256 _value)
         internal
         returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
     {
-        IMulticall3.Call3[] memory calls = _simulateForSignerCalls(_safes, _datas);
+        IMulticall3.Call3[] memory calls = _simulateForSignerCalls(_safes, _datas, _value);
 
         // Now define the state overrides for the simulation.
         Simulation.StateOverride[] memory overrides = _overrides(_safes);
@@ -434,22 +449,26 @@ abstract contract MultisigScript is Script {
         return (accesses, simPayload);
     }
 
-    function _simulateForSignerCalls(address[] memory _safes, bytes[] memory _datas)
+    function _simulateForSignerCalls(address[] memory _safes, bytes[] memory _datas, uint256 _value)
         private
         pure
         returns (IMulticall3.Call3[] memory)
     {
         IMulticall3.Call3[] memory calls = new IMulticall3.Call3[](_safes.length);
-        for (uint256 i = 0; i < _safes.length; i++) {
-            // first simulated signer is the multicall3 contract
+        for (uint256 i; i < _safes.length; i++) {
             address signer = i == 0 ? MULTICALL3_ADDRESS : _safes[i - 1];
+            // uint256 value = i == _safes.length - 1 ? _value : 0;
+
             calls[i] = IMulticall3.Call3({
                 target: _safes[i],
                 allowFailure: false,
-                callData: _execTransactionCalldata(_safes[i], _datas[i], Signatures.genPrevalidatedSignature(signer))
+                callData: _execTransactionCalldata(
+                    _safes[i], _datas[i], _value, Signatures.genPrevalidatedSignature(signer)
+                )
             });
         }
-        return (calls);
+
+        return calls;
     }
 
     function _overrides(address[] memory _safes) internal view returns (Simulation.StateOverride[] memory) {
@@ -518,22 +537,29 @@ abstract contract MultisigScript is Script {
         }
     }
 
-    function _checkSignatures(address _safe, bytes memory _data, bytes memory _signatures) internal view {
-        bytes32 hash = _getTransactionHash(_safe, _data);
+    function _checkSignatures(address _safe, bytes memory _data, uint256 _value, bytes memory _signatures)
+        internal
+        view
+    {
+        bytes32 hash = _getTransactionHash(_safe, _data, _value);
         _signatures = Signatures.prepareSignatures(_safe, hash, _signatures);
         IGnosisSafe(_safe).checkSignatures({dataHash: hash, data: _data, signatures: _signatures});
     }
 
-    function _getTransactionHash(address _safe, bytes memory _data) internal view returns (bytes32) {
-        return keccak256(_encodeTransactionData(_safe, _data));
+    function _getTransactionHash(address _safe, bytes memory _data, uint256 _value) internal view returns (bytes32) {
+        return keccak256(_encodeTransactionData(_safe, _data, _value));
     }
 
-    function _encodeTransactionData(address _safe, bytes memory _data) internal view returns (bytes memory) {
+    function _encodeTransactionData(address _safe, bytes memory _data, uint256 _value)
+        internal
+        view
+        returns (bytes memory)
+    {
         return IGnosisSafe(_safe).encodeTransactionData({
             to: MULTICALL3_ADDRESS,
-            value: 0,
+            value: _value,
             data: _data,
-            operation: Enum.Operation.DelegateCall,
+            operation: _value == 0 ? Enum.Operation.DelegateCall : Enum.Operation.Call,
             safeTxGas: 0,
             baseGas: 0,
             gasPrice: 0,
@@ -543,7 +569,7 @@ abstract contract MultisigScript is Script {
         });
     }
 
-    function _execTransactionCalldata(address _safe, bytes memory _data, bytes memory _signatures)
+    function _execTransactionCalldata(address _safe, bytes memory _data, uint256 _value, bytes memory _signatures)
         internal
         pure
         returns (bytes memory)
@@ -552,9 +578,9 @@ abstract contract MultisigScript is Script {
             IGnosisSafe(_safe).execTransaction,
             (
                 MULTICALL3_ADDRESS,
-                0,
+                _value,
                 _data,
-                Enum.Operation.DelegateCall,
+                _value == 0 ? Enum.Operation.DelegateCall : Enum.Operation.Call,
                 0,
                 0,
                 0,
@@ -565,18 +591,21 @@ abstract contract MultisigScript is Script {
         );
     }
 
-    function _execTransaction(address _safe, bytes memory _data, bytes memory _signatures, bool _broadcast)
-        internal
-        returns (bool)
-    {
+    function _execTransaction(
+        address _safe,
+        bytes memory _data,
+        uint256 _value,
+        bytes memory _signatures,
+        bool _broadcast
+    ) internal returns (bool) {
         if (_broadcast) {
             vm.broadcast();
         }
         return IGnosisSafe(_safe).execTransaction({
             to: MULTICALL3_ADDRESS,
-            value: 0,
+            value: _value,
             data: _data,
-            operation: Enum.Operation.DelegateCall,
+            operation: _value == 0 ? Enum.Operation.DelegateCall : Enum.Operation.Call,
             safeTxGas: 0,
             baseGas: 0,
             gasPrice: 0,
