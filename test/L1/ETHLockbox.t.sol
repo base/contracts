@@ -10,6 +10,7 @@ import { Proxy } from "src/universal/Proxy.sol";
 // Libraries
 import { Constants } from "src/libraries/Constants.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
+import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
 
 // Interfaces
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
@@ -40,6 +41,42 @@ contract ETHLockboxTest is CommonTest {
         assertEq(address(ethLockbox.systemConfig().superchainConfig()), address(superchainConfig));
         assertEq(ethLockbox.authorizedPortals(optimismPortal2), true);
         assertEq(address(ethLockbox.superchainConfig()), address(superchainConfig));
+    }
+
+    /// @notice Tests that the initializer value is correct. Trivial test for normal
+    ///         initialization but confirms that the initValue is not incremented incorrectly if
+    ///         an upgrade function is not present.
+    function test_initialize_correctInitializerValue_succeeds() public {
+        // Get the slot for _initialized.
+        StorageSlot memory slot = ForgeArtifacts.getSlot("ETHLockbox", "_initialized");
+
+        // Get the initializer value.
+        bytes32 slotVal = vm.load(address(ethLockbox), bytes32(slot.slot));
+        uint8 val = uint8(uint256(slotVal) & 0xFF);
+
+        // Assert that the initializer value matches the expected value.
+        assertEq(val, ethLockbox.initVersion());
+    }
+
+    /// @notice Tests that the initialize function reverts if called by a non-proxy admin or owner.
+    /// @param _sender The address of the sender to test.
+    function testFuzz_initialize_notProxyAdminOrProxyAdminOwner_reverts(address _sender) public {
+        // Prank as the not ProxyAdmin or ProxyAdmin owner.
+        vm.assume(_sender != address(proxyAdmin) && _sender != proxyAdminOwner);
+
+        // Get the slot for _initialized.
+        StorageSlot memory slot = ForgeArtifacts.getSlot("ETHLockbox", "_initialized");
+
+        // Set the initialized slot to 0.
+        vm.store(address(ethLockbox), bytes32(slot.slot), bytes32(0));
+
+        // Expect the revert with `ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner` selector
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
+
+        // Call the `initialize` function with the sender
+        vm.prank(_sender);
+        IOptimismPortal2[] memory _portals = new IOptimismPortal2[](1);
+        ethLockbox.initialize(systemConfig, _portals);
     }
 
     /// @notice Tests it reverts when the contract is already initialized.
@@ -315,8 +352,8 @@ contract ETHLockboxTest is CommonTest {
     function testFuzz_authorizePortal_unauthorized_reverts(address _caller) public {
         vm.assume(_caller != proxyAdminOwner);
 
-        // Expect the revert with `Unauthorized` selector
-        vm.expectRevert(IETHLockbox.ETHLockbox_Unauthorized.selector);
+        // Expect the revert with `ProxyAdminOwnedBase_NotProxyAdminOwner` selector
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
 
         // Call the `authorizePortal` function with an unauthorized caller
         vm.prank(_caller);
@@ -330,7 +367,7 @@ contract ETHLockboxTest is CommonTest {
         vm.mockCall(address(_portal), abi.encodeCall(IProxyAdminOwnedBase.proxyAdminOwner, ()), abi.encode(address(0)));
 
         // Expect the revert with `DifferentOwner` selector
-        vm.expectRevert(IETHLockbox.ETHLockbox_DifferentProxyAdminOwner.selector);
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotSharedProxyAdminOwner.selector);
 
         // Call the `authorizePortal` function
         vm.prank(proxyAdminOwner);
@@ -414,8 +451,8 @@ contract ETHLockboxTest is CommonTest {
     function testFuzz_authorizeLockbox_unauthorized_reverts(address _caller) public {
         vm.assume(_caller != proxyAdminOwner);
 
-        // Expect the revert with `Unauthorized` selector
-        vm.expectRevert(IETHLockbox.ETHLockbox_Unauthorized.selector);
+        // Expect the revert with `ProxyAdminOwnedBase_NotProxyAdminOwner` selector
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
 
         // Call the `authorizeLockbox` function with an unauthorized caller
         vm.prank(_caller);
@@ -430,8 +467,8 @@ contract ETHLockboxTest is CommonTest {
 
         vm.mockCall(address(_lockbox), abi.encodeCall(IProxyAdminOwnedBase.proxyAdminOwner, ()), abi.encode(address(0)));
 
-        // Expect the revert with `ETHLockbox_DifferentProxyAdminOwner` selector
-        vm.expectRevert(IETHLockbox.ETHLockbox_DifferentProxyAdminOwner.selector);
+        // Expect the revert with `NotSharedProxyAdminOwner` selector
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotSharedProxyAdminOwner.selector);
 
         // Call the `authorizeLockbox` function with the lockbox
         vm.prank(proxyAdminOwner);
@@ -463,8 +500,8 @@ contract ETHLockboxTest is CommonTest {
     function testFuzz_migrateLiquidity_unauthorized_reverts(address _caller) public {
         vm.assume(_caller != proxyAdminOwner);
 
-        // Expect the revert with `Unauthorized` selector
-        vm.expectRevert(IETHLockbox.ETHLockbox_Unauthorized.selector);
+        // Expect the revert with `ProxyAdminOwnedBase_NotProxyAdminOwner` selector
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
 
         // Call the `migrateLiquidity` function with an unauthorized caller
         vm.prank(_caller);
@@ -479,8 +516,8 @@ contract ETHLockboxTest is CommonTest {
 
         vm.mockCall(address(_lockbox), abi.encodeCall(IProxyAdminOwnedBase.proxyAdminOwner, ()), abi.encode(address(0)));
 
-        // Expect the revert with `ETHLockbox_DifferentProxyAdminOwner` selector
-        vm.expectRevert(IETHLockbox.ETHLockbox_DifferentProxyAdminOwner.selector);
+        // Expect the revert with `NotSharedProxyAdminOwner` selector
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotSharedProxyAdminOwner.selector);
 
         // Call the `migrateLiquidity` function with the lockbox
         vm.prank(proxyAdminOwner);

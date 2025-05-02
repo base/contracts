@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.15;
 
 // Contracts
-import { ProxyAdminOwnedBase } from "src/L1/ProxyAdminOwnedBase.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { ProxyAdminOwnedBase } from "src/L1/ProxyAdminOwnedBase.sol";
+import { ReinitializableBase } from "src/universal/ReinitializableBase.sol";
 
 // Libraries
 import { Constants } from "src/libraries/Constants.sol";
@@ -19,7 +20,7 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 /// @title ETHLockbox
 /// @notice Manages ETH liquidity locking and unlocking for authorized OptimismPortals, enabling unified ETH liquidity
 ///         management across chains in the superchain cluster.
-contract ETHLockbox is ProxyAdminOwnedBase, Initializable, ISemver {
+contract ETHLockbox is ProxyAdminOwnedBase, Initializable, ReinitializableBase, ISemver {
     /// @notice Thrown when the lockbox is paused.
     error ETHLockbox_Paused();
 
@@ -31,9 +32,6 @@ contract ETHLockbox is ProxyAdminOwnedBase, Initializable, ISemver {
 
     /// @notice Thrown when attempting to unlock ETH from the lockbox through a withdrawal transaction.
     error ETHLockbox_NoWithdrawalTransactions();
-
-    /// @notice Thrown when the admin owner of the lockbox is different from the admin owner of the proxy admin.
-    error ETHLockbox_DifferentProxyAdminOwner();
 
     /// @notice Thrown when any authorized portal has a different SuperchainConfig.
     error ETHLockbox_DifferentSuperchainConfig();
@@ -75,13 +73,13 @@ contract ETHLockbox is ProxyAdminOwnedBase, Initializable, ISemver {
     mapping(IETHLockbox => bool) public authorizedLockboxes;
 
     /// @notice Semantic version.
-    /// @custom:semver 1.1.1
+    /// @custom:semver 1.2.0
     function version() public view virtual returns (string memory) {
-        return "1.1.1";
+        return "1.2.0";
     }
 
     /// @notice Constructs the ETHLockbox contract.
-    constructor() {
+    constructor() ReinitializableBase(1) {
         _disableInitializers();
     }
 
@@ -92,7 +90,17 @@ contract ETHLockbox is ProxyAdminOwnedBase, Initializable, ISemver {
     ///      contracts will point to the same pause identifier (the lockbox itself). Therefore, it
     ///      doesn't matter which SystemConfig is used here as long as it belongs to one of the
     ///      chains that share the lockbox.
-    function initialize(ISystemConfig _systemConfig, IOptimismPortal[] calldata _portals) external initializer {
+    function initialize(
+        ISystemConfig _systemConfig,
+        IOptimismPortal[] calldata _portals
+    )
+        external
+        reinitializer(initVersion())
+    {
+        // Initialization transactions must come from the ProxyAdmin or its owner.
+        _assertOnlyProxyAdminOrProxyAdminOwner();
+
+        // Now perform initialization logic.
         systemConfig = _systemConfig;
         for (uint256 i; i < _portals.length; i++) {
             _authorizePortal(_portals[i]);
@@ -113,8 +121,8 @@ contract ETHLockbox is ProxyAdminOwnedBase, Initializable, ISemver {
     /// @notice Authorizes a portal to lock and unlock ETH.
     /// @param _portal The address of the portal to authorize.
     function authorizePortal(IOptimismPortal _portal) external {
-        // Check that the sender is the proxy admin owner.
-        if (msg.sender != proxyAdminOwner()) revert ETHLockbox_Unauthorized();
+        // Check that this transaction is coming from the ProxyAdmin owner.
+        _assertOnlyProxyAdminOwner();
 
         // Authorize the portal.
         _authorizePortal(_portal);
@@ -173,11 +181,11 @@ contract ETHLockbox is ProxyAdminOwnedBase, Initializable, ISemver {
     ///         cannot be removed from the authorized list once added.
     /// @param _lockbox The address of the ETH lockbox to authorize.
     function authorizeLockbox(IETHLockbox _lockbox) external {
-        // Check that the sender is the proxy admin owner.
-        if (msg.sender != proxyAdminOwner()) revert ETHLockbox_Unauthorized();
+        // Check that this transaction is coming from the ProxyAdmin owner.
+        _assertOnlyProxyAdminOwner();
 
         // Check that the lockbox has the same proxy admin owner.
-        if (!_sameProxyAdminOwner(address(_lockbox))) revert ETHLockbox_DifferentProxyAdminOwner();
+        _assertSharedProxyAdminOwner(address(_lockbox));
 
         // Authorize the lockbox.
         authorizedLockboxes[_lockbox] = true;
@@ -192,11 +200,11 @@ contract ETHLockbox is ProxyAdminOwnedBase, Initializable, ISemver {
     ///         from the ETHLockbox on finalized withdrawals.
     /// @param _lockbox The address of the ETH lockbox to migrate liquidity to.
     function migrateLiquidity(IETHLockbox _lockbox) external {
-        // Check that the sender is the proxy admin owner.
-        if (msg.sender != proxyAdminOwner()) revert ETHLockbox_Unauthorized();
+        // Check that this transaction is coming from the ProxyAdmin owner.
+        _assertOnlyProxyAdminOwner();
 
         // Check that the lockbox has the same proxy admin owner.
-        if (!_sameProxyAdminOwner(address(_lockbox))) revert ETHLockbox_DifferentProxyAdminOwner();
+        _assertSharedProxyAdminOwner(address(_lockbox));
 
         // Receive the liquidity.
         uint256 balance = address(this).balance;
@@ -210,7 +218,7 @@ contract ETHLockbox is ProxyAdminOwnedBase, Initializable, ISemver {
     /// @param _portal The address of the portal to authorize.
     function _authorizePortal(IOptimismPortal _portal) internal {
         // Check that the portal has the same proxy admin owner.
-        if (!_sameProxyAdminOwner(address(_portal))) revert ETHLockbox_DifferentProxyAdminOwner();
+        _assertSharedProxyAdminOwner(address(_portal));
 
         // Check that the portal has the same superchain config.
         if (_portal.superchainConfig() != superchainConfig()) revert ETHLockbox_DifferentSuperchainConfig();

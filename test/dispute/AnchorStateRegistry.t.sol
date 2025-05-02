@@ -6,11 +6,13 @@ import { FaultDisputeGame_Init, _changeClaimStatus } from "test/dispute/FaultDis
 
 // Libraries
 import { GameType, GameStatus, Hash, Claim, VMStatuses, Proposal } from "src/dispute/lib/Types.sol";
+import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
 
 // Interfaces
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
 import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
 contract AnchorStateRegistry_Init is FaultDisputeGame_Init {
     /// @dev A valid l2BlockNumber that comes after the current anchor root block.
@@ -50,12 +52,57 @@ contract AnchorStateRegistry_Initialize_Test is AnchorStateRegistry_Init {
         assert(anchorStateRegistry.disputeGameFactory() == disputeGameFactory);
         assert(anchorStateRegistry.superchainConfig() == superchainConfig);
     }
+
+    /// @notice Tests that the initializer value is correct. Trivial test for normal
+    ///         initialization but confirms that the initValue is not incremented incorrectly if
+    ///         an upgrade function is not present.
+    function test_initialize_correctInitializerValue_succeeds() public {
+        // Get the slot for _initialized.
+        StorageSlot memory slot = ForgeArtifacts.getSlot("AnchorStateRegistry", "_initialized");
+
+        // Get the initializer value.
+        bytes32 slotVal = vm.load(address(anchorStateRegistry), bytes32(slot.slot));
+        uint8 val = uint8(uint256(slotVal) & 0xFF);
+
+        // Assert that the initializer value matches the expected value.
+        assertEq(val, anchorStateRegistry.initVersion());
+    }
 }
 
 contract AnchorStateRegistry_Initialize_TestFail is AnchorStateRegistry_Init {
     /// @notice Tests that initialization cannot be done twice
     function test_initialize_twice_reverts() public {
         vm.expectRevert("Initializable: contract is already initialized");
+        anchorStateRegistry.initialize(
+            systemConfig,
+            disputeGameFactory,
+            Proposal({
+                root: Hash.wrap(0xDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF),
+                l2SequenceNumber: 0
+            }),
+            GameType.wrap(0)
+        );
+    }
+
+    /// @notice Tests that initialization reverts if called by a non-proxy admin or owner.
+    /// @param _sender The address of the sender to test.
+    function testFuzz_initialize_notProxyAdminOrProxyAdminOwner_reverts(address _sender) public {
+        // Prank as the not ProxyAdmin or ProxyAdmin owner.
+        vm.assume(
+            _sender != address(anchorStateRegistry.proxyAdmin()) && _sender != anchorStateRegistry.proxyAdminOwner()
+        );
+
+        // Get the slot for _initialized.
+        StorageSlot memory slot = ForgeArtifacts.getSlot("AnchorStateRegistry", "_initialized");
+
+        // Set the initialized slot to 0.
+        vm.store(address(anchorStateRegistry), bytes32(slot.slot), bytes32(0));
+
+        // Expect the revert with `ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner` selector.
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
+
+        // Call the `initialize` function with the sender
+        vm.prank(_sender);
         anchorStateRegistry.initialize(
             systemConfig,
             disputeGameFactory,
