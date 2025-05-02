@@ -20,6 +20,7 @@ import { ICrossDomainMessenger } from "interfaces/universal/ICrossDomainMessenge
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
+import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
 contract L1StandardBridge_Getter_Test is CommonTest {
     /// @dev Test that the accessors return the correct initialized values.
@@ -161,7 +162,42 @@ contract L1StandardBridge_Pause_TestFail is CommonTest {
     }
 }
 
-contract L1StandardBridge_Initialize_TestFail is CommonTest { }
+contract L1StandardBridge_Initialize_TestFail is CommonTest {
+    /// @notice Tests that the initialize function reverts if called by a non-proxy admin or owner.
+    /// @param _sender The address of the sender to test.
+    function testFuzz_initialize_notProxyAdminOrProxyAdminOwner_reverts(address _sender) public {
+        // Prank as the not ProxyAdmin or ProxyAdmin owner.
+        vm.assume(_sender != address(proxyAdmin) && _sender != proxyAdminOwner);
+
+        // Get the slot for _initialized.
+        StorageSlot memory slot = ForgeArtifacts.getSlot("L1StandardBridge", "_initialized");
+
+        // Set the initialized slot to 0.
+        vm.store(address(l1StandardBridge), bytes32(slot.slot), bytes32(0));
+
+        // Expect the revert with `ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner` selector.
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
+
+        // Call the `initialize` function with the sender
+        vm.prank(_sender);
+        l1StandardBridge.initialize(l1CrossDomainMessenger, systemConfig);
+    }
+
+    /// @notice Tests that the initializer value is correct. Trivial test for normal
+    ///         initialization but confirms that the initValue is not incremented incorrectly if
+    ///         an upgrade function is not present.
+    function test_initialize_correctInitializerValue_succeeds() public {
+        // Get the slot for _initialized.
+        StorageSlot memory slot = ForgeArtifacts.getSlot("L1StandardBridge", "_initialized");
+
+        // Get the initializer value.
+        bytes32 slotVal = vm.load(address(l1StandardBridge), bytes32(slot.slot));
+        uint8 val = uint8(uint256(slotVal) & 0xFF);
+
+        // Assert that the initializer value matches the expected value.
+        assertEq(val, l1StandardBridge.initVersion());
+    }
+}
 
 contract L1StandardBridge_Receive_Test is CommonTest {
     /// @dev Tests receive bridges ETH successfully.
@@ -759,6 +795,7 @@ contract L1StandardBridge_Upgrade_Test is CommonTest {
         ISystemConfig newSystemConfig = ISystemConfig(address(0xdeadbeef));
 
         // Trigger upgrade().
+        vm.prank(address(l1StandardBridge.proxyAdmin()));
         l1StandardBridge.upgrade(newSystemConfig);
 
         // Verify that the systemConfig was updated.
@@ -780,10 +817,32 @@ contract L1StandardBridge_Upgrade_Test is CommonTest {
         ISystemConfig newSystemConfig = ISystemConfig(address(0xdeadbeef));
 
         // Trigger first upgrade.
+        vm.prank(address(l1StandardBridge.proxyAdmin()));
         l1StandardBridge.upgrade(newSystemConfig);
 
         // Try to trigger second upgrade.
+        vm.prank(address(l1StandardBridge.proxyAdmin()));
         vm.expectRevert("Initializable: contract is already initialized");
         l1StandardBridge.upgrade(newSystemConfig);
+    }
+
+    /// @notice Tests that the upgrade() function reverts if called by a non-proxy admin or owner.
+    /// @param _sender The address of the sender to test.
+    function testFuzz_upgrade_notProxyAdminOrProxyAdminOwner_reverts(address _sender) public {
+        // Prank as the not ProxyAdmin or ProxyAdmin owner.
+        vm.assume(_sender != address(proxyAdmin) && _sender != proxyAdminOwner);
+
+        // Get the slot for _initialized.
+        StorageSlot memory slot = ForgeArtifacts.getSlot("L1StandardBridge", "_initialized");
+
+        // Set the initialized slot to 0.
+        vm.store(address(l1StandardBridge), bytes32(slot.slot), bytes32(0));
+
+        // Expect the revert with `ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner` selector.
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
+
+        // Call the `upgrade` function with the sender
+        vm.prank(_sender);
+        l1StandardBridge.upgrade(ISystemConfig(address(0xdeadbeef)));
     }
 }

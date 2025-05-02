@@ -3,6 +3,8 @@ pragma solidity 0.8.15;
 
 // Contracts
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { ProxyAdminOwnedBase } from "src/L1/ProxyAdminOwnedBase.sol";
+import { ReinitializableBase } from "src/universal/ReinitializableBase.sol";
 
 // Libraries
 import { GameType, Proposal, Claim, GameStatus, Hash } from "src/dispute/lib/Types.sol";
@@ -21,10 +23,10 @@ import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 ///         FaultDisputeGame type. The anchor state is the latest state that has been proposed on L1 and was not
 ///         challenged within the challenge period. By using stored anchor states, new FaultDisputeGame instances can
 ///         be initialized with a more recent starting state which reduces the amount of required offchain computation.
-contract AnchorStateRegistry is Initializable, ISemver {
+contract AnchorStateRegistry is ProxyAdminOwnedBase, Initializable, ReinitializableBase, ISemver {
     /// @notice Semantic version.
-    /// @custom:semver 3.3.0
-    string public constant version = "3.3.0";
+    /// @custom:semver 3.4.0
+    string public constant version = "3.4.0";
 
     /// @notice The dispute game finality delay in seconds.
     uint256 internal immutable DISPUTE_GAME_FINALITY_DELAY_SECONDS;
@@ -75,7 +77,7 @@ contract AnchorStateRegistry is Initializable, ISemver {
     error AnchorStateRegistry_Unauthorized();
 
     /// @param _disputeGameFinalityDelaySeconds The dispute game finality delay in seconds.
-    constructor(uint256 _disputeGameFinalityDelaySeconds) {
+    constructor(uint256 _disputeGameFinalityDelaySeconds) ReinitializableBase(1) {
         DISPUTE_GAME_FINALITY_DELAY_SECONDS = _disputeGameFinalityDelaySeconds;
         _disableInitializers();
     }
@@ -91,8 +93,12 @@ contract AnchorStateRegistry is Initializable, ISemver {
         GameType _startingRespectedGameType
     )
         external
-        initializer
+        reinitializer(initVersion())
     {
+        // Initialization transactions must come from the ProxyAdmin or its owner.
+        _assertOnlyProxyAdminOrProxyAdminOwner();
+
+        // Now perform initialization logic.
         systemConfig = _systemConfig;
         disputeGameFactory = _disputeGameFactory;
         startingAnchorRoot = _startingAnchorRoot;

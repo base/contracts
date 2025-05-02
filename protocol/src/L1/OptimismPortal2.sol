@@ -238,9 +238,9 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 4.3.0
+    /// @custom:semver 4.4.0
     function version() public pure virtual returns (string memory) {
-        return "4.3.0";
+        return "4.4.0";
     }
 
     /// @param _proofMaturityDelaySeconds The proof maturity delay in seconds.
@@ -261,6 +261,10 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         external
         reinitializer(initVersion())
     {
+        // Initialization transactions must come from the ProxyAdmin or its owner.
+        _assertOnlyProxyAdminOrProxyAdminOwner();
+
+        // Now perform initialization logic.
         systemConfig = _systemConfig;
         anchorStateRegistry = _anchorStateRegistry;
         ethLockbox = _ethLockbox;
@@ -286,6 +290,10 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         external
         reinitializer(initVersion())
     {
+        // Upgrade transactions must come from the ProxyAdmin or its owner.
+        _assertOnlyProxyAdminOrProxyAdminOwner();
+
+        // Now perform upgrade logic.
         anchorStateRegistry = _anchorStateRegistry;
         ethLockbox = _ethLockbox;
         systemConfig = _systemConfig;
@@ -371,6 +379,17 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         // Intentionally empty.
     }
 
+    /// @notice Migrates the total ETH balance to the ETHLockbox.
+    function migrateLiquidity() public {
+        // Liquidity migration can only be triggered by the ProxyAdmin owner.
+        _assertOnlyProxyAdminOwner();
+
+        // Migrate the liquidity.
+        uint256 ethBalance = address(this).balance;
+        ethLockbox.lockETH{ value: ethBalance }();
+        emit ETHMigrated(address(ethLockbox), ethBalance);
+    }
+
     /// @notice Allows the owner of the ProxyAdmin to migrate the OptimismPortal to use a new
     ///         lockbox, point at a new AnchorStateRegistry, and start to use the Super Roots proof
     ///         method. Primarily used for OptimismPortal instances to join the interop set, but
@@ -384,8 +403,8 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     /// @param _newLockbox The address of the new ETHLockbox contract.
     /// @param _newAnchorStateRegistry The address of the new AnchorStateRegistry contract.
     function migrateToSuperRoots(IETHLockbox _newLockbox, IAnchorStateRegistry _newAnchorStateRegistry) external {
-        // Make sure the caller is the owner of the ProxyAdmin.
-        if (msg.sender != proxyAdminOwner()) revert OptimismPortal_Unauthorized();
+        // Migration can only be triggered by the ProxyAdmin owner.
+        _assertOnlyProxyAdminOwner();
 
         // Chains can use this method to swap the proof method from Output Roots to Super Roots
         // without joining the interop set. In this case, the old and new lockboxes will be the
@@ -705,12 +724,6 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         }
     }
 
-    /// @notice Migrates the total ETH balance to the ETHLockbox.
-    function migrateLiquidity() public {
-        if (msg.sender != proxyAdminOwner()) revert OptimismPortal_Unauthorized();
-        _migrateLiquidity();
-    }
-
     /// @notice Accepts deposits of ETH and data, and emits a TransactionDeposited event for use in
     ///         deriving deposit transactions. Note that if a deposit is made by a contract, its
     ///         address will be aliased when retrieved using `tx.origin` or `msg.sender`. Consider
@@ -783,14 +796,6 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     function _isUnsafeTarget(address _target) internal view virtual returns (bool) {
         // Prevent users from targeting an unsafe target address on a withdrawal transaction.
         return _target == address(this) || _target == address(ethLockbox);
-    }
-
-    /// @notice Migrates the total ETH balance to the ETHLockbox.
-    function _migrateLiquidity() internal {
-        uint256 ethBalance = address(this).balance;
-        ethLockbox.lockETH{ value: ethBalance }();
-
-        emit ETHMigrated(address(ethLockbox), ethBalance);
     }
 
     /// @notice Getter for the resource config. Used internally by the ResourceMetering contract.

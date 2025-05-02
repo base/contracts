@@ -543,6 +543,8 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
     constructor(OPContractsManagerContractsContainer _contractsContainer) OPContractsManagerBase(_contractsContainer) { }
 
     /// @notice Upgrades a set of chains to the latest implementation contracts
+    /// @param _superchainConfig The SuperchainConfig contract to upgrade
+    /// @param _superchainProxyAdmin The ProxyAdmin contract for the SuperchainConfig
     /// @param _opChainConfigs Array of OpChain structs, one per chain to upgrade
     /// @dev This function is intended to be called via DELEGATECALL from the Upgrade Controller Safe
     function upgrade(
@@ -574,6 +576,9 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
 
             // Use the SystemConfig to grab the DisputeGameFactory address.
             IDisputeGameFactory dgf = IDisputeGameFactory(_opChainConfigs[i].systemConfigProxy.disputeGameFactory());
+
+            // Need to upgrade the DisputeGameFactory implementation, no internal upgrade call.
+            upgradeTo(_opChainConfigs[i].proxyAdmin, address(dgf), impls.disputeGameFactoryImpl);
 
             // All chains have the PermissionedDisputeGame, grab that.
             IPermissionedDisputeGame permissionedDisputeGame =
@@ -1697,9 +1702,9 @@ contract OPContractsManager is ISemver {
 
     // -------- Constants and Variables --------
 
-    /// @custom:semver 2.1.0
+    /// @custom:semver 2.2.0
     function version() public pure virtual returns (string memory) {
-        return "2.1.0";
+        return "2.2.0";
     }
 
     OPContractsManagerGameTypeAdder public immutable opcmGameTypeAdder;
