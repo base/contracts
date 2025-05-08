@@ -12,7 +12,6 @@ import { Deployer } from "scripts/deploy/Deployer.sol";
 import { Chains } from "scripts/libraries/Chains.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { StateDiff } from "scripts/libraries/StateDiff.sol";
-import { Process } from "scripts/libraries/Process.sol";
 import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { DeploySuperchain2 } from "scripts/deploy/DeploySuperchain2.s.sol";
@@ -30,8 +29,6 @@ import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { IBigStepper } from "interfaces/dispute/IBigStepper.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
@@ -373,8 +370,6 @@ contract Deploy is Deployer {
             _implementation: delayedWETHImpl,
             _data: abi.encodeCall(IDelayedWETH.initialize, (deployOutput.systemConfigProxy))
         });
-
-        setCannonFaultGameImplementation();
     }
 
     ////////////////////////////////////////////////////////////////
@@ -404,83 +399,6 @@ contract Deploy is Deployer {
         );
         require(EIP1967Helper.getAdmin(address(proxy)) == _proxyOwner, "Deploy: EIP1967Proxy admin not set");
         addr_ = address(proxy);
-    }
-
-    ///////////////////////////////////////////////////////////
-    //         Proofs setup helper functions                 //
-    ///////////////////////////////////////////////////////////
-
-    /// @notice Load the appropriate mips absolute prestate for devenets depending on config environment.
-    function loadMipsAbsolutePrestate() internal returns (Claim mipsAbsolutePrestate_) {
-        if (block.chainid == Chains.LocalDevnet || block.chainid == Chains.GethDevnet) {
-            return _loadDevnetMtMipsAbsolutePrestate();
-        } else {
-            console.log(
-                "[Cannon Dispute Game] Using absolute prestate from config: %x", cfg.faultGameAbsolutePrestate()
-            );
-            mipsAbsolutePrestate_ = Claim.wrap(bytes32(cfg.faultGameAbsolutePrestate()));
-        }
-    }
-
-    function loadInteropDevnetAbsolutePrestate() internal returns (Claim interopDevnetAbsolutePrestate_) {
-        string memory filePath = string.concat(vm.projectRoot(), "/../../op-program/bin/prestate-proof-interop.json");
-        if (bytes(Process.bash(string.concat("[[ -f ", filePath, " ]] && echo \"present\""))).length == 0) {
-            revert(
-                "Deploy: cannon prestate dump not found, generate it with `make cannon-prestate` in the monorepo root"
-            );
-        }
-        interopDevnetAbsolutePrestate_ =
-            Claim.wrap(abi.decode(bytes(Process.bash(string.concat("cat ", filePath, " | jq -r .pre"))), (bytes32)));
-        console.log(
-            "[Cannon Dispute Game] Using devnet Interop Devnet Absolute Prestate: %s",
-            vm.toString(Claim.unwrap(interopDevnetAbsolutePrestate_))
-        );
-    }
-
-    /// @notice Loads the multithreaded mips absolute prestate from the prestate-proof-mt64 for devnets otherwise
-    ///         from the config.
-    function _loadDevnetMtMipsAbsolutePrestate() internal returns (Claim mipsAbsolutePrestate_) {
-        // Fetch the absolute prestate dump
-        string memory filePath = string.concat(vm.projectRoot(), "/../../op-program/bin/prestate-proof-mt64.json");
-        if (bytes(Process.bash(string.concat("[[ -f ", filePath, " ]] && echo \"present\""))).length == 0) {
-            revert(
-                "Deploy: MT-Cannon prestate dump not found, generate it with `make cannon-prestate-mt64` in the monorepo root"
-            );
-        }
-        mipsAbsolutePrestate_ =
-            Claim.wrap(abi.decode(bytes(Process.bash(string.concat("cat ", filePath, " | jq -r .pre"))), (bytes32)));
-        console.log(
-            "[MT-Cannon Dispute Game] Using devnet MIPS64 Absolute prestate: %s",
-            vm.toString(Claim.unwrap(mipsAbsolutePrestate_))
-        );
-    }
-
-    /// @notice Sets the implementation for the `CANNON` game type in the `DisputeGameFactory`
-    function setCannonFaultGameImplementation() public {
-        console.log("Setting Cannon FaultDisputeGame implementation");
-        address opcm = artifacts.mustGetAddress("OPContractsManager");
-        IProxyAdmin proxyAdmin = IProxyAdmin(artifacts.mustGetAddress("ProxyAdmin"));
-
-        IOPContractsManager.AddGameInput[] memory addGameInput = new IOPContractsManager.AddGameInput[](1);
-        addGameInput[0] = IOPContractsManager.AddGameInput({
-            saltMixer: "CannonFaultGame",
-            systemConfig: ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy")),
-            proxyAdmin: proxyAdmin,
-            delayedWETH: IDelayedWETH(artifacts.mustGetAddress("DelayedWETHProxy")),
-            disputeGameType: GameTypes.CANNON,
-            disputeAbsolutePrestate: loadMipsAbsolutePrestate(),
-            disputeMaxGameDepth: cfg.faultGameMaxDepth(),
-            disputeSplitDepth: cfg.faultGameSplitDepth(),
-            disputeClockExtension: Duration.wrap(uint64(cfg.faultGameClockExtension())),
-            disputeMaxClockDuration: Duration.wrap(uint64(cfg.faultGameMaxClockDuration())),
-            initialBond: 0.08 ether,
-            vm: IBigStepper(artifacts.mustGetAddress("MipsSingleton")),
-            permissioned: false
-        });
-
-        vm.prank(cfg.finalSystemOwner(), true);
-        (bool success,) = opcm.delegatecall(abi.encodeCall(IOPContractsManager.addGameType, (addGameInput)));
-        require(success, "Deploy: Cannon FaultDisputeGame implementation not set");
     }
 
     /// @notice Get the DeployInput struct to use for testing
