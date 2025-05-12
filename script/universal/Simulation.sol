@@ -150,11 +150,19 @@ library Simulation {
     {
         string memory proj = vm.envOr("TENDERLY_PROJECT", string("TENDERLY_PROJECT"));
         string memory username = vm.envOr("TENDERLY_USERNAME", string("TENDERLY_USERNAME"));
+        bool includeOverrides;
 
         // the following characters are url encoded: []{}
         string memory stateOverrides = "%5B";
         for (uint256 i; i < _overrides.length; i++) {
             StateOverride memory _override = _overrides[i];
+
+            if (_override.overrides.length == 0) {
+                continue;
+            }
+
+            includeOverrides = true;
+
             if (i > 0) stateOverrides = string.concat(stateOverrides, ",");
             stateOverrides = string.concat(
                 stateOverrides,
@@ -187,10 +195,13 @@ library Simulation {
             "&contractAddress=",
             vm.toString(_to),
             "&from=",
-            vm.toString(_from),
-            "&stateOverrides=",
-            stateOverrides
+            vm.toString(_from)
         );
+
+        if (includeOverrides) {
+            str = string.concat(str, "&stateOverrides=", stateOverrides);
+        }
+
         if (bytes(str).length + _data.length * 2 > 7980) {
             // tenderly's nginx has issues with long URLs, so print the raw input data separately
             str = string.concat(str, "\nInsert the following hex into the 'Raw input data' field:");
