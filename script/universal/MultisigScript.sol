@@ -433,8 +433,10 @@ abstract contract MultisigScript is Script {
     {
         IMulticall3.Call3[] memory calls = _simulateForSignerCalls(_safes, _datas, _value);
 
+        bytes32 firstCallDataHash = _getTransactionHash(_safes[0], _datas[0], _value);
+
         // Now define the state overrides for the simulation.
-        Simulation.StateOverride[] memory overrides = _overrides(_safes);
+        Simulation.StateOverride[] memory overrides = _overrides(_safes, firstCallDataHash);
 
         bytes memory txData = abi.encodeCall(IMulticall3.aggregate3, (calls));
         console.log("---\nSimulation link:");
@@ -451,12 +453,12 @@ abstract contract MultisigScript is Script {
 
     function _simulateForSignerCalls(address[] memory _safes, bytes[] memory _datas, uint256 _value)
         private
-        pure
+        view
         returns (IMulticall3.Call3[] memory)
     {
         IMulticall3.Call3[] memory calls = new IMulticall3.Call3[](_safes.length);
         for (uint256 i; i < _safes.length; i++) {
-            address signer = i == 0 ? MULTICALL3_ADDRESS : _safes[i - 1];
+            address signer = i == 0 ? msg.sender : _safes[i - 1];
             // uint256 value = i == _safes.length - 1 ? _value : 0;
 
             calls[i] = IMulticall3.Call3({
@@ -471,13 +473,16 @@ abstract contract MultisigScript is Script {
         return calls;
     }
 
-    function _overrides(address[] memory _safes) internal view returns (Simulation.StateOverride[] memory) {
+    function _overrides(address[] memory _safes, bytes32 firstCallDataHash)
+        internal
+        view
+        returns (Simulation.StateOverride[] memory)
+    {
         Simulation.StateOverride[] memory simOverrides = _simulationOverrides();
         Simulation.StateOverride[] memory overrides =
             new Simulation.StateOverride[](_safes.length + simOverrides.length);
         for (uint256 i = 0; i < _safes.length; i++) {
-            address owner = i == 0 ? MULTICALL3_ADDRESS : address(0);
-            overrides[i] = _safeOverrides(_safes[i], owner);
+            overrides[i] = _safeOverrides(_safes[i], msg.sender, firstCallDataHash, i);
         }
         for (uint256 i = 0; i < simOverrides.length; i++) {
             overrides[i + _safes.length] = simOverrides[i];
@@ -489,17 +494,17 @@ abstract contract MultisigScript is Script {
     // This allows simulation of the final transaction by overriding the threshold to 1.
     // State changes reflected in the simulation as a result of these overrides will
     // not be reflected in the prod execution.
-    function _safeOverrides(address _safe, address _owner)
+    function _safeOverrides(address _safe, address owner, bytes32 dataHash, uint256 index)
         internal
         view
         virtual
         returns (Simulation.StateOverride memory)
     {
-        uint256 _nonce = _getNonce(_safe);
-        if (_owner == address(0)) {
-            return Simulation.overrideSafeThresholdAndNonce(_safe, _nonce);
+        uint256 nonce = _getNonce(_safe);
+        if (index == 0) {
+            return Simulation.overrideSafeThresholdApprovalAndNonce(_safe, nonce, owner, dataHash);
         }
-        return Simulation.overrideSafeThresholdOwnerAndNonce(_safe, _owner, _nonce);
+        return Simulation.overrideSafeThresholdAndNonce(_safe, nonce);
     }
 
     // Get the nonce to use for the given safe, for signing and simulations.

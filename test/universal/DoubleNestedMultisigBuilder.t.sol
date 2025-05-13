@@ -79,14 +79,20 @@ contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
 
     function test_sign_double_nested_safe1() external {
         vm.recordLogs();
-        sign(safe1, safe3);
+        bytes memory txData = abi.encodeWithSelector(bytes4(keccak256("sign(address,address)")), safe1, safe3);
+        vm.prank(wallet1.addr);
+        (bool success,) = address(this).call(txData);
+        vm.assertTrue(success);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(keccak256(logs[logs.length - 1].data), keccak256(abi.encode(dataToSign1)));
     }
 
     function test_sign_double_nested_safe2() external {
         vm.recordLogs();
-        sign(safe2, safe3);
+        bytes memory txData = abi.encodeWithSelector(bytes4(keccak256("sign(address,address)")), safe2, safe3);
+        vm.prank(wallet2.addr);
+        (bool success,) = address(this).call(txData);
+        vm.assertTrue(success);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(keccak256(logs[logs.length - 1].data), keccak256(abi.encode(dataToSign2)));
     }

@@ -58,7 +58,10 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
         buildCallsInternal = _buildCallsNoValue;
 
         vm.recordLogs();
-        sign();
+        bytes memory txData = abi.encodeWithSelector(bytes4(keccak256("sign()")));
+        vm.prank(wallet1.addr);
+        (bool success,) = address(this).call(txData);
+        vm.assertTrue(success);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(keccak256(logs[logs.length - 1].data), keccak256(abi.encode(dataToSignNoValue)));
     }
@@ -67,7 +70,10 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
         buildCallsInternal = _buildCallsWithValue;
 
         vm.recordLogs();
-        sign();
+        bytes memory txData = abi.encodeWithSelector(bytes4(keccak256("sign()")));
+        vm.prank(wallet1.addr);
+        (bool success,) = address(this).call(txData);
+        vm.assertTrue(success);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(keccak256(logs[logs.length - 1].data), keccak256(abi.encode(dataToSignWithValue)));
     }
