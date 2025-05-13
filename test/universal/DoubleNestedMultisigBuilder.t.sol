@@ -11,6 +11,7 @@ import {DoubleNestedMultisigBuilder} from "../../script/universal/DoubleNestedMu
 import {Simulation} from "../../script/universal/Simulation.sol";
 import {IGnosisSafe} from "../../script/universal/IGnosisSafe.sol";
 import {Counter} from "./Counter.sol";
+import {IDoubleNestedMultisigBuilder} from "../TestUtils.sol";
 
 contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
     Vm.Wallet internal wallet1 = vm.createWallet("1");
@@ -79,7 +80,7 @@ contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
 
     function test_sign_double_nested_safe1() external {
         vm.recordLogs();
-        bytes memory txData = abi.encodeWithSelector(bytes4(keccak256("sign(address,address)")), safe1, safe3);
+        bytes memory txData = abi.encodeCall(IDoubleNestedMultisigBuilder.sign, (safe1, safe3));
         vm.prank(wallet1.addr);
         (bool success,) = address(this).call(txData);
         vm.assertTrue(success);
@@ -89,7 +90,7 @@ contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
 
     function test_sign_double_nested_safe2() external {
         vm.recordLogs();
-        bytes memory txData = abi.encodeWithSelector(bytes4(keccak256("sign(address,address)")), safe2, safe3);
+        bytes memory txData = abi.encodeCall(IDoubleNestedMultisigBuilder.sign, (safe2, safe3));
         vm.prank(wallet2.addr);
         (bool success,) = address(this).call(txData);
         vm.assertTrue(success);
