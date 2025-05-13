@@ -473,6 +473,10 @@ abstract contract MultisigScript is Script {
         return calls;
     }
 
+    // The state change simulation can set the threshold, owner address and/or nonce.
+    // This allows simulation of the final transaction by overriding the threshold to 1.
+    // State changes reflected in the simulation as a result of these overrides will
+    // not be reflected in the prod execution.
     function _overrides(address[] memory _safes, bytes32 firstCallDataHash)
         internal
         view
@@ -481,30 +485,23 @@ abstract contract MultisigScript is Script {
         Simulation.StateOverride[] memory simOverrides = _simulationOverrides();
         Simulation.StateOverride[] memory overrides =
             new Simulation.StateOverride[](_safes.length + simOverrides.length);
+
         for (uint256 i = 0; i < _safes.length; i++) {
-            overrides[i] = _safeOverrides(_safes[i], msg.sender, firstCallDataHash, i);
+            uint256 nonce = _getNonce(_safes[i]);
+
+            if (i == 0) {
+                overrides[i] =
+                    Simulation.overrideSafeThresholdApprovalAndNonce(_safes[i], nonce, msg.sender, firstCallDataHash);
+            } else {
+                overrides[i] = Simulation.overrideSafeThresholdAndNonce(_safes[i], nonce);
+            }
         }
+
         for (uint256 i = 0; i < simOverrides.length; i++) {
             overrides[i + _safes.length] = simOverrides[i];
         }
-        return overrides;
-    }
 
-    // The state change simulation can set the threshold, owner address and/or nonce.
-    // This allows simulation of the final transaction by overriding the threshold to 1.
-    // State changes reflected in the simulation as a result of these overrides will
-    // not be reflected in the prod execution.
-    function _safeOverrides(address _safe, address owner, bytes32 dataHash, uint256 index)
-        internal
-        view
-        virtual
-        returns (Simulation.StateOverride memory)
-    {
-        uint256 nonce = _getNonce(_safe);
-        if (index == 0) {
-            return Simulation.overrideSafeThresholdApprovalAndNonce(_safe, nonce, owner, dataHash);
-        }
-        return Simulation.overrideSafeThresholdAndNonce(_safe, nonce);
+        return overrides;
     }
 
     // Get the nonce to use for the given safe, for signing and simulations.
