@@ -459,7 +459,6 @@ abstract contract MultisigScript is Script {
         IMulticall3.Call3[] memory calls = new IMulticall3.Call3[](_safes.length);
         for (uint256 i; i < _safes.length; i++) {
             address signer = i == 0 ? msg.sender : _safes[i - 1];
-            // uint256 value = i == _safes.length - 1 ? _value : 0;
 
             calls[i] = IMulticall3.Call3({
                 target: _safes[i],
