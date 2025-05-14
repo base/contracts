@@ -11,7 +11,6 @@ import {MultisigBuilder} from "../../script/universal/MultisigBuilder.sol";
 import {Simulation} from "../../script/universal/Simulation.sol";
 import {IGnosisSafe} from "../../script/universal/IGnosisSafe.sol";
 import {Counter} from "./Counter.sol";
-import {IMultisigBuilder} from "../TestUtils.sol";
 
 contract MultisigBuilderTest is Test, MultisigBuilder {
     Vm.Wallet internal wallet1 = vm.createWallet("1");
@@ -59,7 +58,7 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
         buildCallsInternal = _buildCallsNoValue;
 
         vm.recordLogs();
-        bytes memory txData = abi.encodeCall(IMultisigBuilder.sign, ());
+        bytes memory txData = abi.encodeCall(MultisigBuilder.sign, ());
         vm.prank(wallet1.addr);
         (bool success,) = address(this).call(txData);
         vm.assertTrue(success);
@@ -71,7 +70,7 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
         buildCallsInternal = _buildCallsWithValue;
 
         vm.recordLogs();
-        bytes memory txData = abi.encodeCall(IMultisigBuilder.sign, ());
+        bytes memory txData = abi.encodeCall(MultisigBuilder.sign, ());
         vm.prank(wallet1.addr);
         (bool success,) = address(this).call(txData);
         vm.assertTrue(success);

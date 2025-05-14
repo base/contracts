@@ -486,15 +486,11 @@ abstract contract MultisigScript is Script {
         Simulation.StateOverride[] memory overrides =
             new Simulation.StateOverride[](_safes.length + simOverrides.length);
 
-        for (uint256 i = 0; i < _safes.length; i++) {
-            uint256 nonce = _getNonce(_safes[i]);
+        uint256 nonce = _getNonce(_safes[0]);
+        overrides[0] = Simulation.overrideSafeThresholdApprovalAndNonce(_safes[0], nonce, msg.sender, firstCallDataHash);
 
-            if (i == 0) {
-                overrides[i] =
-                    Simulation.overrideSafeThresholdApprovalAndNonce(_safes[i], nonce, msg.sender, firstCallDataHash);
-            } else {
-                overrides[i] = Simulation.overrideSafeThresholdAndNonce(_safes[i], nonce);
-            }
+        for (uint256 i = 1; i < _safes.length; i++) {
+            overrides[i] = Simulation.overrideSafeThresholdAndNonce(_safes[i], _getNonce(_safes[i]));
         }
 
         for (uint256 i = 0; i < simOverrides.length; i++) {

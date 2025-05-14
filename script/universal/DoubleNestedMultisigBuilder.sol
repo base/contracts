@@ -11,7 +11,7 @@ abstract contract DoubleNestedMultisigBuilder is MultisigScript {
     /*
      * @custom:deprecated Use `sign(address[] memory _safes)` instead.
      */
-    function sign(address _signerSafe, address _intermediateSafe) public {
+    function sign(address _signerSafe, address _intermediateSafe) external {
         sign(_toArray(_signerSafe, _intermediateSafe));
     }
 

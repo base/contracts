@@ -11,7 +11,7 @@ abstract contract MultisigBuilder is MultisigScript {
     /*
      * @custom:deprecated Use `sign(address[] memory _safes)` instead, with an empty array.
      */
-    function sign() public {
+    function sign() external {
         sign(new address[](0));
     }
 

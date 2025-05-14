@@ -11,7 +11,7 @@ abstract contract NestedMultisigBuilder is MultisigScript {
     /*
      * @custom:deprecated Use `sign(address[] memory _safes)` instead.
      */
-    function sign(address _signerSafe) public {
+    function sign(address _signerSafe) external {
         sign(_toArray(_signerSafe));
     }
 
