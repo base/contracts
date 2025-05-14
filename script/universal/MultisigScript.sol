@@ -433,8 +433,10 @@ abstract contract MultisigScript is Script {
     {
         IMulticall3.Call3[] memory calls = _simulateForSignerCalls(_safes, _datas, _value);
 
+        bytes32 firstCallDataHash = _getTransactionHash(_safes[0], _datas[0], _value);
+
         // Now define the state overrides for the simulation.
-        Simulation.StateOverride[] memory overrides = _overrides(_safes);
+        Simulation.StateOverride[] memory overrides = _overrides(_safes, firstCallDataHash);
 
         bytes memory txData = abi.encodeCall(IMulticall3.aggregate3, (calls));
         console.log("---\nSimulation link:");
@@ -451,13 +453,12 @@ abstract contract MultisigScript is Script {
 
     function _simulateForSignerCalls(address[] memory _safes, bytes[] memory _datas, uint256 _value)
         private
-        pure
+        view
         returns (IMulticall3.Call3[] memory)
     {
         IMulticall3.Call3[] memory calls = new IMulticall3.Call3[](_safes.length);
         for (uint256 i; i < _safes.length; i++) {
-            address signer = i == 0 ? MULTICALL3_ADDRESS : _safes[i - 1];
-            // uint256 value = i == _safes.length - 1 ? _value : 0;
+            address signer = i == 0 ? msg.sender : _safes[i - 1];
 
             calls[i] = IMulticall3.Call3({
                 target: _safes[i],
@@ -471,35 +472,31 @@ abstract contract MultisigScript is Script {
         return calls;
     }
 
-    function _overrides(address[] memory _safes) internal view returns (Simulation.StateOverride[] memory) {
-        Simulation.StateOverride[] memory simOverrides = _simulationOverrides();
-        Simulation.StateOverride[] memory overrides =
-            new Simulation.StateOverride[](_safes.length + simOverrides.length);
-        for (uint256 i = 0; i < _safes.length; i++) {
-            address owner = i == 0 ? MULTICALL3_ADDRESS : address(0);
-            overrides[i] = _safeOverrides(_safes[i], owner);
-        }
-        for (uint256 i = 0; i < simOverrides.length; i++) {
-            overrides[i + _safes.length] = simOverrides[i];
-        }
-        return overrides;
-    }
-
     // The state change simulation can set the threshold, owner address and/or nonce.
     // This allows simulation of the final transaction by overriding the threshold to 1.
     // State changes reflected in the simulation as a result of these overrides will
     // not be reflected in the prod execution.
-    function _safeOverrides(address _safe, address _owner)
+    function _overrides(address[] memory _safes, bytes32 firstCallDataHash)
         internal
         view
-        virtual
-        returns (Simulation.StateOverride memory)
+        returns (Simulation.StateOverride[] memory)
     {
-        uint256 _nonce = _getNonce(_safe);
-        if (_owner == address(0)) {
-            return Simulation.overrideSafeThresholdAndNonce(_safe, _nonce);
+        Simulation.StateOverride[] memory simOverrides = _simulationOverrides();
+        Simulation.StateOverride[] memory overrides =
+            new Simulation.StateOverride[](_safes.length + simOverrides.length);
+
+        uint256 nonce = _getNonce(_safes[0]);
+        overrides[0] = Simulation.overrideSafeThresholdApprovalAndNonce(_safes[0], nonce, msg.sender, firstCallDataHash);
+
+        for (uint256 i = 1; i < _safes.length; i++) {
+            overrides[i] = Simulation.overrideSafeThresholdAndNonce(_safes[i], _getNonce(_safes[i]));
         }
-        return Simulation.overrideSafeThresholdOwnerAndNonce(_safe, _owner, _nonce);
+
+        for (uint256 i = 0; i < simOverrides.length; i++) {
+            overrides[i + _safes.length] = simOverrides[i];
+        }
+
+        return overrides;
     }
 
     // Get the nonce to use for the given safe, for signing and simulations.

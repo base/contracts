@@ -73,14 +73,20 @@ contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
 
     function test_sign_safe1() external {
         vm.recordLogs();
-        sign(safe1);
+        bytes memory txData = abi.encodeCall(NestedMultisigBuilder.sign, (safe1));
+        vm.prank(wallet1.addr);
+        (bool success,) = address(this).call(txData);
+        vm.assertTrue(success);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(keccak256(logs[logs.length - 1].data), keccak256(abi.encode(dataToSign1)));
     }
 
     function test_sign_safe2() external {
         vm.recordLogs();
-        sign(safe2);
+        bytes memory txData = abi.encodeCall(NestedMultisigBuilder.sign, (safe2));
+        vm.prank(wallet2.addr);
+        (bool success,) = address(this).call(txData);
+        vm.assertTrue(success);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(keccak256(logs[logs.length - 1].data), keccak256(abi.encode(dataToSign2)));
     }

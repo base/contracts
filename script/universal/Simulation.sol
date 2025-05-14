@@ -54,6 +54,19 @@ library Simulation {
         return accesses;
     }
 
+    function overrideSafeThresholdApprovalAndNonce(address _safe, uint256 _nonce, address owner, bytes32 dataHash)
+        internal
+        view
+        returns (StateOverride memory)
+    {
+        // solhint-disable-next-line max-line-length
+        StateOverride memory state = StateOverride({contractAddress: _safe, overrides: new StorageOverride[](0)});
+        state = addThresholdOverride(_safe, state);
+        state = addNonceOverride(_safe, state, _nonce);
+        state = addApprovalOverride(state, owner, dataHash);
+        return state;
+    }
+
     function overrideSafeThresholdAndNonce(address _safe, uint256 _nonce)
         internal
         view
@@ -65,16 +78,18 @@ library Simulation {
         return state;
     }
 
-    function overrideSafeThresholdOwnerAndNonce(address _safe, address _owner, uint256 _nonce)
+    function addApprovalOverride(StateOverride memory _state, address owner, bytes32 dataHash)
         internal
-        view
+        pure
         returns (StateOverride memory)
     {
-        StateOverride memory state = StateOverride({contractAddress: _safe, overrides: new StorageOverride[](0)});
-        state = addThresholdOverride(_safe, state);
-        state = addOwnerOverride(_safe, state, _owner);
-        state = addNonceOverride(_safe, state, _nonce);
-        return state;
+        return addOverride(
+            _state,
+            StorageOverride({
+                key: keccak256(abi.encode(dataHash, keccak256(abi.encode(owner, uint256(8))))),
+                value: bytes32(uint256(0x1))
+            })
+        );
     }
 
     function addThresholdOverride(address _safe, StateOverride memory _state)
