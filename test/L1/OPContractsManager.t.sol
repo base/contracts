@@ -524,7 +524,7 @@ contract OPContractsManager_Upgrade_Harness is CommonTest {
                 abi.encode(
                     l2ChainId,
                     string.concat(string(bytes.concat(bytes32(uint256(uint160(address(systemConfig))))))),
-                    "AnchorStateRegistry-SOT"
+                    "AnchorStateRegistry-U16"
                 )
             );
 
@@ -589,27 +589,27 @@ contract OPContractsManager_Upgrade_Harness is CommonTest {
         // Check that the PermissionedDisputeGame is upgraded to the expected version, references
         // the correct anchor state and has the mipsImpl. Although Upgrade 15 doesn't actually
         // change any of this, we might as well check it again.
-        assertEq(ISemver(address(pdg)).version(), "1.6.0");
+        assertEq(ISemver(address(pdg)).version(), "1.7.0");
         assertEq(address(pdg.vm()), impls.mipsImpl);
         assertEq(pdg.l2ChainId(), oldPDG.l2ChainId());
 
         // If the old FaultDisputeGame exists, we expect it to be upgraded. Check same as above.
         if (address(oldFDG) != address(0)) {
-            assertEq(ISemver(address(fdg)).version(), "1.6.0");
+            assertEq(ISemver(address(fdg)).version(), "1.7.0");
             assertEq(address(fdg.vm()), impls.mipsImpl);
             assertEq(fdg.l2ChainId(), oldFDG.l2ChainId());
         }
 
         // Make sure that the SystemConfig is upgraded to the right version. It must also have the
         // right l2ChainId and must be properly initialized.
-        assertEq(ISemver(address(systemConfig)).version(), "3.2.0");
+        assertEq(ISemver(address(systemConfig)).version(), "3.3.0");
         assertEq(impls.systemConfigImpl, EIP1967Helper.getImplementation(address(systemConfig)));
         assertEq(systemConfig.l2ChainId(), l2ChainId);
         DeployUtils.assertInitialized({ _contractAddress: address(systemConfig), _isProxy: true, _slot: 0, _offset: 0 });
 
         // Make sure that the OptimismPortal is upgraded to the right version. It must also have a
         // reference to the new AnchorStateRegistry.
-        assertEq(ISemver(address(optimismPortal2)).version(), "4.4.0");
+        assertEq(ISemver(address(optimismPortal2)).version(), "4.5.0");
         assertEq(impls.optimismPortalImpl, EIP1967Helper.getImplementation(address(optimismPortal2)));
         assertEq(address(optimismPortal2.anchorStateRegistry()), address(newAsrProxy));
         DeployUtils.assertInitialized({
@@ -620,7 +620,7 @@ contract OPContractsManager_Upgrade_Harness is CommonTest {
         });
 
         // Make sure the new AnchorStateRegistry has the right version and is initialized.
-        assertEq(ISemver(address(newAsrProxy)).version(), "3.4.0");
+        assertEq(ISemver(address(newAsrProxy)).version(), "3.5.0");
         vm.prank(address(proxyAdmin));
         assertEq(IProxy(payable(newAsrProxy)).admin(), address(proxyAdmin));
         DeployUtils.assertInitialized({ _contractAddress: address(newAsrProxy), _isProxy: true, _slot: 0, _offset: 0 });
@@ -1026,6 +1026,10 @@ contract OPContractsManager_TestInit is Test {
 
         chainDeployOutput1 = createChainContracts(100);
         chainDeployOutput2 = createChainContracts(101);
+
+        // Mock the SuperchainConfig.paused function to return false.
+        // Otherwise migration will fail!
+        vm.mockCall(address(superchainConfigProxy), ISuperchainConfig.paused.selector, abi.encode(false));
 
         // Fund the lockboxes for testing.
         vm.deal(address(chainDeployOutput1.ethLockboxProxy), 100 ether);
