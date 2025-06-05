@@ -7,6 +7,54 @@ import {SafeL2} from "lib/safe-smart-account/contracts/SafeL2.sol";
 import {Safe} from "lib/safe-smart-account/contracts/Safe.sol";
 import {SafeProxy} from "lib/safe-smart-account/contracts/proxies/SafeProxy.sol";
 
+
+/**
+ * @title MultisigDeployScript
+ * @notice Deploys a hierarchy of Safe multisig wallets where later safes can reference earlier ones as owners
+ * 
+ * @dev This script enables deployment of nested/hierarchical multisig structures for complex governance systems.
+ *      Safes are deployed in array order, allowing later safes to use previously deployed safes as owners.
+ * 
+ * EXAMPLE JSON CONFIGURATION (config/safes-nested.json):
+ * {
+ *   "safeCount": 3,
+ *   "safes": [
+ *     {
+ *       "label": "Treasury",
+ *       "threshold": 2,
+ *       "owners": [
+ *         "0x1234567890123456789012345678901234567890",
+ *         "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+ *       ],
+ *       "ownerRefIndices": []
+ *     },
+ *     {
+ *       "label": "Operations",
+ *       "threshold": 1,
+ *       "owners": [
+ *         "0x9876543210987654321098765432109876543210"
+ *       ],
+ *       "ownerRefIndices": [0]
+ *     },
+ *     {
+ *       "label": "Governance",
+ *       "threshold": 2,
+ *       "owners": [],
+ *       "ownerRefIndices": [0, 1]
+ *     }
+ *   ]
+ * }
+ * 
+ * CONFIGURATION FIELDS:
+ * - label: Human-readable name for the safe
+ * - threshold: Number of signatures required for transactions
+ * - owners: Array of direct address owners (EOAs or other contracts)
+ * - ownerRefIndices: Array of indices referencing previously deployed safes as owners
+ * 
+ * DEPLOYMENT ORDER MATTERS:
+ * - Safes must be ordered so that any referenced safe (via ownerRefIndices) appears earlier in the array
+ * - This ensures referenced safes are already deployed when needed as owners
+ */
 contract MultisigDeployScript is Script {
     // Safe v1.4.1-3 Addresses
     address public constant SINGLETON = 0x29fcB43b46531BcA003ddC8FCB67FFE91900C762;
