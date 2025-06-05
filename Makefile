@@ -14,7 +14,8 @@ deps: clean-lib checkout-op-commit
 		github.com/OpenZeppelin/openzeppelin-contracts@v4.9.3 \
 		github.com/OpenZeppelin/openzeppelin-contracts-upgradeable@v4.7.3 \
 		github.com/rari-capital/solmate@8f9b23f8838670afda0fd8983f2c41e8037ae6bc \
-		github.com/Vectorized/solady@862a0afd3e66917f50e987e91886b9b90c4018a1
+		github.com/Vectorized/solady@862a0afd3e66917f50e987e91886b9b90c4018a1 \
+		github.com/safe-global/safe-smart-account@v1.4.1-3
 
 .PHONY: test
 test:
