@@ -7,14 +7,13 @@ import {SafeL2} from "lib/safe-smart-account/contracts/SafeL2.sol";
 import {Safe} from "lib/safe-smart-account/contracts/Safe.sol";
 import {SafeProxy} from "lib/safe-smart-account/contracts/proxies/SafeProxy.sol";
 
-
 /**
  * @title MultisigDeployScript
  * @notice Deploys a hierarchy of Safe multisig wallets where later safes can reference earlier ones as owners
- * 
+ *
  * @dev This script enables deployment of nested/hierarchical multisig structures for complex governance systems.
  *      Safes are deployed in array order, allowing later safes to use previously deployed safes as owners.
- * 
+ *
  * EXAMPLE JSON CONFIGURATION (config/safes-nested.json):
  * {
  *   "safeCount": 3,
@@ -44,13 +43,13 @@ import {SafeProxy} from "lib/safe-smart-account/contracts/proxies/SafeProxy.sol"
  *     }
  *   ]
  * }
- * 
+ *
  * CONFIGURATION FIELDS:
  * - label: Human-readable name for the safe
  * - threshold: Number of signatures required for transactions
  * - owners: Array of direct address owners (EOAs or other contracts)
  * - ownerRefIndices: Array of indices referencing previously deployed safes as owners
- * 
+ *
  * DEPLOYMENT ORDER MATTERS:
  * - Safes must be ordered so that any referenced safe (via ownerRefIndices) appears earlier in the array
  * - This ensures referenced safes are already deployed when needed as owners
@@ -63,9 +62,9 @@ contract MultisigDeployScript is Script {
 
     struct SafeWallet {
         string label;
-        uint256 threshold;         
+        uint256 threshold;
         address[] owners;
-        uint256[] ownerRefIndices;     
+        uint256[] ownerRefIndices;
     }
 
     // Track deployed safes and their predicted addresses
@@ -82,20 +81,21 @@ contract MultisigDeployScript is Script {
         // Read safeCount directly from JSON
         uint256 safeCount = vm.parseJsonUint(json, ".safeCount");
         console.log("Reading", safeCount, "safes from configuration");
-        
+
         // Parse each safe individually field by field
         for (uint256 i = 0; i < safeCount; i++) {
             string memory basePath = string(abi.encodePacked(".safes[", vm.toString(i), "]"));
 
             safes.push();
-            
+
             // Parse simple fields (these work reliably)
             safes[i].label = vm.parseJsonString(json, string(abi.encodePacked(basePath, ".label")));
             safes[i].threshold = vm.parseJsonUint(json, string(abi.encodePacked(basePath, ".threshold")));
-            
+
             // Parse arrays (these are more reliable when done individually)
             safes[i].owners = vm.parseJsonAddressArray(json, string(abi.encodePacked(basePath, ".owners")));
-            safes[i].ownerRefIndices = vm.parseJsonUintArray(json, string(abi.encodePacked(basePath, ".ownerRefIndices")));
+            safes[i].ownerRefIndices =
+                vm.parseJsonUintArray(json, string(abi.encodePacked(basePath, ".ownerRefIndices")));
         }
 
         // Print out the config to verify parsing worked
@@ -129,14 +129,14 @@ contract MultisigDeployScript is Script {
         for (uint256 i = 0; i < safes.length; i++) {
             SafeWallet memory config = safes[i];
             uint256 saltNonce = baseNonce + i;
-            
+
             console.log("Deploying Safe:", config.label);
             console.log("  Index:", i);
             console.log("  Salt Nonce:", saltNonce);
-            
+
             // Resolve owner addresses (combine direct owners + referenced safe addresses)
             address[] memory resolvedOwners = resolveOwnerAddresses(config, safes);
-            
+
             console.log("  Total Owners:", resolvedOwners.length);
             console.log("  Direct Owners:", config.owners.length);
             console.log("  Safe References:", config.ownerRefIndices.length);
@@ -159,12 +159,12 @@ contract MultisigDeployScript is Script {
 
             // Deploy Safe with calculated nonce
             SafeProxy safe = factory.createProxyWithNonce(SINGLETON, initializer, saltNonce);
-            
+
             // Store deployed address
             deployedSafes[config.label] = address(safe);
 
             console.log("  Deployed at:", address(safe));
-            
+
             // Log resolved owners
             for (uint256 k = 0; k < resolvedOwners.length; k++) {
                 console.log("    Owner", k, ":", resolvedOwners[k]);
@@ -186,15 +186,19 @@ contract MultisigDeployScript is Script {
         }
     }
 
-    function resolveOwnerAddresses(SafeWallet memory config, SafeWallet[] memory safes) internal view returns (address[] memory) {
+    function resolveOwnerAddresses(SafeWallet memory config, SafeWallet[] memory safes)
+        internal
+        view
+        returns (address[] memory)
+    {
         uint256 totalOwners = config.owners.length + config.ownerRefIndices.length;
         address[] memory resolved = new address[](totalOwners);
-        
+
         // Add direct address owners
         for (uint256 i = 0; i < config.owners.length; i++) {
             resolved[i] = config.owners[i];
         }
-        
+
         // Add referenced safe addresses (they must already be deployed due to array order)
         for (uint256 i = 0; i < config.ownerRefIndices.length; i++) {
             uint256 refIndex = config.ownerRefIndices[i];
@@ -203,7 +207,7 @@ contract MultisigDeployScript is Script {
             require(refAddr != address(0), string(abi.encodePacked("Reference not deployed: ", refLabel)));
             resolved[config.owners.length + i] = refAddr;
         }
-        
+
         return resolved;
     }
-} 
+}
