@@ -2,10 +2,10 @@
 pragma solidity ^0.8.0;
 
 import {Script, console} from "forge-std/Script.sol";
-import {SafeProxyFactory} from "@safe/proxies/SafeProxyFactory.sol";
-import {SafeL2} from "@safe/SafeL2.sol";
-import {Safe} from "@safe/Safe.sol";
-import {SafeProxy} from "@safe/proxies/SafeProxy.sol";
+import {SafeProxyFactory} from "lib/safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
+import {SafeL2} from "lib/safe-smart-account/contracts/SafeL2.sol";
+import {Safe} from "lib/safe-smart-account/contracts/Safe.sol";
+import {SafeProxy} from "lib/safe-smart-account/contracts/proxies/SafeProxy.sol";
 
 contract MultisigDeployScript is Script {
     // Safe v1.4.1-3 Addresses

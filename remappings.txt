@@ -3,4 +3,3 @@
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts
 @rari-capital/solmate/=lib/solmate/
 @solady/=lib/solady/src/
-@safe/=lib/safe-smart-account/contracts/
