@@ -44,3 +44,12 @@ bindings:
 	abigen --abi out/BalanceTracker.sol/BalanceTracker.abi.json --pkg bindings --type BalanceTracker --out bindings/balance_tracker.go
 	abigen --abi out/FeeDisburser.sol/FeeDisburser.abi.json --pkg bindings --type FeeDisburser --out bindings/fee_disburser.go
 	cd bindings && go mod tidy
+
+
+##
+# Script 
+## 
+.PHONY: deploy-nested
+deploy-nested:
+	forge script script/universal/MultisigDeploy.s.sol:MultisigDeployScript --interactive 1 --broadcast
+
