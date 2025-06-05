@@ -74,8 +74,10 @@ contract MultisigDeployScript is Script {
     SafeWallet[] public safes;
 
     function setUp() public {
-        // Read configs from JSON file
-        string memory json = vm.readFile("config/safes-nested.json");
+        // Read configs from JSON
+        string memory configPath = vm.envString("MULTISIG_CONFIG_PATH");
+        string memory json = vm.readFile(configPath);
+        console.log("Using config path:", configPath);
 
         // Read safeCount directly from JSON
         uint256 safeCount = vm.parseJsonUint(json, ".safeCount");
