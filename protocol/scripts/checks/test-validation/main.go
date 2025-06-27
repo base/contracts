@@ -353,8 +353,6 @@ var excludedPaths = []string{
 	// infrastructure beyond standard harnesses or different setup contracts patterns.
 	"test/dispute/FaultDisputeGame.t.sol",       // Contains contracts not matching FaultDisputeGame base name
 	"test/dispute/SuperFaultDisputeGame.t.sol",  // Contains contracts not matching SuperFaultDisputeGame base name
-	"test/L1/L1CrossDomainMessenger.t.sol",      // Contains contracts not matching L1CrossDomainMessenger base name
-	"test/L1/L1ERC721Bridge.t.sol",              // Contains contracts not matching L1ERC721Bridge base name
 	"test/L1/ResourceMetering.t.sol",            // Contains contracts not matching ResourceMetering base name
 	"test/L1/StandardValidator.t.sol",           // Contains contracts not matching StandardValidator base name
 	"test/L2/CrossDomainOwnable.t.sol",          // Contains contracts not matching CrossDomainOwnable base name
