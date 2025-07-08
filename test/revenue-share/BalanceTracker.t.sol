@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {CommonTest} from "test/CommonTest.t.sol";
-import {ReenterProcessFees} from "test/revenue-share/mocks/ReenterProcessFees.sol";
-
-import {Proxy} from "@eth-optimism-bedrock/src/universal/Proxy.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {Proxy} from "@eth-optimism-bedrock/src/universal/Proxy.sol";
 
 import {BalanceTracker} from "src/revenue-share/BalanceTracker.sol";
 
+import {CommonTest} from "test/CommonTest.t.sol";
+import {ReenterProcessFees} from "test/revenue-share/mocks/ReenterProcessFees.sol";
+
 contract BalanceTrackerTest is CommonTest {
     event ProcessedFunds(
-        address indexed _systemAddress, bool indexed _success, uint256 _balanceNeeded, uint256 _balanceSent
+        address indexed systemAddress, bool indexed success, uint256 balanceNeeded, uint256 balanceSent
     );
-    event SentProfit(address indexed _profitWallet, bool indexed _success, uint256 _balanceSent);
-    event ReceivedFunds(address indexed _sender, uint256 _amount);
+    event SentProfit(address indexed profitWallet, bool indexed success, uint256 balanceSent);
+    event ReceivedFunds(address indexed sender, uint256 amount);
 
     uint256 constant MAX_SYSTEM_ADDRESS_COUNT = 20;
     uint256 constant INITIAL_BALANCE_TRACKER_BALANCE = 2_000 ether;
