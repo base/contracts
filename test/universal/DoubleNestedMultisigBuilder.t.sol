@@ -4,13 +4,13 @@ pragma solidity 0.8.15;
 import {IMulticall3} from "forge-std/interfaces/IMulticall3.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-
 import {Preinstalls} from "@eth-optimism-bedrock/src/libraries/Preinstalls.sol";
 
-import {DoubleNestedMultisigBuilder} from "../../script/universal/DoubleNestedMultisigBuilder.sol";
-import {Simulation} from "../../script/universal/Simulation.sol";
-import {IGnosisSafe} from "../../script/universal/IGnosisSafe.sol";
-import {Counter} from "./Counter.sol";
+import {DoubleNestedMultisigBuilder} from "script/universal/DoubleNestedMultisigBuilder.sol";
+import {Simulation} from "script/universal/Simulation.sol";
+import {IGnosisSafe} from "script/universal/IGnosisSafe.sol";
+
+import {Counter} from "test/universal/Counter.sol";
 
 contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
     Vm.Wallet internal wallet1 = vm.createWallet("1");

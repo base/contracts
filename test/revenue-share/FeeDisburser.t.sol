@@ -1,21 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {CommonTest} from "test/CommonTest.t.sol";
-import {FeeVaultRevert} from "test/revenue-share/mocks/FeeVaultRevert.sol";
-import {OptimismWalletRevert} from "test/revenue-share/mocks/OptimismWalletRevert.sol";
-
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
-import {L2StandardBridge} from "@eth-optimism-bedrock/src/L2/L2StandardBridge.sol";
-import {SequencerFeeVault, FeeVault} from "@eth-optimism-bedrock/src/L2/SequencerFeeVault.sol";
 import {BaseFeeVault} from "@eth-optimism-bedrock/src/L2/BaseFeeVault.sol";
 import {L1FeeVault} from "@eth-optimism-bedrock/src/L2/L1FeeVault.sol";
+import {L2StandardBridge} from "@eth-optimism-bedrock/src/L2/L2StandardBridge.sol";
+import {SequencerFeeVault, FeeVault} from "@eth-optimism-bedrock/src/L2/SequencerFeeVault.sol";
 import {Predeploys} from "@eth-optimism-bedrock/src/libraries/Predeploys.sol";
 
 import {FeeDisburser} from "src/revenue-share/FeeDisburser.sol";
+
+import {FeeVaultRevert} from "test/revenue-share/mocks/FeeVaultRevert.sol";
+import {OptimismWalletRevert} from "test/revenue-share/mocks/OptimismWalletRevert.sol";
+import {CommonTest} from "test/CommonTest.t.sol";
 
 contract FeeDisburserTest is CommonTest {
     event FeesDisbursed(uint256 _disbursementTime, uint256 _paidToOptimism, uint256 _totalFeesDisbursed);

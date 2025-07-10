@@ -2,14 +2,14 @@
 pragma solidity ^0.8.15;
 
 // solhint-disable no-console
-import {console} from "forge-std/console.sol";
-import {Vm} from "forge-std/Vm.sol";
+import {console} from "lib/forge-std/src/console.sol";
+import {Vm} from "lib/forge-std/src/Vm.sol";
 
 import {IGnosisSafe} from "./IGnosisSafe.sol";
 
 library Simulation {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
-    Vm internal constant vm = Vm(VM_ADDRESS);
+    Vm internal constant VM = Vm(VM_ADDRESS);
 
     struct StateOverride {
         address contractAddress;
@@ -40,137 +40,147 @@ library Simulation {
             StorageOverride[] memory storageOverrides = stateOverride.overrides;
             for (uint256 j; j < storageOverrides.length; j++) {
                 StorageOverride memory storageOverride = storageOverrides[j];
-                vm.store(stateOverride.contractAddress, storageOverride.key, storageOverride.value);
+                VM.store({
+                    target: stateOverride.contractAddress,
+                    slot: storageOverride.key,
+                    value: storageOverride.value
+                });
             }
         }
 
         // Execute the call in forge and return the state diff.
-        vm.startStateDiffRecording();
-        vm.prank(simPayload.from);
+        VM.startStateDiffRecording();
+        VM.prank({msgSender: simPayload.from});
         (bool ok, bytes memory returnData) = address(simPayload.to).call(simPayload.data);
-        Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
-        require(ok, string.concat("Simulator::simulateFromSimPayload failed: ", vm.toString(returnData)));
+        Vm.AccountAccess[] memory accesses = VM.stopAndReturnStateDiff();
+        require(ok, string.concat("Simulator::simulateFromSimPayload failed: ", VM.toString({value: returnData})));
         require(accesses.length > 0, "Simulator::simulateFromSimPayload: No state changes");
         return accesses;
     }
 
-    function overrideSafeThresholdApprovalAndNonce(address _safe, uint256 _nonce, address owner, bytes32 dataHash)
+    function overrideSafeThresholdApprovalAndNonce(address safe, uint256 nonce, address owner, bytes32 dataHash)
         internal
         view
         returns (StateOverride memory)
     {
         // solhint-disable-next-line max-line-length
-        StateOverride memory state = StateOverride({contractAddress: _safe, overrides: new StorageOverride[](0)});
-        state = addThresholdOverride(_safe, state);
-        state = addNonceOverride(_safe, state, _nonce);
-        state = addApprovalOverride(state, owner, dataHash);
+        StateOverride memory state = StateOverride({contractAddress: safe, overrides: new StorageOverride[](0)});
+        state = addThresholdOverride({safe: safe, state: state});
+        state = addNonceOverride({safe: safe, state: state, nonce: nonce});
+        state = addApprovalOverride({state: state, owner: owner, dataHash: dataHash});
         return state;
     }
 
-    function overrideSafeThresholdAndNonce(address _safe, uint256 _nonce)
-        internal
-        view
-        returns (StateOverride memory)
-    {
-        StateOverride memory state = StateOverride({contractAddress: _safe, overrides: new StorageOverride[](0)});
-        state = addThresholdOverride(_safe, state);
-        state = addNonceOverride(_safe, state, _nonce);
+    function overrideSafeThresholdAndNonce(address safe, uint256 nonce) internal view returns (StateOverride memory) {
+        StateOverride memory state = StateOverride({contractAddress: safe, overrides: new StorageOverride[](0)});
+        state = addThresholdOverride({safe: safe, state: state});
+        state = addNonceOverride({safe: safe, state: state, nonce: nonce});
         return state;
     }
 
-    function addApprovalOverride(StateOverride memory _state, address owner, bytes32 dataHash)
+    function addApprovalOverride(StateOverride memory state, address owner, bytes32 dataHash)
         internal
         pure
         returns (StateOverride memory)
     {
-        return addOverride(
-            _state,
-            StorageOverride({
+        return addOverride({
+            state: state,
+            storageOverride: StorageOverride({
                 key: keccak256(abi.encode(dataHash, keccak256(abi.encode(owner, uint256(8))))),
                 value: bytes32(uint256(0x1))
             })
-        );
+        });
     }
 
-    function addThresholdOverride(address _safe, StateOverride memory _state)
+    function addThresholdOverride(address safe, StateOverride memory state)
         internal
         view
         returns (StateOverride memory)
     {
         // get the threshold and check if we need to override it
-        if (IGnosisSafe(_safe).getThreshold() == 1) return _state;
+        if (IGnosisSafe(safe).getThreshold() == 1) return state;
 
         // set the threshold (slot 4) to 1
-        return addOverride(_state, StorageOverride({key: bytes32(uint256(0x4)), value: bytes32(uint256(0x1))}));
+        return addOverride({
+            state: state,
+            storageOverride: StorageOverride({key: bytes32(uint256(0x4)), value: bytes32(uint256(0x1))})
+        });
     }
 
-    function addOwnerOverride(address _safe, StateOverride memory _state, address _owner)
+    function addOwnerOverride(address safe, StateOverride memory state, address owner)
         internal
         view
         returns (StateOverride memory)
     {
-        // get the owners and check if _owner is an owner
-        address[] memory owners = IGnosisSafe(_safe).getOwners();
+        // get the owners and check if owner is an owner
+        address[] memory owners = IGnosisSafe(safe).getOwners();
         for (uint256 i; i < owners.length; i++) {
-            if (owners[i] == _owner) return _state;
+            if (owners[i] == owner) return state;
         }
 
         // set the ownerCount (slot 3) to 1
-        _state = addOverride(_state, StorageOverride({key: bytes32(uint256(0x3)), value: bytes32(uint256(0x1))}));
-        // override the owner mapping (slot 2), which requires two key/value pairs: { 0x1: _owner, _owner: 0x1 }
-        _state = addOverride(
-            _state,
-            StorageOverride({
+        state = addOverride({
+            state: state,
+            storageOverride: StorageOverride({key: bytes32(uint256(0x3)), value: bytes32(uint256(0x1))})
+        });
+        // override the owner mapping (slot 2), which requires two key/value pairs: { 0x1: owner, owner: 0x1 }
+        state = addOverride({
+            state: state,
+            storageOverride: StorageOverride({
                 key: bytes32(0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0), // keccak256(1 || 2)
-                value: bytes32(uint256(uint160(_owner)))
+                value: bytes32(uint256(uint160(owner)))
             })
-        );
-        return addOverride(
-            _state, StorageOverride({key: keccak256(abi.encode(_owner, uint256(2))), value: bytes32(uint256(0x1))})
-        );
+        });
+        return addOverride({
+            state: state,
+            storageOverride: StorageOverride({key: keccak256(abi.encode(owner, uint256(2))), value: bytes32(uint256(0x1))})
+        });
     }
 
-    function addNonceOverride(address _safe, StateOverride memory _state, uint256 _nonce)
+    function addNonceOverride(address safe, StateOverride memory state, uint256 nonce)
         internal
         view
         returns (StateOverride memory)
     {
         // get the nonce and check if we need to override it
-        if (IGnosisSafe(_safe).nonce() == _nonce) return _state;
+        if (IGnosisSafe(safe).nonce() == nonce) return state;
 
         // set the nonce (slot 5) to the desired value
-        return addOverride(_state, StorageOverride({key: bytes32(uint256(0x5)), value: bytes32(_nonce)}));
+        return addOverride({
+            state: state,
+            storageOverride: StorageOverride({key: bytes32(uint256(0x5)), value: bytes32(nonce)})
+        });
     }
 
-    function addOverride(StateOverride memory _state, StorageOverride memory _override)
+    function addOverride(StateOverride memory state, StorageOverride memory storageOverride)
         internal
         pure
         returns (StateOverride memory)
     {
-        StorageOverride[] memory overrides = new StorageOverride[](_state.overrides.length + 1);
-        for (uint256 i; i < _state.overrides.length; i++) {
-            overrides[i] = _state.overrides[i];
+        StorageOverride[] memory overrides = new StorageOverride[](state.overrides.length + 1);
+        for (uint256 i; i < state.overrides.length; i++) {
+            overrides[i] = state.overrides[i];
         }
-        overrides[_state.overrides.length] = _override;
-        return StateOverride({contractAddress: _state.contractAddress, overrides: overrides});
+        overrides[state.overrides.length] = storageOverride;
+        return StateOverride({contractAddress: state.contractAddress, overrides: overrides});
     }
 
-    function logSimulationLink(address _to, bytes memory _data, address _from) internal view {
-        logSimulationLink(_to, _data, _from, new StateOverride[](0));
+    function logSimulationLink(address to, bytes memory data, address from) internal view {
+        logSimulationLink({to: to, data: data, from: from, overrides: new StateOverride[](0)});
     }
 
-    function logSimulationLink(address _to, bytes memory _data, address _from, StateOverride[] memory _overrides)
+    function logSimulationLink(address to, bytes memory data, address from, StateOverride[] memory overrides)
         internal
         view
     {
-        string memory proj = vm.envOr("TENDERLY_PROJECT", string("TENDERLY_PROJECT"));
-        string memory username = vm.envOr("TENDERLY_USERNAME", string("TENDERLY_USERNAME"));
+        string memory proj = VM.envOr({name: "TENDERLY_PROJECT", defaultValue: string("TENDERLY_PROJECT")});
+        string memory username = VM.envOr({name: "TENDERLY_USERNAME", defaultValue: string("TENDERLY_USERNAME")});
         bool includeOverrides;
 
         // the following characters are url encoded: []{}
         string memory stateOverrides = "%5B";
-        for (uint256 i; i < _overrides.length; i++) {
-            StateOverride memory _override = _overrides[i];
+        for (uint256 i; i < overrides.length; i++) {
+            StateOverride memory _override = overrides[i];
 
             if (_override.overrides.length == 0) {
                 continue;
@@ -182,7 +192,7 @@ library Simulation {
             stateOverrides = string.concat(
                 stateOverrides,
                 "%7B\"contractAddress\":\"",
-                vm.toString(_override.contractAddress),
+                VM.toString({value: _override.contractAddress}),
                 "\",\"storage\":%5B"
             );
             for (uint256 j; j < _override.overrides.length; j++) {
@@ -190,9 +200,9 @@ library Simulation {
                 stateOverrides = string.concat(
                     stateOverrides,
                     "%7B\"key\":\"",
-                    vm.toString(_override.overrides[j].key),
+                    VM.toString({value: _override.overrides[j].key}),
                     "\",\"value\":\"",
-                    vm.toString(_override.overrides[j].value),
+                    VM.toString({value: _override.overrides[j].value}),
                     "\"%7D"
                 );
             }
@@ -206,24 +216,24 @@ library Simulation {
             "/",
             proj,
             "/simulator/new?network=",
-            vm.toString(block.chainid),
+            VM.toString({value: block.chainid}),
             "&contractAddress=",
-            vm.toString(_to),
+            VM.toString({value: to}),
             "&from=",
-            vm.toString(_from)
+            VM.toString({value: from})
         );
 
         if (includeOverrides) {
             str = string.concat(str, "&stateOverrides=", stateOverrides);
         }
 
-        if (bytes(str).length + _data.length * 2 > 7980) {
+        if (bytes(str).length + data.length * 2 > 7980) {
             // tenderly's nginx has issues with long URLs, so print the raw input data separately
             str = string.concat(str, "\nInsert the following hex into the 'Raw input data' field:");
             console.log(str);
-            console.log(vm.toString(_data));
+            console.log(VM.toString({value: data}));
         } else {
-            str = string.concat(str, "&rawFunctionInput=", vm.toString(_data));
+            str = string.concat(str, "&rawFunctionInput=", VM.toString({value: data}));
             console.log(str);
         }
     }

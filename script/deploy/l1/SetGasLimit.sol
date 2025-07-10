@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import {Vm} from "lib/forge-std/src/Vm.sol";
 import {SystemConfig} from "@eth-optimism-bedrock/src/L1/SystemConfig.sol";
-import {MultisigScript, IMulticall3, IGnosisSafe, Simulation} from "../../universal/MultisigScript.sol";
-import {Vm} from "forge-std/Vm.sol";
 
+import {MultisigScript, IMulticall3, IGnosisSafe, Simulation} from "../../universal/MultisigScript.sol";
+
+/// @title SetGasLimit
+///
+/// @notice A script for updating the gas limit parameter on the Base L1 SystemConfig contract.
+///
+/// @dev This script assumes the SystemConfig contract is governed by a multisig and thus facilitates the collection of
+///      signer approvals & execution. The gas limit parameter controls the maximum amount of gas that can be consumed
+///      in a single L2 block.
 contract SetGasLimit is MultisigScript {
     address internal SYSTEM_CONFIG_OWNER = vm.envAddress("SYSTEM_CONFIG_OWNER");
     address internal L1_SYSTEM_CONFIG = vm.envAddress("L1_SYSTEM_CONFIG_ADDRESS");
@@ -46,14 +54,14 @@ contract SetGasLimit is MultisigScript {
     // We need to expect that the gas limit will have been updated previously in our simulation
     // Use this override to specifically set the gas limit to the expected update value.
     function _simulationOverrides() internal view override returns (Simulation.StateOverride[] memory) {
-        Simulation.StateOverride[] memory _stateOverrides = new Simulation.StateOverride[](1);
-        Simulation.StorageOverride[] memory _storageOverrides = new Simulation.StorageOverride[](1);
-        _storageOverrides[0] = Simulation.StorageOverride({
+        Simulation.StateOverride[] memory stateOverrides = new Simulation.StateOverride[](1);
+        Simulation.StorageOverride[] memory storageOverrides = new Simulation.StorageOverride[](1);
+        storageOverrides[0] = Simulation.StorageOverride({
             key: 0x0000000000000000000000000000000000000000000000000000000000000068, // slot of gas limit
             value: bytes32(uint256(_fromGasLimit()))
         });
         // solhint-disable-next-line max-line-length
-        _stateOverrides[0] = Simulation.StateOverride({contractAddress: L1_SYSTEM_CONFIG, overrides: _storageOverrides});
-        return _stateOverrides;
+        stateOverrides[0] = Simulation.StateOverride({contractAddress: L1_SYSTEM_CONFIG, overrides: storageOverrides});
+        return stateOverrides;
     }
 }

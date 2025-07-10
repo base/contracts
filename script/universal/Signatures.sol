@@ -2,49 +2,52 @@
 pragma solidity ^0.8.15;
 
 // solhint-disable no-console
-import {console} from "forge-std/console.sol";
-
+import {console} from "lib/forge-std/src/console.sol";
 import {Bytes} from "@eth-optimism-bedrock/src/libraries/Bytes.sol";
 import {LibSort} from "@solady/utils/LibSort.sol";
 
 import {IGnosisSafe} from "./IGnosisSafe.sol";
 
 library Signatures {
-    function prepareSignatures(address _safe, bytes32 hash, bytes memory _signatures)
+    function prepareSignatures(address safe, bytes32 hash, bytes memory signatures)
         internal
         view
         returns (bytes memory)
     {
         // prepend the prevalidated signatures to the signatures
-        address[] memory approvers = getApprovers(_safe, hash);
-        bytes memory prevalidatedSignatures = genPrevalidatedSignatures(approvers);
-        _signatures = bytes.concat(prevalidatedSignatures, _signatures);
+        address[] memory approvers = getApprovers({safeAddr: safe, hash: hash});
+        bytes memory prevalidatedSignatures = genPrevalidatedSignatures({addresses: approvers});
+        signatures = bytes.concat(prevalidatedSignatures, signatures);
 
         // safe requires all signatures to be unique, and sorted ascending by public key
-        return sortUniqueSignatures(
-            _safe, _signatures, hash, IGnosisSafe(_safe).getThreshold(), prevalidatedSignatures.length
-        );
+        return sortUniqueSignatures({
+            safe: safe,
+            signatures: signatures,
+            dataHash: hash,
+            threshold: IGnosisSafe(safe).getThreshold(),
+            dynamicOffset: prevalidatedSignatures.length
+        });
     }
 
-    function genPrevalidatedSignatures(address[] memory _addresses) internal pure returns (bytes memory) {
-        LibSort.sort(_addresses);
+    function genPrevalidatedSignatures(address[] memory addresses) internal pure returns (bytes memory) {
+        LibSort.sort({a: addresses});
         bytes memory signatures;
-        for (uint256 i; i < _addresses.length; i++) {
-            signatures = bytes.concat(signatures, genPrevalidatedSignature(_addresses[i]));
+        for (uint256 i; i < addresses.length; i++) {
+            signatures = bytes.concat(signatures, genPrevalidatedSignature({addr: addresses[i]}));
         }
         return signatures;
     }
 
-    function genPrevalidatedSignature(address _address) internal pure returns (bytes memory) {
+    function genPrevalidatedSignature(address addr) internal pure returns (bytes memory) {
         uint8 v = 1;
         bytes32 s = bytes32(0);
-        bytes32 r = bytes32(uint256(uint160(_address)));
+        bytes32 r = bytes32(uint256(uint160(addr)));
         return abi.encodePacked(r, s, v);
     }
 
-    function getApprovers(address _safe, bytes32 hash) internal view returns (address[] memory) {
+    function getApprovers(address safeAddr, bytes32 hash) internal view returns (address[] memory) {
         // get a list of owners that have approved this transaction
-        IGnosisSafe safe = IGnosisSafe(_safe);
+        IGnosisSafe safe = IGnosisSafe(safeAddr);
         uint256 threshold = safe.getThreshold();
         address[] memory owners = safe.getOwners();
         address[] memory approvers = new address[](threshold);
@@ -68,33 +71,33 @@ library Signatures {
     }
 
     // solhint-disable max-line-length
-    /**
-     * @notice Sorts the signatures in ascending order of the signer's address, and removes any duplicates.
-     * @dev see https://github.com/safe-global/safe-smart-account/blob/1ed486bb148fe40c26be58d1b517cec163980027/contracts/Safe.sol#L265-L334
-     * @param _safe Address of the Safe that should verify the signatures.
-     * @param _signatures Signature data that should be verified.
-     *                    Can be packed ECDSA signature ({bytes32 r}{bytes32 s}{uint8 v}), contract signature (EIP-1271) or approved hash.
-     *                    Can be suffixed with EIP-1271 signatures after threshold*65 bytes.
-     * @param dataHash Hash that is signed.
-     * @param threshold Number of signatures required to approve the transaction.
-     * @param dynamicOffset Offset to add to the `s` value of any EIP-1271 signature.
-     *                      Can be used to accommodate any additional signatures prepended to the array.
-     *                      If prevalidated signatures were prepended, this should be the length of those signatures.
-     */
+    /// @notice Sorts the signatures in ascending order of the signer's address, and removes any duplicates.
+    ///
+    /// @dev see https://github.com/safe-global/safe-smart-account/blob/1ed486bb148fe40c26be58d1b517cec163980027/contracts/Safe.sol#L265-L334
+    /// @dev `signatures` can be packed ECDSA signature ({bytes32 r}{bytes32 s}{uint8 v}), contract signature (EIP-1271) or approved hash.
+    /// @dev `signatures` can be suffixed with EIP-1271 signatures after threshold*65 bytes.
+    ///
+    /// @param safe          Address of the Safe that should verify the signatures.
+    /// @param signatures    Signature data that should be verified.
+    /// @param dataHash      Hash that is signed.
+    /// @param threshold     Number of signatures required to approve the transaction.
+    /// @param dynamicOffset Offset to add to the `s` value of any EIP-1271 signature.
+    ///                      Can be used to accommodate any additional signatures prepended to the array.
+    ///                      If prevalidated signatures were prepended, this should be the length of those signatures.
     function sortUniqueSignatures(
-        address _safe,
-        bytes memory _signatures,
+        address safe,
+        bytes memory signatures,
         bytes32 dataHash,
         uint256 threshold,
         uint256 dynamicOffset
     ) internal view returns (bytes memory) {
         bytes memory sorted;
-        uint256 count = uint256(_signatures.length / 0x41);
+        uint256 count = uint256(signatures.length / 0x41);
         uint256[] memory addressesAndIndexes = new uint256[](threshold);
         address[] memory uniqueAddresses = new address[](threshold);
         uint256 j;
         for (uint256 i; i < count; i++) {
-            (address owner, bool isOwner) = extractOwner(_safe, _signatures, dataHash, i);
+            (address owner, bool isOwner) = extractOwner({safe: safe, signatures: signatures, dataHash: dataHash, i: i});
             if (!isOwner) {
                 continue;
             }
@@ -115,10 +118,10 @@ library Signatures {
         }
         require(j == threshold, "not enough signatures");
 
-        LibSort.sort(addressesAndIndexes);
+        LibSort.sort({a: addressesAndIndexes});
         for (uint256 i; i < count; i++) {
             uint256 index = addressesAndIndexes[i] & 0xffffffff;
-            (uint8 v, bytes32 r, bytes32 s) = signatureSplit(_signatures, index);
+            (uint8 v, bytes32 r, bytes32 s) = signatureSplit({signatures: signatures, pos: index});
             if (v == 0) {
                 // The `s` value is used by safe as a lookup into the signature bytes.
                 // Increment by the offset so that the lookup location remains correct.
@@ -129,19 +132,19 @@ library Signatures {
 
         // append the non-static part of the signatures (can contain EIP-1271 signatures if contracts are signers)
         // if there were any duplicates detected above, they will be safely ignored by Safe's checkNSignatures method
-        sorted = appendRemainingBytes(sorted, _signatures);
+        sorted = appendRemainingBytes({a1: sorted, a2: signatures});
 
         return sorted;
     }
 
-    function extractOwner(address _safe, bytes memory _signatures, bytes32 dataHash, uint256 i)
+    function extractOwner(address safe, bytes memory signatures, bytes32 dataHash, uint256 i)
         internal
         view
         returns (address, bool)
     {
-        (uint8 v, bytes32 r, bytes32 s) = signatureSplit(_signatures, i);
-        address owner = extractOwner(dataHash, r, s, v);
-        bool isOwner = IGnosisSafe(_safe).isOwner(owner);
+        (uint8 v, bytes32 r, bytes32 s) = signatureSplit({signatures: signatures, pos: i});
+        address owner = extractOwner({dataHash: dataHash, r: r, s: s, v: v});
+        bool isOwner = IGnosisSafe(safe).isOwner({owner: owner});
         if (!isOwner) {
             console.log("---\nSkipping the following signature, which was recovered to a non-owner address %s:", owner);
             console.logBytes(abi.encodePacked(r, s, v));
