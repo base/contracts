@@ -77,6 +77,10 @@ contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
         return safe4;
     }
 
+    function _printDataHashes() internal view override returns (bool) {
+        return true;
+    }
+
     function test_sign_double_nested_safe1() external {
         vm.recordLogs();
         bytes memory txData = abi.encodeCall(DoubleNestedMultisigBuilder.sign, (safe1, safe3));

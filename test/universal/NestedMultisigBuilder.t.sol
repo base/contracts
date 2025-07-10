@@ -71,6 +71,10 @@ contract NestedMultisigBuilderTest is Test, NestedMultisigBuilder {
         return address(safe3);
     }
 
+    function _printDataHashes() internal view override returns (bool) {
+        return true;
+    }
+
     function test_sign_safe1() external {
         vm.recordLogs();
         bytes memory txData = abi.encodeCall(NestedMultisigBuilder.sign, (safe1));

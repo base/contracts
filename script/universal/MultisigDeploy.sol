@@ -135,7 +135,7 @@ contract MultisigDeployScript is Script {
             console.log("  Salt Nonce:", saltNonce);
 
             // Resolve owner addresses (combine direct owners + referenced safe addresses)
-            address[] memory resolvedOwners = resolveOwnerAddresses(config, safes);
+            address[] memory resolvedOwners = resolveOwnerAddresses(config);
 
             console.log("  Total Owners:", resolvedOwners.length);
             console.log("  Direct Owners:", config.owners.length);
@@ -186,11 +186,7 @@ contract MultisigDeployScript is Script {
         }
     }
 
-    function resolveOwnerAddresses(SafeWallet memory config, SafeWallet[] memory safes)
-        internal
-        view
-        returns (address[] memory)
-    {
+    function resolveOwnerAddresses(SafeWallet memory config) internal view returns (address[] memory) {
         uint256 totalOwners = config.owners.length + config.ownerRefIndices.length;
         address[] memory resolved = new address[](totalOwners);
 

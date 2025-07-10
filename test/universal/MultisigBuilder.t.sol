@@ -20,6 +20,7 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
     Counter internal counter = new Counter(address(safe));
 
     function () internal view returns (IMulticall3.Call3Value[] memory) buildCallsInternal;
+    function () internal view returns (bool) printDataHashesInternal = printDataHashesEnabled;
 
     bytes internal dataToSignNoValue =
     // solhint-disable-next-line max-line-length
@@ -28,6 +29,10 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
     bytes internal dataToSignWithValue =
     // solhint-disable-next-line max-line-length
         hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280cd150dbb03d4bb38e5325a914ff3861da880437fd5856c0f7e39054e64e05aed0";
+
+    string internal dataToSignTyped =
+    // solhint-disable-next-line max-line-length
+        '{"domain":{"chainId":31337,"verifyingContract":"0x00000000000000000000000000000000000003e9"},"message":{"baseGas":0,"data":"0x174dea710000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000005615deb798bb3e4dfa0139dfa1b3d433cc23b72f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000004d09de08a00000000000000000000000000000000000000000000000000000000","gasPrice":0,"gasToken":"0x0000000000000000000000000000000000000000","nonce":0,"operation":1,"refundReceiver":"0x0000000000000000000000000000000000000000","safeTxGas":0,"to":"0xcA11bde05977b3631167028862bE2a173976CA11","value":0},"primaryType":"SafeTx","types":{"EIP712Domain":[{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}],"SafeTx":[{"name":"to","type":"address"},{"name":"value","type":"uint256"},{"name":"data","type":"bytes"},{"name":"operation","type":"uint8"},{"name":"safeTxGas","type":"uint256"},{"name":"baseGas","type":"uint256"},{"name":"gasPrice","type":"uint256"},{"name":"gasToken","type":"address"},{"name":"refundReceiver","type":"address"},{"name":"nonce","type":"uint256"}]}}';
 
     function setUp() public {
         vm.etch(safe, Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid));
@@ -54,6 +59,10 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
         return address(safe);
     }
 
+    function _printDataHashes() internal view override returns (bool) {
+        return printDataHashesInternal();
+    }
+
     function test_sign_no_value() external {
         buildCallsInternal = _buildCallsNoValue;
 
@@ -76,6 +85,19 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
         vm.assertTrue(success);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(keccak256(logs[logs.length - 1].data), keccak256(abi.encode(dataToSignWithValue)));
+    }
+
+    function test_sign_typed_data() external {
+        buildCallsInternal = _buildCallsNoValue;
+        printDataHashesInternal = printDataHashesDisabled;
+
+        vm.recordLogs();
+        bytes memory txData = abi.encodeCall(MultisigBuilder.sign, ());
+        vm.prank(wallet1.addr);
+        (bool success,) = address(this).call(txData);
+        vm.assertTrue(success);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(keccak256(logs[logs.length - 1].data), keccak256(abi.encode(dataToSignTyped)));
     }
 
     function test_run() external {
@@ -110,5 +132,13 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
         });
 
         return calls;
+    }
+
+    function printDataHashesEnabled() internal pure returns (bool) {
+        return true;
+    }
+
+    function printDataHashesDisabled() internal pure returns (bool) {
+        return false;
     }
 }
