@@ -6,6 +6,7 @@ import {console} from "forge-std/console.sol";
 import {Script} from "forge-std/Script.sol";
 import {IMulticall3} from "forge-std/interfaces/IMulticall3.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {stdJson} from "forge-std/StdJson.sol";
 
 import {IGnosisSafe, Enum} from "./IGnosisSafe.sol";
 import {Signatures} from "./Signatures.sol";
@@ -332,7 +333,7 @@ abstract contract MultisigScript is Script {
         return safes;
     }
 
-    function _transactionDatas(address[] memory _safes) private view returns (bytes[] memory datas, uint256 value) {
+    function _transactionDatas(address[] memory _safes) internal view returns (bytes[] memory datas, uint256 value) {
         // Build the calls and sum the values
         IMulticall3.Call3Value[] memory calls = _buildCalls();
         for (uint256 i = 0; i < calls.length; i++) {
@@ -375,7 +376,8 @@ abstract contract MultisigScript is Script {
     }
 
     function _printDataToSign(address _safe, bytes memory _data, uint256 _value) internal {
-        bytes memory txData = _encodeTransactionData(_safe, _data, _value);
+        bytes memory txData =
+            _printDataHashes() ? _encodeTransactionData(_safe, _data, _value) : _encodeEIP712Json(_safe, _data, _value);
         bytes32 hash = _getTransactionHash(_safe, _data, _value);
 
         emit DataToSign(txData);
@@ -395,6 +397,14 @@ abstract contract MultisigScript is Script {
         );
         console.log("This is a critical step that must not be skipped.");
         console.log("###############################");
+    }
+
+    // Controls whether the safe tx is printed as structured EIP-712 data, or just hashes.
+    //
+    // If you want to print and sign hashed EIP-712 data (domain + message hash) rather than the
+    // typed EIP-712 data struct, override this function and return `true`.
+    function _printDataHashes() internal view virtual returns (bool) {
+        return false;
     }
 
     function _executeTransaction(
@@ -564,6 +574,39 @@ abstract contract MultisigScript is Script {
             refundReceiver: address(0),
             _nonce: _getNonce(_safe)
         });
+    }
+
+    function _encodeEIP712Json(address _safe, bytes memory _data, uint256 _value) internal returns (bytes memory) {
+        string memory types = '{"EIP712Domain":[' '{"name":"chainId","type":"uint256"},'
+            '{"name":"verifyingContract","type":"address"}],' '"SafeTx":[' '{"name":"to","type":"address"},'
+            '{"name":"value","type":"uint256"},' '{"name":"data","type":"bytes"},'
+            '{"name":"operation","type":"uint8"},' '{"name":"safeTxGas","type":"uint256"},'
+            '{"name":"baseGas","type":"uint256"},' '{"name":"gasPrice","type":"uint256"},'
+            '{"name":"gasToken","type":"address"},' '{"name":"refundReceiver","type":"address"},'
+            '{"name":"nonce","type":"uint256"}]}';
+
+        string memory domain = stdJson.serialize("domain", "chainId", uint256(block.chainid));
+        domain = stdJson.serialize("domain", "verifyingContract", address(_safe));
+
+        string memory message = stdJson.serialize("message", "to", MULTICALL3_ADDRESS);
+        message = stdJson.serialize("message", "value", _value);
+        message = stdJson.serialize("message", "data", _data);
+        message = stdJson.serialize(
+            "message", "operation", uint256(_value == 0 ? Enum.Operation.DelegateCall : Enum.Operation.Call)
+        );
+        message = stdJson.serialize("message", "safeTxGas", uint256(0));
+        message = stdJson.serialize("message", "baseGas", uint256(0));
+        message = stdJson.serialize("message", "gasPrice", uint256(0));
+        message = stdJson.serialize("message", "gasToken", address(0));
+        message = stdJson.serialize("message", "refundReceiver", address(0));
+        message = stdJson.serialize("message", "nonce", _getNonce(_safe));
+
+        string memory json = stdJson.serialize("", "primaryType", string("SafeTx"));
+        json = stdJson.serialize("", "types", types);
+        json = stdJson.serialize("", "domain", domain);
+        json = stdJson.serialize("", "message", message);
+
+        return abi.encodePacked(json);
     }
 
     function _execTransactionCalldata(address _safe, bytes memory _data, uint256 _value, bytes memory _signatures)
