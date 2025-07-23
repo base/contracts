@@ -642,7 +642,7 @@ contract DeployImplementations is Script {
         ChainAssertions.checkL1StandardBridgeImpl(_output.l1StandardBridgeImpl);
         ChainAssertions.checkMIPS(_output.mipsSingleton, _output.preimageOracleSingleton);
         assertValidOpcm(_input, _output);
-        assertValidOptimismMintableERC20FactoryImpl(_input, _output);
+        ChainAssertions.checkOptimismMintableERC20FactoryImpl(_output.optimismMintableERC20FactoryImpl);
         assertValidOptimismPortalImpl(_input, _output);
         ChainAssertions.checkETHLockboxImpl(_output.ethLockboxImpl, _output.optimismPortalImpl);
         // We can use DeployOPChainInput(address(0)) here because no method will be called on _doi when isProxy is false
@@ -670,14 +670,5 @@ contract DeployImplementations is Script {
         require(vm.load(address(portal), bytes32(uint256(61))) == bytes32(0), "PORTAL-40");
 
         require(address(portal.ethLockbox()) == address(0), "PORTAL-50");
-    }
-
-    function assertValidOptimismMintableERC20FactoryImpl(Input memory, Output memory _output) private view {
-        IOptimismMintableERC20Factory factory = _output.optimismMintableERC20FactoryImpl;
-
-        DeployUtils.assertInitialized({ _contractAddress: address(factory), _isProxy: false, _slot: 0, _offset: 0 });
-
-        require(address(factory.BRIDGE()) == address(0), "MERC20F-10");
-        require(address(factory.bridge()) == address(0), "MERC20F-20");
     }
 }

@@ -500,7 +500,12 @@ contract DeployOPChain is Script {
             _slot: 0,
             _offset: 0
         });
-        assertValidOptimismMintableERC20Factory(_doo);
+        DeployUtils.assertInitialized({
+            _contractAddress: address(_doo.optimismMintableERC20FactoryProxy()),
+            _isProxy: true,
+            _slot: 0,
+            _offset: 0
+        });
         assertValidOptimismPortal(_doi, _doo);
         assertValidETHLockbox(_doi, _doo);
         assertValidPermissionedDisputeGame(_doi, _doo);
@@ -563,15 +568,6 @@ contract DeployOPChain is Script {
         (Hash actualRoot,) = _doo.anchorStateRegistryProxy().anchors(GameTypes.PERMISSIONED_CANNON);
         bytes32 expectedRoot = 0xdead000000000000000000000000000000000000000000000000000000000000;
         require(Hash.unwrap(actualRoot) == expectedRoot, "ANCHORP-40");
-    }
-
-    function assertValidOptimismMintableERC20Factory(DeployOPChainOutput _doo) internal {
-        IOptimismMintableERC20Factory factory = _doo.optimismMintableERC20FactoryProxy();
-
-        DeployUtils.assertInitialized({ _contractAddress: address(factory), _isProxy: true, _slot: 0, _offset: 0 });
-
-        require(factory.BRIDGE() == address(_doo.l1StandardBridgeProxy()), "MERC20F-10");
-        require(factory.bridge() == address(_doo.l1StandardBridgeProxy()), "MERC20F-20");
     }
 
     function assertValidOptimismPortal(DeployOPChainInput _doi, DeployOPChainOutput _doo) internal {
