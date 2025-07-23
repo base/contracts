@@ -41,6 +41,7 @@ import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
+import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 
 /// @title Deploy
 /// @notice Script used to deploy a bedrock system. The entire system is deployed within the `run` function.
@@ -299,7 +300,9 @@ contract Deploy is Deployer {
         ChainAssertions.checkETHLockboxImpl(
             IETHLockbox(impls.ETHLockbox), IOptimismPortal2(payable(impls.OptimismPortal))
         );
-        ChainAssertions.checkOptimismMintableERC20Factory({ _contracts: impls, _isProxy: false });
+        ChainAssertions.checkOptimismMintableERC20FactoryImpl(
+            IOptimismMintableERC20Factory(impls.OptimismMintableERC20Factory)
+        );
         ChainAssertions.checkDisputeGameFactory(
             IDisputeGameFactory(impls.DisputeGameFactory), address(0), address(0), false
         );
