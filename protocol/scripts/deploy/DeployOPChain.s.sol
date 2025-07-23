@@ -465,7 +465,12 @@ contract DeployOPChain is Script {
     // -------- Deployment Assertions --------
     function assertValidDeploy(DeployOPChainInput _doi, DeployOPChainOutput _doo) internal {
         assertValidAnchorStateRegistryProxy(_doi, _doo);
-        assertValidDisputeGameFactory(_doi, _doo);
+        ChainAssertions.checkDisputeGameFactory(
+            _doo.disputeGameFactoryProxy(),
+            address(_doi.opChainProxyAdminOwner()),
+            address(_doo.permissionedDisputeGame()),
+            true
+        );
         ChainAssertions.checkL1CrossDomainMessenger(_doo.l1CrossDomainMessengerProxy(), vm, true);
         assertValidL1ERC721Bridge(_doo);
         DeployUtils.assertInitialized({
@@ -623,18 +628,6 @@ contract DeployOPChain is Script {
         require(address(lockbox.systemConfig()) == address(_doo.systemConfigProxy()), "ETHLOCKBOX-10");
         require(lockbox.authorizedPortals(_doo.optimismPortalProxy()), "ETHLOCKBOX-20");
         require(lockbox.proxyAdminOwner() == _doi.opChainProxyAdminOwner(), "ETHLOCKBOX-30");
-    }
-
-    function assertValidDisputeGameFactory(DeployOPChainInput _doi, DeployOPChainOutput _doo) internal {
-        IDisputeGameFactory factory = _doo.disputeGameFactoryProxy();
-
-        DeployUtils.assertInitialized({ _contractAddress: address(factory), _isProxy: true, _slot: 0, _offset: 0 });
-
-        require(
-            address(factory.gameImpls(GameTypes.PERMISSIONED_CANNON)) == address(_doo.permissionedDisputeGame()),
-            "DF-10"
-        );
-        require(factory.owner() == address(_doi.opChainProxyAdminOwner()), "DF-20");
     }
 
     function assertValidAddressManager(DeployOPChainInput, DeployOPChainOutput _doo) internal view {
