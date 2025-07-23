@@ -7,6 +7,8 @@ import { console2 as console } from "forge-std/console2.sol";
 
 // Scripts
 import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
+import { DeployOPChainInput } from "scripts/deploy/DeployOPChain.s.sol";
+import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 // Libraries
@@ -51,7 +53,14 @@ library ChainAssertions {
     }
 
     /// @notice Asserts that the SystemConfig is setup correctly
-    function checkSystemConfig(Types.ContractSet memory _contracts, DeployConfig _cfg, bool _isProxy) internal view {
+    function checkSystemConfig(
+        Types.ContractSet memory _contracts,
+        DeployOPChainInput _doi,
+        bool _isProxy
+    )
+        internal
+        view
+    {
         ISystemConfig config = ISystemConfig(_contracts.SystemConfig);
         console.log(
             "Running chain assertions on the SystemConfig %s at %s",
@@ -65,25 +74,16 @@ library ChainAssertions {
         IResourceMetering.ResourceConfig memory resourceConfig = config.resourceConfig();
 
         if (_isProxy) {
-            require(config.owner() == _cfg.finalSystemOwner(), "CHECK-SCFG-10");
-            require(config.basefeeScalar() == _cfg.basefeeScalar(), "CHECK-SCFG-20");
-            require(config.blobbasefeeScalar() == _cfg.blobbasefeeScalar(), "CHECK-SCFG-30");
-            require(config.batcherHash() == bytes32(uint256(uint160(_cfg.batchSenderAddress()))), "CHECK-SCFG-40");
-            require(config.gasLimit() == uint64(_cfg.l2GenesisBlockGasLimit()), "CHECK-SCFG-50");
-            require(config.unsafeBlockSigner() == _cfg.p2pSequencerAddress(), "CHECK-SCFG-60");
+            require(config.owner() == _doi.systemConfigOwner(), "CHECK-SCFG-10");
+            require(config.basefeeScalar() == _doi.basefeeScalar(), "CHECK-SCFG-20");
+            require(config.blobbasefeeScalar() == _doi.blobBaseFeeScalar(), "CHECK-SCFG-30");
+            require(config.batcherHash() == bytes32(uint256(uint160(_doi.batcher()))), "CHECK-SCFG-40");
+            require(config.gasLimit() == uint64(_doi.gasLimit()), "CHECK-SCFG-50");
+            require(config.unsafeBlockSigner() == _doi.unsafeBlockSigner(), "CHECK-SCFG-60");
             require(config.scalar() >> 248 == 1, "CHECK-SCFG-70");
-            // Check _config
-            IResourceMetering.ResourceConfig memory rconfig = Constants.DEFAULT_RESOURCE_CONFIG();
-            require(resourceConfig.maxResourceLimit == rconfig.maxResourceLimit, "CHECK-SCFG-80");
-            require(resourceConfig.elasticityMultiplier == rconfig.elasticityMultiplier, "CHECK-SCFG-90");
-            require(resourceConfig.baseFeeMaxChangeDenominator == rconfig.baseFeeMaxChangeDenominator, "CHECK-SCFG-100");
-            require(resourceConfig.systemTxMaxGas == rconfig.systemTxMaxGas, "CHECK-SCFG-110");
-            require(resourceConfig.minimumBaseFee == rconfig.minimumBaseFee, "CHECK-SCFG-120");
-            require(resourceConfig.maximumBaseFee == rconfig.maximumBaseFee, "CHECK-SCFG-130");
             // Depends on start block being set to 0 in `initialize`
-            uint256 cfgStartBlock = _cfg.systemConfigStartBlock();
-            require(config.startBlock() == (cfgStartBlock == 0 ? block.number : cfgStartBlock), "CHECK-SCFG-140");
-            require(config.batchInbox() == _cfg.batchInboxAddress(), "CHECK-SCFG-150");
+            require(config.startBlock() == block.number, "CHECK-SCFG-140");
+            require(config.batchInbox() == _doi.opcm().chainIdToBatchInboxAddress(_doi.l2ChainId()), "CHECK-SCFG-150");
             // Check _addresses
             require(config.l1CrossDomainMessenger() == _contracts.L1CrossDomainMessenger, "CHECK-SCFG-160");
             require(config.l1ERC721Bridge() == _contracts.L1ERC721Bridge, "CHECK-SCFG-170");
@@ -457,5 +457,29 @@ library ChainAssertions {
             keccak256(fullPermissionedDisputeGameInitcode) == keccak256(vm.getCode("PermissionedDisputeGame")),
             "CHECK-OPCM-210"
         );
+    }
+
+    /// @notice Converts variables needed from the DeployConfig to a DeployOPChainInput contract
+    function dioToContractSet(DeployImplementations.Output memory _output)
+        internal
+        pure
+        returns (Types.ContractSet memory)
+    {
+        return Types.ContractSet({
+            L1CrossDomainMessenger: address(_output.l1CrossDomainMessengerImpl),
+            L1StandardBridge: address(_output.l1StandardBridgeImpl),
+            L2OutputOracle: address(0),
+            DisputeGameFactory: address(_output.disputeGameFactoryImpl),
+            DelayedWETH: address(_output.delayedWETHImpl),
+            PermissionedDelayedWETH: address(_output.delayedWETHImpl),
+            AnchorStateRegistry: address(_output.anchorStateRegistryImpl),
+            OptimismMintableERC20Factory: address(_output.optimismMintableERC20FactoryImpl),
+            OptimismPortal: address(_output.optimismPortalImpl),
+            ETHLockbox: address(_output.ethLockboxImpl),
+            SystemConfig: address(_output.systemConfigImpl),
+            L1ERC721Bridge: address(_output.l1ERC721BridgeImpl),
+            ProtocolVersions: address(_output.protocolVersionsImpl),
+            SuperchainConfig: address(_output.superchainConfigImpl)
+        });
     }
 }

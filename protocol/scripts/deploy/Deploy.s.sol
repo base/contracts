@@ -9,6 +9,7 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 
 // Scripts
 import { Deployer } from "scripts/deploy/Deployer.sol";
+import { DeployOPChainInput } from "scripts/deploy/DeployOPChain.s.sol";
 import { Chains } from "scripts/libraries/Chains.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { StateDiff } from "scripts/libraries/StateDiff.sol";
@@ -288,22 +289,7 @@ contract Deploy is Deployer {
         artifacts.save("PreimageOracle", address(dio.preimageOracleSingleton));
 
         // Get a contract set from the implementation addresses which were just deployed.
-        Types.ContractSet memory impls = Types.ContractSet({
-            L1CrossDomainMessenger: address(dio.l1CrossDomainMessengerImpl),
-            L1StandardBridge: address(dio.l1StandardBridgeImpl),
-            L2OutputOracle: address(0),
-            DisputeGameFactory: address(dio.disputeGameFactoryImpl),
-            DelayedWETH: address(dio.delayedWETHImpl),
-            PermissionedDelayedWETH: address(dio.delayedWETHImpl),
-            AnchorStateRegistry: address(0),
-            OptimismMintableERC20Factory: address(dio.optimismMintableERC20FactoryImpl),
-            OptimismPortal: address(dio.optimismPortalImpl),
-            ETHLockbox: address(dio.ethLockboxImpl),
-            SystemConfig: address(dio.systemConfigImpl),
-            L1ERC721Bridge: address(dio.l1ERC721BridgeImpl),
-            ProtocolVersions: address(dio.protocolVersionsImpl),
-            SuperchainConfig: address(dio.superchainConfigImpl)
-        });
+        Types.ContractSet memory impls = ChainAssertions.dioToContractSet(dio);
 
         ChainAssertions.checkL1CrossDomainMessenger(IL1CrossDomainMessenger(impls.L1CrossDomainMessenger), vm, false);
         ChainAssertions.checkL1StandardBridgeImpl(IL1StandardBridge(payable(impls.L1StandardBridge)));
@@ -328,7 +314,7 @@ contract Deploy is Deployer {
             _mips: IMIPS(address(dio.mipsSingleton)),
             _superchainProxyAdmin: superchainProxyAdmin
         });
-        ChainAssertions.checkSystemConfig({ _contracts: impls, _cfg: cfg, _isProxy: false });
+        ChainAssertions.checkSystemConfig({ _doi: DeployOPChainInput(address(0)), _contracts: impls, _isProxy: false });
     }
 
     /// @notice Deploy all of the OP Chain specific contracts
