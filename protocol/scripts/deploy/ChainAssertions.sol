@@ -13,7 +13,6 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 // Libraries
 import { Constants } from "src/libraries/Constants.sol";
-import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Types } from "scripts/libraries/Types.sol";
 import { Blueprint } from "src/libraries/Blueprint.sol";
 import { GameTypes } from "src/dispute/lib/Types.sol";
@@ -240,32 +239,23 @@ library ChainAssertions {
     }
 
     /// @notice Asserts that the L1ERC721Bridge is setup correctly
-    function checkL1ERC721Bridge(Types.ContractSet memory _contracts, bool _isProxy) internal view {
-        console.log("Running chain assertions on the L1ERC721Bridge");
-        IL1ERC721Bridge bridge = IL1ERC721Bridge(_contracts.L1ERC721Bridge);
-        console.log(
-            "Running chain assertions on the L1ERC721Bridge %s at %s",
-            _isProxy ? "proxy" : "implementation",
-            address(bridge)
-        );
-        require(address(bridge) != address(0), "CHECK-L1ERC721B-10");
+    function checkL1ERC721BridgeImpl(IL1ERC721Bridge _bridge) internal view {
+        console.log("Running chain assertions on the L1ERC721Bridge implementation at %s", address(_bridge));
 
         // Check that the contract is initialized
-        DeployUtils.assertInitialized({ _contractAddress: address(bridge), _isProxy: _isProxy, _slot: 0, _offset: 0 });
+        DeployUtils.assertInitialized({ _contractAddress: address(_bridge), _isProxy: false, _slot: 0, _offset: 0 });
 
-        if (_isProxy) {
-            require(address(bridge.OTHER_BRIDGE()) == Predeploys.L2_ERC721_BRIDGE, "CHECK-L1ERC721B-10");
-            require(address(bridge.otherBridge()) == Predeploys.L2_ERC721_BRIDGE, "CHECK-L1ERC721B-20");
-            require(address(bridge.MESSENGER()) == _contracts.L1CrossDomainMessenger, "CHECK-L1ERC721B-30");
-            require(address(bridge.messenger()) == _contracts.L1CrossDomainMessenger, "CHECK-L1ERC721B-40");
-            require(address(bridge.systemConfig()) == _contracts.SystemConfig, "CHECK-L1ERC721B-50");
-        } else {
-            require(address(bridge.OTHER_BRIDGE()) == address(0), "CHECK-L1ERC721B-60");
-            require(address(bridge.otherBridge()) == address(0), "CHECK-L1ERC721B-70");
-            require(address(bridge.MESSENGER()) == address(0), "CHECK-L1ERC721B-80");
-            require(address(bridge.messenger()) == address(0), "CHECK-L1ERC721B-90");
-            require(address(bridge.systemConfig()) == address(0), "CHECK-L1ERC721B-100");
-        }
+        require(address(_bridge.OTHER_BRIDGE()) == address(0), "CHECK-L1ERC721B-60");
+        require(address(_bridge.otherBridge()) == address(0), "CHECK-L1ERC721B-70");
+        require(address(_bridge.MESSENGER()) == address(0), "CHECK-L1ERC721B-80");
+        require(address(_bridge.messenger()) == address(0), "CHECK-L1ERC721B-90");
+        require(address(_bridge.systemConfig()) == address(0), "CHECK-L1ERC721B-100");
+        require(
+            checkProxyAdminCallFails(
+                address(_bridge), IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotResolvedDelegateProxy.selector
+            ),
+            "CHECK-L1XDM-130"
+        );
     }
 
     /// @notice Asserts the OptimismPortal is setup correctly

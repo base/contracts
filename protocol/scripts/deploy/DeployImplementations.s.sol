@@ -638,7 +638,7 @@ contract DeployImplementations is Script {
             _offset: 0
         });
         ChainAssertions.checkL1CrossDomainMessenger(IL1CrossDomainMessenger(impls.L1CrossDomainMessenger), vm, false);
-        assertValidL1ERC721BridgeImpl(_input, _output);
+        ChainAssertions.checkL1ERC721BridgeImpl(_output.l1ERC721BridgeImpl);
         ChainAssertions.checkL1StandardBridgeImpl(_output.l1StandardBridgeImpl);
         ChainAssertions.checkMIPS(_output.mipsSingleton, _output.preimageOracleSingleton);
         assertValidOpcm(_input, _output);
@@ -670,18 +670,6 @@ contract DeployImplementations is Script {
         require(vm.load(address(portal), bytes32(uint256(61))) == bytes32(0), "PORTAL-40");
 
         require(address(portal.ethLockbox()) == address(0), "PORTAL-50");
-    }
-
-    function assertValidL1ERC721BridgeImpl(Input memory, Output memory _output) private view {
-        IL1ERC721Bridge bridge = _output.l1ERC721BridgeImpl;
-
-        DeployUtils.assertInitialized({ _contractAddress: address(bridge), _isProxy: false, _slot: 0, _offset: 0 });
-
-        require(address(bridge.OTHER_BRIDGE()) == address(0), "L721B-10");
-        require(address(bridge.otherBridge()) == address(0), "L721B-20");
-        require(address(bridge.MESSENGER()) == address(0), "L721B-30");
-        require(address(bridge.messenger()) == address(0), "L721B-40");
-        require(address(bridge.systemConfig()) == address(0), "L721B-50");
     }
 
     function assertValidOptimismMintableERC20FactoryImpl(Input memory, Output memory _output) private view {
