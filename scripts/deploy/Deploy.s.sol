@@ -313,7 +313,9 @@ contract Deploy is Deployer {
             IETHLockbox(impls.ETHLockbox), IOptimismPortal2(payable(impls.OptimismPortal))
         );
         ChainAssertions.checkOptimismMintableERC20Factory({ _contracts: impls, _isProxy: false });
-        ChainAssertions.checkDisputeGameFactory({ _contracts: impls, _expectedOwner: address(0), _isProxy: false });
+        ChainAssertions.checkDisputeGameFactory(
+            IDisputeGameFactory(impls.DisputeGameFactory), address(0), address(0), false
+        );
         ChainAssertions.checkDelayedWETHImpl(IDelayedWETH(payable(impls.DelayedWETH)), cfg.faultGameWithdrawalDelay());
         ChainAssertions.checkMIPS({
             _mips: IMIPS(address(dio.mipsSingleton)),
