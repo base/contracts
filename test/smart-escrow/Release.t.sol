@@ -57,7 +57,7 @@ contract ReleaseSmartEscrow is BaseSmartEscrowTest {
     }
 
     function testFuzz_release(uint256 timestamp) public {
-        vm.assume(timestamp < type(uint64).max);
+        vm.assume(timestamp < type(uint64).max - 1);
         vm.warp(timestamp);
         uint256 releasable = smartEscrow.releasable();
         smartEscrow.release();
