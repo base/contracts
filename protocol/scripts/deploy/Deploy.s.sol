@@ -296,7 +296,12 @@ contract Deploy is Deployer {
         ChainAssertions.checkL1CrossDomainMessenger(IL1CrossDomainMessenger(impls.L1CrossDomainMessenger), vm, false);
         ChainAssertions.checkL1StandardBridgeImpl(IL1StandardBridge(payable(impls.L1StandardBridge)));
         ChainAssertions.checkL1ERC721BridgeImpl(IL1ERC721Bridge(impls.L1ERC721Bridge));
-        ChainAssertions.checkOptimismPortal2({ _contracts: impls, _cfg: cfg, _isProxy: false });
+        ChainAssertions.checkOptimismPortal2({
+            _contracts: impls,
+            _superchainConfig: superchainConfigProxy,
+            _opChainProxyAdminOwner: cfg.finalSystemOwner(),
+            _isProxy: false
+        });
         ChainAssertions.checkETHLockboxImpl(
             IETHLockbox(impls.ETHLockbox), IOptimismPortal2(payable(impls.OptimismPortal))
         );
@@ -319,6 +324,7 @@ contract Deploy is Deployer {
             _superchainProxyAdmin: superchainProxyAdmin
         });
         ChainAssertions.checkSystemConfig({ _doi: DeployOPChainInput(address(0)), _contracts: impls, _isProxy: false });
+        ChainAssertions.checkAnchorStateRegistryProxy(IAnchorStateRegistry(impls.AnchorStateRegistry), false);
     }
 
     /// @notice Deploy all of the OP Chain specific contracts
