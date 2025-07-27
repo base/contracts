@@ -2,10 +2,10 @@
 pragma solidity 0.8.15;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {L2StandardBridge} from "@eth-optimism-bedrock/src/L2/L2StandardBridge.sol";
-import {Predeploys} from "@eth-optimism-bedrock/src/libraries/Predeploys.sol";
-import {SafeCall} from "@eth-optimism-bedrock/src/libraries/SafeCall.sol";
-import {FeeVault} from "@eth-optimism-bedrock/src/universal/FeeVault.sol";
+import {L2StandardBridge} from "lib/optimism/packages/contracts-bedrock/src/L2/L2StandardBridge.sol";
+import {Predeploys} from "lib/optimism/packages/contracts-bedrock/src/libraries/Predeploys.sol";
+import {SafeCall} from "lib/optimism/packages/contracts-bedrock/src/libraries/SafeCall.sol";
+import {FeeVault} from "lib/optimism/packages/contracts-bedrock/src/universal/FeeVault.sol";
 
 /// @title FeeDisburser
 ///

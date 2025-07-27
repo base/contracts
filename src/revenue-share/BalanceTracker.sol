@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import {SafeCall} from "@eth-optimism-bedrock/src/libraries/SafeCall.sol";
+import {SafeCall} from "lib/optimism/packages/contracts-bedrock/src/libraries/SafeCall.sol";
 
 /// @title BalanceTracker
 ///

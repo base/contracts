@@ -4,9 +4,11 @@ pragma solidity 0.8.15;
 // solhint-disable no-console
 import {console} from "lib/forge-std/src/console.sol";
 import {Script} from "lib/forge-std/src/Script.sol";
-import {Predeploys} from "@eth-optimism-bedrock/src/libraries/Predeploys.sol";
-import {OptimismMintableERC20Factory} from "@eth-optimism-bedrock/src/universal/OptimismMintableERC20Factory.sol";
-import {OptimismMintableERC721Factory} from "@eth-optimism-bedrock/src/universal/OptimismMintableERC721Factory.sol";
+import {Predeploys} from "lib/optimism/packages/contracts-bedrock/src/libraries/Predeploys.sol";
+import {OptimismMintableERC20Factory} from
+    "lib/optimism/packages/contracts-bedrock/src/universal/OptimismMintableERC20Factory.sol";
+import {OptimismMintableERC721Factory} from
+    "lib/optimism/packages/contracts-bedrock/src/universal/OptimismMintableERC721Factory.sol";
 
 // Deploys test token contracts on L2 to test Base Mainnet functionality
 contract DeployTestTokenContracts is Script {
