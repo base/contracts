@@ -7,27 +7,56 @@ import {Vm} from "lib/forge-std/src/Vm.sol";
 
 import {IGnosisSafe} from "./IGnosisSafe.sol";
 
+/// @title Simulation
+///
+/// @notice Library for simulating multisig transactions with state overrides in Foundry
+///
+/// @dev This library provides utilities for:
+///      - Simulating multisig transactions before execution
+///      - Overriding contract storage states for testing scenarios
+///      - Generating Tenderly simulation links for external transaction analysis
+///      - Managing Gnosis Safe parameters (threshold, nonce, approvals) during simulation
 library Simulation {
-    address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
-    Vm internal constant VM = Vm(VM_ADDRESS);
-
+    /// @notice Represents state overrides for a specific contract during simulation. Used to modify contract storage
+    ///         slots temporarily for testing purposes
     struct StateOverride {
+        /// @dev The address of the contract whose state will be overridden
         address contractAddress;
+        /// @dev Array of storage slot overrides to apply to this contract
         StorageOverride[] overrides;
     }
 
+    /// @notice Represents a single storage slot override. Maps a storage slot key to a new value during simulation
     struct StorageOverride {
+        /// @dev The storage slot key
         bytes32 key;
+        /// @dev The new value to store in the slot during simulation
         bytes32 value;
     }
 
+    /// @notice Contains all parameters needed to execute a simulation. Encapsulates transaction data and state
+    ///         modifications for simulation execution
     struct Payload {
+        /// @dev Address that will appear as the transaction sender
         address from;
+        /// @dev Target contract address for the transaction
         address to;
+        /// @dev Encoded transaction data to execute
         bytes data;
+        /// @dev Array of state overrides to apply before simulation
         StateOverride[] stateOverrides;
     }
 
+    /// @notice Foundry VM instance for state manipulation during simulations
+    Vm internal constant VM = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
+    /// @notice Executes a simulation using the provided payload and returns state changes
+    ///
+    /// @dev This is the core simulation function that applies state overrides and executes the transaction
+    ///
+    /// @param simPayload The simulation payload containing transaction data and state overrides
+    ///
+    /// @return accesses Array of account access records showing all state changes during simulation
     function simulateFromSimPayload(Payload memory simPayload) internal returns (Vm.AccountAccess[] memory) {
         // solhint-disable-next-line max-line-length
         require(simPayload.from != address(0), "Simulator::simulateFromSimPayload: from address cannot be zero address");
@@ -58,6 +87,16 @@ library Simulation {
         return accesses;
     }
 
+    /// @notice Creates a comprehensive state override for a Gnosis Safe including threshold, nonce, and approval
+    ///
+    /// @dev Combines multiple overrides: sets threshold to 1, updates nonce, and pre-approves transaction hash
+    ///
+    /// @param safe     The address of the Gnosis Safe to override
+    /// @param nonce    The nonce value to set for the safe
+    /// @param owner    The owner address that should appear to have approved the transaction
+    /// @param dataHash The transaction hash that should appear as pre-approved
+    ///
+    /// @return state StateOverride struct containing all the necessary storage overrides
     function overrideSafeThresholdApprovalAndNonce(address safe, uint256 nonce, address owner, bytes32 dataHash)
         internal
         view
@@ -71,6 +110,14 @@ library Simulation {
         return state;
     }
 
+    /// @notice Creates a state override for a Gnosis Safe's threshold and nonce only
+    ///
+    /// @dev Sets the safe's threshold to 1 and updates its nonce for simulation purposes
+    ///
+    /// @param safe  The address of the Gnosis Safe to override
+    /// @param nonce The nonce value to set for the safe
+    ///
+    /// @return state StateOverride struct containing threshold and nonce overrides
     function overrideSafeThresholdAndNonce(address safe, uint256 nonce) internal view returns (StateOverride memory) {
         StateOverride memory state = StateOverride({contractAddress: safe, overrides: new StorageOverride[](0)});
         state = addThresholdOverride({safe: safe, state: state});
@@ -78,6 +125,15 @@ library Simulation {
         return state;
     }
 
+    /// @notice Adds a transaction approval override to the state
+    ///
+    /// @dev Simulates that the specified owner has already approved the given transaction hash
+    ///
+    /// @param state    The existing state override to modify
+    /// @param owner    The address of the owner who should appear to have approved
+    /// @param dataHash The transaction hash that should appear as approved
+    ///
+    /// @return _ StateOverride struct with the approval override added
     function addApprovalOverride(StateOverride memory state, address owner, bytes32 dataHash)
         internal
         pure
@@ -92,6 +148,14 @@ library Simulation {
         });
     }
 
+    /// @notice Adds a threshold override to set the safe's signature threshold to 1
+    ///
+    /// @dev Only adds the override if the current threshold is not already 1
+    ///
+    /// @param safe  The address of the Gnosis Safe to check and potentially override
+    /// @param state The existing state override to modify
+    ///
+    /// @return _ StateOverride struct with threshold override added (if needed)
     function addThresholdOverride(address safe, StateOverride memory state)
         internal
         view
@@ -107,36 +171,15 @@ library Simulation {
         });
     }
 
-    function addOwnerOverride(address safe, StateOverride memory state, address owner)
-        internal
-        view
-        returns (StateOverride memory)
-    {
-        // get the owners and check if owner is an owner
-        address[] memory owners = IGnosisSafe(safe).getOwners();
-        for (uint256 i; i < owners.length; i++) {
-            if (owners[i] == owner) return state;
-        }
-
-        // set the ownerCount (slot 3) to 1
-        state = addOverride({
-            state: state,
-            storageOverride: StorageOverride({key: bytes32(uint256(0x3)), value: bytes32(uint256(0x1))})
-        });
-        // override the owner mapping (slot 2), which requires two key/value pairs: { 0x1: owner, owner: 0x1 }
-        state = addOverride({
-            state: state,
-            storageOverride: StorageOverride({
-                key: bytes32(0xe90b7bceb6e7df5418fb78d8ee546e97c83a08bbccc01a0644d599ccd2a7c2e0), // keccak256(1 || 2)
-                value: bytes32(uint256(uint160(owner)))
-            })
-        });
-        return addOverride({
-            state: state,
-            storageOverride: StorageOverride({key: keccak256(abi.encode(owner, uint256(2))), value: bytes32(uint256(0x1))})
-        });
-    }
-
+    /// @notice Adds a nonce override to set the safe's transaction nonce
+    ///
+    /// @dev Only adds the override if the current nonce differs from the desired value
+    ///
+    /// @param safe  The address of the Gnosis Safe to check and potentially override
+    /// @param state The existing state override to modify
+    /// @param nonce The nonce value to set for the safe
+    ///
+    /// @return _ StateOverride struct with nonce override added (if needed)
     function addNonceOverride(address safe, StateOverride memory state, uint256 nonce)
         internal
         view
@@ -152,6 +195,14 @@ library Simulation {
         });
     }
 
+    /// @notice Appends a new storage override to an existing state override
+    ///
+    /// @dev Creates a new array with the additional override appended
+    ///
+    /// @param state           The existing state override to extend
+    /// @param storageOverride The new storage override to add
+    ///
+    /// @return _ StateOverride struct with the new override added to the array
     function addOverride(StateOverride memory state, StorageOverride memory storageOverride)
         internal
         pure
@@ -165,10 +216,25 @@ library Simulation {
         return StateOverride({contractAddress: state.contractAddress, overrides: overrides});
     }
 
+    /// @notice Generates and logs a Tenderly simulation link without state overrides
+    ///
+    /// @dev Convenience function that calls the full logSimulationLink with empty overrides
+    ///
+    /// @param to   The target contract address for the simulation
+    /// @param data The transaction data to simulate
+    /// @param from The address that will appear as the transaction sender
     function logSimulationLink(address to, bytes memory data, address from) internal view {
         logSimulationLink({to: to, data: data, from: from, overrides: new StateOverride[](0)});
     }
 
+    /// @notice Generates and logs a Tenderly simulation link with state overrides
+    ///
+    /// @dev Creates a properly formatted URL for Tenderly's transaction simulator with state modifications
+    ///
+    /// @param to        The target contract address for the simulation
+    /// @param data      The transaction data to simulate
+    /// @param from      The address that will appear as the transaction sender
+    /// @param overrides Array of state overrides to apply during simulation
     function logSimulationLink(address to, bytes memory data, address from, StateOverride[] memory overrides)
         internal
         view

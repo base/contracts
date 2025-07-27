@@ -8,7 +8,24 @@ import {LibSort} from "@solady/utils/LibSort.sol";
 
 import {IGnosisSafe} from "./IGnosisSafe.sol";
 
+/// @title Signatures - Gnosis Safe Signature Processing Library
+///
+/// @notice Library for handling, sorting, and validating signatures for Gnosis Safe transactions
+///
+/// @dev This library provides utilities for preparing signatures, handling prevalidated signatures,
+///      and ensuring signatures are properly formatted and sorted for Safe contract execution.
+///      Supports ECDSA signatures, contract signatures (EIP-1271), and approved hash signatures.
 library Signatures {
+    /// @notice Prepares signatures for Safe transaction execution by adding prevalidated signatures and sorting
+    ///
+    /// @dev Combines prevalidated signatures (from approved hashes) with provided signatures,
+    ///      then sorts them in ascending order by signer address as required by Safe contracts
+    ///
+    /// @param safe       The address of the Safe contract
+    /// @param hash       The transaction hash that was signed
+    /// @param signatures The raw signatures to be processed
+    ///
+    /// @return _ The prepared and sorted signature bytes ready for Safe execution
     function prepareSignatures(address safe, bytes32 hash, bytes memory signatures)
         internal
         view
@@ -29,6 +46,15 @@ library Signatures {
         });
     }
 
+    /// @notice Generates prevalidated signature bytes from an array of addresses
+    ///
+    /// @dev Creates signature data for addresses that have already approved the transaction hash.
+    ///      These signatures use a special format where the address is encoded in the r value
+    ///      and v=1 to indicate prevalidation
+    ///
+    /// @param addresses Array of addresses that have prevalidated the transaction
+    ///
+    /// @return _ Concatenated signature bytes for all prevalidated addresses
     function genPrevalidatedSignatures(address[] memory addresses) internal pure returns (bytes memory) {
         LibSort.sort({a: addresses});
         bytes memory signatures;
@@ -38,6 +64,13 @@ library Signatures {
         return signatures;
     }
 
+    /// @notice Generates a single prevalidated signature for a given address
+    ///
+    /// @dev Creates a signature where r = address, s = 0, v = 1 to indicate prevalidation
+    ///
+    /// @param addr The address to generate a prevalidated signature for
+    ///
+    /// @return 65-byte signature in the format (r, s, v)
     function genPrevalidatedSignature(address addr) internal pure returns (bytes memory) {
         uint8 v = 1;
         bytes32 s = bytes32(0);
@@ -45,6 +78,15 @@ library Signatures {
         return abi.encodePacked(r, s, v);
     }
 
+    /// @notice Retrieves addresses that have approved a specific transaction hash
+    ///
+    /// @dev Queries the Safe contract to find owners who have called approveHash() for the given hash.
+    ///      Returns up to threshold number of approvers to optimize gas usage
+    ///
+    /// @param safeAddr The address of the Safe contract to query
+    /// @param hash     The transaction hash to check approvals for
+    ///
+    /// @return _ Array of addresses that have approved the transaction hash
     function getApprovers(address safeAddr, bytes32 hash) internal view returns (address[] memory) {
         // get a list of owners that have approved this transaction
         IGnosisSafe safe = IGnosisSafe(safeAddr);
@@ -137,6 +179,18 @@ library Signatures {
         return sorted;
     }
 
+    /// @notice Extracts and validates the owner address from a signature at a specific index
+    ///
+    /// @dev Recovers the signer address from the signature and verifies it's a Safe owner.
+    ///      Logs information about invalid signatures for debugging
+    ///
+    /// @param safe       The Safe contract address to validate ownership against
+    /// @param signatures The signature bytes array
+    /// @param dataHash   The hash that was signed
+    /// @param i          The index of the signature to extract (0-based)
+    ///
+    /// @return owner   The recovered address from the signature
+    /// @return isOwner Whether the recovered address is a valid Safe owner
     function extractOwner(address safe, bytes memory signatures, bytes32 dataHash, uint256 i)
         internal
         view
@@ -152,6 +206,19 @@ library Signatures {
         return (owner, isOwner);
     }
 
+    /// @notice Extracts the owner address from signature components
+    ///
+    /// @dev Handles different signature types:
+    ///      - v <= 1: Prevalidated signature (address encoded in r)
+    ///      - v > 30: Ethereum signed message format
+    ///      - Otherwise: Standard ECDSA signature
+    ///
+    /// @param dataHash The hash that was signed
+    /// @param r The r component of the signature
+    /// @param s The s component of the signature
+    /// @param v The v component of the signature
+    ///
+    /// @return _ The recovered signer address
     function extractOwner(bytes32 dataHash, bytes32 r, bytes32 s, uint8 v) internal pure returns (address) {
         if (v <= 1) {
             return address(uint160(uint256(r)));
@@ -162,7 +229,18 @@ library Signatures {
         return ecrecover(dataHash, v, r, s);
     }
 
-    // see https://github.com/safe-global/safe-contracts/blob/1ed486bb148fe40c26be58d1b517cec163980027/contracts/common/SignatureDecoder.sol
+    /// @notice Splits signature bytes to extract individual signature components
+    ///
+    /// @dev Extracts the r, s, v components from a signature at a specific position.
+    ///      Each signature is 65 bytes (32 + 32 + 1). Uses assembly for efficient memory access.
+    ///      Based on Safe's SignatureDecoder contract
+    ///
+    /// @param signatures The concatenated signature bytes
+    /// @param pos        The position index of the signature to extract (0-based)
+    ///
+    /// @return v The v component (recovery id)
+    /// @return r The r component (first 32 bytes)
+    /// @return s The s component (second 32 bytes)
     function signatureSplit(bytes memory signatures, uint256 pos)
         internal
         pure
@@ -176,6 +254,15 @@ library Signatures {
         }
     }
 
+    /// @notice Appends remaining bytes from a2 to a1 if a2 is longer
+    ///
+    /// @dev Used to append EIP-1271 signature data that may exist after the standard signature bytes.
+    ///      This preserves any additional signature data required for contract signature validation
+    ///
+    /// @param a1 The base signature bytes
+    /// @param a2 The source bytes that may contain additional data
+    ///
+    /// @return _ The concatenated bytes with any additional data from a2 appended
     function appendRemainingBytes(bytes memory a1, bytes memory a2) internal pure returns (bytes memory) {
         if (a2.length > a1.length) {
             a1 = bytes.concat(a1, Bytes.slice(a2, a1.length, a2.length - a1.length));
