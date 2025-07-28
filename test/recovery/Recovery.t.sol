@@ -73,6 +73,21 @@ contract RecoveryTest is Test {
         recovery.withdrawETH(targets, amounts);
     }
 
+    function test_WithdrawETH_ArrayLengthMismatch() public {
+        // Arrange
+        address[] memory targets = new address[](2);
+        targets[0] = recipient1;
+        targets[1] = recipient2;
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 1 ether;
+
+        // Act & Assert
+        vm.expectRevert(Recovery.ArrayLengthMismatch.selector);
+        vm.prank(owner);
+        recovery.withdrawETH(targets, amounts);
+    }
+
     function test_WithdrawETH_FailedTransfer() public {
         // Create a contract that rejects ETH
         RejectETH rejecter = new RejectETH();
