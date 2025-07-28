@@ -4,11 +4,11 @@ pragma solidity 0.8.15;
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {BaseFeeVault} from "@eth-optimism-bedrock/src/L2/BaseFeeVault.sol";
-import {L1FeeVault} from "@eth-optimism-bedrock/src/L2/L1FeeVault.sol";
-import {L2StandardBridge} from "@eth-optimism-bedrock/src/L2/L2StandardBridge.sol";
-import {SequencerFeeVault, FeeVault} from "@eth-optimism-bedrock/src/L2/SequencerFeeVault.sol";
-import {Predeploys} from "@eth-optimism-bedrock/src/libraries/Predeploys.sol";
+import {BaseFeeVault} from "lib/optimism/packages/contracts-bedrock/src/L2/BaseFeeVault.sol";
+import {L1FeeVault} from "lib/optimism/packages/contracts-bedrock/src/L2/L1FeeVault.sol";
+import {L2StandardBridge} from "lib/optimism/packages/contracts-bedrock/src/L2/L2StandardBridge.sol";
+import {SequencerFeeVault, FeeVault} from "lib/optimism/packages/contracts-bedrock/src/L2/SequencerFeeVault.sol";
+import {Predeploys} from "lib/optimism/packages/contracts-bedrock/src/libraries/Predeploys.sol";
 
 import {FeeDisburser} from "src/revenue-share/FeeDisburser.sol";
 

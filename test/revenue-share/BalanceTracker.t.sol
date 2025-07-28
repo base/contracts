@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {Proxy} from "@eth-optimism-bedrock/src/universal/Proxy.sol";
+import {Proxy} from "lib/optimism/packages/contracts-bedrock/src/universal/Proxy.sol";
 
 import {BalanceTracker} from "src/revenue-share/BalanceTracker.sol";
 

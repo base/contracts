@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import {Vm} from "lib/forge-std/src/Vm.sol";
-import {SystemConfig} from "@eth-optimism-bedrock/src/L1/SystemConfig.sol";
+import {SystemConfig} from "lib/optimism/packages/contracts-bedrock/src/L1/SystemConfig.sol";
 
 import {MultisigScript, IMulticall3, IGnosisSafe, Simulation} from "../../universal/MultisigScript.sol";
 
