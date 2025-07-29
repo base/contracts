@@ -73,7 +73,7 @@ contract RecoveryTest is Test {
         recovery.withdrawETH(targets, amounts);
     }
 
-    function test_WithdrawETH_FailedTransfer() public {
+    function test_WithdrawETH_SkipsFailedTransfers() public {
         // Create a contract that rejects ETH
         RejectETH rejecter = new RejectETH();
 
@@ -86,10 +86,18 @@ contract RecoveryTest is Test {
         amounts[0] = 1 ether;
         amounts[1] = 2 ether;
 
-        // Act & Assert - the entire transaction should revert
-        vm.expectRevert(Recovery.ETHWithdrawalFailed.selector);
+        // Record initial balances
+        uint256 initialBalance1 = recipient1.balance;
+        uint256 initialContractBalance = address(recovery).balance;
+
+        // Act
         vm.prank(owner);
         recovery.withdrawETH(targets, amounts);
+
+        // Assert - only the successful transfer should have gone through
+        assertEq(recipient1.balance, initialBalance1 + 1 ether, "Recipient1 should receive ETH");
+        assertEq(address(rejecter).balance, 0, "Rejecter should not receive ETH");
+        assertEq(address(recovery).balance, initialContractBalance - 1 ether, "Contract should have sent only 1 ETH");
     }
 
     function test_AuthorizeUpgrade_OnlyOwner() public {

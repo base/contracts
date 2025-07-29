@@ -18,9 +18,6 @@ contract Recovery is UUPSUpgradeable {
     /// @dev Error thrown when the caller is not the owner.
     error Unauthorized();
 
-    /// @dev Error thrown when the ETH withdrawal fails.
-    error ETHWithdrawalFailed();
-
     /// @dev Modifier to check if the caller is the owner.
     modifier onlyOwner() {
         if (msg.sender != OWNER) revert Unauthorized();
@@ -46,7 +43,7 @@ contract Recovery is UUPSUpgradeable {
     function withdrawETH(address[] calldata targets, uint256[] calldata amounts) public onlyOwner {
         for (uint256 i = 0; i < targets.length; i++) {
             (bool success,) = targets[i].call{value: amounts[i]}("");
-            if (!success) revert ETHWithdrawalFailed();
+            if (!success) continue;
         }
     }
 }
