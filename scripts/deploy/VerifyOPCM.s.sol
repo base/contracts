@@ -40,6 +40,9 @@ contract VerifyOPCM is Script {
     /// @notice Thrown when an artifact file is empty.
     error VerifyOPCM_EmptyArtifactFile(string _artifactPath);
 
+    /// @notice Thrown when contractsContainer addresses are not the same across all OPCM components.
+    error VerifyOPCM_ContractsContainerMismatch();
+
     /// @notice Thrown when the creation bytecode is not found in an artifact file.
     error VerifyOPCM_CreationBytecodeNotFound(string _artifactPath);
 
@@ -119,12 +122,14 @@ contract VerifyOPCM is Script {
         fieldNameOverrides["opcmUpgrader"] = "OPContractsManagerUpgrader";
         fieldNameOverrides["opcmInteropMigrator"] = "OPContractsManagerInteropMigrator";
         fieldNameOverrides["opcmStandardValidator"] = "OPContractsManagerStandardValidator";
+        fieldNameOverrides["contractsContainer"] = "OPContractsManagerContractsContainer";
 
         // Overrides for situations where contracts have differently named source files.
         sourceNameOverrides["OPContractsManagerGameTypeAdder"] = "OPContractsManager";
         sourceNameOverrides["OPContractsManagerDeployer"] = "OPContractsManager";
         sourceNameOverrides["OPContractsManagerUpgrader"] = "OPContractsManager";
         sourceNameOverrides["OPContractsManagerInteropMigrator"] = "OPContractsManager";
+        sourceNameOverrides["OPContractsManagerContractsContainer"] = "OPContractsManager";
 
         // Expected getter functions and their verification methods.
         // CRITICAL: Any getter in the ABI that's not in this list will cause verification to fail.
@@ -225,6 +230,19 @@ contract VerifyOPCM is Script {
             revert VerifyOPCM_NoProperties();
         }
 
+        // Verify that all component contracts have the same contractsContainer address.
+        _verifyContractsContainerConsistency(propRefs);
+
+        // Get the ContractsContainer address from the first component (they're all the same)
+        address contractsContainerAddr = address(0);
+        for (uint256 i = 0; i < propRefs.length; i++) {
+            string memory field = propRefs[i].field;
+            if (_hasContractsContainer(field)) {
+                contractsContainerAddr = _getContractsContainerAddress(propRefs[i].addr);
+                break;
+            }
+        }
+
         // Collect implementation references.
         OpcmContractRef[] memory implRefs = _getOpcmContractRefs(_opcm, "implementations", false);
         if (implRefs.length == 0) {
@@ -238,12 +256,18 @@ contract VerifyOPCM is Script {
         }
 
         // Create a single array to join everything together.
-        uint256 extraRefs = 1;
+        uint256 extraRefs = 2; // OPCM + ContractsContainer
         OpcmContractRef[] memory refs =
             new OpcmContractRef[](propRefs.length + implRefs.length + bpRefs.length + extraRefs);
 
         // References for OPCM and linked contracts.
         refs[0] = OpcmContractRef({ field: "opcm", name: "OPContractsManager", addr: address(_opcm), blueprint: false });
+        refs[1] = OpcmContractRef({
+            field: "contractsContainer",
+            name: "OPContractsManagerContractsContainer",
+            addr: contractsContainerAddr,
+            blueprint: false
+        });
 
         // Add the property references.
         for (uint256 i = 0; i < propRefs.length; i++) {
@@ -262,6 +286,92 @@ contract VerifyOPCM is Script {
 
         // Return the combined references.
         return refs;
+    }
+
+    /// @notice Verifies that all OPCM component contracts have the same contractsContainer address.
+    /// @param _propRefs Array of property references containing component addresses.
+    function _verifyContractsContainerConsistency(OpcmContractRef[] memory _propRefs) internal view {
+        // Process components that have contractsContainer(), validate addresses, and verify consistency
+        OpcmContractRef[] memory components = new OpcmContractRef[](_propRefs.length);
+        address[] memory containerAddresses = new address[](_propRefs.length);
+        uint256 componentCount = 0;
+        address expectedContainer = address(0);
+
+        for (uint256 i = 0; i < _propRefs.length; i++) {
+            OpcmContractRef memory propRef = _propRefs[i];
+
+            if (!_hasContractsContainer(propRef.field)) {
+                continue;
+            }
+
+            components[componentCount] = propRef;
+            address containerAddr = _getContractsContainerAddress(propRef.addr);
+
+            if (containerAddr == address(0)) {
+                console.log(string.concat("ERROR: Failed to retrieve contractsContainer address from ", propRef.field));
+                revert VerifyOPCM_ContractsContainerMismatch();
+            }
+
+            containerAddresses[componentCount] = containerAddr;
+
+            if (componentCount == 0) {
+                expectedContainer = containerAddr;
+            } else if (containerAddr != expectedContainer) {
+                _logContainerAddressMismatch(components, containerAddresses, componentCount);
+                revert VerifyOPCM_ContractsContainerMismatch();
+            }
+
+            componentCount++;
+        }
+
+        // Ensure we found at least one component
+        if (componentCount == 0) {
+            console.log("ERROR: No OPCM components found for contractsContainer verification");
+            revert VerifyOPCM_ContractsContainerMismatch();
+        }
+
+        console.log(
+            string.concat(
+                "OK: All ", vm.toString(componentCount), " components have the same contractsContainer address"
+            )
+        );
+        console.log(string.concat("  contractsContainer: ", vm.toString(expectedContainer)));
+    }
+
+    /// @notice Logs container address mismatch details for debugging.
+    /// @param _components Array of components found so far.
+    /// @param _containerAddresses Array of container addresses for each component.
+    /// @param _componentCount Number of components processed.
+    function _logContainerAddressMismatch(
+        OpcmContractRef[] memory _components,
+        address[] memory _containerAddresses,
+        uint256 _componentCount
+    )
+        internal
+        pure
+    {
+        console.log("ERROR: contractsContainer addresses are not consistent across all components");
+        for (uint256 j = 0; j <= _componentCount; j++) {
+            console.log(string.concat("  ", _components[j].field, ": ", vm.toString(_containerAddresses[j])));
+        }
+    }
+
+    /// @notice Gets the contractsContainer address from a contract.
+    /// @param _contract The contract address to query.
+    /// @return The contractsContainer address.
+    function _getContractsContainerAddress(address _contract) internal view returns (address) {
+        // Call the contractsContainer() function on the contract.
+        // nosemgrep: sol-style-use-abi-encodecall
+        (bool success, bytes memory returnData) = _contract.staticcall(abi.encodeWithSignature("contractsContainer()"));
+        if (!success) {
+            console.log(
+                string.concat(
+                    "[FAIL] ERROR: Failed to call contractsContainer() function on contract ", vm.toString(_contract)
+                )
+            );
+            return address(0);
+        }
+        return abi.decode(returnData, (address));
     }
 
     /// @notice Verifies a single OPCM contract reference (implementation or bytecode).
@@ -761,6 +871,30 @@ contract VerifyOPCM is Script {
 
         // Return computed path, relative to the contracts-bedrock directory.
         return string.concat("forge-artifacts/", sourceName, ".sol/", _contractName, ".json");
+    }
+
+    /// @notice Checks if a field name represents an OPCM component contract that has contractsContainer().
+    /// @param _field The field name to check.
+    /// @return True if the field represents an OPCM component with contractsContainer(), false otherwise.
+    function _hasContractsContainer(string memory _field) internal pure returns (bool) {
+        // Check if it starts with "opcm"
+        if (!LibString.startsWith(_field, "opcm")) {
+            return false;
+        }
+
+        // Components that start with "opcm" but don't extend OPContractsManagerBase (and thus don't have
+        // contractsContainer())
+        string[] memory exclusions = new string[](1);
+        exclusions[0] = "opcmStandardValidator";
+
+        // Check if the field is in the exclusion list
+        for (uint256 i = 0; i < exclusions.length; i++) {
+            if (LibString.eq(_field, exclusions[i])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// @notice Gets all OPCM getter function names from the ABI.

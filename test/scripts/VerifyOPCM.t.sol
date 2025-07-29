@@ -4,6 +4,9 @@ pragma solidity 0.8.15;
 // Foundry
 import { VmSafe } from "forge-std/Vm.sol";
 
+// Libraries
+import { LibString } from "@solady/utils/LibString.sol";
+
 // Tests
 import { OPContractsManager_TestInit } from "test/L1/OPContractsManager.t.sol";
 
@@ -11,7 +14,7 @@ import { OPContractsManager_TestInit } from "test/L1/OPContractsManager.t.sol";
 import { VerifyOPCM } from "scripts/deploy/VerifyOPCM.s.sol";
 
 // Interfaces
-import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
+import { IOPContractsManager, IOPContractsManagerUpgrader } from "interfaces/L1/IOPContractsManager.sol";
 
 contract VerifyOPCM_Harness is VerifyOPCM {
     function loadArtifactInfo(string memory _artifactPath) public view returns (ArtifactInfo memory) {
@@ -35,6 +38,10 @@ contract VerifyOPCM_Harness is VerifyOPCM {
 
     function buildArtifactPath(string memory _contractName) public view returns (string memory) {
         return _buildArtifactPath(_contractName);
+    }
+
+    function verifyContractsContainerConsistency(OpcmContractRef[] memory _propRefs) public view {
+        return _verifyContractsContainerConsistency(_propRefs);
     }
 
     function verifyOpcmImmutableVariables(IOPContractsManager _opcm) public returns (bool) {
@@ -243,6 +250,122 @@ contract VerifyOPCM_Run_Test is VerifyOPCM_TestInit {
         // Run the script.
         vm.expectRevert(VerifyOPCM.VerifyOPCM_Failed.selector);
         harness.run(address(opcm), true);
+    }
+
+    /// @notice Tests that the script verifies all component contracts have the same contractsContainer address.
+    function test_verifyContractsContainerConsistency_succeeds() public {
+        // Coverage changes bytecode and causes failures, skip.
+        skipIfCoverage();
+
+        // Get the property references (which include the component addresses)
+        VerifyOPCM.OpcmContractRef[] memory propRefs = harness.getOpcmPropertyRefs(opcm);
+
+        // This should succeed with the current setup where all contracts have the same containerAddress.
+        harness.verifyContractsContainerConsistency(propRefs);
+    }
+
+    /// @notice Tests that the script reverts when contracts have different contractsContainer addresses.
+    function test_verifyContractsContainerConsistency_mismatch_reverts() public {
+        // Coverage changes bytecode and causes failures, skip.
+        skipIfCoverage();
+
+        // Get the property references (which include the component addresses)
+        VerifyOPCM.OpcmContractRef[] memory propRefs = harness.getOpcmPropertyRefs(opcm);
+
+        // Create a different address to simulate a mismatch.
+        address differentContainer = address(0x9999999999999999999999999999999999999999);
+
+        // Mock the first OPCM component found to return a different contractsContainer address
+        _mockFirstOpcmComponent(propRefs, differentContainer);
+
+        // Now the consistency check should fail.
+        vm.expectRevert(VerifyOPCM.VerifyOPCM_ContractsContainerMismatch.selector);
+        harness.verifyContractsContainerConsistency(propRefs);
+    }
+
+    /// @notice Tests that each OPCM component can be individually tested for container mismatch.
+    function test_verifyContractsContainerConsistency_eachComponent_reverts() public {
+        // Coverage changes bytecode and causes failures, skip.
+        skipIfCoverage();
+
+        // Get the property references (which include the component addresses)
+        VerifyOPCM.OpcmContractRef[] memory propRefs = harness.getOpcmPropertyRefs(opcm);
+
+        // Test each OPCM component individually (only those that actually have contractsContainer())
+        address differentContainer = address(0x9999999999999999999999999999999999999999);
+
+        uint256 componentsWithContainerTested = 0;
+        for (uint256 i = 0; i < propRefs.length; i++) {
+            string memory field = propRefs[i].field;
+            if (_hasContractsContainer(field)) {
+                // Mock this specific component to return a different address
+                vm.mockCall(
+                    propRefs[i].addr,
+                    abi.encodeCall(IOPContractsManagerUpgrader.contractsContainer, ()),
+                    abi.encode(differentContainer)
+                );
+
+                // The consistency check should fail
+                vm.expectRevert(VerifyOPCM.VerifyOPCM_ContractsContainerMismatch.selector);
+                harness.verifyContractsContainerConsistency(propRefs);
+
+                // Clear the mock for next iteration
+                vm.clearMockedCalls();
+                componentsWithContainerTested++;
+            }
+        }
+
+        // Ensure we actually tested some components (currently: deployer, gameTypeAdder, upgrader, interopMigrator)
+        assertGt(componentsWithContainerTested, 0, "Should have tested at least one component");
+    }
+
+    /// @notice Utility function to mock the first OPCM component's contractsContainer address.
+    /// @param _propRefs Array of property references to search through.
+    /// @param _mockAddress The address to mock the contractsContainer call to return.
+    function _mockFirstOpcmComponent(VerifyOPCM.OpcmContractRef[] memory _propRefs, address _mockAddress) internal {
+        for (uint256 i = 0; i < _propRefs.length; i++) {
+            string memory field = _propRefs[i].field;
+            // Check if this is an OPCM component that has contractsContainer()
+            if (_hasContractsContainer(field)) {
+                vm.mockCall(
+                    _propRefs[i].addr,
+                    abi.encodeCall(IOPContractsManagerUpgrader.contractsContainer, ()),
+                    abi.encode(_mockAddress)
+                );
+                return;
+            }
+        }
+    }
+
+    /// @notice Helper function to check if a field represents an OPCM component.
+    /// @param _field The field name to check.
+    /// @return True if the field represents an OPCM component (starts with "opcm"), false otherwise.
+    function _isOpcmComponent(string memory _field) internal pure returns (bool) {
+        return LibString.startsWith(_field, "opcm");
+    }
+
+    /// @notice Helper function to check if a field represents an OPCM component that has contractsContainer().
+    /// @param _field The field name to check.
+    /// @return True if the field represents an OPCM component with contractsContainer(), false otherwise.
+    function _hasContractsContainer(string memory _field) internal pure returns (bool) {
+        // Check if it starts with "opcm"
+        if (!LibString.startsWith(_field, "opcm")) {
+            return false;
+        }
+
+        // Components that start with "opcm" but don't extend OPContractsManagerBase (and thus don't have
+        // contractsContainer())
+        string[] memory exclusions = new string[](1);
+        exclusions[0] = "opcmStandardValidator";
+
+        // Check if the field is in the exclusion list
+        for (uint256 i = 0; i < exclusions.length; i++) {
+            if (LibString.eq(_field, exclusions[i])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// @notice Tests that immutable variables are correctly verified in the OPCM contract.
