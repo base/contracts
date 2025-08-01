@@ -183,7 +183,11 @@ abstract contract MultisigScript is Script {
     function _simulationOverrides() internal view virtual returns (Simulation.StateOverride[] memory overrides_) {}
 
     constructor() {
-        multicallAddress = vm.envBool("USE_CB_MULTICALL") ? CB_MULTICALL : MULTICALL3_ADDRESS;
+        bool useCbMulticall;
+        try vm.envBool("USE_CB_MULTICALL") {
+            useCbMulticall = vm.envBool("USE_CB_MULTICALL");
+        } catch {}
+        multicallAddress = useCbMulticall ? CB_MULTICALL : MULTICALL3_ADDRESS;
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -566,23 +570,12 @@ abstract contract MultisigScript is Script {
 
     function _execTransactionCalldata(address safe, bytes memory data, uint256 value, bytes memory signatures)
         internal
-        pure
+        view
         returns (bytes memory)
     {
         return abi.encodeCall(
             IGnosisSafe(safe).execTransaction,
-            (
-                multicallAddress,
-                value,
-                data,
-                _getOperation(value),
-                0,
-                0,
-                0,
-                address(0),
-                payable(address(0)),
-                signatures
-            )
+            (multicallAddress, value, data, _getOperation(value), 0, 0, 0, address(0), payable(address(0)), signatures)
         );
     }
 
