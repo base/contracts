@@ -148,6 +148,10 @@ import {Simulation} from "./Simulation.sol";
 abstract contract MultisigScript is Script {
     bytes32 internal constant SAFE_NONCE_SLOT = bytes32(uint256(5));
 
+    address internal constant CB_MULTICALL = 0x8BDE8F549F56D405f07e1aA15Df9e1FC69839881;
+
+    address internal multicallAddress;
+
     /// @dev Event emitted from a `sign()` call containing the data to sign. Used in testing.
     event DataToSign(bytes data);
 
@@ -177,6 +181,14 @@ abstract contract MultisigScript is Script {
     // Tenderly simulations can accept generic state overrides. This hook enables this functionality.
     // By default, an empty (no-op) override is returned.
     function _simulationOverrides() internal view virtual returns (Simulation.StateOverride[] memory overrides_) {}
+
+    constructor() {
+        bool useCbMulticall;
+        try vm.envBool("USE_CB_MULTICALL") {
+            useCbMulticall = vm.envBool("USE_CB_MULTICALL");
+        } catch {}
+        multicallAddress = useCbMulticall ? CB_MULTICALL : MULTICALL3_ADDRESS;
+    }
 
     //////////////////////////////////////////////////////////////////////////////////////
     ///                                Public Functions                                ///
@@ -426,12 +438,12 @@ abstract contract MultisigScript is Script {
         bytes memory txData = abi.encodeCall(IMulticall3.aggregate3, (calls));
         console.log("---\nSimulation link:");
         // solhint-disable max-line-length
-        Simulation.logSimulationLink({to: MULTICALL3_ADDRESS, data: txData, from: msg.sender, overrides: overrides});
+        Simulation.logSimulationLink({to: multicallAddress, data: txData, from: msg.sender, overrides: overrides});
 
         // Forge simulation of the data logged in the link. If the simulation fails
         // we revert to make it explicit that the simulation failed.
         Simulation.Payload memory simPayload =
-            Simulation.Payload({to: MULTICALL3_ADDRESS, data: txData, from: msg.sender, stateOverrides: overrides});
+            Simulation.Payload({to: multicallAddress, data: txData, from: msg.sender, stateOverrides: overrides});
         Vm.AccountAccess[] memory accesses = Simulation.simulateFromSimPayload({simPayload: simPayload});
         return (accesses, simPayload);
     }
@@ -543,10 +555,10 @@ abstract contract MultisigScript is Script {
         returns (bytes memory)
     {
         return IGnosisSafe(safe).encodeTransactionData({
-            to: MULTICALL3_ADDRESS,
+            to: multicallAddress,
             value: value,
             data: data,
-            operation: value == 0 ? Enum.Operation.DelegateCall : Enum.Operation.Call,
+            operation: _getOperation(value),
             safeTxGas: 0,
             baseGas: 0,
             gasPrice: 0,
@@ -558,23 +570,12 @@ abstract contract MultisigScript is Script {
 
     function _execTransactionCalldata(address safe, bytes memory data, uint256 value, bytes memory signatures)
         internal
-        pure
+        view
         returns (bytes memory)
     {
         return abi.encodeCall(
             IGnosisSafe(safe).execTransaction,
-            (
-                MULTICALL3_ADDRESS,
-                value,
-                data,
-                value == 0 ? Enum.Operation.DelegateCall : Enum.Operation.Call,
-                0,
-                0,
-                0,
-                address(0),
-                payable(address(0)),
-                signatures
-            )
+            (multicallAddress, value, data, _getOperation(value), 0, 0, 0, address(0), payable(address(0)), signatures)
         );
     }
 
@@ -586,10 +587,10 @@ abstract contract MultisigScript is Script {
             vm.broadcast();
         }
         return IGnosisSafe(safe).execTransaction({
-            to: MULTICALL3_ADDRESS,
+            to: multicallAddress,
             value: value,
             data: data,
-            operation: value == 0 ? Enum.Operation.DelegateCall : Enum.Operation.Call,
+            operation: _getOperation(value),
             safeTxGas: 0,
             baseGas: 0,
             gasPrice: 0,
@@ -610,5 +611,13 @@ abstract contract MultisigScript is Script {
         array[0] = address1;
         array[1] = address2;
         return array;
+    }
+
+    function _getOperation(uint256 value) private view returns (Enum.Operation) {
+        if (multicallAddress == CB_MULTICALL || value == 0) {
+            return Enum.Operation.DelegateCall;
+        }
+
+        return Enum.Operation.Call;
     }
 }
