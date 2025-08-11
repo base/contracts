@@ -94,7 +94,6 @@ contract CBMulticallTest is CommonTest {
         calls[1] =
             CBMulticall.Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 2)});
         (uint256 bn, bytes32 bh, CBMulticall.Result[] memory res) = mc.blockAndAggregate(calls);
-        // silence unused vars while still asserting one result
         assertEq(bn, block.number);
         assertEq(bh, blockhash(block.number));
         assertEq(res.length, 2);
