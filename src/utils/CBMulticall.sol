@@ -141,7 +141,6 @@ contract CBMulticall {
     }
 
     /// @notice Aggregate calls with a msg value
-    /// @notice Reverts if msg.value is less than the sum of the call values
     /// @param calls An array of Call3Value structs
     /// @return returnData An array of Result structs
     function aggregate3Value(Call3Value[] calldata calls) public payable returns (Result[] memory returnData) {
