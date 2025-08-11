@@ -145,7 +145,6 @@ contract CBMulticall {
     /// @param calls An array of Call3Value structs
     /// @return returnData An array of Result structs
     function aggregate3Value(Call3Value[] calldata calls) public payable returns (Result[] memory returnData) {
-        uint256 valAccumulator;
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call3Value calldata calli;
@@ -153,11 +152,6 @@ contract CBMulticall {
             Result memory result = returnData[i];
             calli = calls[i];
             uint256 val = calli.value;
-            // Humanity will be a Type V Kardashev Civilization before this overflows - andreas
-            // ~ 10^25 Wei in existence << ~ 10^76 size uint fits in a uint256
-            unchecked {
-                valAccumulator += val;
-            }
             (result.success, result.returnData) = calli.target.call{value: val}(calli.callData);
             assembly {
                 // Revert if the call fails and failure is not allowed
@@ -171,7 +165,7 @@ contract CBMulticall {
                     mstore(0x24, 0x0000000000000000000000000000000000000000000000000000000000000017)
                     // set revert string: bytes32(abi.encodePacked("Multicall3: call failed"))
                     mstore(0x44, 0x4d756c746963616c6c333a2063616c6c206661696c6564000000000000000000)
-                    revert(0x00, 0x84)
+                    revert(0x00, 0x64)
                 }
             }
             unchecked {
