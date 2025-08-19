@@ -46,7 +46,6 @@ interface IGnosisSafe {
     ) external payable returns (bool success);
     function getOwners() external view returns (address[] memory);
     function getThreshold() external view returns (uint256);
-    function isModuleEnabled(address module) external view returns (bool);
     function isOwner(address owner) external view returns (bool);
     function nonce() external view returns (uint256);
     function removeOwner(address prevOwner, address owner, uint256 _threshold) external;
