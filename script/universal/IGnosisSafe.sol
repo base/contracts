@@ -12,8 +12,10 @@ abstract contract Enum {
 
 /// @title IGnosisSafe - Gnosis Safe Interface
 interface IGnosisSafe {
+    function addOwnerWithThreshold(address owner, uint256 _threshold) external;
     function approveHash(bytes32 hashToApprove) external;
     function approvedHashes(address, bytes32) external view returns (uint256);
+    function changeThreshold(uint256 _threshold) external;
     function checkNSignatures(bytes32 dataHash, bytes memory data, bytes memory signatures, uint256 requiredSignatures)
         external
         view;
@@ -46,6 +48,7 @@ interface IGnosisSafe {
     function getThreshold() external view returns (uint256);
     function isOwner(address owner) external view returns (bool);
     function nonce() external view returns (uint256);
+    function removeOwner(address prevOwner, address owner, uint256 _threshold) external;
     function setup(
         address[] memory _owners,
         uint256 _threshold,
@@ -56,4 +59,5 @@ interface IGnosisSafe {
         uint256 payment,
         address paymentReceiver
     ) external;
+    function swapOwner(address prevOwner, address oldOwner, address newOwner) external;
 }
