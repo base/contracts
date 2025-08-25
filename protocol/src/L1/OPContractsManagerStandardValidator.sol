@@ -36,8 +36,8 @@ import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 /// before and after an upgrade.
 contract OPContractsManagerStandardValidator is ISemver {
     /// @notice The semantic version of the OPContractsManagerStandardValidator contract.
-    /// @custom:semver 1.7.0
-    string public constant version = "1.7.0";
+    /// @custom:semver 1.8.0
+    string public constant version = "1.8.0";
 
     /// @notice The SuperchainConfig contract.
     ISuperchainConfig public superchainConfig;
@@ -709,7 +709,7 @@ contract OPContractsManagerStandardValidator is ISemver {
         _errors = internalRequire(
             LibString.eq(getVersion(address(_mips)), mipsVersion()), string.concat(_errorPrefix, "-20"), _errors
         );
-        _errors = internalRequire(_mips.stateVersion() == 7, string.concat(_errorPrefix, "-30"), _errors);
+        _errors = internalRequire(_mips.stateVersion() == 8, string.concat(_errorPrefix, "-30"), _errors);
         return _errors;
     }
 
