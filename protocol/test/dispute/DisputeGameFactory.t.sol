@@ -21,6 +21,7 @@ import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
 import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 import { ISuperFaultDisputeGame } from "interfaces/dispute/ISuperFaultDisputeGame.sol";
 import { IPermissionedDisputeGame } from "interfaces/dispute/IPermissionedDisputeGame.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
 import { ISuperPermissionedDisputeGame } from "interfaces/dispute/ISuperPermissionedDisputeGame.sol";
 // Mocks
 import { AlphabetVM } from "test/mocks/AlphabetVM.sol";
@@ -53,6 +54,8 @@ contract DisputeGameFactory_TestInit is CommonTest {
     event ImplementationSet(address indexed impl, GameType indexed gameType);
     event ImplementationArgsSet(GameType indexed gameType, bytes args);
     event InitBondUpdated(GameType indexed gameType, uint256 indexed newBond);
+
+    uint256 l2ChainId = 111;
 
     function setUp() public virtual override {
         super.setUp();
@@ -222,7 +225,7 @@ contract DisputeGameFactory_TestInit is CommonTest {
             vm_, // 20 bytes
             anchorStateRegistry, // 20 bytes
             delayedWeth, // 20 bytes
-            uint256(111) // 32 bytes (l2ChainId)
+            l2ChainId // 32 bytes (l2ChainId)
         );
 
         _setGame(gameImpl_, GameTypes.CANNON, implArgs);
@@ -258,6 +261,37 @@ contract DisputeGameFactory_TestInit is CommonTest {
         assembly {
             out_ := or(and(not(shl(248, 0xFF)), _claim), shl(248, _status))
         }
+    }
+
+    function setupPermissionedDisputeGameV2(
+        Claim _absolutePrestate,
+        address _proposer,
+        address _challenger
+    )
+        internal
+        returns (address gameImpl_, AlphabetVM vm_, IPreimageOracle preimageOracle_)
+    {
+        (vm_, preimageOracle_) = _createVM(_absolutePrestate);
+        gameImpl_ = DeployUtils.create1({
+            _name: "PermissionedDisputeGameV2",
+            _args: DeployUtils.encodeConstructor(
+                abi.encodeCall(
+                    IPermissionedDisputeGameV2.__constructor__,
+                    (_getGameConstructorParamsV2(GameTypes.PERMISSIONED_CANNON), _proposer, _challenger)
+                )
+            )
+        });
+
+        // Encode the implementation args for CWIA (tightly packed)
+        bytes memory implArgs = abi.encodePacked(
+            _absolutePrestate, // 32 bytes
+            vm_, // 20 bytes
+            anchorStateRegistry, // 20 bytes
+            delayedWeth, // 20 bytes
+            l2ChainId // 32 bytes (l2ChainId)
+        );
+
+        _setGame(gameImpl_, GameTypes.PERMISSIONED_CANNON, implArgs);
     }
 }
 
@@ -453,7 +487,7 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         assertEq(Claim.unwrap(gameV2.absolutePrestate()), Claim.unwrap(absolutePrestate));
         assertEq(Claim.unwrap(gameV2.rootClaim()), Claim.unwrap(rootClaim));
         assertEq(gameV2.extraData(), extraData);
-        assertEq(gameV2.l2ChainId(), 111);
+        assertEq(gameV2.l2ChainId(), l2ChainId);
         assertEq(address(gameV2.gameCreator()), address(this));
         assertEq(gameV2.l2BlockNumber(), uint256(type(uint32).max));
         assertEq(address(gameV2.vm()), address(vm_));
