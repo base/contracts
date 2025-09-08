@@ -378,7 +378,7 @@ contract Initializer_Test is CommonTest {
     function test_cannotReinitialize_succeeds() public {
         // Collect exclusions.
         uint256 j;
-        string[] memory excludes = new string[](10);
+        string[] memory excludes = new string[](11);
         // Contract is currently not being deployed as part of the standard deployment script.
         excludes[j++] = "src/L2/OptimismSuperchainERC20.sol";
         // Periphery contracts don't get deployed as part of the standard deployment script.
@@ -390,6 +390,7 @@ contract Initializer_Test is CommonTest {
         //       don't work properly. Remove these exclusions once the deployment script is fixed.
         excludes[j++] = "src/dispute/FaultDisputeGame.sol";
         excludes[j++] = "src/dispute/v2/FaultDisputeGameV2.sol";
+        excludes[j++] = "src/dispute/v2/PermissionedDisputeGameV2.sol";
         excludes[j++] = "src/dispute/SuperFaultDisputeGame.sol";
         excludes[j++] = "src/dispute/PermissionedDisputeGame.sol";
         excludes[j++] = "src/dispute/SuperPermissionedDisputeGame.sol";
