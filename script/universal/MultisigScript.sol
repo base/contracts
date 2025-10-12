@@ -146,6 +146,12 @@ import {Simulation} from "./Simulation.sol";
 ///     │        │        │        │        │        │          │            run()             │
 ///     │        │        │        │        │        │          │─────────────────────────────>│
 abstract contract MultisigScript is Script {
+    struct MappingParent {
+        bytes32 slot;
+        bytes32 parent;
+        bytes32 key;
+    }
+
     bytes32 internal constant SAFE_NONCE_SLOT = bytes32(uint256(5));
 
     address internal constant CB_MULTICALL = 0x8BDE8F549F56D405f07e1aA15Df9e1FC69839881;
@@ -647,5 +653,18 @@ abstract contract MultisigScript is Script {
         }
 
         return Enum.Operation.Call;
+    }
+
+    function _appendToParents(MappingParent[] memory parents, MappingParent memory newParent)
+        private
+        pure
+        returns (MappingParent[] memory)
+    {
+        MappingParent[] memory newArr = new MappingParent[](parents.length + 1);
+        for (uint256 i; i < parents.length; i++) {
+            newArr[i] = parents[i];
+        }
+        newArr[parents.length] = newParent;
+        return newArr;
     }
 }
