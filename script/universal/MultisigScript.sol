@@ -225,7 +225,7 @@ abstract contract MultisigScript is Script {
         (bytes[] memory datas, uint256 value) = _transactionDatas({safes: safes});
 
         vm.startMappingRecording();
-        (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
+        (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload, MappingParent memory parent) =
             _simulateForSigner({safes: safes, datas: datas, value: value});
 
         bytes memory encodedStateDiff = abi.encode(accesses);
@@ -233,7 +233,8 @@ abstract contract MultisigScript is Script {
         string memory json = vm.serializeBytes(obj, "stateDiff", encodedStateDiff);
         json = vm.serializeBytes(obj, "overrides", abi.encode(simPayload));
 
-        MappingParent[] memory parents = new MappingParent[](0);
+        MappingParent[] memory parents = new MappingParent[](1);
+        parents[0] = parent;
 
         for (uint256 i; i < accesses.length; i++) {
             for (uint256 j; j < accesses[i].storageAccesses.length; j++) {
@@ -465,14 +466,15 @@ abstract contract MultisigScript is Script {
 
     function _simulateForSigner(address[] memory safes, bytes[] memory datas, uint256 value)
         internal
-        returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
+        returns (Vm.AccountAccess[] memory, Simulation.Payload memory, MappingParent memory)
     {
         IMulticall3.Call3[] memory calls = _simulateForSignerCalls({safes: safes, datas: datas, value: value});
 
         bytes32 firstCallDataHash = _getTransactionHash({safe: safes[0], data: datas[0], value: value});
 
         // Now define the state overrides for the simulation.
-        Simulation.StateOverride[] memory overrides = _overrides({safes: safes, firstCallDataHash: firstCallDataHash});
+        (Simulation.StateOverride[] memory overrides, MappingParent memory parent) =
+            _overrides({safes: safes, firstCallDataHash: firstCallDataHash});
 
         bytes memory txData = abi.encodeCall(IMulticall3.aggregate3, (calls));
         console.log("---\nSimulation link:");
@@ -484,7 +486,7 @@ abstract contract MultisigScript is Script {
         Simulation.Payload memory simPayload =
             Simulation.Payload({to: multicallAddress, data: txData, from: msg.sender, stateOverrides: overrides});
         Vm.AccountAccess[] memory accesses = Simulation.simulateFromSimPayload({simPayload: simPayload});
-        return (accesses, simPayload);
+        return (accesses, simPayload, parent);
     }
 
     function _simulateForSignerCalls(address[] memory safes, bytes[] memory datas, uint256 value)
@@ -518,7 +520,7 @@ abstract contract MultisigScript is Script {
     function _overrides(address[] memory safes, bytes32 firstCallDataHash)
         internal
         view
-        returns (Simulation.StateOverride[] memory)
+        returns (Simulation.StateOverride[] memory, MappingParent memory)
     {
         Simulation.StateOverride[] memory simOverrides = _simulationOverrides();
         Simulation.StateOverride[] memory overrides = new Simulation.StateOverride[](safes.length + simOverrides.length);
@@ -540,7 +542,14 @@ abstract contract MultisigScript is Script {
             overrides[i + safes.length] = simOverrides[i];
         }
 
-        return overrides;
+        return (
+            overrides,
+            MappingParent({
+                slot: keccak256(abi.encode(msg.sender, uint256(8))),
+                parent: bytes32(uint256(8)),
+                key: bytes32(bytes20(msg.sender))
+            })
+        );
     }
 
     // Get the nonce to use for the given safe, for signing and simulations.
