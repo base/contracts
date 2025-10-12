@@ -253,12 +253,6 @@ abstract contract MultisigScript is Script {
 
         json = vm.serializeBytes(obj, "preimages", abi.encode(parents));
 
-        bytes memory txData = _encodeTransactionData({safe: safes[0], data: datas[0], value: value});
-        json = vm.serializeBytes(obj, "dataToSign", txData);
-        json = vm.serializeAddress(obj, "targetSafe", _ownerSafe());
-
-        vm.writeJson(json, "stateDiff.json");
-
         _postSign({accesses: accesses, simPayload: simPayload});
         _postCheck({accesses: accesses, simPayload: simPayload});
 
@@ -266,6 +260,13 @@ abstract contract MultisigScript is Script {
         for (uint256 i; i < safes.length; i++) {
             vm.store({target: safes[i], slot: SAFE_NONCE_SLOT, value: bytes32(originalNonces[i])});
         }
+
+        bytes memory txData = _encodeTransactionData({safe: safes[0], data: datas[0], value: value});
+        json = vm.serializeBytes(obj, "dataToSign", txData);
+        json = vm.serializeAddress(obj, "targetSafe", _ownerSafe());
+
+        vm.writeJson(json, "stateDiff.json");
+
         _printDataToSign({safe: safes[0], data: datas[0], value: value});
     }
 
