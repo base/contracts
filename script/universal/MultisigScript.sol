@@ -255,7 +255,7 @@ abstract contract MultisigScript is Script {
 
         bytes memory txData = _encodeTransactionData({safe: safes[0], data: datas[0], value: value});
         json = vm.serializeBytes(obj, "dataToSign", txData);
-        json = vm.serializeBytes(obj, "targetSafe", _ownerSafe());
+        json = vm.serializeAddress(obj, "targetSafe", _ownerSafe());
 
         vm.writeJson(json, "stateDiff.json");
 
