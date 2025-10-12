@@ -218,8 +218,36 @@ abstract contract MultisigScript is Script {
 
         (bytes[] memory datas, uint256 value) = _transactionDatas({safes: safes});
 
+        vm.startMappingRecording();
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
             _simulateForSigner({safes: safes, datas: datas, value: value});
+
+        bytes memory encodedStateDiff = abi.encode(accesses);
+        string memory obj = "root";
+        string memory json = vm.serializeBytes(obj, "stateDiff", encodedStateDiff);
+        json = vm.serializeBytes(obj, "overrides", abi.encode(simPayload));
+
+        MappingParent[] memory parents = new MappingParent[](0);
+
+        for (uint256 i; i < accesses.length; i++) {
+            for (uint256 j; j < accesses[i].storageAccesses.length; j++) {
+                (bool found, bytes32 key, bytes32 parent) = vm.getMappingKeyAndParentOf(
+                    accesses[i].storageAccesses[j].account, accesses[i].storageAccesses[j].slot
+                );
+                if (found) {
+                    parents = _appendToParents(
+                        parents, MappingParent({slot: accesses[i].storageAccesses[j].slot, parent: parent, key: key})
+                    );
+                }
+            }
+        }
+
+        // Clear the mapping recording session after we have queried the data
+        vm.stopMappingRecording();
+
+        json = vm.serializeBytes(obj, "preimages", abi.encode(parents));
+
+        vm.writeJson(json, "stateDiff.json");
 
         _postSign({accesses: accesses, simPayload: simPayload});
         _postCheck({accesses: accesses, simPayload: simPayload});
