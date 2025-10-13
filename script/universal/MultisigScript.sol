@@ -10,6 +10,7 @@ import {Vm} from "lib/forge-std/src/Vm.sol";
 import {IGnosisSafe, Enum} from "./IGnosisSafe.sol";
 import {Signatures} from "./Signatures.sol";
 import {Simulation} from "./Simulation.sol";
+import {StateDiff} from "./StateDiff.sol";
 
 /// @title MultisigScript
 /// @notice Script builder for Forge scripts that require signatures from Safes. Supports both non-nested
@@ -146,12 +147,6 @@ import {Simulation} from "./Simulation.sol";
 ///     │        │        │        │        │        │          │            run()             │
 ///     │        │        │        │        │        │          │─────────────────────────────>│
 abstract contract MultisigScript is Script {
-    struct MappingParent {
-        bytes32 slot;
-        bytes32 parent;
-        bytes32 key;
-    }
-
     bytes32 internal constant SAFE_NONCE_SLOT = bytes32(uint256(5));
 
     address internal constant CB_MULTICALL = 0x8BDE8F549F56D405f07e1aA15Df9e1FC69839881;
@@ -225,34 +220,15 @@ abstract contract MultisigScript is Script {
         (bytes[] memory datas, uint256 value) = _transactionDatas({safes: safes});
 
         vm.startMappingRecording();
-        (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload, MappingParent memory parent) =
-            _simulateForSigner({safes: safes, datas: datas, value: value});
-
-        bytes memory encodedStateDiff = abi.encode(accesses);
-        string memory obj = "root";
-        string memory json = vm.serializeBytes(obj, "stateDiff", encodedStateDiff);
-        json = vm.serializeBytes(obj, "overrides", abi.encode(simPayload));
-
-        MappingParent[] memory parents = new MappingParent[](1);
-        parents[0] = parent;
-
-        for (uint256 i; i < accesses.length; i++) {
-            for (uint256 j; j < accesses[i].storageAccesses.length; j++) {
-                (bool found, bytes32 key, bytes32 parent) = vm.getMappingKeyAndParentOf(
-                    accesses[i].storageAccesses[j].account, accesses[i].storageAccesses[j].slot
-                );
-                if (found) {
-                    parents = _appendToParents(
-                        parents, MappingParent({slot: accesses[i].storageAccesses[j].slot, parent: parent, key: key})
-                    );
-                }
-            }
-        }
-
-        // Clear the mapping recording session after we have queried the data
+        (
+            Vm.AccountAccess[] memory accesses,
+            Simulation.Payload memory simPayload,
+            StateDiff.MappingParent memory firstParent
+        ) = _simulateForSigner({safes: safes, datas: datas, value: value});
+        (StateDiff.MappingParent[] memory parents, string memory json) = StateDiff.collectStateDiff(
+            StateDiff.CollectStateDiffOpts({accesses: accesses, simPayload: simPayload, firstParent: firstParent})
+        );
         vm.stopMappingRecording();
-
-        json = vm.serializeBytes(obj, "preimages", abi.encode(parents));
 
         _postSign({accesses: accesses, simPayload: simPayload});
         _postCheck({accesses: accesses, simPayload: simPayload});
@@ -263,10 +239,7 @@ abstract contract MultisigScript is Script {
         }
 
         bytes memory txData = _encodeTransactionData({safe: safes[0], data: datas[0], value: value});
-        json = vm.serializeBytes(obj, "dataToSign", txData);
-        json = vm.serializeAddress(obj, "targetSafe", _ownerSafe());
-
-        vm.writeJson(json, "stateDiff.json");
+        StateDiff.recordStateDiff({json: json, parents: parents, txData: txData, targetSafe: _ownerSafe()});
 
         _printDataToSign({safe: safes[0], data: datas[0], value: value});
     }
@@ -466,14 +439,14 @@ abstract contract MultisigScript is Script {
 
     function _simulateForSigner(address[] memory safes, bytes[] memory datas, uint256 value)
         internal
-        returns (Vm.AccountAccess[] memory, Simulation.Payload memory, MappingParent memory)
+        returns (Vm.AccountAccess[] memory, Simulation.Payload memory, StateDiff.MappingParent memory)
     {
         IMulticall3.Call3[] memory calls = _simulateForSignerCalls({safes: safes, datas: datas, value: value});
 
         bytes32 firstCallDataHash = _getTransactionHash({safe: safes[0], data: datas[0], value: value});
 
         // Now define the state overrides for the simulation.
-        (Simulation.StateOverride[] memory overrides, MappingParent memory parent) =
+        (Simulation.StateOverride[] memory overrides, StateDiff.MappingParent memory parent) =
             _overrides({safes: safes, firstCallDataHash: firstCallDataHash});
 
         bytes memory txData = abi.encodeCall(IMulticall3.aggregate3, (calls));
@@ -520,7 +493,7 @@ abstract contract MultisigScript is Script {
     function _overrides(address[] memory safes, bytes32 firstCallDataHash)
         internal
         view
-        returns (Simulation.StateOverride[] memory, MappingParent memory)
+        returns (Simulation.StateOverride[] memory, StateDiff.MappingParent memory)
     {
         Simulation.StateOverride[] memory simOverrides = _simulationOverrides();
         Simulation.StateOverride[] memory overrides = new Simulation.StateOverride[](safes.length + simOverrides.length);
@@ -544,7 +517,7 @@ abstract contract MultisigScript is Script {
 
         return (
             overrides,
-            MappingParent({
+            StateDiff.MappingParent({
                 slot: keccak256(abi.encode(msg.sender, uint256(8))),
                 parent: bytes32(uint256(8)),
                 key: bytes32(bytes20(msg.sender))
@@ -667,18 +640,5 @@ abstract contract MultisigScript is Script {
         }
 
         return Enum.Operation.Call;
-    }
-
-    function _appendToParents(MappingParent[] memory parents, MappingParent memory newParent)
-        private
-        pure
-        returns (MappingParent[] memory)
-    {
-        MappingParent[] memory newArr = new MappingParent[](parents.length + 1);
-        for (uint256 i; i < parents.length; i++) {
-            newArr[i] = parents[i];
-        }
-        newArr[parents.length] = newParent;
-        return newArr;
     }
 }
