@@ -64,7 +64,11 @@ library StateDiff {
         json = VM.serializeBytes(OBJ, "preimages", abi.encode(parents));
         json = VM.serializeBytes(OBJ, "dataToSign", txData);
         json = VM.serializeAddress(OBJ, "targetSafe", targetSafe);
-        VM.writeJson(json, "stateDiff.json");
+
+        bool shouldWrite = VM.envOr("RECORD_STATE_DIFF", false);
+        if (shouldWrite) {
+            VM.writeJson(json, "stateDiff.json");
+        }
     }
 
     function _appendToParents(MappingParent[] memory parents, MappingParent memory newParent)
