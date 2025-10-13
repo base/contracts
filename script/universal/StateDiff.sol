@@ -15,7 +15,6 @@ library StateDiff {
     struct CollectStateDiffOpts {
         Vm.AccountAccess[] accesses;
         Simulation.Payload simPayload;
-        MappingParent firstParent;
     }
 
     /// @notice Foundry VM instance for state manipulation during simulations
@@ -32,7 +31,12 @@ library StateDiff {
         json = VM.serializeBytes(OBJ, "overrides", abi.encode(opts.simPayload));
 
         MappingParent[] memory parents = new MappingParent[](1);
-        parents[0] = opts.firstParent;
+        // Account for the msg.sender approval override
+        parents[0] = MappingParent({
+            slot: keccak256(abi.encode(msg.sender, uint256(8))),
+            parent: bytes32(uint256(8)),
+            key: bytes32(bytes20(msg.sender))
+        });
 
         for (uint256 i; i < opts.accesses.length; i++) {
             for (uint256 j; j < opts.accesses[i].storageAccesses.length; j++) {
