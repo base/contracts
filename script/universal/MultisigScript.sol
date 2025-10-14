@@ -10,6 +10,7 @@ import {Vm} from "lib/forge-std/src/Vm.sol";
 import {IGnosisSafe, Enum} from "./IGnosisSafe.sol";
 import {Signatures} from "./Signatures.sol";
 import {Simulation} from "./Simulation.sol";
+import {StateDiff} from "./StateDiff.sol";
 
 /// @title MultisigScript
 /// @notice Script builder for Forge scripts that require signatures from Safes. Supports both non-nested
@@ -218,8 +219,12 @@ abstract contract MultisigScript is Script {
 
         (bytes[] memory datas, uint256 value) = _transactionDatas({safes: safes});
 
+        vm.startMappingRecording();
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
             _simulateForSigner({safes: safes, datas: datas, value: value});
+        (StateDiff.MappingParent[] memory parents, string memory json) =
+            StateDiff.collectStateDiff(StateDiff.CollectStateDiffOpts({accesses: accesses, simPayload: simPayload}));
+        vm.stopMappingRecording();
 
         _postSign({accesses: accesses, simPayload: simPayload});
         _postCheck({accesses: accesses, simPayload: simPayload});
@@ -228,7 +233,11 @@ abstract contract MultisigScript is Script {
         for (uint256 i; i < safes.length; i++) {
             vm.store({target: safes[i], slot: SAFE_NONCE_SLOT, value: bytes32(originalNonces[i])});
         }
-        _printDataToSign({safe: safes[0], data: datas[0], value: value});
+
+        bytes memory txData = _encodeTransactionData({safe: safes[0], data: datas[0], value: value});
+        StateDiff.recordStateDiff({json: json, parents: parents, txData: txData, targetSafe: _ownerSafe()});
+
+        _printDataToSign({safe: safes[0], data: datas[0], value: value, txData: txData});
     }
 
     /// Step 1.1 (optional)
@@ -370,8 +379,7 @@ abstract contract MultisigScript is Script {
         });
     }
 
-    function _printDataToSign(address safe, bytes memory data, uint256 value) internal {
-        bytes memory txData = _encodeTransactionData({safe: safe, data: data, value: value});
+    function _printDataToSign(address safe, bytes memory data, uint256 value, bytes memory txData) internal {
         bytes32 hash = _getTransactionHash({safe: safe, data: data, value: value});
 
         emit DataToSign({data: txData});
