@@ -237,7 +237,7 @@ abstract contract MultisigScript is Script {
         bytes memory txData = _encodeTransactionData({safe: safes[0], data: datas[0], value: value});
         StateDiff.recordStateDiff({json: json, parents: parents, txData: txData, targetSafe: _ownerSafe()});
 
-        _printDataToSign({safe: safes[0], data: datas[0], value: value});
+        _printDataToSign({safe: safes[0], data: datas[0], value: value, txData: txData});
     }
 
     /// Step 1.1 (optional)
@@ -379,8 +379,7 @@ abstract contract MultisigScript is Script {
         });
     }
 
-    function _printDataToSign(address safe, bytes memory data, uint256 value) internal {
-        bytes memory txData = _encodeTransactionData({safe: safe, data: data, value: value});
+    function _printDataToSign(address safe, bytes memory data, uint256 value, bytes memory txData) internal {
         bytes32 hash = _getTransactionHash({safe: safe, data: data, value: value});
 
         emit DataToSign({data: txData});
