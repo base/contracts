@@ -35,11 +35,6 @@
         "internalType": "contract IProtocolVersions",
         "name": "_protocolVersions",
         "type": "address"
-      },
-      {
-        "internalType": "contract IProxyAdmin",
-        "name": "_superchainProxyAdmin",
-        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
@@ -749,19 +744,6 @@
     "outputs": [
       {
         "internalType": "contract ISuperchainConfig",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "superchainProxyAdmin",
-    "outputs": [
-      {
-        "internalType": "contract IProxyAdmin",
         "name": "",
         "type": "address"
       }
