@@ -68,8 +68,7 @@ contract OPContractsManager_Harness is OPContractsManager {
         OPContractsManagerInteropMigrator _opcmInteropMigrator,
         OPContractsManagerStandardValidator _opcmStandardValidator,
         ISuperchainConfig _superchainConfig,
-        IProtocolVersions _protocolVersions,
-        IProxyAdmin _superchainProxyAdmin
+        IProtocolVersions _protocolVersions
     )
         OPContractsManager(
             _opcmGameTypeAdder,
@@ -78,8 +77,7 @@ contract OPContractsManager_Harness is OPContractsManager {
             _opcmInteropMigrator,
             _opcmStandardValidator,
             _superchainConfig,
-            _protocolVersions,
-            _superchainProxyAdmin
+            _protocolVersions
         )
     { }
 
@@ -340,7 +338,6 @@ contract OPContractsManager_TestInit is CommonTest {
     function setupEnvVars() public {
         vm.setEnv("EXPECTED_SUPERCHAIN_CONFIG", vm.toString(address(opcm.superchainConfig())));
         vm.setEnv("EXPECTED_PROTOCOL_VERSIONS", vm.toString(address(opcm.protocolVersions())));
-        vm.setEnv("EXPECTED_SUPERCHAIN_PROXY_ADMIN", vm.toString(address(opcm.superchainProxyAdmin())));
     }
 
     /// @notice Helper function to deploy a new set of L1 contracts via OPCM.
@@ -460,8 +457,7 @@ contract OPContractsManager_ChainIdToBatchInboxAddress_Test is Test, FeatureFlag
                 opcmImplementations, superchainConfigProxy, address(superchainProxyAdmin), challenger, 100, bytes32(0)
             ),
             _superchainConfig: superchainConfigProxy,
-            _protocolVersions: protocolVersionsProxy,
-            _superchainProxyAdmin: superchainProxyAdmin
+            _protocolVersions: protocolVersionsProxy
         });
     }
 
@@ -1258,7 +1254,6 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
         // Set up environment variables with the actual OPCM addresses for tests that need themqq
         vm.setEnv("EXPECTED_SUPERCHAIN_CONFIG", vm.toString(address(opcm.superchainConfig())));
         vm.setEnv("EXPECTED_PROTOCOL_VERSIONS", vm.toString(address(opcm.protocolVersions())));
-        vm.setEnv("EXPECTED_SUPERCHAIN_PROXY_ADMIN", vm.toString(address(opcm.superchainProxyAdmin())));
 
         // Run the upgrade test and checks
         runCurrentUpgrade(upgrader);

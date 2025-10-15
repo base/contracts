@@ -206,8 +206,7 @@ contract DeployImplementations is Script {
                     _output.opcmInteropMigrator,
                     _output.opcmStandardValidator,
                     _input.superchainConfigProxy,
-                    _input.protocolVersionsProxy,
-                    _input.superchainProxyAdmin
+                    _input.protocolVersionsProxy
                 )
             )
         );
@@ -769,8 +768,7 @@ contract DeployImplementations is Script {
             _impls: impls,
             _proxies: proxies,
             _opcm: IOPContractsManager(address(_output.opcm)),
-            _mips: IMIPS64(address(_output.mipsSingleton)),
-            _superchainProxyAdmin: _input.superchainProxyAdmin
+            _mips: IMIPS64(address(_output.mipsSingleton))
         });
 
         ChainAssertions.checkOptimismMintableERC20FactoryImpl(_output.optimismMintableERC20FactoryImpl);
