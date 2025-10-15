@@ -6,4 +6,4 @@ optimizer_runs = 999999
 solc_version = "0.8.15"
 extra_output_files = ["abi"]
 
-# See more config options https://github.com/foundry-rs/foundry/tree/master/config
+# See more config options https://github.com/foundry-rs/foundry/tree/main/crates/config
