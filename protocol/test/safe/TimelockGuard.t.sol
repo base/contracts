@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import { Test } from "forge-std/Test.sol";
 import { GnosisSafe as Safe } from "safe-contracts/GnosisSafe.sol";
 import { GuardManager } from "safe-contracts/base/GuardManager.sol";
+import { ITransactionGuard } from "interfaces/safe/ITransactionGuard.sol";
 import "test/safe-tools/SafeTestTools.sol";
 
 import { TimelockGuard } from "src/safe/TimelockGuard.sol";
@@ -1043,5 +1044,25 @@ contract TimelockGuard_ClearTimelockGuard_Test is TimelockGuard_TestInit {
         vm.expectRevert(TimelockGuard.TimelockGuard_GuardStillEnabled.selector);
         vm.prank(address(safeInstance.safe));
         timelockGuard.clearTimelockGuard();
+    }
+}
+
+/// @title TimelockGuard_SupportsInterface_Test
+/// @notice Tests ERC165 interface support for TimelockGuard
+contract TimelockGuard_SupportsInterface_Test is TimelockGuard_TestInit {
+    function test_supportsInterface_iTransactionGuard_succeeds() external view {
+        bytes4 interfaceId = 0xe6d7a83a; // ITransactionGuard interface ID
+        assertTrue(timelockGuard.supportsInterface(interfaceId), "Should support ITransactionGuard");
+    }
+
+    function test_supportsInterface_ierc165_succeeds() external view {
+        bytes4 interfaceId = 0x01ffc9a7; // IERC165 interface ID
+        assertTrue(timelockGuard.supportsInterface(interfaceId), "Should support IERC165");
+    }
+
+    function test_supportsInterface_invalidInterface_fails(bytes4 _interfaceId) external view {
+        vm.assume(_interfaceId != type(ITransactionGuard).interfaceId);
+        vm.assume(_interfaceId != type(IERC165).interfaceId);
+        assertFalse(timelockGuard.supportsInterface(_interfaceId), "Should not support invalid interface");
     }
 }
