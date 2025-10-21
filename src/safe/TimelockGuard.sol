@@ -2,18 +2,14 @@
 pragma solidity 0.8.15;
 
 // Safe
-import { GnosisSafe as Safe } from "safe-contracts/GnosisSafe.sol";
+import { Safe } from "safe-contracts/Safe.sol";
 import { Enum } from "safe-contracts/common/Enum.sol";
-import { Guard as IGuard } from "safe-contracts/base/GuardManager.sol";
-import { IERC165 } from "safe-contracts/interfaces/IERC165.sol";
+import { BaseGuard } from "safe-contracts/base/GuardManager.sol";
 
 // Libraries
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { SemverComp } from "src/libraries/SemverComp.sol";
 import { Constants } from "src/libraries/Constants.sol";
-
-// Interfaces
-import { ITransactionGuard } from "interfaces/safe/ITransactionGuard.sol";
 
 /// @title TimelockGuard
 /// @notice This guard provides timelock functionality for Safe transactions
@@ -69,7 +65,7 @@ import { ITransactionGuard } from "interfaces/safe/ITransactionGuard.sol";
 /// | Quorum+             | challenge +                    | cancelTransaction                        |
 /// |                     | changeOwnershipToFallback      |                                          |
 /// +-------------------------------------------------------------------------------------------------+
-abstract contract TimelockGuard is IGuard, IERC165 {
+abstract contract TimelockGuard is BaseGuard {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     /// @notice Allowed states of a transaction
@@ -293,7 +289,7 @@ abstract contract TimelockGuard is IGuard, IERC165 {
     //                 Guard Interface Functions                  //
     ////////////////////////////////////////////////////////////////
 
-    /// @notice Implementation of IGuard interface.Called by the Safe before executing a transaction
+    /// @notice Implementation of Guard interface.Called by the Safe before executing a transaction
     /// @dev This function is used to check that the transaction has been scheduled and is ready to execute.
     ///      It only reads the state of the contract, and potentially reverts in order to protect against execution of
     ///      unscheduled, early or cancelled transactions.
@@ -367,7 +363,7 @@ abstract contract TimelockGuard is IGuard, IERC165 {
         }
     }
 
-    /// @notice Implementation of IGuard interface. Called by the Safe after executing a transaction
+    /// @notice Implementation of Guard interface. Called by the Safe after executing a transaction
     /// @dev This function is used to update the state of the contract after the transaction has been executed.
     ///      Although making state changes here is a violation of the Checks-Effects-Interactions pattern, it
     ///      safe to do in this case because we trust that the Safe does not enable arbitrary calls without
@@ -429,6 +425,8 @@ abstract contract TimelockGuard is IGuard, IERC165 {
         safeState.cancellationThreshold = 1;
         emit CancellationThresholdUpdated(_safe, oldThreshold, 1);
     }
+
+    // (reverted) _encodeTransactionData helper removed; we rely on Safe.encodeTransactionData in v1.4.1
 
     ////////////////////////////////////////////////////////////////
     //              External State-Changing Functions             //
@@ -676,17 +674,5 @@ abstract contract TimelockGuard is IGuard, IERC165 {
     ///         the Safe UI.
     function signCancellation(bytes32) public {
         emit Message("This function is not meant to be called, did you mean to call cancelTransaction?");
-    }
-
-    ////////////////////////////////////////////////////////////////
-    //                    ERC165 Support                          //
-    ////////////////////////////////////////////////////////////////
-
-    /// @notice ERC165 interface detection
-    /// @param _interfaceId The interface identifier to check
-    /// @return True if the contract implements the interface
-    function supportsInterface(bytes4 _interfaceId) external view virtual override returns (bool) {
-        return _interfaceId == type(ITransactionGuard).interfaceId // 0xe6d7a83a
-            || _interfaceId == type(IERC165).interfaceId; // 0x01ffc9a7
     }
 }
