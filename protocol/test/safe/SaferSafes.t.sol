@@ -2,15 +2,16 @@
 pragma solidity 0.8.15;
 
 import { Enum } from "safe-contracts/common/Enum.sol";
-import { GnosisSafe as Safe } from "safe-contracts/GnosisSafe.sol";
+import { Safe } from "safe-contracts/Safe.sol";
 import "test/safe-tools/SafeTestTools.sol";
 
 import { SaferSafes } from "src/safe/SaferSafes.sol";
 import { LivenessModule2 } from "src/safe/LivenessModule2.sol";
 
-import { GuardManager, Guard as IGuard } from "safe-contracts/base/GuardManager.sol";
+import { GuardManager } from "safe-contracts/base/GuardManager.sol";
 import { ModuleManager } from "safe-contracts/base/ModuleManager.sol";
-import { GnosisSafe as Safe } from "safe-contracts/GnosisSafe.sol";
+import { DummyGuard } from "test/mocks/DummyGuard.sol";
+import { Safe } from "safe-contracts/Safe.sol";
 
 // Import the test utils from LivenessModule2 tests
 import { LivenessModule2_TestUtils } from "test/safe/LivenessModule2.t.sol";
@@ -211,24 +212,15 @@ contract SaferSafes_ChangeOwnershipToFallback_Test is SaferSafes_TestInit {
 
     function test_changeOwnershipToFallback_withOtherGuard_succeeds() external {
         _enableModule(safeInstance, CHALLENGE_PERIOD, fallbackOwner);
-        // Create a mock guard
-        address dummyGuard = makeAddr("dummyGuard");
-        vm.mockCall(
-            dummyGuard,
-            abi.encodeCall(
-                IGuard.checkTransaction,
-                (address(0), 0, "", Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)), "", address(0))
-            ),
-            ""
-        );
-        vm.mockCall(dummyGuard, abi.encodeCall(IGuard.checkAfterExecution, (bytes32(0), false)), "");
+        // Deploy a DummyGuard
+        DummyGuard dummyGuard = new DummyGuard();
 
-        // Enable the mock guard on the Safe
+        // Enable the guard on the Safe
         SafeTestLib.execTransaction(
             safeInstance,
             address(safeInstance.safe),
             0,
-            abi.encodeCall(GuardManager.setGuard, (dummyGuard)),
+            abi.encodeCall(GuardManager.setGuard, (address(dummyGuard))),
             Enum.Operation.Call
         );
 
