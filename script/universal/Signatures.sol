@@ -161,7 +161,7 @@ library Signatures {
         require(j == threshold, "not enough signatures");
 
         LibSort.sort({a: addressesAndIndexes});
-        for (uint256 i; i < count; i++) {
+        for (uint256 i; i < threshold; i++) {
             uint256 index = addressesAndIndexes[i] & 0xffffffff;
             (uint8 v, bytes32 r, bytes32 s) = signatureSplit({signatures: signatures, pos: index});
             if (v == 0) {
