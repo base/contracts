@@ -195,9 +195,7 @@ contract SmartEscrow is AccessControlDefaultAdminRules {
         }
         if ((end_ - start_) % vestingPeriodSeconds_ != 0) {
             revert UnevenVestingPeriod({
-                vestingPeriodSeconds: vestingPeriodSeconds_,
-                startTimestamp: start_,
-                endTimestamp: end_
+                vestingPeriodSeconds: vestingPeriodSeconds_, startTimestamp: start_, endTimestamp: end_
             });
         }
 

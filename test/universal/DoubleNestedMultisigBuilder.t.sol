@@ -24,7 +24,7 @@ contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
 
     bytes internal dataToSign1 =
     // solhint-disable max-line-length
-        hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280c79f9c7295573dc135fa98d1fc9f5a01ae7e7caad046143376e34f9945288b7a0";
+    hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280c79f9c7295573dc135fa98d1fc9f5a01ae7e7caad046143376e34f9945288b7a0";
     bytes internal dataToSign2 =
         hex"190132640243d7aade8c72f3d90d2dbf359e9897feba5fce1453bc8d9e7ba10d171579f9c7295573dc135fa98d1fc9f5a01ae7e7caad046143376e34f9945288b7a0";
 
@@ -64,10 +64,7 @@ contract DoubleNestedMultisigBuilderTest is Test, DoubleNestedMultisigBuilder {
         IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
 
         calls[0] = IMulticall3.Call3Value({
-            target: address(counter),
-            allowFailure: false,
-            callData: abi.encodeCall(Counter.increment, ()),
-            value: 0
+            target: address(counter), allowFailure: false, callData: abi.encodeCall(Counter.increment, ()), value: 0
         });
 
         return calls;

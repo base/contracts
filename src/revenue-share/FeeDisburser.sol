@@ -160,14 +160,10 @@ contract FeeDisburser {
 
         // Send remaining funds to L1 wallet on L1
         L2StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE)).bridgeETHTo{value: address(this).balance}({
-            _to: L1_WALLET,
-            _minGasLimit: WITHDRAWAL_MIN_GAS,
-            _extraData: bytes("")
+            _to: L1_WALLET, _minGasLimit: WITHDRAWAL_MIN_GAS, _extraData: bytes("")
         });
         emit FeesDisbursed({
-            disbursementTime: lastDisbursementTime,
-            paidToOptimism: optimismRevenueShare,
-            totalFeesDisbursed: feeBalance
+            disbursementTime: lastDisbursementTime, paidToOptimism: optimismRevenueShare, totalFeesDisbursed: feeBalance
         });
     }
 

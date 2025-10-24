@@ -72,9 +72,7 @@ contract Challenger1of2 {
         );
 
         bytes memory result = Address.functionCall({
-            target: L2_OUTPUT_ORACLE_PROXY,
-            data: data,
-            errorMessage: "Challenger1of2: failed to execute"
+            target: L2_OUTPUT_ORACLE_PROXY, data: data, errorMessage: "Challenger1of2: failed to execute"
         });
 
         emit ChallengerCallExecuted({caller: msg.sender, data: data, result: result});

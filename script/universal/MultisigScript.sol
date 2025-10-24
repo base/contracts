@@ -289,11 +289,7 @@ abstract contract MultisigScript is Script {
         vm.store({target: ownerSafe, slot: SAFE_NONCE_SLOT, value: bytes32(_getNonce({safe: ownerSafe}))});
 
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) = _executeTransaction({
-            safe: ownerSafe,
-            data: datas[0],
-            value: value,
-            signatures: signatures,
-            broadcast: false
+            safe: ownerSafe, data: datas[0], value: value, signatures: signatures, broadcast: false
         });
 
         _postRun({accesses: accesses, simPayload: simPayload});
@@ -312,11 +308,7 @@ abstract contract MultisigScript is Script {
         (bytes[] memory datas, uint256 value) = _transactionDatas({safes: _toArray(ownerSafe)});
 
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) = _executeTransaction({
-            safe: ownerSafe,
-            data: datas[0],
-            value: value,
-            signatures: signatures,
-            broadcast: true
+            safe: ownerSafe, data: datas[0], value: value, signatures: signatures, broadcast: true
         });
 
         _postRun({accesses: accesses, simPayload: simPayload});
@@ -373,9 +365,7 @@ abstract contract MultisigScript is Script {
         console.logBytes32(hash);
 
         return IMulticall3.Call3({
-            target: safe,
-            allowFailure: false,
-            callData: abi.encodeCall(IGnosisSafe(safe).approveHash, (hash))
+            target: safe, allowFailure: false, callData: abi.encodeCall(IGnosisSafe(safe).approveHash, (hash))
         });
     }
 
@@ -424,10 +414,7 @@ abstract contract MultisigScript is Script {
         // This can be used to e.g. call out to the Tenderly API and get additional
         // data about the state diff before broadcasting the transaction.
         Simulation.Payload memory simPayload = Simulation.Payload({
-            from: msg.sender,
-            to: safe,
-            data: simData,
-            stateOverrides: new Simulation.StateOverride[](0)
+            from: msg.sender, to: safe, data: simData, stateOverrides: new Simulation.StateOverride[](0)
         });
         return (accesses, simPayload);
     }
@@ -494,10 +481,7 @@ abstract contract MultisigScript is Script {
 
         uint256 nonce = _getNonce({safe: safes[0]});
         overrides[0] = Simulation.overrideSafeThresholdApprovalAndNonce({
-            safe: safes[0],
-            nonce: nonce,
-            owner: msg.sender,
-            dataHash: firstCallDataHash
+            safe: safes[0], nonce: nonce, owner: msg.sender, dataHash: firstCallDataHash
         });
 
         for (uint256 i = 1; i < safes.length; i++) {
@@ -562,18 +546,19 @@ abstract contract MultisigScript is Script {
         view
         returns (bytes memory)
     {
-        return IGnosisSafe(safe).encodeTransactionData({
-            to: multicallAddress,
-            value: value,
-            data: data,
-            operation: _getOperation(value),
-            safeTxGas: 0,
-            baseGas: 0,
-            gasPrice: 0,
-            gasToken: address(0),
-            refundReceiver: address(0),
-            _nonce: _getNonce(safe)
-        });
+        return IGnosisSafe(safe)
+            .encodeTransactionData({
+                to: multicallAddress,
+                value: value,
+                data: data,
+                operation: _getOperation(value),
+                safeTxGas: 0,
+                baseGas: 0,
+                gasPrice: 0,
+                gasToken: address(0),
+                refundReceiver: address(0),
+                _nonce: _getNonce(safe)
+            });
     }
 
     function _execTransactionCalldata(address safe, bytes memory data, uint256 value, bytes memory signatures)
@@ -594,18 +579,19 @@ abstract contract MultisigScript is Script {
         if (broadcast) {
             vm.broadcast();
         }
-        return IGnosisSafe(safe).execTransaction({
-            to: multicallAddress,
-            value: value,
-            data: data,
-            operation: _getOperation(value),
-            safeTxGas: 0,
-            baseGas: 0,
-            gasPrice: 0,
-            gasToken: address(0),
-            refundReceiver: payable(address(0)),
-            signatures: signatures
-        });
+        return IGnosisSafe(safe)
+            .execTransaction({
+                to: multicallAddress,
+                value: value,
+                data: data,
+                operation: _getOperation(value),
+                safeTxGas: 0,
+                baseGas: 0,
+                gasPrice: 0,
+                gasToken: address(0),
+                refundReceiver: payable(address(0)),
+                signatures: signatures
+            });
     }
 
     function _toArray(address addr) internal pure returns (address[] memory) {

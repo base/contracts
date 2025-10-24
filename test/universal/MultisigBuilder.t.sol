@@ -8,26 +8,32 @@ import {Preinstalls} from "lib/optimism/packages/contracts-bedrock/src/libraries
 
 import {MultisigBuilder} from "script/universal/MultisigBuilder.sol";
 import {Simulation} from "script/universal/Simulation.sol";
-import {IGnosisSafe} from "script/universal/IGnosisSafe.sol";
+import {IGnosisSafe, Enum} from "script/universal/IGnosisSafe.sol";
+import {Signatures} from "script/universal/Signatures.sol";
 
 import {Counter} from "test/universal/Counter.sol";
 
 contract MultisigBuilderTest is Test, MultisigBuilder {
     Vm.Wallet internal wallet1 = vm.createWallet("1");
     Vm.Wallet internal wallet2 = vm.createWallet("2");
+    Vm.Wallet internal wallet3 = vm.createWallet("3");
 
     address internal safe = address(1001);
     Counter internal counter = new Counter(address(safe));
 
-    function () internal view returns (IMulticall3.Call3Value[] memory) buildCallsInternal;
+    function() internal view returns (IMulticall3.Call3Value[] memory) buildCallsInternal;
 
     bytes internal dataToSignNoValue =
     // solhint-disable-next-line max-line-length
-        hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280cd0722aa57d06d71497c199147817c38ae160e5b355d3fb5ccbe34c3dbadeae6d";
+    hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280cd0722aa57d06d71497c199147817c38ae160e5b355d3fb5ccbe34c3dbadeae6d";
 
     bytes internal dataToSignWithValue =
     // solhint-disable-next-line max-line-length
-        hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280cd150dbb03d4bb38e5325a914ff3861da880437fd5856c0f7e39054e64e05aed0";
+    hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280cd150dbb03d4bb38e5325a914ff3861da880437fd5856c0f7e39054e64e05aed0";
+
+    bytes internal dataToSign3of2 =
+    // solhint-disable-next-line max-line-length
+    hex"190132640243d7aade8c72f3d90d2dbf359e9897feba5fce1453bc8d9e7ba10d1715e6bf78f25eeee432952e1453c1b0d0bd867a1d4c4c859aa07ec7e2ef9cb87bc7";
 
     function setUp() public {
         vm.etch(safe, Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid));
@@ -86,14 +92,53 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
         run(signatures);
     }
 
+    function test_run_with_more_signatures_than_threshold() external {
+        // Create a safe with 3 owners but threshold of 2
+        address safe3of2 = address(1002);
+        vm.etch(safe3of2, Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid));
+        vm.deal(safe3of2, 10 ether);
+
+        address[] memory owners = new address[](3);
+        owners[0] = wallet1.addr;
+        owners[1] = wallet2.addr;
+        owners[2] = wallet3.addr;
+        IGnosisSafe(safe3of2).setup(owners, 2, address(0), "", address(0), address(0), 0, address(0));
+
+        Counter counter3of2 = new Counter(safe3of2);
+        bytes32 hash = keccak256(dataToSign3of2);
+
+        // Sign with ALL 3 wallets (more than threshold of 2)
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, hash);
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, hash);
+        (uint8 v3, bytes32 r3, bytes32 s3) = vm.sign(wallet3, hash);
+
+        // Provide all 3 signatures (more than threshold)
+        bytes memory sigs = abi.encodePacked(r1, s1, v1, r2, s2, v2, r3, s3, v3);
+        sigs = Signatures.prepareSignatures({safe: safe3of2, hash: hash, signatures: sigs});
+
+        bool success = IGnosisSafe(safe3of2)
+            .execTransaction({
+                to: address(counter3of2),
+                value: 0,
+                data: abi.encodeCall(Counter.increment, ()),
+                operation: Enum.Operation.Call,
+                safeTxGas: 0,
+                baseGas: 0,
+                gasPrice: 0,
+                gasToken: address(0),
+                refundReceiver: payable(address(0)),
+                signatures: sigs
+            });
+
+        assertTrue(success, "Should succeed with extra signatures");
+        assertEq(counter3of2.count(), 1, "Counter should be incremented");
+    }
+
     function _buildCallsNoValue() internal view returns (IMulticall3.Call3Value[] memory) {
         IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
 
         calls[0] = IMulticall3.Call3Value({
-            target: address(counter),
-            allowFailure: false,
-            callData: abi.encodeCall(Counter.increment, ()),
-            value: 0
+            target: address(counter), allowFailure: false, callData: abi.encodeCall(Counter.increment, ()), value: 0
         });
 
         return calls;
