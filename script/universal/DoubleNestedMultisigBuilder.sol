@@ -12,9 +12,7 @@ abstract contract DoubleNestedMultisigBuilder is MultisigScript {
     }
 
     /// @custom:deprecated Use `approve(address[] memory safes, bytes memory signatures)` instead.
-    function approveOnBehalfOfSignerSafe(address signerSafe, address intermediateSafe, bytes memory signatures)
-        public
-    {
+    function approveOnBehalfOfSignerSafe(address signerSafe, address intermediateSafe, bytes memory signatures) public {
         approve({safes: _toArray(signerSafe, intermediateSafe), signatures: signatures});
     }
 

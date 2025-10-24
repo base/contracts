@@ -155,10 +155,7 @@ contract BalanceTracker is ReentrancyGuardUpgradeable {
 
         bool success = SafeCall.send({_target: systemAddress, _gas: gasleft(), _value: valueToSend});
         emit ProcessedFunds({
-            systemAddress: systemAddress,
-            success: success,
-            balanceNeeded: valueNeeded,
-            balanceSent: valueToSend
+            systemAddress: systemAddress, success: success, balanceNeeded: valueNeeded, balanceSent: valueToSend
         });
     }
 }

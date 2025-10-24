@@ -21,19 +21,19 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
     address internal safe = address(1001);
     Counter internal counter = new Counter(address(safe));
 
-    function () internal view returns (IMulticall3.Call3Value[] memory) buildCallsInternal;
+    function() internal view returns (IMulticall3.Call3Value[] memory) buildCallsInternal;
 
     bytes internal dataToSignNoValue =
     // solhint-disable-next-line max-line-length
-        hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280cd0722aa57d06d71497c199147817c38ae160e5b355d3fb5ccbe34c3dbadeae6d";
+    hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280cd0722aa57d06d71497c199147817c38ae160e5b355d3fb5ccbe34c3dbadeae6d";
 
     bytes internal dataToSignWithValue =
     // solhint-disable-next-line max-line-length
-        hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280cd150dbb03d4bb38e5325a914ff3861da880437fd5856c0f7e39054e64e05aed0";
+    hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280cd150dbb03d4bb38e5325a914ff3861da880437fd5856c0f7e39054e64e05aed0";
 
     bytes internal dataToSign3of2 =
     // solhint-disable-next-line max-line-length
-        hex"190132640243d7aade8c72f3d90d2dbf359e9897feba5fce1453bc8d9e7ba10d1715e6bf78f25eeee432952e1453c1b0d0bd867a1d4c4c859aa07ec7e2ef9cb87bc7";
+    hex"190132640243d7aade8c72f3d90d2dbf359e9897feba5fce1453bc8d9e7ba10d1715e6bf78f25eeee432952e1453c1b0d0bd867a1d4c4c859aa07ec7e2ef9cb87bc7";
 
     function setUp() public {
         vm.etch(safe, Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid));
@@ -116,18 +116,19 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
         bytes memory sigs = abi.encodePacked(r1, s1, v1, r2, s2, v2, r3, s3, v3);
         sigs = Signatures.prepareSignatures({safe: safe3of2, hash: hash, signatures: sigs});
 
-        bool success = IGnosisSafe(safe3of2).execTransaction({
-            to: address(counter3of2),
-            value: 0,
-            data: abi.encodeCall(Counter.increment, ()),
-            operation: Enum.Operation.Call,
-            safeTxGas: 0,
-            baseGas: 0,
-            gasPrice: 0,
-            gasToken: address(0),
-            refundReceiver: payable(address(0)),
-            signatures: sigs
-        });
+        bool success = IGnosisSafe(safe3of2)
+            .execTransaction({
+                to: address(counter3of2),
+                value: 0,
+                data: abi.encodeCall(Counter.increment, ()),
+                operation: Enum.Operation.Call,
+                safeTxGas: 0,
+                baseGas: 0,
+                gasPrice: 0,
+                gasToken: address(0),
+                refundReceiver: payable(address(0)),
+                signatures: sigs
+            });
 
         assertTrue(success, "Should succeed with extra signatures");
         assertEq(counter3of2.count(), 1, "Counter should be incremented");
@@ -137,10 +138,7 @@ contract MultisigBuilderTest is Test, MultisigBuilder {
         IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
 
         calls[0] = IMulticall3.Call3Value({
-            target: address(counter),
-            allowFailure: false,
-            callData: abi.encodeCall(Counter.increment, ()),
-            value: 0
+            target: address(counter), allowFailure: false, callData: abi.encodeCall(Counter.increment, ()), value: 0
         });
 
         return calls;

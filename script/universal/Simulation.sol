@@ -70,9 +70,7 @@ library Simulation {
             for (uint256 j; j < storageOverrides.length; j++) {
                 StorageOverride memory storageOverride = storageOverrides[j];
                 VM.store({
-                    target: stateOverride.contractAddress,
-                    slot: storageOverride.key,
-                    value: storageOverride.value
+                    target: stateOverride.contractAddress, slot: storageOverride.key, value: storageOverride.value
                 });
             }
         }
@@ -166,8 +164,7 @@ library Simulation {
 
         // set the threshold (slot 4) to 1
         return addOverride({
-            state: state,
-            storageOverride: StorageOverride({key: bytes32(uint256(0x4)), value: bytes32(uint256(0x1))})
+            state: state, storageOverride: StorageOverride({key: bytes32(uint256(0x4)), value: bytes32(uint256(0x1))})
         });
     }
 
@@ -190,8 +187,7 @@ library Simulation {
 
         // set the nonce (slot 5) to the desired value
         return addOverride({
-            state: state,
-            storageOverride: StorageOverride({key: bytes32(uint256(0x5)), value: bytes32(nonce)})
+            state: state, storageOverride: StorageOverride({key: bytes32(uint256(0x5)), value: bytes32(nonce)})
         });
     }
 
