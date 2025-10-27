@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Proxy} from "lib/optimism/packages/contracts-bedrock/src/universal/Proxy.sol";
 
 import {BalanceTracker} from "src/revenue-share/BalanceTracker.sol";
@@ -229,6 +228,7 @@ contract BalanceTrackerTest is CommonTest {
         delete systemAddresses;
         delete targetBalances;
         for (uint256 i = 0; i < balanceTracker.MAX_SYSTEM_ADDRESS_COUNT(); i++) {
+            // forge-lint: disable-next-line(unsafe-typecast)
             systemAddresses.push(payable(address(uint160(i + 100))));
             targetBalances.push(l2OutputProposerTargetBalance);
         }

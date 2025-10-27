@@ -15,7 +15,7 @@ import {CommonTest} from "test/CommonTest.t.sol";
 contract L1FeeVaultTest is CommonTest {
     uint256 constant BASE_MAINNET_BLOCK = 2116000;
 
-    string BASE_MAINNET_URL = vm.envString({name: "BASE_MAINNET_URL"});
+    string baseMainnetUrl = vm.envString({name: "BASE_MAINNET_URL"});
     address recipient;
     FeeVault_Final.WithdrawalNetwork withdrawalNetwork;
     uint256 minimumWithdrawalAmount;
@@ -24,7 +24,7 @@ contract L1FeeVaultTest is CommonTest {
 
     function setUp() public virtual override {
         super.setUp();
-        vm.createSelectFork(BASE_MAINNET_URL, BASE_MAINNET_BLOCK);
+        vm.createSelectFork(baseMainnetUrl, BASE_MAINNET_BLOCK);
 
         recipient = L1FeeVault_Final(payable(Predeploys.SEQUENCER_FEE_WALLET)).RECIPIENT();
         minimumWithdrawalAmount = L1FeeVault_Final(payable(Predeploys.SEQUENCER_FEE_WALLET)).MIN_WITHDRAWAL_AMOUNT();

@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.15;
 
-// solhint-disable no-console
-import {console} from "forge-std/console.sol";
-import {Test, StdUtils} from "forge-std/Test.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {Test} from "forge-std/Test.sol";
 import {L2OutputOracle} from "lib/optimism/packages/contracts-bedrock/src/L1/L2OutputOracle.sol";
 import {ProxyAdmin} from "lib/optimism/packages/contracts-bedrock/src/universal/ProxyAdmin.sol";
 import {Proxy} from "lib/optimism/packages/contracts-bedrock/src/universal/Proxy.sol";
@@ -23,12 +20,12 @@ contract Challenger1of2Test is Test {
     L2OutputOracle l2OutputOracle;
     Challenger1of2 challenger;
 
-    bytes DELETE_OUTPUTS_SIGNATURE = abi.encodeWithSignature("deleteL2Outputs(uint256)", 1);
-    bytes NONEXISTENT_SIGNATURE = abi.encodeWithSignature("something()");
-    bytes ZERO_OUTPUT = new bytes(0);
+    bytes constant DELETE_OUTPUTS_SIGNATURE = abi.encodeWithSignature("deleteL2Outputs(uint256)", 1);
+    bytes constant NONEXISTENT_SIGNATURE = abi.encodeWithSignature("something()");
+    bytes constant ZERO_OUTPUT = new bytes(0);
 
-    uint256 ZERO = 0;
-    uint256 NONZERO_INTEGER = 100;
+    uint256 constant ZERO = 0;
+    uint256 constant NONZERO_INTEGER = 100;
 
     event ChallengerCallExecuted(address indexed _caller, bytes _data, bytes _result);
 
@@ -164,6 +161,7 @@ contract Challenger1of2Test is Test {
         vm.warp(oracle.computeL2Timestamp(oracle.nextBlockNumber()) + 1);
 
         vm.startPrank(proposer);
+        // forge-lint: disable-next-line(unsafe-typecast)
         oracle.proposeL2Output(bytes32("something"), oracle.nextBlockNumber(), blockhash(10), 10);
         vm.stopPrank();
     }

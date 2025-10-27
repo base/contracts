@@ -6,7 +6,6 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {BaseFeeVault} from "lib/optimism/packages/contracts-bedrock/src/L2/BaseFeeVault.sol";
 import {L1FeeVault} from "lib/optimism/packages/contracts-bedrock/src/L2/L1FeeVault.sol";
-import {L2StandardBridge} from "lib/optimism/packages/contracts-bedrock/src/L2/L2StandardBridge.sol";
 import {SequencerFeeVault, FeeVault} from "lib/optimism/packages/contracts-bedrock/src/L2/SequencerFeeVault.sol";
 import {Predeploys} from "lib/optimism/packages/contracts-bedrock/src/libraries/Predeploys.sol";
 
@@ -43,8 +42,8 @@ contract FeeDisburserTest is CommonTest {
     uint256 minimumWithdrawalAmount = 10 ether;
     address proxyAdminOwner = address(2048);
 
-    bytes MINIMUM_WITHDRAWAL_AMOUNT_SIGNATURE = abi.encodeWithSignature("MIN_WITHDRAWAL_AMOUNT()");
-    bytes WITHDRAW_SIGNATURE = abi.encodeWithSignature("withdraw()");
+    bytes constant MINIMUM_WITHDRAWAL_AMOUNT_SIGNATURE = abi.encodeWithSignature("MIN_WITHDRAWAL_AMOUNT()");
+    bytes constant WITHDRAW_SIGNATURE = abi.encodeWithSignature("withdraw()");
 
     function setUp() public override {
         super.setUp();
