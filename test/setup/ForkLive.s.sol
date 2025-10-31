@@ -208,7 +208,8 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         IOPContractsManager.OpChainConfig[] memory opChains = new IOPContractsManager.OpChainConfig[](1);
         opChains[0] = IOPContractsManager.OpChainConfig({
             systemConfigProxy: systemConfig,
-            absolutePrestate: Claim.wrap(bytes32(keccak256("absolutePrestate")))
+            cannonPrestate: Claim.wrap(bytes32(keccak256("cannonPrestate"))),
+            cannonKonaPrestate: Claim.wrap(bytes32(keccak256("cannonKonaPrestate")))
         });
 
         // Turn the SuperchainPAO into a DelegateCaller so we can try to upgrade the
