@@ -358,6 +358,13 @@ abstract contract MultisigScript is Script {
         datas = new bytes[](safes.length);
         datas[datas.length - 1] = abi.encodeCall(IMulticall3.aggregate3Value, (calls));
 
+        target = multicallAddress;
+        if (!_useMulticall()) {
+            require(calls.length == 1, "MultisigScript::_transactionDatas must use a single call if not multicall");
+            target = calls[0].target;
+            datas[datas.length - 1] = calls[0].callData;
+        }
+
         // The first n-1 calls are the nested approval calls
         uint256 valueForCallToApprove = value;
         for (uint256 i = safes.length - 1; i > 0; i--) {
@@ -370,12 +377,6 @@ abstract contract MultisigScript is Script {
             datas[i - 1] = abi.encodeCall(IMulticall3.aggregate3, (approvalCall));
 
             valueForCallToApprove = 0;
-        }
-
-        target = multicallAddress;
-        if (!_useMulticall()) {
-            require(calls.length == 1, "MultisigScript::_transactionDatas must use a single call if not multicall");
-            target = calls[0].target;
         }
     }
 
