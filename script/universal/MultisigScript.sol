@@ -370,22 +370,26 @@ abstract contract MultisigScript is Script {
         for (uint256 i = safes.length - 1; i > 0; i--) {
             address targetSafe = safes[i];
             bytes memory callToApprove = datas[i];
+            address to = target;
+            if (i < safes.length - 1) {
+                to = multicallAddress;
+            }
 
             IMulticall3.Call3[] memory approvalCall = new IMulticall3.Call3[](1);
             approvalCall[0] =
-                _generateApproveCall({safe: targetSafe, data: callToApprove, value: valueForCallToApprove});
+                _generateApproveCall({safe: targetSafe, to: to, data: callToApprove, value: valueForCallToApprove});
             datas[i - 1] = abi.encodeCall(IMulticall3.aggregate3, (approvalCall));
 
             valueForCallToApprove = 0;
         }
     }
 
-    function _generateApproveCall(address safe, bytes memory data, uint256 value)
+    function _generateApproveCall(address safe, address to, bytes memory data, uint256 value)
         internal
         view
         returns (IMulticall3.Call3 memory)
     {
-        bytes32 hash = _getTransactionHash({safe: safe, to: multicallAddress, data: data, value: value});
+        bytes32 hash = _getTransactionHash({safe: safe, to: to, data: data, value: value});
 
         console.log("---\nNested hash for safe %s:", safe);
         console.logBytes32(hash);
