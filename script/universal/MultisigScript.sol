@@ -460,7 +460,9 @@ abstract contract MultisigScript is Script {
     {
         IMulticall3.Call3[] memory calls = _simulateForSignerCalls({safes: safes, to: to, datas: datas, value: value});
 
-        bytes32 firstCallDataHash = _getTransactionHash({safe: safes[0], to: to, data: datas[0], value: value});
+        bytes32 firstCallDataHash = _getTransactionHash({
+            safe: safes[0], to: safes.length > 1 ? multicallAddress : to, data: datas[0], value: value
+        });
 
         // Now define the state overrides for the simulation.
         Simulation.StateOverride[] memory overrides = _overrides({safes: safes, firstCallDataHash: firstCallDataHash});
@@ -468,12 +470,12 @@ abstract contract MultisigScript is Script {
         bytes memory txData = abi.encodeCall(IMulticall3.aggregate3, (calls));
         console.log("---\nSimulation link:");
         // solhint-disable max-line-length
-        Simulation.logSimulationLink({to: multicallAddress, data: txData, from: msg.sender, overrides: overrides});
+        Simulation.logSimulationLink({to: to, data: txData, from: msg.sender, overrides: overrides});
 
         // Forge simulation of the data logged in the link. If the simulation fails
         // we revert to make it explicit that the simulation failed.
         Simulation.Payload memory simPayload =
-            Simulation.Payload({to: multicallAddress, data: txData, from: msg.sender, stateOverrides: overrides});
+            Simulation.Payload({to: to, data: txData, from: msg.sender, stateOverrides: overrides});
         Vm.AccountAccess[] memory accesses = Simulation.simulateFromSimPayload({simPayload: simPayload});
         return (accesses, simPayload);
     }
@@ -492,7 +494,7 @@ abstract contract MultisigScript is Script {
                 allowFailure: false,
                 callData: _execTransactionCalldata({
                     safe: safes[i],
-                    to: to,
+                    to: i == safes.length - 1 ? to : multicallAddress,
                     data: datas[i],
                     value: value,
                     signatures: Signatures.genPrevalidatedSignature(signer)
