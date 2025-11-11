@@ -138,4 +138,3 @@ contract MultisigScriptNestedTest is Test, MultisigScript {
     }
 }
 
-

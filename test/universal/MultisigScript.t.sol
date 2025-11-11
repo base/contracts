@@ -97,8 +97,7 @@ contract MultisigScriptTest is Test, MultisigScript {
         // One valid, one invalid should revert
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, keccak256(dataToSignNoValue));
         bytes memory signatures = abi.encodePacked(r1, s1, v1, bytes32(0), bytes32(0), uint8(27));
-        bytes memory callData =
-            abi.encodeCall(this.verify, (new address[](0), signatures));
+        bytes memory callData = abi.encodeCall(this.verify, (new address[](0), signatures));
         (bool success, bytes memory ret) = address(this).call(callData);
         assertFalse(success);
         assertTrue(ret.length > 0);
@@ -177,5 +176,4 @@ contract MultisigScriptTest is Test, MultisigScript {
         return calls;
     }
 }
-
 

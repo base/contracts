@@ -175,4 +175,3 @@ contract MultisigScriptDoubleNestedTest is Test, MultisigScript {
     }
 }
 
-
