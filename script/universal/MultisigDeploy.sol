@@ -56,7 +56,7 @@ contract MultisigDeployScript is Script {
     // Safe v1.4.1-3 Addresses
     address public constant SINGLETON = 0x29fcB43b46531BcA003ddC8FCB67FFE91900C762;
     address public constant FACTORY_PROXY = 0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67;
-    address public constant COMPATBILITY_FALLBACK_HANDLER = 0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99;
+    address public constant COMPATIBILITY_FALLBACK_HANDLER = 0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99;
 
     struct SafeWallet {
         string label;
@@ -148,7 +148,7 @@ contract MultisigDeployScript is Script {
                     config.threshold,
                     address(0), // to
                     hex"", // data
-                    COMPATBILITY_FALLBACK_HANDLER,
+                    COMPATIBILITY_FALLBACK_HANDLER,
                     address(0), // payment token
                     0, // payment
                     payable(address(0)) // payment receiver
