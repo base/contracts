@@ -470,12 +470,12 @@ abstract contract MultisigScript is Script {
         bytes memory txData = abi.encodeCall(IMulticall3.aggregate3, (calls));
         console.log("---\nSimulation link:");
         // solhint-disable max-line-length
-        Simulation.logSimulationLink({to: to, data: txData, from: msg.sender, overrides: overrides});
+        Simulation.logSimulationLink({to: multicallAddress, data: txData, from: msg.sender, overrides: overrides});
 
         // Forge simulation of the data logged in the link. If the simulation fails
         // we revert to make it explicit that the simulation failed.
         Simulation.Payload memory simPayload =
-            Simulation.Payload({to: to, data: txData, from: msg.sender, stateOverrides: overrides});
+            Simulation.Payload({to: multicallAddress, data: txData, from: msg.sender, stateOverrides: overrides});
         Vm.AccountAccess[] memory accesses = Simulation.simulateFromSimPayload({simPayload: simPayload});
         return (accesses, simPayload);
     }
