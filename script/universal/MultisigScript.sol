@@ -248,10 +248,12 @@ abstract contract MultisigScript is Script {
             vm.store({target: safes[i], slot: SAFE_NONCE_SLOT, value: bytes32(originalNonces[i])});
         }
 
-        bytes memory txData = _encodeTransactionData(SafeTx({safe: safes[0], to: target, data: datas[0], value: value}));
+        address initialTarget = _getInitialTarget(safes, target);
+        bytes memory txData =
+            _encodeTransactionData(SafeTx({safe: safes[0], to: initialTarget, data: datas[0], value: value}));
         StateDiff.recordStateDiff({json: json, parents: parents, txData: txData, targetSafe: _ownerSafe()});
 
-        _printDataToSign({safe: safes[0], to: target, data: datas[0], value: value, txData: txData});
+        _printDataToSign({safe: safes[0], to: initialTarget, data: datas[0], value: value, txData: txData});
     }
 
     /// Step 1.1 (optional)
@@ -460,9 +462,8 @@ abstract contract MultisigScript is Script {
     {
         IMulticall3.Call3[] memory calls = _simulateForSignerCalls({safes: safes, to: to, datas: datas, value: value});
 
-        bytes32 firstCallDataHash = _getTransactionHash({
-            safe: safes[0], to: safes.length > 1 ? multicallAddress : to, data: datas[0], value: value
-        });
+        bytes32 firstCallDataHash =
+            _getTransactionHash({safe: safes[0], to: _getInitialTarget(safes, to), data: datas[0], value: value});
 
         // Now define the state overrides for the simulation.
         Simulation.StateOverride[] memory overrides = _overrides({safes: safes, firstCallDataHash: firstCallDataHash});
@@ -660,5 +661,9 @@ abstract contract MultisigScript is Script {
         }
 
         return Enum.Operation.Call;
+    }
+
+    function _getInitialTarget(address[] memory safes, address target) private view returns (address) {
+        return safes.length > 1 ? multicallAddress : target;
     }
 }
