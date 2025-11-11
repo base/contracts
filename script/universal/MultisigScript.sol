@@ -266,7 +266,9 @@ abstract contract MultisigScript is Script {
     function verify(address[] memory safes, bytes memory signatures) public view {
         safes = _appendOwnerSafe({safes: safes});
         (bytes[] memory datas, uint256 value, address target) = _transactionDatas({safes: safes});
-        _checkSignatures({safe: safes[0], to: target, data: datas[0], value: value, signatures: signatures});
+        _checkSignatures({
+            safe: safes[0], to: _getInitialTarget(safes, target), data: datas[0], value: value, signatures: signatures
+        });
     }
 
     /// Step 2 (optional for non-nested setups)
