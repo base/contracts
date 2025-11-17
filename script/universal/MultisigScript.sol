@@ -184,10 +184,15 @@ abstract contract MultisigScript is Script {
     // By default, an empty (no-op) override is returned.
     function _simulationOverrides() internal view virtual returns (Simulation.StateOverride[] memory overrides_) {}
 
-    /// @notice If set to true, the executed call runs through our custom CBMulticall contract as a DELEGATECALL for each call
-    /// This results in the multisig inheriting the multicall logic as well as the multicall call target logic
-    /// This should be used for tasks that use Optimism's OPCM, for example
-    function _useDelegateCall() internal pure virtual returns (bool) {
+    /// @notice If set to true, the executed aggregate call runs through the custom `CBMulticall` contract
+    ///         as a `DELEGATECALL` for each individual call.
+    /// @dev    In delegatecall mode:
+    ///         - The multisig inherits the multicall logic and executes each target in its own context
+    ///           (e.g. for Optimism's OPCM-style flows).
+    ///         - The `value` field of each `IMulticall3.Call3Value` returned by `_buildCalls` MUST be zero.
+    ///           Per-call value routing is not supported; any ETH attached to the Safe transaction is shared
+    ///           across all calls according to the delegatee's logic.
+    function _useDelegateCall() internal view virtual returns (bool) {
         return false;
     }
 
@@ -366,9 +371,14 @@ abstract contract MultisigScript is Script {
         }
     }
 
+    /// @dev Converts `IMulticall3.Call3Value` calls into `CBMulticall.Call3` calls for delegatecall mode.
+    ///      All `value` fields must be zero; delegatecall mode does not support per-call value routing.
     function _toCall3Array(IMulticall3.Call3Value[] memory calls) private pure returns (CBMulticall.Call3[] memory) {
         CBMulticall.Call3[] memory dCalls = new CBMulticall.Call3[](calls.length);
         for (uint256 i; i < calls.length; i++) {
+            // Delegatecall mode relies on the Safe's `msg.value` handling rather than per-call value routing.
+            // Enforce that no per-call value is specified when using delegatecall mode.
+            require(calls[i].value == 0, "MultisigScript: delegatecall mode does not support call value");
             dCalls[i] = CBMulticall.Call3({
                 target: calls[i].target, allowFailure: calls[i].allowFailure, callData: calls[i].callData
             });

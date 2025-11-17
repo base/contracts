@@ -131,6 +131,8 @@ contract CBMulticall {
             assembly {
                 // Revert if the call fails and failure is not allowed
                 // `allowFailure := calldataload(add(calli, 0x20))` and `success := mload(result)`
+                // NOTE: We intentionally preserve the original Multicall3 error string
+                //       ("Multicall3: call failed") for compatibility with existing tooling.
                 if iszero(or(calldataload(add(calli, 0x20)), mload(result))) {
                     // set "Error(string)" signature: bytes32(bytes4(keccak256("Error(string)")))
                     mstore(0x00, 0x08c379a000000000000000000000000000000000000000000000000000000000)
@@ -167,6 +169,8 @@ contract CBMulticall {
             assembly {
                 // Revert if the call fails and failure is not allowed
                 // `allowFailure := calldataload(add(calli, 0x20))` and `success := mload(result)`
+                // NOTE: We intentionally preserve the original Multicall3 error string
+                //       ("Multicall3: call failed") for compatibility with existing tooling.
                 if iszero(or(calldataload(add(calli, 0x20)), mload(result))) {
                     // set "Error(string)" signature: bytes32(bytes4(keccak256("Error(string)")))
                     mstore(0x00, 0x08c379a000000000000000000000000000000000000000000000000000000000)
