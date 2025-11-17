@@ -5,14 +5,33 @@ import {CBMulticall} from "src/utils/CBMulticall.sol";
 import {CommonTest} from "test/CommonTest.t.sol";
 import {MockReceiver} from "test/mocks/MockReceiver.sol";
 
+/// @dev Helper contract used to invoke `aggregateDelegateCalls` via `delegatecall`.
+///      This simulates the intended multisig usage pattern where the multicall
+///      logic is executed in the context of another contract.
+contract CBMulticallDelegateCaller {
+    CBMulticall public mc;
+
+    constructor(CBMulticall _mc) {
+        mc = _mc;
+    }
+
+    function aggregateDelegateCalls(CBMulticall.Call3[] calldata calls) external returns (CBMulticall.Result[] memory) {
+        (, bytes memory data) =
+            address(mc).delegatecall(abi.encodeWithSelector(CBMulticall.aggregateDelegateCalls.selector, calls));
+        return abi.decode(data, (CBMulticall.Result[]));
+    }
+}
+
 contract CBMulticallTest is CommonTest {
     CBMulticall mc;
     MockReceiver target;
+    CBMulticallDelegateCaller delegateCaller;
 
     function setUp() public override {
         super.setUp();
         mc = new CBMulticall();
         target = new MockReceiver();
+        delegateCaller = new CBMulticallDelegateCaller(mc);
     }
 
     function test_aggregate_returnsBlockNumberAndData() external {
@@ -158,6 +177,52 @@ contract CBMulticallTest is CommonTest {
         });
         vm.expectRevert(bytes("Multicall3: call failed"));
         mc.aggregate3(calls3);
+    }
+
+    function test_aggregateDelegateCalls_success() external {
+        CBMulticall.Call3[] memory calls3 = new CBMulticall.Call3[](1);
+        calls3[0] = CBMulticall.Call3({
+            target: address(target),
+            allowFailure: false,
+            callData: abi.encodeWithSelector(MockReceiver.bump.selector, 4)
+        });
+        CBMulticall.Result[] memory ret3 = delegateCaller.aggregateDelegateCalls(calls3);
+        assertTrue(ret3[0].success);
+        assertEq(abi.decode(ret3[0].returnData, (uint256)), 5);
+    }
+
+    function test_aggregateDelegateCalls_allowedFailure_returnsFalse() external {
+        CBMulticall.Call3[] memory calls3 = new CBMulticall.Call3[](1);
+        calls3[0] = CBMulticall.Call3({
+            target: address(target),
+            allowFailure: true,
+            callData: abi.encodeWithSelector(MockReceiver.willRevert.selector)
+        });
+        CBMulticall.Result[] memory ret3 = delegateCaller.aggregateDelegateCalls(calls3);
+        assertFalse(ret3[0].success);
+    }
+
+    function test_aggregateDelegateCalls_revertsOnNonAllowedFailure() external {
+        CBMulticall.Call3[] memory calls3 = new CBMulticall.Call3[](1);
+        calls3[0] = CBMulticall.Call3({
+            target: address(target),
+            allowFailure: false,
+            callData: abi.encodeWithSelector(MockReceiver.willRevert.selector)
+        });
+        vm.expectRevert();
+        delegateCaller.aggregateDelegateCalls(calls3);
+    }
+
+    function test_aggregateDelegateCalls_directCall_revertsWithMustDelegateCall() external {
+        CBMulticall.Call3[] memory calls3 = new CBMulticall.Call3[](1);
+        calls3[0] = CBMulticall.Call3({
+            target: address(target),
+            allowFailure: false,
+            callData: abi.encodeWithSelector(MockReceiver.bump.selector, 1)
+        });
+
+        vm.expectRevert(CBMulticall.MustDelegateCall.selector);
+        mc.aggregateDelegateCalls(calls3);
     }
 
     function test_aggregate3Value_success_usesContractBalance() external {

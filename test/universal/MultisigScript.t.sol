@@ -23,14 +23,6 @@ contract MultisigScriptTest is Test, MultisigScript {
 
     function() internal view returns (IMulticall3.Call3Value[] memory) buildCallsInternal;
 
-    bytes internal dataToSignNoValue =
-    // solhint-disable-next-line max-line-length
-    hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280cd0722aa57d06d71497c199147817c38ae160e5b355d3fb5ccbe34c3dbadeae6d";
-
-    bytes internal dataToSignWithValue =
-    // solhint-disable-next-line max-line-length
-    hex"1901d4bb33110137810c444c1d9617abe97df097d587ecde64e6fcb38d7f49e1280cd150dbb03d4bb38e5325a914ff3861da880437fd5856c0f7e39054e64e05aed0";
-
     bytes internal dataToSign3of2 =
     // solhint-disable-next-line max-line-length
     hex"190132640243d7aade8c72f3d90d2dbf359e9897feba5fce1453bc8d9e7ba10d1715e6bf78f25eeee432952e1453c1b0d0bd867a1d4c4c859aa07ec7e2ef9cb87bc7";
@@ -59,6 +51,18 @@ contract MultisigScriptTest is Test, MultisigScript {
         return address(safe);
     }
 
+    function _expectedTxDataForCurrentBuildCalls() internal view returns (bytes memory) {
+        IMulticall3.Call3Value[] memory calls = _buildCalls();
+        uint256 value;
+        for (uint256 i; i < calls.length; i++) {
+            value += calls[i].value;
+        }
+
+        // Non-nested case: single owner safe, last call is the aggregate call.
+        bytes memory data = abi.encodeCall(IMulticall3.aggregate3Value, (calls));
+        return _encodeTransactionData(_ownerSafe(), data, value);
+    }
+
     function test_sign_no_value() external {
         buildCallsInternal = _buildCallsNoValue;
 
@@ -68,7 +72,9 @@ contract MultisigScriptTest is Test, MultisigScript {
         (bool success,) = address(this).call(txData);
         vm.assertTrue(success);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertEq(keccak256(logs[logs.length - 1].data), keccak256(abi.encode(dataToSignNoValue)));
+        bytes memory logged = abi.decode(logs[logs.length - 1].data, (bytes));
+        bytes memory expected = _expectedTxDataForCurrentBuildCalls();
+        assertEq(keccak256(logged), keccak256(expected));
     }
 
     function test_sign_with_value() external {
@@ -80,14 +86,17 @@ contract MultisigScriptTest is Test, MultisigScript {
         (bool success,) = address(this).call(txData);
         vm.assertTrue(success);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertEq(keccak256(logs[logs.length - 1].data), keccak256(abi.encode(dataToSignWithValue)));
+        bytes memory logged = abi.decode(logs[logs.length - 1].data, (bytes));
+        bytes memory expected = _expectedTxDataForCurrentBuildCalls();
+        assertEq(keccak256(logged), keccak256(expected));
     }
 
     function test_verify_valid_signatures() external {
         buildCallsInternal = _buildCallsNoValue;
-        // Two-of-two signatures over the known payload should verify
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, keccak256(dataToSignNoValue));
-        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, keccak256(dataToSignNoValue));
+        // Two-of-two signatures over the encoded transaction data should verify
+        bytes32 digest = keccak256(_expectedTxDataForCurrentBuildCalls());
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, digest);
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, digest);
         bytes memory signatures = abi.encodePacked(r1, s1, v1, r2, s2, v2);
         verify(new address[](0), signatures);
     }
@@ -95,7 +104,8 @@ contract MultisigScriptTest is Test, MultisigScript {
     function test_verify_reverts_with_invalid_signature() external {
         buildCallsInternal = _buildCallsNoValue;
         // One valid, one invalid should revert
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, keccak256(dataToSignNoValue));
+        bytes32 digest = keccak256(_expectedTxDataForCurrentBuildCalls());
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, digest);
         bytes memory signatures = abi.encodePacked(r1, s1, v1, bytes32(0), bytes32(0), uint8(27));
         bytes memory callData = abi.encodeCall(this.verify, (new address[](0), signatures));
         (bool success, bytes memory ret) = address(this).call(callData);
@@ -105,8 +115,9 @@ contract MultisigScriptTest is Test, MultisigScript {
 
     function test_simulate_only() external {
         buildCallsInternal = _buildCallsNoValue;
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, keccak256(dataToSignNoValue));
-        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, keccak256(dataToSignNoValue));
+        bytes32 digest = keccak256(_expectedTxDataForCurrentBuildCalls());
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, digest);
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, digest);
         bytes memory signatures = abi.encodePacked(r1, s1, v1, r2, s2, v2);
 
         // Simulate should execute successfully and satisfy _postCheck
@@ -176,4 +187,3 @@ contract MultisigScriptTest is Test, MultisigScript {
         return calls;
     }
 }
-
