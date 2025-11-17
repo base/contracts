@@ -11,6 +11,7 @@ import {IGnosisSafe, Enum} from "./IGnosisSafe.sol";
 import {Signatures} from "./Signatures.sol";
 import {Simulation} from "./Simulation.sol";
 import {StateDiff} from "./StateDiff.sol";
+import {CBMulticall} from "../../src/utils/CBMulticall.sol";
 
 /// @title MultisigScript
 /// @notice Script builder for Forge scripts that require signatures from Safes. Supports both non-nested
@@ -183,12 +184,24 @@ abstract contract MultisigScript is Script {
     // By default, an empty (no-op) override is returned.
     function _simulationOverrides() internal view virtual returns (Simulation.StateOverride[] memory overrides_) {}
 
+    /// @notice If set to true, the executed aggregate call runs through the custom `CBMulticall` contract
+    ///         as a `DELEGATECALL` for each individual call.
+    /// @dev    In delegatecall mode:
+    ///         - The multisig inherits the multicall logic and executes each target in its own context
+    ///           (e.g. for Optimism's OPCM-style flows).
+    ///         - The `value` field of each `IMulticall3.Call3Value` returned by `_buildCalls` MUST be zero.
+    ///           Per-call value routing is not supported; any ETH attached to the Safe transaction is shared
+    ///           across all calls according to the delegatee's logic.
+    function _useDelegateCall() internal view virtual returns (bool) {
+        return false;
+    }
+
     constructor() {
         bool useCbMulticall;
         try vm.envBool("USE_CB_MULTICALL") {
             useCbMulticall = vm.envBool("USE_CB_MULTICALL");
         } catch {}
-        multicallAddress = useCbMulticall ? CB_MULTICALL : MULTICALL3_ADDRESS;
+        multicallAddress = (useCbMulticall || _useDelegateCall()) ? CB_MULTICALL : MULTICALL3_ADDRESS;
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -339,6 +352,10 @@ abstract contract MultisigScript is Script {
         datas = new bytes[](safes.length);
         datas[datas.length - 1] = abi.encodeCall(IMulticall3.aggregate3Value, (calls));
 
+        if (_useDelegateCall()) {
+            datas[datas.length - 1] = abi.encodeCall(CBMulticall.aggregateDelegateCalls, (_toCall3Array(calls)));
+        }
+
         // The first n-1 calls are the nested approval calls
         uint256 valueForCallToApprove = value;
         for (uint256 i = safes.length - 1; i > 0; i--) {
@@ -352,6 +369,21 @@ abstract contract MultisigScript is Script {
 
             valueForCallToApprove = 0;
         }
+    }
+
+    /// @dev Converts `IMulticall3.Call3Value` calls into `CBMulticall.Call3` calls for delegatecall mode.
+    ///      All `value` fields must be zero; delegatecall mode does not support per-call value routing.
+    function _toCall3Array(IMulticall3.Call3Value[] memory calls) private pure returns (CBMulticall.Call3[] memory) {
+        CBMulticall.Call3[] memory dCalls = new CBMulticall.Call3[](calls.length);
+        for (uint256 i; i < calls.length; i++) {
+            // Delegatecall mode relies on the Safe's `msg.value` handling rather than per-call value routing.
+            // Enforce that no per-call value is specified when using delegatecall mode.
+            require(calls[i].value == 0, "MultisigScript: delegatecall mode does not support call value");
+            dCalls[i] = CBMulticall.Call3({
+                target: calls[i].target, allowFailure: calls[i].allowFailure, callData: calls[i].callData
+            });
+        }
+        return dCalls;
     }
 
     function _generateApproveCall(address safe, bytes memory data, uint256 value)
