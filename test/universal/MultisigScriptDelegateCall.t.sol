@@ -108,4 +108,3 @@ contract MultisigScriptDelegateCallTest is Test, MultisigScript {
     }
 }
 
-
