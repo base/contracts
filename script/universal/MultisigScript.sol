@@ -150,7 +150,7 @@ import {CBMulticall} from "../../src/utils/CBMulticall.sol";
 abstract contract MultisigScript is Script {
     bytes32 internal constant SAFE_NONCE_SLOT = bytes32(uint256(5));
 
-    address internal constant CB_MULTICALL = 0x8BDE8F549F56D405f07e1aA15Df9e1FC69839881;
+    address internal constant CB_MULTICALL = 0xA8B8CA1d6F0F5Ce63dCEA9121A01b302c5801303;
 
     address internal multicallAddress;
 
