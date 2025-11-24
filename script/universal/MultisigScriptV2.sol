@@ -11,6 +11,7 @@ import {CBMulticall} from "../../src/utils/CBMulticall.sol";
 
 import {IGnosisSafe, Enum} from "./IGnosisSafe.sol";
 import {Signatures} from "./Signatures.sol";
+import {StateDiff} from "./StateDiff.sol";
 import {Simulation} from "./Simulation.sol";
 
 /// @title MultisigScript
@@ -230,6 +231,8 @@ abstract contract MultisigScriptV2 is Script {
         Call[] memory callsChain = _buildCallsChain({safes: safes});
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
             _simulateForSigner({safes: safes, callsChain: callsChain});
+        (StateDiff.MappingParent[] memory parents, string memory json) =
+            StateDiff.collectStateDiff(StateDiff.CollectStateDiffOpts({accesses: accesses, simPayload: simPayload}));
 
         _postSign({accesses: accesses, simPayload: simPayload});
         _postCheck({accesses: accesses, simPayload: simPayload});
@@ -238,6 +241,10 @@ abstract contract MultisigScriptV2 is Script {
         for (uint256 i; i < safes.length; i++) {
             vm.store({target: safes[i], slot: SAFE_NONCE_SLOT, value: bytes32(originalNonces[i])});
         }
+
+        bytes memory txData = _encodeTransactionData({safe: safes[0], call: callsChain[0]});
+        StateDiff.recordStateDiff({json: json, parents: parents, txData: txData, targetSafe: _ownerSafe()});
+
         _printDataToSign({safe: safes[0], call: callsChain[0]});
     }
 
