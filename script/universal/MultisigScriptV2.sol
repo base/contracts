@@ -358,13 +358,11 @@ abstract contract MultisigScriptV2 is Script {
     ///
     /// @return callsChain The calls chain for the given safes.
     function _buildCallsChain(address[] memory safes) internal view returns (Call[] memory callsChain) {
-        // Build the script calls
+        // Build the script calls.
         Call[] memory scriptCalls = _buildCallsChecked();
 
-        // When there are multiple calls, we aggregate them into a single `aggregate3` call that will be executed via a
-        // delegate call to the CB_MULTICALL contract.
+        // Build the final script call.
         Call memory aggregatedScriptCall = _buildAggregatedScriptCall({scriptCalls: scriptCalls});
-        console.logBytes(aggregatedScriptCall.data);
 
         // The very last call is the actual call to execute
         callsChain = new Call[](safes.length);
@@ -432,6 +430,8 @@ abstract contract MultisigScriptV2 is Script {
             currentGroupIndex: currentGroupIndex
         });
 
+        // NOTE: When aggregating via a Multicall call, the root call is always a delegatecall to `aggregateDelegateCalls`
+        //       as it offers the most flexibility and allows perofming any other type of call.
         return Call({
             operation: Enum.Operation.DelegateCall,
             target: CB_MULTICALL,
