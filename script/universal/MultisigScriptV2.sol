@@ -595,9 +595,9 @@ abstract contract MultisigScriptV2 is Script {
         bytes32 firstCallDataHash = _getTransactionHash({safe: safes[0], call: callsChain[0]});
         Simulation.StateOverride[] memory overrides = _overrides({safes: safes, firstCallDataHash: firstCallDataHash});
 
-        // Build the execution calls chain for all the safe-to-safe approvals followed by the final script call.
-        Call[] memory executionCallsChain = _buildExecutionCalls({safes: safes, callsChain: callsChain});
-        bytes memory txData = abi.encodeCall(CBMulticall.aggregate3, (_toCall3s(executionCallsChain)));
+        // Build the `execTransaction` calls chain for all the safe-to-safe approvals followed by the final script call.
+        Call[] memory execTransactionCalls = _buildExecTransactionCalls({safes: safes, callsChain: callsChain});
+        bytes memory txData = abi.encodeCall(CBMulticall.aggregate3, (_toCall3s(execTransactionCalls)));
         console.logBytes(txData);
 
         console.log("---\nSimulation link:");
@@ -615,22 +615,22 @@ abstract contract MultisigScriptV2 is Script {
     /// @param safes The list of safes to execute the calls from.
     /// @param callsChain The list of calls to wrap in a `execTransaction` call.
     ///
-    /// @return executionCalls The list of `execTransaction` calls.
-    function _buildExecutionCalls(address[] memory safes, Call[] memory callsChain)
+    /// @return execTransactionCalls The list of `execTransaction` calls.
+    function _buildExecTransactionCalls(address[] memory safes, Call[] memory callsChain)
         internal
         view
-        returns (Call[] memory executionCalls)
+        returns (Call[] memory execTransactionCalls)
     {
         require(
             safes.length == callsChain.length,
-            "MultisigScript::_buildExecutionCalls: Safes and callsChain must have the same length"
+            "MultisigScript::_buildExecTransactionCalls: Safes and callsChain must have the same length"
         );
 
-        executionCalls = new Call[](safes.length);
+        execTransactionCalls = new Call[](safes.length);
         for (uint256 i; i < safes.length; i++) {
             address signer = i == 0 ? msg.sender : safes[i - 1];
 
-            executionCalls[i] = _buildExecTransactionCall({
+            execTransactionCalls[i] = _buildExecTransactionCall({
                 safe: safes[i],
                 call: callsChain[i],
                 signatures: Signatures.genPrevalidatedSignature(signer)
