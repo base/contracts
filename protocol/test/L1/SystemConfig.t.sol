@@ -950,3 +950,19 @@ contract SystemConfig_SetDAFootprintGasScalar_Test is SystemConfig_TestInit {
         assertEq(systemConfig.daFootprintGasScalar(), newScalar);
     }
 }
+
+/// @title SystemConfig_IsCustomGasToken_Test
+/// @notice Test contract for SystemConfig `isCustomGasToken` function.
+contract SystemConfig_IsCustomGasToken_Test is SystemConfig_TestInit {
+    /// @notice Tests that `isCustomGasToken` returns the correct value.
+    function test_isCustomGasToken_enabled_succeeds() external {
+        skipIfSysFeatureDisabled(Features.CUSTOM_GAS_TOKEN);
+        assertTrue(systemConfig.isCustomGasToken());
+    }
+
+    /// @notice Tests that `isCustomGasToken` returns the correct value.
+    function test_isCustomGasToken_disabled_succeeds() external {
+        skipIfSysFeatureEnabled(Features.CUSTOM_GAS_TOKEN);
+        assertFalse(systemConfig.isCustomGasToken());
+    }
+}
