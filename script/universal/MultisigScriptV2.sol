@@ -3,7 +3,6 @@ pragma solidity ^0.8.15;
 
 // solhint-disable no-console
 import {console} from "lib/forge-std/src/console.sol";
-import {IMulticall3} from "lib/forge-std/src/interfaces/IMulticall3.sol";
 import {Script} from "lib/forge-std/src/Script.sol";
 import {Vm} from "lib/forge-std/src/Vm.sol";
 
@@ -580,10 +579,7 @@ abstract contract MultisigScriptV2 is Script {
         // This can be used to e.g. call out to the Tenderly API and get additional
         // data about the state diff before broadcasting the transaction.
         Simulation.Payload memory simPayload = Simulation.Payload({
-            from: msg.sender,
-            to: safe,
-            data: simCall.data,
-            stateOverrides: new Simulation.StateOverride[](0)
+            from: msg.sender, to: safe, data: simCall.data, stateOverrides: new Simulation.StateOverride[](0)
         });
         return (accesses, simPayload);
     }
@@ -638,9 +634,7 @@ abstract contract MultisigScriptV2 is Script {
             address signer = i == 0 ? msg.sender : safes[i - 1];
 
             execTransactionCalls[i] = _buildExecTransactionCall({
-                safe: safes[i],
-                call: callsChain[i],
-                signatures: Signatures.genPrevalidatedSignature(signer)
+                safe: safes[i], call: callsChain[i], signatures: Signatures.genPrevalidatedSignature(signer)
             });
         }
     }
@@ -659,10 +653,7 @@ abstract contract MultisigScriptV2 is Script {
 
         uint256 nonce = _getNonce({safe: safes[0]});
         overrides[0] = Simulation.overrideSafeThresholdApprovalAndNonce({
-            safe: safes[0],
-            nonce: nonce,
-            owner: msg.sender,
-            dataHash: firstCallDataHash
+            safe: safes[0], nonce: nonce, owner: msg.sender, dataHash: firstCallDataHash
         });
 
         for (uint256 i = 1; i < safes.length; i++) {
@@ -719,18 +710,19 @@ abstract contract MultisigScriptV2 is Script {
     ///
     /// @return The result of `encodeTransactionData` function from the given safe for the given call.
     function _encodeTransactionData(address safe, Call memory call) internal view returns (bytes memory) {
-        return IGnosisSafe(safe).encodeTransactionData({
-            to: call.target,
-            value: call.value,
-            data: call.data,
-            operation: call.operation,
-            safeTxGas: 0,
-            baseGas: 0,
-            gasPrice: 0,
-            gasToken: address(0),
-            refundReceiver: address(0),
-            _nonce: _getNonce(safe)
-        });
+        return IGnosisSafe(safe)
+            .encodeTransactionData({
+                to: call.target,
+                value: call.value,
+                data: call.data,
+                operation: call.operation,
+                safeTxGas: 0,
+                baseGas: 0,
+                gasPrice: 0,
+                gasToken: address(0),
+                refundReceiver: address(0),
+                _nonce: _getNonce(safe)
+            });
     }
 
     /// @notice Checks the signatures for the given safe and call.
@@ -742,11 +734,12 @@ abstract contract MultisigScriptV2 is Script {
         bytes32 hash = _getTransactionHash({safe: safe, call: call});
         signatures = Signatures.prepareSignatures({safe: safe, hash: hash, signatures: signatures});
 
-        IGnosisSafe(safe).checkSignatures({
-            dataHash: hash,
-            data: _encodeTransactionData({safe: safe, call: call}), // NOTE: This field is the data preimage but not strictly required as `checkSignatures` ignores it.
-            signatures: signatures
-        });
+        IGnosisSafe(safe)
+            .checkSignatures({
+                dataHash: hash,
+                data: _encodeTransactionData({safe: safe, call: call}), // NOTE: This field is the data preimage but not strictly required as `checkSignatures` ignores it.
+                signatures: signatures
+            });
     }
 
     /// @notice Gets the transaction hash for the given safe and call.
@@ -809,18 +802,19 @@ abstract contract MultisigScriptV2 is Script {
             vm.broadcast();
         }
 
-        return IGnosisSafe(safe).execTransaction({
-            to: call.target,
-            value: call.value,
-            data: call.data,
-            operation: call.operation,
-            safeTxGas: 0,
-            baseGas: 0,
-            gasPrice: 0,
-            gasToken: address(0),
-            refundReceiver: payable(address(0)),
-            signatures: signatures
-        });
+        return IGnosisSafe(safe)
+            .execTransaction({
+                to: call.target,
+                value: call.value,
+                data: call.data,
+                operation: call.operation,
+                safeTxGas: 0,
+                baseGas: 0,
+                gasPrice: 0,
+                gasToken: address(0),
+                refundReceiver: payable(address(0)),
+                signatures: signatures
+            });
     }
 
     /// @notice Gets the type for the given call.
@@ -831,11 +825,13 @@ abstract contract MultisigScriptV2 is Script {
     function _getCall3Type(Call memory call) internal pure returns (Call3Type) {
         if (call.operation == Enum.Operation.DelegateCall) {
             return Call3Type.DELEGATE_CALL;
-        } else if (call.value == 0) {
-            return Call3Type.CALL;
-        } else {
-            return Call3Type.CALL_VALUE;
         }
+
+        if (call.value == 0) {
+            return Call3Type.CALL;
+        }
+
+        return Call3Type.CALL_VALUE;
     }
 
     /// @notice Converts the given call to the format expected by the `CBMulticall.aggregate3` function.
@@ -928,19 +924,6 @@ abstract contract MultisigScriptV2 is Script {
     function _toArray(address addr) internal pure returns (address[] memory) {
         address[] memory array = new address[](1);
         array[0] = addr;
-        return array;
-    }
-
-    /// @notice Wraps the given addresses in an array of two addresses.
-    ///
-    /// @param address1 The first address to wrap.
-    /// @param address2 The second address to wrap.
-    ///
-    /// @return The addresses wrapped in an array of two addresses.
-    function _toArray(address address1, address address2) internal pure returns (address[] memory) {
-        address[] memory array = new address[](2);
-        array[0] = address1;
-        array[1] = address2;
         return array;
     }
 }

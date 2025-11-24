@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IMulticall3} from "forge-std/interfaces/IMulticall3.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {console} from "forge-std/console.sol";
 import {Preinstalls} from "lib/optimism/packages/contracts-bedrock/src/libraries/Preinstalls.sol";
 
 import {MultisigScriptV2} from "script/universal/MultisigScriptV2.sol";
@@ -26,7 +24,7 @@ contract MultisigScriptV2Test is Test, MultisigScriptV2 {
 
     bytes internal dataToSign3of2 =
     // solhint-disable-next-line max-line-length
-        hex"190132640243d7aade8c72f3d90d2dbf359e9897feba5fce1453bc8d9e7ba10d1715e6bf78f25eeee432952e1453c1b0d0bd867a1d4c4c859aa07ec7e2ef9cb87bc7";
+    hex"190132640243d7aade8c72f3d90d2dbf359e9897feba5fce1453bc8d9e7ba10d1715e6bf78f25eeee432952e1453c1b0d0bd867a1d4c4c859aa07ec7e2ef9cb87bc7";
 
     function setUp() public {
         vm.etch(safe, Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid));
@@ -177,18 +175,19 @@ contract MultisigScriptV2Test is Test, MultisigScriptV2 {
         bytes memory sigs = abi.encodePacked(r1, s1, v1, r2, s2, v2, r3, s3, v3);
         sigs = Signatures.prepareSignatures({safe: safe3of2, hash: hash, signatures: sigs});
 
-        bool success = IGnosisSafe(safe3of2).execTransaction({
-            to: address(counter3of2),
-            value: 0,
-            data: abi.encodeCall(Counter.increment, ()),
-            operation: Enum.Operation.Call,
-            safeTxGas: 0,
-            baseGas: 0,
-            gasPrice: 0,
-            gasToken: address(0),
-            refundReceiver: payable(address(0)),
-            signatures: sigs
-        });
+        bool success = IGnosisSafe(safe3of2)
+            .execTransaction({
+                to: address(counter3of2),
+                value: 0,
+                data: abi.encodeCall(Counter.increment, ()),
+                operation: Enum.Operation.Call,
+                safeTxGas: 0,
+                baseGas: 0,
+                gasPrice: 0,
+                gasToken: address(0),
+                refundReceiver: payable(address(0)),
+                signatures: sigs
+            });
 
         assertTrue(success, "Should succeed with extra signatures");
         assertEq(counter3of2.count(), 1, "Counter should be incremented");
