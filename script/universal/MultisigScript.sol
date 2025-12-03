@@ -4,6 +4,7 @@ pragma solidity ^0.8.15;
 // solhint-disable no-console
 import {console} from "lib/forge-std/src/console.sol";
 import {Script} from "lib/forge-std/src/Script.sol";
+import {stdJson} from "lib/forge-std/src/StdJson.sol";
 import {Vm} from "lib/forge-std/src/Vm.sol";
 
 import {CBMulticall} from "../../src/utils/CBMulticall.sol";
@@ -200,6 +201,14 @@ abstract contract MultisigScript is Script {
     // Tenderly simulations can accept generic state overrides. This hook enables this functionality.
     // By default, an empty (no-op) override is returned.
     function _simulationOverrides() internal view virtual returns (Simulation.StateOverride[] memory overrides_) {}
+
+    /// @notice Controls whether the safe tx is printed as hashes or structured EIP-712 data.
+    ///
+    /// @dev Override and return `true` to print hashed data (domain + message hash) instead of
+    ///      the typed EIP-712 JSON structure. By default, returns `false` to use EIP-712 JSON.
+    function _printDataHashes() internal view virtual returns (bool) {
+        return true;
+    }
 
     //////////////////////////////////////////////////////////////////////////////////////
     ///                                Public Functions                                ///
@@ -529,14 +538,22 @@ abstract contract MultisigScript is Script {
 
     /// @notice Prints the data to sign for the given safe and call.
     ///
+    /// @dev Uses `_printDataHashes()` to determine the output format:
+    ///      - `true`: prints raw transaction data (hashes)
+    ///      - `false` (default): prints EIP-712 JSON structure for hardware wallets
+    ///
     /// @param safe The address of the safe to print the data to sign for.
     /// @param call The call to print the data to sign for.
     function _printDataToSign(address safe, Call memory call) internal {
-        bytes memory txData = _encodeTransactionData({safe: safe, call: call});
+        bytes memory txData = _printDataHashes()
+            ? _encodeTransactionData({safe: safe, call: call})
+            : _encodeEIP712Json({safe: safe, call: call});
+
         emit DataToSign({data: txData});
 
         console.log("---\nIf submitting onchain, call Safe.approveHash on %s with the following hash:", safe);
-        console.logBytes32(_getTransactionHash({safe: safe, call: call}));
+        bytes32 hash = _getTransactionHash({safe: safe, call: call});
+        console.logBytes32(hash);
 
         console.log("---\nData to sign:");
         console.log("vvvvvvvv");
@@ -723,6 +740,47 @@ abstract contract MultisigScript is Script {
                 refundReceiver: address(0),
                 _nonce: _getNonce(safe)
             });
+    }
+
+    /// @notice Encodes the transaction as EIP-712 structured JSON for hardware wallet signing.
+    ///
+    /// @param safe The address of the safe that will execute the transaction.
+    /// @param call The call to encode.
+    ///
+    /// @return The EIP-712 JSON structure as bytes.
+    function _encodeEIP712Json(address safe, Call memory call) internal returns (bytes memory) {
+        // EIP-712 type definitions for Safe transaction
+        string memory types = '{"EIP712Domain":[' '{"name":"chainId","type":"uint256"},'
+            '{"name":"verifyingContract","type":"address"}],' '"SafeTx":[' '{"name":"to","type":"address"},'
+            '{"name":"value","type":"uint256"},' '{"name":"data","type":"bytes"},'
+            '{"name":"operation","type":"uint8"},' '{"name":"safeTxGas","type":"uint256"},'
+            '{"name":"baseGas","type":"uint256"},' '{"name":"gasPrice","type":"uint256"},'
+            '{"name":"gasToken","type":"address"},' '{"name":"refundReceiver","type":"address"},'
+            '{"name":"nonce","type":"uint256"}]}';
+
+        // Build domain object
+        string memory domain = stdJson.serialize("domain", "chainId", uint256(block.chainid));
+        domain = stdJson.serialize("domain", "verifyingContract", safe);
+
+        // Build message object with transaction details
+        string memory message = stdJson.serialize("message", "to", call.target);
+        message = stdJson.serialize("message", "value", call.value);
+        message = stdJson.serialize("message", "data", call.data);
+        message = stdJson.serialize("message", "operation", uint256(call.operation));
+        message = stdJson.serialize("message", "safeTxGas", uint256(0));
+        message = stdJson.serialize("message", "baseGas", uint256(0));
+        message = stdJson.serialize("message", "gasPrice", uint256(0));
+        message = stdJson.serialize("message", "gasToken", address(0));
+        message = stdJson.serialize("message", "refundReceiver", address(0));
+        message = stdJson.serialize("message", "nonce", _getNonce(safe));
+
+        // Combine into final JSON structure
+        string memory json = stdJson.serialize("", "primaryType", string("SafeTx"));
+        json = stdJson.serialize("", "types", types);
+        json = stdJson.serialize("", "domain", domain);
+        json = stdJson.serialize("", "message", message);
+
+        return abi.encodePacked(json);
     }
 
     /// @notice Checks the signatures for the given safe and call.

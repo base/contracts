@@ -10,6 +10,7 @@ import {Simulation} from "script/universal/Simulation.sol";
 import {IGnosisSafe, Enum} from "script/universal/IGnosisSafe.sol";
 
 import {Counter} from "test/universal/Counter.sol";
+import {LibString} from "lib/solady/src/utils/LibString.sol";
 
 import {CBMulticall} from "src/utils/CBMulticall.sol";
 
@@ -20,6 +21,9 @@ contract MultisigScriptTest is Test, MultisigScript {
 
     address internal safe = address(1001);
     Counter internal counter = new Counter(address(safe));
+
+    /// @dev Controls whether to use hash-based or EIP-712 JSON output. True by default.
+    bool internal _useDataHashes = true;
 
     function setUp() public {
         vm.etch(safe, Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid));
@@ -127,6 +131,13 @@ contract MultisigScriptTest is Test, MultisigScript {
         return address(safe);
     }
 
+    /// @inheritdoc MultisigScript
+    ///
+    /// @dev Returns `_useDataHashes` which is true by default (hash-based signing).
+    function _printDataHashes() internal view override returns (bool) {
+        return _useDataHashes;
+    }
+
     /// @notice Helper to compute the expected transaction data for signing
     ///
     /// @return The encoded transaction data that signers need to sign
@@ -193,5 +204,28 @@ contract MultisigScriptTest is Test, MultisigScript {
 
         bytes memory signatures = abi.encodePacked(r1, s1, v1, r2, s2, v2, r3, s3, v3);
         run(signatures);
+    }
+
+    /// @notice Tests that sign() emits EIP-712 JSON formatted data
+    ///
+    /// @dev Verifies the output contains expected EIP-712 structure fields
+    function test_sign_eip712() external {
+        _useDataHashes = false;
+
+        vm.recordLogs();
+
+        vm.prank(wallet1.addr);
+        this.sign(new address[](0));
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes memory logged = abi.decode(logs[logs.length - 1].data, (bytes));
+
+        // Verify the logged data contains EIP-712 JSON structure markers
+        string memory loggedStr = string(logged);
+        assertTrue(LibString.contains(loggedStr, "EIP712Domain"), "EIP-712 output should contain EIP712Domain");
+        assertTrue(LibString.contains(loggedStr, "SafeTx"), "EIP-712 output should contain SafeTx type");
+        assertTrue(LibString.contains(loggedStr, "primaryType"), "EIP-712 output should contain primaryType");
+        assertTrue(LibString.contains(loggedStr, "domain"), "EIP-712 output should contain domain");
+        assertTrue(LibString.contains(loggedStr, "message"), "EIP-712 output should contain message");
     }
 }
