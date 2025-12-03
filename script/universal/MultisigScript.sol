@@ -3,15 +3,15 @@ pragma solidity ^0.8.15;
 
 // solhint-disable no-console
 import {console} from "lib/forge-std/src/console.sol";
-import {IMulticall3} from "lib/forge-std/src/interfaces/IMulticall3.sol";
 import {Script} from "lib/forge-std/src/Script.sol";
 import {Vm} from "lib/forge-std/src/Vm.sol";
 
+import {CBMulticall} from "../../src/utils/CBMulticall.sol";
+
 import {IGnosisSafe, Enum} from "./IGnosisSafe.sol";
 import {Signatures} from "./Signatures.sol";
-import {Simulation} from "./Simulation.sol";
 import {StateDiff} from "./StateDiff.sol";
-import {CBMulticall} from "../../src/utils/CBMulticall.sol";
+import {Simulation} from "./Simulation.sol";
 
 /// @title MultisigScript
 /// @notice Script builder for Forge scripts that require signatures from Safes. Supports both non-nested
@@ -149,10 +149,27 @@ import {CBMulticall} from "../../src/utils/CBMulticall.sol";
 ///     │        │        │        │        │        │          │─────────────────────────────>│
 abstract contract MultisigScript is Script {
     bytes32 internal constant SAFE_NONCE_SLOT = bytes32(uint256(5));
-
     address internal constant CB_MULTICALL = 0xA8B8CA1d6F0F5Ce63dCEA9121A01b302c5801303;
 
-    address internal multicallAddress;
+    /// @notice A struct representing a call to a contract.
+    ///
+    /// @param operation The operation to perform on the contract.
+    /// @param target The address of the contract to call.
+    /// @param data The data to call the contract with.
+    /// @param value The value to send with the call.
+    struct Call {
+        Enum.Operation operation;
+        address target;
+        bytes data;
+        uint256 value;
+    }
+
+    /// @notice The available types of for call3 calls.
+    enum Call3Type {
+        DELEGATE_CALL,
+        CALL,
+        CALL_VALUE
+    }
 
     /// @dev Event emitted from a `sign()` call containing the data to sign. Used in testing.
     event DataToSign(bytes data);
@@ -165,7 +182,7 @@ abstract contract MultisigScript is Script {
     function _ownerSafe() internal view virtual returns (address);
 
     /// @notice Creates the calldata for signatures (`sign`), approvals (`approve`), and execution (`run`)
-    function _buildCalls() internal view virtual returns (IMulticall3.Call3Value[] memory);
+    function _buildCalls() internal view virtual returns (Call[] memory);
 
     /// @notice Follow up assertions to ensure that the script ran to completion.
     /// @dev Called after `sign` and `run`, but not `approve`.
@@ -183,26 +200,6 @@ abstract contract MultisigScript is Script {
     // Tenderly simulations can accept generic state overrides. This hook enables this functionality.
     // By default, an empty (no-op) override is returned.
     function _simulationOverrides() internal view virtual returns (Simulation.StateOverride[] memory overrides_) {}
-
-    /// @notice If set to true, the executed aggregate call runs through the custom `CBMulticall` contract
-    ///         as a `DELEGATECALL` for each individual call.
-    /// @dev    In delegatecall mode:
-    ///         - The multisig inherits the multicall logic and executes each target in its own context
-    ///           (e.g. for Optimism's OPCM-style flows).
-    ///         - The `value` field of each `IMulticall3.Call3Value` returned by `_buildCalls` MUST be zero.
-    ///           Per-call value routing is not supported; any ETH attached to the Safe transaction is shared
-    ///           across all calls according to the delegatee's logic.
-    function _useDelegateCall() internal view virtual returns (bool) {
-        return false;
-    }
-
-    constructor() {
-        bool useCbMulticall;
-        try vm.envBool("USE_CB_MULTICALL") {
-            useCbMulticall = vm.envBool("USE_CB_MULTICALL");
-        } catch {}
-        multicallAddress = (useCbMulticall || _useDelegateCall()) ? CB_MULTICALL : MULTICALL3_ADDRESS;
-    }
 
     //////////////////////////////////////////////////////////////////////////////////////
     ///                                Public Functions                                ///
@@ -230,14 +227,11 @@ abstract contract MultisigScript is Script {
             originalNonces[i] = _getNonce({safe: safes[i]});
         }
 
-        (bytes[] memory datas, uint256 value) = _transactionDatas({safes: safes});
-
-        vm.startMappingRecording();
+        Call[] memory callsChain = _buildCallsChain({safes: safes});
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _simulateForSigner({safes: safes, datas: datas, value: value});
+            _simulateForSigner({safes: safes, callsChain: callsChain});
         (StateDiff.MappingParent[] memory parents, string memory json) =
             StateDiff.collectStateDiff(StateDiff.CollectStateDiffOpts({accesses: accesses, simPayload: simPayload}));
-        vm.stopMappingRecording();
 
         _postSign({accesses: accesses, simPayload: simPayload});
         _postCheck({accesses: accesses, simPayload: simPayload});
@@ -247,10 +241,10 @@ abstract contract MultisigScript is Script {
             vm.store({target: safes[i], slot: SAFE_NONCE_SLOT, value: bytes32(originalNonces[i])});
         }
 
-        bytes memory txData = _encodeTransactionData({safe: safes[0], data: datas[0], value: value});
+        bytes memory txData = _encodeTransactionData({safe: safes[0], call: callsChain[0]});
         StateDiff.recordStateDiff({json: json, parents: parents, txData: txData, targetSafe: _ownerSafe()});
 
-        _printDataToSign({safe: safes[0], data: datas[0], value: value, txData: txData});
+        _printDataToSign({safe: safes[0], call: callsChain[0]});
     }
 
     /// Step 1.1 (optional)
@@ -262,8 +256,9 @@ abstract contract MultisigScript is Script {
     /// @param signatures The signatures to verify (concatenated, 65-bytes per sig).
     function verify(address[] memory safes, bytes memory signatures) public view {
         safes = _appendOwnerSafe({safes: safes});
-        (bytes[] memory datas, uint256 value) = _transactionDatas({safes: safes});
-        _checkSignatures({safe: safes[0], data: datas[0], value: value, signatures: signatures});
+
+        Call[] memory callsChain = _buildCallsChain({safes: safes});
+        _checkSignatures({safe: safes[0], call: callsChain[0], signatures: signatures});
     }
 
     /// Step 2 (optional for non-nested setups)
@@ -280,9 +275,11 @@ abstract contract MultisigScript is Script {
     /// @param signatures The signatures from step 1 (concatenated, 65-bytes per sig)
     function approve(address[] memory safes, bytes memory signatures) public {
         safes = _appendOwnerSafe({safes: safes});
-        (bytes[] memory datas, uint256 value) = _transactionDatas({safes: safes});
+
+        Call[] memory callsChain = _buildCallsChain({safes: safes});
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _executeTransaction({safe: safes[0], data: datas[0], value: value, signatures: signatures, broadcast: true});
+            _executeTransaction({safe: safes[0], call: callsChain[0], signatures: signatures, broadcast: true});
+
         _postApprove({accesses: accesses, simPayload: simPayload});
     }
 
@@ -297,13 +294,12 @@ abstract contract MultisigScript is Script {
     /// @param signatures The signatures from step 1 (concatenated, 65-bytes per sig)
     function simulate(bytes memory signatures) public {
         address ownerSafe = _ownerSafe();
-        (bytes[] memory datas, uint256 value) = _transactionDatas({safes: _toArray(ownerSafe)});
+        Call[] memory callsChain = _buildCallsChain({safes: _toArray(ownerSafe)});
 
         vm.store({target: ownerSafe, slot: SAFE_NONCE_SLOT, value: bytes32(_getNonce({safe: ownerSafe}))});
 
-        (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) = _executeTransaction({
-            safe: ownerSafe, data: datas[0], value: value, signatures: signatures, broadcast: false
-        });
+        (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
+            _executeTransaction({safe: ownerSafe, call: callsChain[0], signatures: signatures, broadcast: false});
 
         _postRun({accesses: accesses, simPayload: simPayload});
         _postCheck({accesses: accesses, simPayload: simPayload});
@@ -318,11 +314,10 @@ abstract contract MultisigScript is Script {
     /// @param signatures The signatures from step 1 (concatenated, 65-bytes per sig)
     function run(bytes memory signatures) public {
         address ownerSafe = _ownerSafe();
-        (bytes[] memory datas, uint256 value) = _transactionDatas({safes: _toArray(ownerSafe)});
+        Call[] memory callsChain = _buildCallsChain({safes: _toArray(ownerSafe)});
 
-        (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) = _executeTransaction({
-            safe: ownerSafe, data: datas[0], value: value, signatures: signatures, broadcast: true
-        });
+        (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
+            _executeTransaction({safe: ownerSafe, call: callsChain[0], signatures: signatures, broadcast: true});
 
         _postRun({accesses: accesses, simPayload: simPayload});
         _postCheck({accesses: accesses, simPayload: simPayload});
@@ -332,6 +327,11 @@ abstract contract MultisigScript is Script {
     ///                               Internal Functions                               ///
     //////////////////////////////////////////////////////////////////////////////////////
 
+    /// @notice Appends the owner safe to the list of safes.
+    ///
+    /// @param safes The list of safes to append the owner safe to.
+    ///
+    /// @return The list of safes with the owner safe appended.
     function _appendOwnerSafe(address[] memory safes) internal view returns (address[] memory) {
         address[] memory extendedSafes = new address[](safes.length + 1);
         for (uint256 i; i < safes.length; i++) {
@@ -341,73 +341,202 @@ abstract contract MultisigScript is Script {
         return extendedSafes;
     }
 
-    function _transactionDatas(address[] memory safes) private view returns (bytes[] memory datas, uint256 value) {
-        // Build the calls and sum the values
-        IMulticall3.Call3Value[] memory calls = _buildCalls();
-        for (uint256 i; i < calls.length; i++) {
-            value += calls[i].value;
+    /// @notice Wrapper around `_buildCalls` that checks that the script calls are valid.
+    ///
+    /// @return The list of calls.
+    function _buildCallsChecked() internal view returns (Call[] memory) {
+        Call[] memory scriptCalls = _buildCalls();
+        for (uint256 i; i < scriptCalls.length; i++) {
+            Call memory call = scriptCalls[i];
+
+            require(
+                call.operation == Enum.Operation.Call || call.value == 0,
+                "MultisigScript::_buildCallsChecked: Value must be 0 for delegate calls"
+            );
         }
 
-        // The very last call is the actual (aggregated) call to execute
-        datas = new bytes[](safes.length);
-        datas[datas.length - 1] = abi.encodeCall(IMulticall3.aggregate3Value, (calls));
+        return scriptCalls;
+    }
 
-        if (_useDelegateCall()) {
-            datas[datas.length - 1] = abi.encodeCall(CBMulticall.aggregateDelegateCalls, (_toCall3Array(calls)));
-        }
+    /// @notice Build the list of safe-to-safe approval calls followed by the final script call.
+    ///
+    /// @param safes The list of safes to build the calls chain for.
+    ///
+    /// @return callsChain The calls chain for the given safes.
+    function _buildCallsChain(address[] memory safes) internal view returns (Call[] memory callsChain) {
+        // Build the script calls.
+        Call[] memory scriptCalls = _buildCallsChecked();
 
-        // The first n-1 calls are the nested approval calls
-        uint256 valueForCallToApprove = value;
+        // Build the final script call.
+        Call memory aggregatedScriptCall = _buildAggregatedScriptCall({scriptCalls: scriptCalls});
+
+        // The very last call is the actual call to execute
+        callsChain = new Call[](safes.length);
+        callsChain[callsChain.length - 1] = aggregatedScriptCall;
+
+        // The first n-1 calls are the nested approval calls. We build the approvals backwards, starting from the last safe.
         for (uint256 i = safes.length - 1; i > 0; i--) {
-            address targetSafe = safes[i];
-            bytes memory callToApprove = datas[i];
+            address safe = safes[i];
+            Call memory callToApprove = callsChain[i];
 
-            IMulticall3.Call3[] memory approvalCall = new IMulticall3.Call3[](1);
-            approvalCall[0] =
-                _generateApproveCall({safe: targetSafe, data: callToApprove, value: valueForCallToApprove});
-            datas[i - 1] = abi.encodeCall(IMulticall3.aggregate3, (approvalCall));
-
-            valueForCallToApprove = 0;
+            callsChain[i - 1] = _buildApproveCall({safe: safe, call: callToApprove});
         }
     }
 
-    /// @dev Converts `IMulticall3.Call3Value` calls into `CBMulticall.Call3` calls for delegatecall mode.
-    ///      All `value` fields must be zero; delegatecall mode does not support per-call value routing.
-    function _toCall3Array(IMulticall3.Call3Value[] memory calls) private pure returns (CBMulticall.Call3[] memory) {
-        CBMulticall.Call3[] memory dCalls = new CBMulticall.Call3[](calls.length);
-        for (uint256 i; i < calls.length; i++) {
-            // Delegatecall mode relies on the Safe's `msg.value` handling rather than per-call value routing.
-            // Enforce that no per-call value is specified when using delegatecall mode.
-            require(calls[i].value == 0, "MultisigScript: delegatecall mode does not support call value");
-            dCalls[i] = CBMulticall.Call3({
-                target: calls[i].target, allowFailure: calls[i].allowFailure, callData: calls[i].callData
+    /// @notice Builds the aggregated script call.
+    ///
+    /// @param scriptCalls The list of script calls to aggregate.
+    ///
+    /// @return The aggregated script call.
+    function _buildAggregatedScriptCall(Call[] memory scriptCalls) internal pure returns (Call memory) {
+        // When there is only one call, we return it directly as there is no need to aggregate it into a Multicall call.
+        if (scriptCalls.length == 1) {
+            return scriptCalls[0];
+        }
+
+        CBMulticall.Call3[] memory rootCalls = new CBMulticall.Call3[](scriptCalls.length);
+        uint256 rootCallsIndex;
+
+        Call[] memory currentGroup = new Call[](scriptCalls.length);
+        currentGroup[0] = scriptCalls[0];
+        uint256 currentGroupIndex;
+
+        for (uint256 i; i < scriptCalls.length; i++) {
+            Call memory currentCall = scriptCalls[i];
+            Call3Type currentType = _getCall3Type(currentCall);
+            Call3Type groupType = _getCall3Type(currentGroup[0]);
+
+            // If the current call has the same type as the current group, add it to the current group and continue.
+            if (groupType == currentType) {
+                currentGroup[currentGroupIndex] = currentCall;
+                currentGroupIndex++;
+                continue;
+            }
+
+            // Consume the current group and append the calls to the root calls.
+            rootCallsIndex += _aggregateCalls({
+                groupType: groupType,
+                rootCalls: rootCalls,
+                rootCallsIndex: rootCallsIndex,
+                currentGroup: currentGroup,
+                currentGroupIndex: currentGroupIndex
             });
+
+            // Reset the current group (for the next group)
+            currentGroup[0] = currentCall;
+            currentGroupIndex = 1;
         }
-        return dCalls;
+
+        // Process the final group left in the current group.
+        rootCallsIndex += _aggregateCalls({
+            groupType: _getCall3Type(currentGroup[0]),
+            rootCalls: rootCalls,
+            rootCallsIndex: rootCallsIndex,
+            currentGroup: currentGroup,
+            currentGroupIndex: currentGroupIndex
+        });
+
+        // NOTE: When aggregating via a Multicall call, the root call is always a delegatecall to `aggregateDelegateCalls`
+        //       as it offers the most flexibility and allows perofming any other type of call.
+        return Call({
+            operation: Enum.Operation.DelegateCall,
+            target: CB_MULTICALL,
+            data: abi.encodeCall(CBMulticall.aggregateDelegateCalls, (rootCalls)),
+            value: 0
+        });
     }
 
-    function _generateApproveCall(address safe, bytes memory data, uint256 value)
-        internal
-        view
-        returns (IMulticall3.Call3 memory)
-    {
-        bytes32 hash = _getTransactionHash({safe: safe, data: data, value: value});
+    /// @notice Aggregates the current group of calls into a single Multicall call.
+    ///
+    /// @param groupType The type of the current group.
+    /// @param rootCalls The root calls to append the calls to.
+    /// @param rootCallsIndex The index of the root calls to append the calls to.
+    /// @param currentGroup The current group of calls to consume.
+    /// @param currentGroupIndex The index of the current group.
+    ///
+    /// @return rootCallsCount The number of root calls appended.
+    function _aggregateCalls(
+        Call3Type groupType,
+        CBMulticall.Call3[] memory rootCalls,
+        uint256 rootCallsIndex,
+        Call[] memory currentGroup,
+        uint256 currentGroupIndex
+    ) internal pure returns (uint256 rootCallsCount) {
+        uint256 rootCallsIndexSaved = rootCallsIndex;
+
+        // Append the call3 delegate calls directly to the root calls.
+        if (groupType == Call3Type.DELEGATE_CALL) {
+            for (uint256 j; j < currentGroupIndex; j++) {
+                rootCalls[rootCallsIndex] = _toDelegateCall3(currentGroup[j]);
+                rootCallsIndex++;
+            }
+        }
+        // Otherwise aggregate the calls into a single Multicall call.
+        else {
+            CBMulticall.Call3 memory rootCall;
+
+            if (groupType == Call3Type.CALL) {
+                CBMulticall.Call3[] memory call3s = new CBMulticall.Call3[](currentGroupIndex);
+                for (uint256 j; j < currentGroupIndex; j++) {
+                    call3s[j] = _toCall3(currentGroup[j]);
+                }
+
+                rootCall = CBMulticall.Call3({
+                    target: CB_MULTICALL,
+                    allowFailure: false,
+                    callData: abi.encodeCall(CBMulticall.aggregate3, (call3s))
+                });
+            } else {
+                CBMulticall.Call3Value[] memory call3Values = new CBMulticall.Call3Value[](currentGroupIndex);
+                for (uint256 j; j < currentGroupIndex; j++) {
+                    call3Values[j] = _toCall3Value(currentGroup[j]);
+                }
+
+                rootCall = CBMulticall.Call3({
+                    target: CB_MULTICALL,
+                    allowFailure: false,
+                    callData: abi.encodeCall(CBMulticall.aggregate3Value, (call3Values))
+                });
+            }
+
+            rootCalls[rootCallsIndex] = rootCall;
+            rootCallsIndex++;
+        }
+
+        // Return the number of root calls appended.
+        rootCallsCount = rootCallsIndex - rootCallsIndexSaved;
+    }
+
+    /// @notice Builds the approve call (`approveHash`) for the given safe and call.
+    ///
+    /// @param safe The address of the safe to approve.
+    /// @param call The call to approve.
+    ///
+    /// @return The approve call.
+    function _buildApproveCall(address safe, Call memory call) internal view returns (Call memory) {
+        bytes32 hash = _getTransactionHash({safe: safe, call: call});
 
         console.log("---\nNested hash for safe %s:", safe);
         console.logBytes32(hash);
 
-        return IMulticall3.Call3({
-            target: safe, allowFailure: false, callData: abi.encodeCall(IGnosisSafe(safe).approveHash, (hash))
+        return Call({
+            operation: Enum.Operation.Call,
+            target: safe,
+            data: abi.encodeCall(IGnosisSafe(safe).approveHash, (hash)),
+            value: 0
         });
     }
 
-    function _printDataToSign(address safe, bytes memory data, uint256 value, bytes memory txData) internal {
-        bytes32 hash = _getTransactionHash({safe: safe, data: data, value: value});
-
+    /// @notice Prints the data to sign for the given safe and call.
+    ///
+    /// @param safe The address of the safe to print the data to sign for.
+    /// @param call The call to print the data to sign for.
+    function _printDataToSign(address safe, Call memory call) internal {
+        bytes memory txData = _encodeTransactionData({safe: safe, call: call});
         emit DataToSign({data: txData});
 
         console.log("---\nIf submitting onchain, call Safe.approveHash on %s with the following hash:", safe);
-        console.logBytes32(hash);
+        console.logBytes32(_getTransactionHash({safe: safe, call: call}));
 
         console.log("---\nData to sign:");
         console.log("vvvvvvvv");
@@ -423,80 +552,91 @@ abstract contract MultisigScript is Script {
         console.log("###############################");
     }
 
-    function _executeTransaction(
-        address safe,
-        bytes memory data,
-        uint256 value,
-        bytes memory signatures,
-        bool broadcast
-    ) internal returns (Vm.AccountAccess[] memory, Simulation.Payload memory) {
-        bytes32 hash = _getTransactionHash({safe: safe, data: data, value: value});
+    /// @notice Executes the given transaction.
+    ///
+    /// @param safe The address of the safe to execute the transaction from.
+    /// @param call The call to execute.
+    /// @param signatures The signatures to use for the transaction.
+    /// @param broadcast Whether to broadcast the transaction.
+    ///
+    /// @return The account accesses and simulation payload.
+    function _executeTransaction(address safe, Call memory call, bytes memory signatures, bool broadcast)
+        internal
+        returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
+    {
+        bytes32 hash = _getTransactionHash({safe: safe, call: call});
         signatures = Signatures.prepareSignatures({safe: safe, hash: hash, signatures: signatures});
 
-        bytes memory simData = _execTransactionCalldata({safe: safe, data: data, value: value, signatures: signatures});
-        Simulation.logSimulationLink({to: safe, data: simData, from: msg.sender});
+        Call memory simCall = _buildExecTransactionCall({safe: safe, call: call, signatures: signatures});
+        Simulation.logSimulationLink({to: safe, data: simCall.data, from: msg.sender});
 
         vm.startStateDiffRecording();
-        bool success =
-            _execTransaction({safe: safe, data: data, value: value, signatures: signatures, broadcast: broadcast});
+        bool success = _execTransaction({safe: safe, call: call, signatures: signatures, broadcast: broadcast});
         Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
-        require(success, "MultisigBase::_executeTransaction: Transaction failed");
-        require(accesses.length > 0, "MultisigBase::_executeTransaction: No state changes");
+        require(success, "MultisigScript::_executeTransaction: Transaction failed");
+        require(accesses.length > 0, "MultisigScript::_executeTransaction: No state changes");
 
         // This can be used to e.g. call out to the Tenderly API and get additional
         // data about the state diff before broadcasting the transaction.
         Simulation.Payload memory simPayload = Simulation.Payload({
-            from: msg.sender, to: safe, data: simData, stateOverrides: new Simulation.StateOverride[](0)
+            from: msg.sender, to: safe, data: simCall.data, stateOverrides: new Simulation.StateOverride[](0)
         });
         return (accesses, simPayload);
     }
 
-    function _simulateForSigner(address[] memory safes, bytes[] memory datas, uint256 value)
+    /// @notice Simulates the given `callsChain` associated to the given `safes` as if initiated by `msg.sender`.
+    ///
+    /// @param safes The list of safes to simulate the transaction for.
+    /// @param callsChain The list of calls to simulate the transaction for.
+    ///
+    /// @return The account accesses and simulation payload.
+    function _simulateForSigner(address[] memory safes, Call[] memory callsChain)
         internal
         returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
     {
-        IMulticall3.Call3[] memory calls = _simulateForSignerCalls({safes: safes, datas: datas, value: value});
-
-        bytes32 firstCallDataHash = _getTransactionHash({safe: safes[0], data: datas[0], value: value});
-
-        // Now define the state overrides for the simulation.
+        // Define the state overrides for the simulation.
+        bytes32 firstCallDataHash = _getTransactionHash({safe: safes[0], call: callsChain[0]});
         Simulation.StateOverride[] memory overrides = _overrides({safes: safes, firstCallDataHash: firstCallDataHash});
 
-        bytes memory txData = abi.encodeCall(IMulticall3.aggregate3, (calls));
-        console.log("---\nSimulation link:");
-        // solhint-disable max-line-length
-        Simulation.logSimulationLink({to: multicallAddress, data: txData, from: msg.sender, overrides: overrides});
+        // Build the `execTransaction` calls chain for all the safe-to-safe approvals followed by the final script call.
+        Call[] memory execTransactionCalls = _buildExecTransactionCalls({safes: safes, callsChain: callsChain});
+        bytes memory txData = abi.encodeCall(CBMulticall.aggregate3, (_toCall3s(execTransactionCalls)));
+        console.logBytes(txData);
 
-        // Forge simulation of the data logged in the link. If the simulation fails
-        // we revert to make it explicit that the simulation failed.
+        console.log("---\nSimulation link:");
+        Simulation.logSimulationLink({to: CB_MULTICALL, data: txData, from: msg.sender, overrides: overrides});
+
+        // Forge simulation of the data logged in the link. If the simulation fails we revert to make it explicit that the simulation failed.
         Simulation.Payload memory simPayload =
-            Simulation.Payload({to: multicallAddress, data: txData, from: msg.sender, stateOverrides: overrides});
+            Simulation.Payload({to: CB_MULTICALL, data: txData, from: msg.sender, stateOverrides: overrides});
         Vm.AccountAccess[] memory accesses = Simulation.simulateFromSimPayload({simPayload: simPayload});
         return (accesses, simPayload);
     }
 
-    function _simulateForSignerCalls(address[] memory safes, bytes[] memory datas, uint256 value)
-        private
+    /// @notice Wraps each of the given calls in a `execTransaction` call.
+    ///
+    /// @param safes The list of safes to execute the calls from.
+    /// @param callsChain The list of calls to wrap in a `execTransaction` call.
+    ///
+    /// @return execTransactionCalls The list of `execTransaction` calls.
+    function _buildExecTransactionCalls(address[] memory safes, Call[] memory callsChain)
+        internal
         view
-        returns (IMulticall3.Call3[] memory)
+        returns (Call[] memory execTransactionCalls)
     {
-        IMulticall3.Call3[] memory calls = new IMulticall3.Call3[](safes.length);
+        require(
+            safes.length == callsChain.length,
+            "MultisigScript::_buildExecTransactionCalls: Safes and callsChain must have the same length"
+        );
+
+        execTransactionCalls = new Call[](safes.length);
         for (uint256 i; i < safes.length; i++) {
             address signer = i == 0 ? msg.sender : safes[i - 1];
 
-            calls[i] = IMulticall3.Call3({
-                target: safes[i],
-                allowFailure: false,
-                callData: _execTransactionCalldata({
-                    safe: safes[i],
-                    data: datas[i],
-                    value: value,
-                    signatures: Signatures.genPrevalidatedSignature(signer)
-                })
+            execTransactionCalls[i] = _buildExecTransactionCall({
+                safe: safes[i], call: callsChain[i], signatures: Signatures.genPrevalidatedSignature(signer)
             });
         }
-
-        return calls;
     }
 
     // The state change simulation can set the threshold, owner address and/or nonce.
@@ -563,27 +703,19 @@ abstract contract MultisigScript is Script {
         }
     }
 
-    function _checkSignatures(address safe, bytes memory data, uint256 value, bytes memory signatures) internal view {
-        bytes32 hash = _getTransactionHash({safe: safe, data: data, value: value});
-        signatures = Signatures.prepareSignatures({safe: safe, hash: hash, signatures: signatures});
-        IGnosisSafe(safe).checkSignatures({dataHash: hash, data: data, signatures: signatures});
-    }
-
-    function _getTransactionHash(address safe, bytes memory data, uint256 value) internal view returns (bytes32) {
-        return keccak256(_encodeTransactionData({safe: safe, data: data, value: value}));
-    }
-
-    function _encodeTransactionData(address safe, bytes memory data, uint256 value)
-        internal
-        view
-        returns (bytes memory)
-    {
+    /// @notice Returns the result of `encodeTransactionData` function from the given safe for the given call.
+    ///
+    /// @param safe The address of the safe that will execute the transaction.
+    /// @param call The call to get the encoded transaction data for.
+    ///
+    /// @return The result of `encodeTransactionData` function from the given safe for the given call.
+    function _encodeTransactionData(address safe, Call memory call) internal view returns (bytes memory) {
         return IGnosisSafe(safe)
             .encodeTransactionData({
-                to: multicallAddress,
-                value: value,
-                data: data,
-                operation: _getOperation(value),
+                to: call.target,
+                value: call.value,
+                data: call.data,
+                operation: call.operation,
                 safeTxGas: 0,
                 baseGas: 0,
                 gasPrice: 0,
@@ -593,30 +725,89 @@ abstract contract MultisigScript is Script {
             });
     }
 
-    function _execTransactionCalldata(address safe, bytes memory data, uint256 value, bytes memory signatures)
-        internal
-        view
-        returns (bytes memory)
-    {
-        return abi.encodeCall(
-            IGnosisSafe(safe).execTransaction,
-            (multicallAddress, value, data, _getOperation(value), 0, 0, 0, address(0), payable(address(0)), signatures)
-        );
+    /// @notice Checks the signatures for the given safe and call.
+    ///
+    /// @param safe The address of the safe to check the signatures for.
+    /// @param call The call to check the signatures for.
+    /// @param signatures The signatures to check.
+    function _checkSignatures(address safe, Call memory call, bytes memory signatures) internal view {
+        bytes32 hash = _getTransactionHash({safe: safe, call: call});
+        signatures = Signatures.prepareSignatures({safe: safe, hash: hash, signatures: signatures});
+
+        IGnosisSafe(safe)
+            .checkSignatures({
+                dataHash: hash,
+                data: _encodeTransactionData({safe: safe, call: call}), // NOTE: This field is the data preimage but not strictly required as `checkSignatures` ignores it.
+                signatures: signatures
+            });
     }
 
-    function _execTransaction(address safe, bytes memory data, uint256 value, bytes memory signatures, bool broadcast)
+    /// @notice Gets the transaction hash for the given safe and call.
+    ///
+    /// @param safe The address of the safe that will execute the transaction.
+    /// @param call The call to get the transaction hash for.
+    ///
+    /// @return The transaction hash for the given safe and call.
+    function _getTransactionHash(address safe, Call memory call) internal view returns (bytes32) {
+        return keccak256(_encodeTransactionData({safe: safe, call: call}));
+    }
+
+    /// @notice Wrapps the given `call` in a `execTransaction` call.
+    ///
+    /// @param safe The address of the safe to execute the transaction from.
+    /// @param call The call to execute.
+    /// @param signatures The signatures to use for the transaction.
+    ///
+    /// @return The execTransaction call.
+    function _buildExecTransactionCall(address safe, Call memory call, bytes memory signatures)
+        internal
+        pure
+        returns (Call memory)
+    {
+        return Call({
+            operation: Enum.Operation.Call,
+            target: safe,
+            data: abi.encodeCall(
+                IGnosisSafe(safe).execTransaction,
+                (
+                    call.target, // to
+                    call.value, // value
+                    call.data, // data
+                    call.operation, // operation
+                    0, // safeTxGas
+                    0, // baseGas
+                    0, // gasPrice
+                    address(0), // gasToken
+                    payable(address(0)), // refundReceiver
+                    signatures // signatures
+                )
+            ),
+            value: 0
+        });
+    }
+
+    /// @notice Executes the given call from the given safe.
+    ///
+    /// @param safe The address of the safe to execute the call from.
+    /// @param call The call to execute.
+    /// @param signatures The signatures to use for the transaction.
+    /// @param broadcast Whether to broadcast the transaction.
+    ///
+    /// @return The result of the transaction.
+    function _execTransaction(address safe, Call memory call, bytes memory signatures, bool broadcast)
         internal
         returns (bool)
     {
         if (broadcast) {
             vm.broadcast();
         }
+
         return IGnosisSafe(safe)
             .execTransaction({
-                to: multicallAddress,
-                value: value,
-                data: data,
-                operation: _getOperation(value),
+                to: call.target,
+                value: call.value,
+                data: call.data,
+                operation: call.operation,
                 safeTxGas: 0,
                 baseGas: 0,
                 gasPrice: 0,
@@ -626,24 +817,113 @@ abstract contract MultisigScript is Script {
             });
     }
 
+    /// @notice Gets the type for the given call.
+    ///
+    /// @param call The call to get the type for.
+    ///
+    /// @return The type for the given call.
+    function _getCall3Type(Call memory call) internal pure returns (Call3Type) {
+        if (call.operation == Enum.Operation.DelegateCall) {
+            return Call3Type.DELEGATE_CALL;
+        }
+
+        if (call.value == 0) {
+            return Call3Type.CALL;
+        }
+
+        return Call3Type.CALL_VALUE;
+    }
+
+    /// @notice Converts the given call to the format expected by the `CBMulticall.aggregate3` function.
+    ///
+    /// @param call The call to convert to the format expected by the `CBMulticall.aggregate3` function.
+    ///
+    /// @return The call in the format expected by the `CBMulticall.aggregate3` function.
+    function _toCall3(Call memory call) internal pure returns (CBMulticall.Call3 memory) {
+        require(call.operation == Enum.Operation.Call, "MultisigScript::_toCall3: Operation must be Call");
+        require(call.value == 0, "MultisigScript::_toCall3: Value must be 0");
+
+        return CBMulticall.Call3({target: call.target, allowFailure: false, callData: call.data});
+    }
+
+    /// @notice Converts the given call to the format expected by the `CBMulticall.aggregate3Value` function.
+    ///
+    /// @param call The call to convert to the format expected by the `CBMulticall.aggregate3Value` function.
+    ///
+    /// @return The call in the format expected by the `CBMulticall.aggregate3Value` function.
+    function _toCall3Value(Call memory call) internal pure returns (CBMulticall.Call3Value memory) {
+        require(call.operation == Enum.Operation.Call, "MultisigScript::_toCall3Value: Operation must be Call");
+        require(call.value > 0, "MultisigScript::_toCall3Value: Value must be greater than 0");
+
+        return
+            CBMulticall.Call3Value({target: call.target, allowFailure: false, value: call.value, callData: call.data});
+    }
+
+    /// @notice Converts the given call to the format expected by the `CBMulticall.aggregateDelegateCalls` function.
+    ///
+    /// @param call The call to convert to the format expected by the `CBMulticall.aggregateDelegateCalls` function.
+    ///
+    /// @return The call in the format expected by the `CBMulticall.aggregateDelegateCalls` function.
+    function _toDelegateCall3(Call memory call) internal pure returns (CBMulticall.Call3 memory) {
+        require(
+            call.operation == Enum.Operation.DelegateCall,
+            "MultisigScript::_toDelegateCall3: Operation must be DelegateCall"
+        );
+        require(call.value == 0, "MultisigScript::_toDelegateCall3: Value must be 0");
+
+        return CBMulticall.Call3({target: call.target, allowFailure: false, callData: call.data});
+    }
+
+    /// @notice Converts the given calls to the format expected by the `aggregate3` function.
+    ///
+    /// @param calls The calls to get the call3 values for.
+    ///
+    /// @return The calls in the format expected by the `aggregate3` function.
+    function _toCall3s(Call[] memory calls) internal pure returns (CBMulticall.Call3[] memory) {
+        CBMulticall.Call3[] memory call3s = new CBMulticall.Call3[](calls.length);
+        for (uint256 i; i < calls.length; i++) {
+            call3s[i] = _toCall3(calls[i]);
+        }
+
+        return call3s;
+    }
+
+    /// @notice Converts the given calls to the format expected by the `aggregate3Value` function.
+    ///
+    /// @param calls The calls to get the call3 values for.
+    ///
+    /// @return The calls in the format expected by the `aggregate3` function.
+    function _toCall3Values(Call[] memory calls) internal pure returns (CBMulticall.Call3Value[] memory) {
+        CBMulticall.Call3Value[] memory call3Values = new CBMulticall.Call3Value[](calls.length);
+        for (uint256 i; i < calls.length; i++) {
+            call3Values[i] = _toCall3Value(calls[i]);
+        }
+
+        return call3Values;
+    }
+
+    /// @notice Converts the given calls to the format expected by the `aggregateDelegateCalls` function.
+    ///
+    /// @param calls The calls to get the call3 values for.
+    ///
+    /// @return The calls in the format expected by the `aggregateDelegateCalls` function.
+    function _toDelegateCall3s(Call[] memory calls) internal pure returns (CBMulticall.Call3[] memory) {
+        CBMulticall.Call3[] memory delegateCall3s = new CBMulticall.Call3[](calls.length);
+        for (uint256 i; i < calls.length; i++) {
+            delegateCall3s[i] = _toDelegateCall3(calls[i]);
+        }
+
+        return delegateCall3s;
+    }
+
+    /// @notice Wraps the given address in an array of one address.
+    ///
+    /// @param addr The address to wrap.
+    ///
+    /// @return The address wrapped in an array of one address.
     function _toArray(address addr) internal pure returns (address[] memory) {
         address[] memory array = new address[](1);
         array[0] = addr;
         return array;
-    }
-
-    function _toArray(address address1, address address2) internal pure returns (address[] memory) {
-        address[] memory array = new address[](2);
-        array[0] = address1;
-        array[1] = address2;
-        return array;
-    }
-
-    function _getOperation(uint256 value) private view returns (Enum.Operation) {
-        if (multicallAddress == CB_MULTICALL || value == 0) {
-            return Enum.Operation.DelegateCall;
-        }
-
-        return Enum.Operation.Call;
     }
 }
