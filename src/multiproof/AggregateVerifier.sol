@@ -23,8 +23,7 @@ import "./Errors.sol";
 // Interfaces
 import { GameStatus, IDisputeGame, IDisputeGameFactory } from "optimism/src/dispute/AnchorStateRegistry.sol";
 import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
-import {ITEEVerifier} from "./interfaces/ITEEVerifier.sol";
-import {IZKVerifier} from "./interfaces/IZKVerifier.sol";
+import {IVerifier} from "./interfaces/IVerifier.sol";
 
 contract AggregateVerifier is Clone, IDisputeGame {
     ////////////////////////////////////////////////////////////////
@@ -88,10 +87,10 @@ contract AggregateVerifier is Clone, IDisputeGame {
     IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
 
     /// @notice The TEE prover.
-    ITEEVerifier public immutable TEE_VERIFIER;
+    IVerifier public immutable TEE_VERIFIER;
 
     /// @notice The ZK prover.
-    IZKVerifier public immutable ZK_VERIFIER;
+    IVerifier public immutable ZK_VERIFIER;
 
     /// @notice The address that can submit a TEE proof.
     address public immutable TEE_PROPOSER;
@@ -140,8 +139,8 @@ contract AggregateVerifier is Clone, IDisputeGame {
     constructor(
         GameType _gameType,
         IAnchorStateRegistry _anchorStateRegistry,
-        ITEEVerifier _teeVerifier,
-        IZKVerifier _zkVerifier,
+        IVerifier _teeVerifier,
+        IVerifier _zkVerifier,
         address _teeProposer,
         uint256 _l2ChainId,
         uint256 _blockInterval

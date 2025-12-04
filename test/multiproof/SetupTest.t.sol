@@ -4,12 +4,10 @@ pragma solidity ^0.8.0;
 import { Test, console2 } from "forge-std/Test.sol";
 import { AggregateVerifier, IAnchorStateRegistry } from "src/AggregateVerifier.sol";
 
-import {ITEEVerifier} from "src/interfaces/ITEEVerifier.sol";
-import {IZKVerifier} from "src/interfaces/IZKVerifier.sol";
+import {IVerifier} from "src/interfaces/IVerifier.sol";
 
 // Mocks
-import { MockTEEVerifier } from "src/mocks/MockTEEVerifier.sol";
-import { MockZKVerifier } from "src/mocks/MockZKVerifier.sol";
+import { MockVerifier } from "src/mocks/MockVerifier.sol";
 import { MockSystemConfig } from "src/mocks/MockSystemConfig.sol";
 
 // Optimism
@@ -42,8 +40,8 @@ contract SetupTest is Test {
     DisputeGameFactory public factory;
     AnchorStateRegistry public anchorStateRegistry;
 
-    MockTEEVerifier public teeVerifier;
-    MockZKVerifier public zkVerifier;
+    MockVerifier public teeVerifier;
+    MockVerifier public zkVerifier;
 
     function setUp() public virtual {
         _deployContractsAndProxies();
@@ -85,8 +83,8 @@ contract SetupTest is Test {
         factory = DisputeGameFactory(address(factoryProxy));
 
         // Deploy the verifiers
-        teeVerifier = new MockTEEVerifier();
-        zkVerifier = new MockZKVerifier();
+        teeVerifier = new MockVerifier();
+        zkVerifier = new MockVerifier();
     }
 
     function _initializeProxies() internal {
@@ -101,8 +99,8 @@ contract SetupTest is Test {
         AggregateVerifier aggregateVerifierImpl = new AggregateVerifier(
             AGGREGATE_VERIFIER_GAME_TYPE,
             IAnchorStateRegistry(address(anchorStateRegistry)),
-            ITEEVerifier(address(teeVerifier)),
-            IZKVerifier(address(zkVerifier)),
+            IVerifier(address(teeVerifier)),
+            IVerifier(address(zkVerifier)),
             TEE_PROVER,
             L2_CHAIN_ID,
             BLOCK_INTERVAL
