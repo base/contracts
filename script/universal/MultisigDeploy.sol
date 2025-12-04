@@ -133,7 +133,7 @@ contract MultisigDeployScript is Script {
             console.log("  Salt Nonce:", saltNonce);
 
             // Resolve owner addresses (combine direct owners + referenced safe addresses)
-            address[] memory resolvedOwners = _resolveOwnerAddresses({config: config, safeWallets: safes});
+            address[] memory resolvedOwners = _resolveOwnerAddresses({config: config});
 
             console.log("  Total Owners:", resolvedOwners.length);
             console.log("  Direct Owners:", config.owners.length);
@@ -185,11 +185,7 @@ contract MultisigDeployScript is Script {
         }
     }
 
-    function _resolveOwnerAddresses(SafeWallet memory config, SafeWallet[] memory safeWallets)
-        internal
-        view
-        returns (address[] memory)
-    {
+    function _resolveOwnerAddresses(SafeWallet memory config) internal view returns (address[] memory) {
         uint256 totalOwners = config.owners.length + config.ownerRefIndices.length;
         address[] memory resolved = new address[](totalOwners);
 
@@ -201,7 +197,7 @@ contract MultisigDeployScript is Script {
         // Add referenced safe addresses (they must already be deployed due to array order)
         for (uint256 i; i < config.ownerRefIndices.length; i++) {
             uint256 refIndex = config.ownerRefIndices[i];
-            string memory refLabel = safeWallets[refIndex].label;
+            string memory refLabel = safes[refIndex].label;
             address refAddr = deployedSafes[refLabel];
             require(refAddr != address(0), string(abi.encodePacked("Reference not deployed: ", refLabel)));
             resolved[config.owners.length + i] = refAddr;

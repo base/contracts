@@ -4,7 +4,8 @@ pragma solidity 0.8.15;
 import {Vm} from "lib/forge-std/src/Vm.sol";
 import {SystemConfig} from "lib/optimism/packages/contracts-bedrock/src/L1/SystemConfig.sol";
 
-import {MultisigScript, IMulticall3, Simulation} from "../../universal/MultisigScript.sol";
+import {Enum} from "../../universal/IGnosisSafe.sol";
+import {MultisigScript, Simulation} from "../../universal/MultisigScript.sol";
 
 /// @title SetGasLimit
 ///
@@ -34,13 +35,13 @@ contract SetGasLimit is MultisigScript {
         assert(SystemConfig(L1_SYSTEM_CONFIG).gasLimit() == _toGasLimit());
     }
 
-    function _buildCalls() internal view override returns (IMulticall3.Call3Value[] memory) {
-        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
+    function _buildCalls() internal view override returns (Call[] memory) {
+        Call[] memory calls = new Call[](1);
 
-        calls[0] = IMulticall3.Call3Value({
+        calls[0] = Call({
+            operation: Enum.Operation.Call,
             target: L1_SYSTEM_CONFIG,
-            allowFailure: false,
-            callData: abi.encodeCall(SystemConfig.setGasLimit, (_toGasLimit())),
+            data: abi.encodeCall(SystemConfig.setGasLimit, (_toGasLimit())),
             value: 0
         });
 
