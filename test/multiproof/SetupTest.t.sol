@@ -1,0 +1,117 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import { Test, console2 } from "forge-std/Test.sol";
+import { AggregateVerifier, IAnchorStateRegistry } from "src/AggregateVerifier.sol";
+
+import {ITEEVerifier} from "src/interfaces/ITEEVerifier.sol";
+import {IZKVerifier} from "src/interfaces/IZKVerifier.sol";
+
+// Mocks
+import { MockTEEVerifier } from "src/mocks/MockTEEVerifier.sol";
+import { MockZKVerifier } from "src/mocks/MockZKVerifier.sol";
+import { MockSystemConfig } from "src/mocks/MockSystemConfig.sol";
+
+// Optimism
+import { IDisputeGame, DisputeGameFactory } from "optimism/src/dispute/DisputeGameFactory.sol";
+import { GameType, Duration, Claim } from "optimism/src/dispute/lib/Types.sol";
+import { ISystemConfig, IDisputeGameFactory, Hash, Proposal, AnchorStateRegistry } from "optimism/src/dispute/AnchorStateRegistry.sol";
+
+// OpenZeppelin
+import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+contract SetupTest is Test {
+    // Constants
+    GameType public constant AGGREGATE_VERIFIER_GAME_TYPE = GameType.wrap(621);
+    uint256 public constant L2_CHAIN_ID = 8453;
+    uint256 public constant BLOCK_INTERVAL = 100;
+    uint256 public constant INIT_BOND = 1 ether;
+    // Finality delay handled by the AggregateVerifier
+    uint256 public constant FINALITY_DELAY = 0 days;
+
+    uint256 public currentL2BlockNumber = 0;
+
+    address public immutable TEE_PROVER = makeAddr("tee-prover");
+    address public immutable ZK_PROVER = makeAddr("zk-prover");
+    address public immutable ATTACKER = makeAddr("attacker");
+
+    ProxyAdmin public proxyAdmin;
+    MockSystemConfig public systemConfig;
+
+    DisputeGameFactory public factory;
+    AnchorStateRegistry public anchorStateRegistry;
+
+    MockTEEVerifier public teeVerifier;
+    MockZKVerifier public zkVerifier;
+
+    function setUp() public virtual {
+        _deployContractsAndProxies();
+        _initializeProxies();
+
+        // Deploy the implementations
+        _deployAndSetAggregateVerifier();
+
+        // Set the timestamp to after the retirement timestamp
+        vm.warp(block.timestamp + 1);
+    }
+
+    function _deployContractsAndProxies() internal {
+        // Deploy the system config
+        systemConfig = new MockSystemConfig();
+
+        // Deploy the relay anchor state registry
+        AnchorStateRegistry _anchorStateRegistry = new AnchorStateRegistry(FINALITY_DELAY);
+        // Deploy the dispute game factory
+        DisputeGameFactory _factory = new DisputeGameFactory();
+
+        // Deploy proxy admin
+        proxyAdmin = new ProxyAdmin();
+
+        // Deploy proxy for anchor state registry
+        TransparentUpgradeableProxy anchorStateRegistryProxy = new TransparentUpgradeableProxy(
+            address(_anchorStateRegistry),
+            address(proxyAdmin),
+            ""
+        );
+        anchorStateRegistry = AnchorStateRegistry(address(anchorStateRegistryProxy));
+        
+        // Deploy proxy for factory
+        TransparentUpgradeableProxy factoryProxy = new TransparentUpgradeableProxy(
+            address(_factory),
+            address(proxyAdmin),
+            ""
+        );
+        factory = DisputeGameFactory(address(factoryProxy));
+
+        // Deploy the verifiers
+        teeVerifier = new MockTEEVerifier();
+        zkVerifier = new MockZKVerifier();
+    }
+
+    function _initializeProxies() internal {
+        // Initialize the proxies
+        anchorStateRegistry.initialize(ISystemConfig(address(systemConfig)), IDisputeGameFactory(address(factory)), Proposal({root: Hash.wrap(keccak256(abi.encode(currentL2BlockNumber))), l2SequenceNumber: currentL2BlockNumber}), GameType.wrap(0));
+        factory.initialize(address(this));
+    }
+
+    function _deployAndSetAggregateVerifier() internal {
+
+        // Deploy the dispute game relay implementation
+        AggregateVerifier aggregateVerifierImpl = new AggregateVerifier(
+            AGGREGATE_VERIFIER_GAME_TYPE,
+            IAnchorStateRegistry(address(anchorStateRegistry)),
+            ITEEVerifier(address(teeVerifier)),
+            IZKVerifier(address(zkVerifier)),
+            TEE_PROVER,
+            L2_CHAIN_ID,
+            BLOCK_INTERVAL
+        );
+
+        // Set the implementation for the aggregate verifier
+        factory.setImplementation(AGGREGATE_VERIFIER_GAME_TYPE, IDisputeGame(address(aggregateVerifierImpl)));
+
+        // Set the bond amount for the aggregate verifier
+        factory.setInitBond(AGGREGATE_VERIFIER_GAME_TYPE, INIT_BOND);
+    }
+}
