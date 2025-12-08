@@ -113,9 +113,9 @@ contract AggregateVerifierTest is SetupTest {
     function _provideProof(AggregateVerifier game, address prover, bool isTeeProof, bytes memory proof) internal {
         vm.prank(prover);
         if (isTeeProof) {
-            game.verifyTeeProof(proof);
+            game.verifyProof(proof, AggregateVerifier.ProofType.TEE);
         } else {
-            game.verifyZkProof(proof);
+            game.verifyProof(proof, AggregateVerifier.ProofType.ZK);
         }
     }
 }

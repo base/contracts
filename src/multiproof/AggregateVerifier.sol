@@ -253,68 +253,56 @@ contract AggregateVerifier is Clone, IDisputeGame {
     //                    Proving Methods                         //
     ////////////////////////////////////////////////////////////////
 
-    /// @notice Verifies a TEE proof for the current game.
-    /// @param proofBytes The proof bytes.
-    function verifyTeeProof(bytes calldata proofBytes) external {
-        // The caller must be the TEE proposer.
-        if (msg.sender != TEE_PROPOSER) revert NotAuthorized();
+    function verifyProof(bytes calldata proofBytes, ProofType proofType) external {
+        // The game must not be over.
+        if (gameOver()) revert GameOver();
 
-        // Verify the proof.
-        _verifyTeeProof(proofBytes, msg.sender);
+        if (proofType == ProofType.TEE) {
+            if (msg.sender != TEE_PROPOSER) revert NotAuthorized();
+            _verifyTeeProof(proofBytes);
+        } else if (proofType == ProofType.ZK) {
+            _verifyZkProof(proofBytes);
+        }
+        else {
+            revert InvalidProofType();
+        }
+
+        provingData.lastProvedAt = Timestamp.wrap(uint64(block.timestamp));
+
+        // Emit the proved event.
+        emit Proved(msg.sender, proofType);
     }
 
     /// @notice Verifies a TEE proof for the current game.
     /// @param proofBytes The proof bytes.
-    /// @param prover The address of the prover.
-    function _verifyTeeProof(bytes memory proofBytes, address prover) internal {
+    function _verifyTeeProof(bytes memory proofBytes) internal {
         // Only one TEE proof can be submitted.
         if (provingData.teeProver != address(0)) revert AlreadyProven();
 
         // The game must be in progress.
         if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
 
-        // The game must not be over.
-        if (gameOver()) revert GameOver();
-
         // Validate the proof.
         if (!TEE_VERIFIER.verify(proofBytes, rootClaim(), l2SequenceNumber())) revert InvalidProof();
 
         // Update proving data.
-        provingData.teeProver = prover;
-        provingData.lastProvedAt = Timestamp.wrap(uint64(block.timestamp));
-
-        // Emit the proved event.
-        emit Proved(prover, ProofType.TEE);
+        provingData.teeProver = msg.sender;
     }
 
     /// @notice Verifies a ZK proof for the current game.
     /// @param proofBytes The proof bytes.
-    function verifyZkProof(bytes calldata proofBytes) external {
-        _verifyZkProof(proofBytes, msg.sender);
-    }
-
-    /// @notice Verifies a ZK proof for the current game.
-    /// @param proofBytes The proof bytes.
-    /// @param prover The address of the prover.
-    function _verifyZkProof(bytes memory proofBytes, address prover) internal {
+    function _verifyZkProof(bytes memory proofBytes) internal {
         // Only one ZK proof can be submitted.
         if (provingData.zkProver != address(0)) revert AlreadyProven();
 
         // The game must be in progress or challenged (to allow nullification).
         if (status == GameStatus.DEFENDER_WINS) revert ClaimAlreadyResolved();
 
-        // The game must not be over.
-        if (gameOver()) revert GameOver();
-
         // Validate the proof.
         if (!ZK_VERIFIER.verify(proofBytes, rootClaim(), l2SequenceNumber())) revert InvalidProof();
 
         // Update proving data.
-        provingData.zkProver = prover;
-        provingData.lastProvedAt = Timestamp.wrap(uint64(block.timestamp));
-
-        // Emit the proved event.
-        emit Proved(prover, ProofType.ZK);
+        provingData.zkProver = msg.sender;
     }
 
     /// @notice Resolves the game after enough time has passed.
