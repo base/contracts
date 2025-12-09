@@ -299,6 +299,9 @@ contract AggregateVerifier is Clone, IDisputeGame {
 
         // Update proving data.
         provingData.zkProver = msg.sender;
+
+        // Bond can be reclaimed after a ZK proof is provided.
+        bondRecipient = gameCreator();
     }
 
     /// @notice Resolves the game after enough time has passed.
