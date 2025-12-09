@@ -16,6 +16,8 @@ import { GameStatus, IDisputeGame, IDisputeGameFactory } from "optimism/src/disp
 import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
 import {IVerifier} from "./interfaces/IVerifier.sol";
 
+import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
+
 contract AggregateVerifier is Clone, IDisputeGame {
     ////////////////////////////////////////////////////////////////
     //                         Enums                              //
@@ -35,12 +37,12 @@ contract AggregateVerifier is Clone, IDisputeGame {
     /// @param counteredByGameAddress The address of the game that countered this game.
     /// @param teeProver The address that provided a TEE proof.
     /// @param zkProver The address that provided a ZK proof.
-    /// @param lastProvedAt The timestamp of the last provided proof.
+    /// @param expectedResolution The timestamp of the game's expected resolution.
     struct ProvingData {
         address counteredByGameAddress;
         address teeProver;
         address zkProver;
-        Timestamp lastProvedAt;
+        Timestamp expectedResolution;
     }
 
     ////////////////////////////////////////////////////////////////
@@ -66,10 +68,10 @@ contract AggregateVerifier is Clone, IDisputeGame {
     //                         State Vars                         //
     ////////////////////////////////////////////////////////////////
     /// @notice The slow finalization delay.
-    uint256 public constant SLOW_FINALIZATION_DELAY = 7 days;
+    uint64 public constant SLOW_FINALIZATION_DELAY = 7 days;
 
     /// @notice The fast finalization delay.
-    uint256 public constant FAST_FINALIZATION_DELAY = 1 days;
+    uint64 public constant FAST_FINALIZATION_DELAY = 1 days;
 
     /// @notice The anchor state registry.
     IAnchorStateRegistry internal immutable ANCHOR_STATE_REGISTRY;
@@ -212,6 +214,9 @@ contract AggregateVerifier is Clone, IDisputeGame {
         // Set the game's starting timestamp
         createdAt = Timestamp.wrap(uint64(block.timestamp));
 
+        // Game cannot resolve without a proof
+        provingData.expectedResolution = Timestamp.wrap(type(uint64).max);
+
         wasRespectedGameTypeWhenCreated =
             GameType.unwrap(ANCHOR_STATE_REGISTRY.respectedGameType()) == GameType.unwrap(GAME_TYPE);
     }
@@ -258,7 +263,7 @@ contract AggregateVerifier is Clone, IDisputeGame {
             revert InvalidProofType();
         }
 
-        provingData.lastProvedAt = Timestamp.wrap(uint64(block.timestamp));
+        _updateExpectedResolution();
 
         // Emit the proved event.
         emit Proved(msg.sender, proofType);
@@ -476,13 +481,19 @@ contract AggregateVerifier is Clone, IDisputeGame {
 
     /// @notice Determines if the game is finished.
     function gameOver() public view returns (bool) {
+        return provingData.expectedResolution.raw() <= block.timestamp;
+    }
+
+    function _updateExpectedResolution() internal {
+        uint64 newResolution = uint64(block.timestamp);
         if (provingData.teeProver != address(0) && provingData.zkProver != address(0)) {
-            return provingData.lastProvedAt.raw() + FAST_FINALIZATION_DELAY < uint64(block.timestamp);
+            newResolution += FAST_FINALIZATION_DELAY;
         } else if (provingData.teeProver != address(0) || provingData.zkProver != address(0)) {
-            return provingData.lastProvedAt.raw() + SLOW_FINALIZATION_DELAY < uint64(block.timestamp);
-        } 
-        // No proof was provided so don't view the game as over.
-        return false;
+            newResolution += SLOW_FINALIZATION_DELAY;
+        } else {
+            revert NoProofProvided();
+        }
+        provingData.expectedResolution = Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, provingData.expectedResolution.raw())));
     }
 
     /// @notice Getter for the game type.
