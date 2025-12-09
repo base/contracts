@@ -1,25 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import "test/SetupTest.t.sol";
-import {GameStatus, Timestamp, AggregateVerifier} from "src/AggregateVerifier.sol";
-import {
-    MissingTEEProof,
-    MissingZKProof,
-    IncorrectRootClaim,
-    IncorrectBlockNumber,
-    IncorrectParentIndex,
-    NotAuthorized
-} from "src/Errors.sol";
+import "test/BaseTest.t.sol";
 
-// Optimism
-import { ClaimAlreadyResolved, GameAlreadyExists } from "optimism/src/dispute/lib/Errors.sol";
-
-contract AggregateVerifierTest is SetupTest {
-    function setUp() public override {
-        super.setUp();
-        anchorStateRegistry.setRespectedGameType(AGGREGATE_VERIFIER_GAME_TYPE);
-    }
+contract AggregateVerifierTest is BaseTest {
 
     function testInitializeWithTEEProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
@@ -89,33 +73,30 @@ contract AggregateVerifierTest is SetupTest {
         _provideProof(game, ZK_PROVER, true, proof);
     }
 
-    // Helper function to create a game via factory
-    function _createAggregateVerifierGame(
-        address creator,
-        Claim rootClaim,
-        uint256 l2BlockNumber,
-        uint32 parentIndex
-    ) internal returns (AggregateVerifier game) {
-        bytes memory extraData = abi.encodePacked(
-            uint256(l2BlockNumber),
-            uint32(parentIndex)
-        );
+    function testUpdatingAnchorStateRegistryWithTEEProof() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
+        bytes memory proof = "tee-proof";
         
-        vm.deal(creator, INIT_BOND);
-        vm.prank(creator);
-        return AggregateVerifier(address(factory.create{value: INIT_BOND}(
-            AGGREGATE_VERIFIER_GAME_TYPE,
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER,
             rootClaim,
-            extraData
-        )));
-    }
+            currentL2BlockNumber,
+            type(uint32).max
+        );
 
-    function _provideProof(AggregateVerifier game, address prover, bool isTeeProof, bytes memory proof) internal {
-        vm.prank(prover);
-        if (isTeeProof) {
-            game.verifyProof(proof, AggregateVerifier.ProofType.TEE);
-        } else {
-            game.verifyProof(proof, AggregateVerifier.ProofType.ZK);
-        }
+        _provideProof(game, TEE_PROVER, true, proof);
+        
+        // Resolve after 7 days
+        vm.warp(block.timestamp + 7 days + 1);
+        game.resolve();
+        assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
+
+        // Update AnchorStateRegistry
+        vm.warp(block.timestamp + 1);
+        game.closeGame();
+        (Hash root, uint256 l2SequenceNumber) = anchorStateRegistry.getAnchorRoot();
+        assertEq(root.raw(), rootClaim.raw());
+        assertEq(l2SequenceNumber, currentL2BlockNumber);
     }
 }

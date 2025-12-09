@@ -9,15 +9,6 @@ import {
     Proposal,
     Timestamp
 } from "optimism/src/dispute/lib/Types.sol";
-import {
-    AlreadyInitialized,
-    ClaimAlreadyResolved,
-    NoCreditToClaim,
-    BondTransferFailed,
-    GamePaused,
-    GameNotResolved,
-    GameNotFinalized
-} from "optimism/src/dispute/lib/Errors.sol";
 import "./Errors.sol";
 
 // Interfaces

@@ -2,9 +2,9 @@
 pragma solidity 0.8.15;
 
 
-import "test/AggregateVerifier.t.sol";
+import "test/BaseTest.t.sol";
 
-contract NullifyTest is AggregateVerifierTest {
+contract NullifyTest is BaseTest {
 
     function testNullifyWithTEEProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;

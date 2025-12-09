@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import "test/AggregateVerifier.t.sol";
+import "test/BaseTest.t.sol";
 
-contract ChallengeTest is AggregateVerifierTest {
+contract ChallengeTest is BaseTest {
 
     function testChallengeTEEProofWithZKProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;

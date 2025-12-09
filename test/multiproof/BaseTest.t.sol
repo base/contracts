@@ -2,7 +2,8 @@
 pragma solidity ^0.8.0;
 
 import { Test, console2 } from "forge-std/Test.sol";
-import { AggregateVerifier, IAnchorStateRegistry } from "src/AggregateVerifier.sol";
+import "src/AggregateVerifier.sol";
+import "src/Errors.sol";
 
 import {IVerifier} from "src/interfaces/IVerifier.sol";
 
@@ -19,7 +20,7 @@ import { ISystemConfig, IDisputeGameFactory, Hash, Proposal, AnchorStateRegistry
 import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-contract SetupTest is Test {
+contract BaseTest is Test {
     // Constants
     GameType public constant AGGREGATE_VERIFIER_GAME_TYPE = GameType.wrap(621);
     uint256 public constant L2_CHAIN_ID = 8453;
@@ -49,6 +50,8 @@ contract SetupTest is Test {
 
         // Deploy the implementations
         _deployAndSetAggregateVerifier();
+
+        anchorStateRegistry.setRespectedGameType(AGGREGATE_VERIFIER_GAME_TYPE);
 
         // Set the timestamp to after the retirement timestamp
         vm.warp(block.timestamp + 1);
@@ -111,5 +114,35 @@ contract SetupTest is Test {
 
         // Set the bond amount for the aggregate verifier
         factory.setInitBond(AGGREGATE_VERIFIER_GAME_TYPE, INIT_BOND);
+    }
+
+    // Helper function to create a game via factory
+    function _createAggregateVerifierGame(
+        address creator,
+        Claim rootClaim,
+        uint256 l2BlockNumber,
+        uint32 parentIndex
+    ) internal returns (AggregateVerifier game) {
+        bytes memory extraData = abi.encodePacked(
+            uint256(l2BlockNumber),
+            uint32(parentIndex)
+        );
+        
+        vm.deal(creator, INIT_BOND);
+        vm.prank(creator);
+        return AggregateVerifier(address(factory.create{value: INIT_BOND}(
+            AGGREGATE_VERIFIER_GAME_TYPE,
+            rootClaim,
+            extraData
+        )));
+    }
+
+    function _provideProof(AggregateVerifier game, address prover, bool isTeeProof, bytes memory proof) internal {
+        vm.prank(prover);
+        if (isTeeProof) {
+            game.verifyProof(proof, AggregateVerifier.ProofType.TEE);
+        } else {
+            game.verifyProof(proof, AggregateVerifier.ProofType.ZK);
+        }
     }
 }
