@@ -46,12 +46,11 @@ contract ChallengeTest is BaseTest {
         assertEq(counteredBy, address(game2));
 
         // Retrieve bond after challenge
-        vm.warp(block.timestamp + 7 days + 1);
+        vm.warp(block.timestamp + 7 days);
         game2.resolve();
         assertEq(uint8(game2.status()), uint8(GameStatus.DEFENDER_WINS));
         assertEq(ZK_PROVER.balance, 0);
         assertEq(address(game1).balance, INIT_BOND);
-        vm.prank(ZK_PROVER);
         game1.claimCredit();
         assertEq(ZK_PROVER.balance, INIT_BOND);
         assertEq(address(game1).balance, 0);

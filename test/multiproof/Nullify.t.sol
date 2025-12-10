@@ -70,7 +70,7 @@ contract NullifyTest is BaseTest {
         assertEq(game1.bondRecipient(), ZK_PROVER);
     }
 
-    function testNullifyFailsIfNoTEEProof() public {
+    function testTEENullifyFailsIfNoTEEProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk1")));
@@ -100,7 +100,7 @@ contract NullifyTest is BaseTest {
         game1.nullify(gameIndex, AggregateVerifier.ProofType.TEE);
     }
 
-    function testNullifyFailsIfNoZKProof() public {
+    function testZKNullifyFailsIfNoZKProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee1")));
@@ -140,7 +140,7 @@ contract NullifyTest is BaseTest {
         _provideProof(game1, TEE_PROVER, true, teeProof1);
 
         // Resolve game1
-        vm.warp(block.timestamp + 7 days + 1);
+        vm.warp(block.timestamp + 7 days);
         game1.resolve();
         
         // Try to nullify game1
