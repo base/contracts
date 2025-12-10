@@ -251,8 +251,8 @@ library Config {
         return vm.envOr("DEV_FEATURE__DEPLOY_V2_DISPUTE_GAMES", false);
     }
 
-    /// @notice Returns true if the development feature custom gas token is enabled.
-    function devFeatureCustomGasToken() internal view returns (bool) {
-        return vm.envOr("DEV_FEATURE__CUSTOM_GAS_TOKEN", false);
+    /// @notice Returns true if the system feature custom_gas_token is enabled.
+    function sysFeatureCustomGasToken() internal view returns (bool) {
+        return vm.envOr("SYS_FEATURE__CUSTOM_GAS_TOKEN", false);
     }
 }
