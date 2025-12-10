@@ -193,6 +193,9 @@ contract AggregateVerifier is Clone, IDisputeGame {
             // The parent game must be a valid game.
             if (parentGame.status() == GameStatus.CHALLENGER_WINS) revert InvalidParentGame();
 
+            // The parent game must have a proof.
+            if (AggregateVerifier(address(parentGame)).teeProver() == address(0) && AggregateVerifier(address(parentGame)).zkProver() == address(0)) revert InvalidParentGame();
+
             startingOutputRoot = Proposal({
                 l2SequenceNumber: parentGame.l2SequenceNumber(),
                 root: Hash.wrap(parentGame.rootClaim().raw())

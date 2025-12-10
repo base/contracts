@@ -213,4 +213,41 @@ contract AggregateVerifierTest is BaseTest {
         game.resolve();
         assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
     }
+
+    function testParentGameMustHaveAProof() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
+        bytes memory proof = "tee-proof";
+        
+        AggregateVerifier parentGame = _createAggregateVerifierGame(
+            TEE_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            type(uint32).max
+        );
+
+        uint256 parentGameIndex = factory.gameCount() - 1;
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        Claim rootClaimChild = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
+
+        // Cannot create a child game without a proof for the parent
+        vm.expectRevert(InvalidParentGame.selector);
+        _createAggregateVerifierGame(
+            TEE_PROVER,
+            rootClaimChild,
+            currentL2BlockNumber,
+            uint32(parentGameIndex)
+        );
+
+        // Provide proof for the parent game
+        _provideProof(parentGame, TEE_PROVER, true, proof);
+        
+        // Create the child game
+        AggregateVerifier childGame = _createAggregateVerifierGame(
+            TEE_PROVER,
+            rootClaimChild,
+            currentL2BlockNumber,
+            uint32(parentGameIndex)
+        );
+    }
 }
