@@ -421,6 +421,8 @@ contract AggregateVerifier is Clone, IDisputeGame {
         status = GameStatus.CHALLENGER_WINS;
         // Refund the bond. This can override a challenge.
         bondRecipient = gameCreator();
+        // To allow bond to be claimed in case challenging game is nullified
+        delete provingData.counteredByGameAddress;
 
         emit Nullified(msg.sender, game);
     }

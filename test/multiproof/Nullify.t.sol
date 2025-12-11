@@ -36,6 +36,11 @@ contract NullifyTest is BaseTest {
     
         assertEq(uint8(game1.status()), uint8(GameStatus.CHALLENGER_WINS));
         assertEq(game1.bondRecipient(), TEE_PROVER);
+
+        uint256 balanceBefore = game1.gameCreator().balance;
+        game1.claimCredit();
+        assertEq(game1.gameCreator().balance, balanceBefore + INIT_BOND);
+        assertEq(address(game1).balance, 0);
     }
 
     function testNullifyWithZKProof() public {
@@ -68,6 +73,11 @@ contract NullifyTest is BaseTest {
 
         assertEq(uint8(game1.status()), uint8(GameStatus.CHALLENGER_WINS));
         assertEq(game1.bondRecipient(), ZK_PROVER);
+
+        uint256 balanceBefore = game1.gameCreator().balance;
+        game1.claimCredit();
+        assertEq(game1.gameCreator().balance, balanceBefore + INIT_BOND);
+        assertEq(address(game1).balance, 0);
     }
 
     function testTEENullifyFailsIfNoTEEProof() public {
@@ -194,5 +204,10 @@ contract NullifyTest is BaseTest {
         game1.nullify(challengeIndex, AggregateVerifier.ProofType.ZK);
         
         assertEq(game1.bondRecipient(), TEE_PROVER);
+
+        uint256 balanceBefore = game1.gameCreator().balance;
+        game1.claimCredit();
+        assertEq(game1.gameCreator().balance, balanceBefore + INIT_BOND);
+        assertEq(address(game1).balance, 0);
     }
 }
