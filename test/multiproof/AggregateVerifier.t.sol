@@ -243,7 +243,7 @@ contract AggregateVerifierTest is BaseTest {
         _provideProof(parentGame, TEE_PROVER, true, proof);
         
         // Create the child game
-        AggregateVerifier childGame = _createAggregateVerifierGame(
+        _createAggregateVerifierGame(
             TEE_PROVER,
             rootClaimChild,
             currentL2BlockNumber,

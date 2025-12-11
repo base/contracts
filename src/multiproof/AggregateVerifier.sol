@@ -274,7 +274,7 @@ contract AggregateVerifier is Clone, IDisputeGame {
 
     /// @notice Verifies a TEE proof for the current game.
     /// @param proofBytes The proof bytes.
-    function _verifyTeeProof(bytes memory proofBytes) internal {
+    function _verifyTeeProof(bytes calldata proofBytes) internal {
         // Only one TEE proof can be submitted.
         if (provingData.teeProver != address(0)) revert AlreadyProven();
 
@@ -290,7 +290,7 @@ contract AggregateVerifier is Clone, IDisputeGame {
 
     /// @notice Verifies a ZK proof for the current game.
     /// @param proofBytes The proof bytes.
-    function _verifyZkProof(bytes memory proofBytes) internal {
+    function _verifyZkProof(bytes calldata proofBytes) internal {
         // Only one ZK proof can be submitted.
         if (provingData.zkProver != address(0)) revert AlreadyProven();
 
