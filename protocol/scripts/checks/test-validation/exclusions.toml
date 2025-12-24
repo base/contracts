@@ -18,6 +18,7 @@
 src_validation = [
     "test/invariants/",                    # Invariant testing framework - no direct src counterpart
     "test/opcm/",                          # OP Chain Manager tests - may have different structure
+    "test/L1/opcm/",                       # OP Chain Manager tests in L1 directory - may have different structure
     "test/scripts/",                       # Script tests - test deployment/utility scripts, not contracts
     "test/integration/",                   # Integration tests - test multiple contracts together
     "test/cannon/MIPS64Memory.t.sol",      # Tests external MIPS implementation
@@ -85,6 +86,7 @@ function_name_validation = [
     "test/safe/SafeSigners.t.sol",             # Function name validation issues
     "test/libraries/Predeploys.t.sol",         # Function 'uncategorizedInterop' doesn't exist in library
     "test/libraries/TransientContext.t.sol",   # Function 'reentrantAware' doesn't exist in library
+    "test/libraries/Encoding.t.sol",           # Function 'decodeSuperRootProof' is internal, not in ABI
 ]
 
 [excluded_tests]
@@ -99,4 +101,5 @@ contracts = [
     "Constants_Test",                           # Invalid naming pattern - doesn't specify function or Uncategorized
     "LivenessModule2_TestUtils",                # Test utils library in LivenessModule2 test file
     "L1Block_SetCustomGasToken_Test",           # Custom gas token tests hosted in the L1Block test file
+    "OPContractsManagerV2_Upgrade_TestInit",    # Test initialization contract with non-standard naming pattern (4 parts instead of 3)
 ]
