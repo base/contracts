@@ -32,6 +32,7 @@ src_validation = [
     "test/vendor/InitializableOZv5.t.sol", # Tests external vendor code
 	"test/L2/LegacyFeeSplitter.t.sol",     # Tests legacy fee splitter with updated vaults interface
 	"test/L2/FeeSplitterVaults.t.sol",     # Tests FeeSplitter with vault-specific scenarios using test helper
+	"test/dispute/zk/OptimisticZkGame.t.sol", # Renamed from OPSuccinctFaultDisputeGame - artifacts may reference old name
 ]
 
 # PATHS EXCLUDED FROM CONTRACT NAME FILE PATH VALIDATION:
