@@ -237,10 +237,13 @@ abstract contract MultisigScript is Script {
         }
 
         Call[] memory callsChain = _buildCallsChain({safes: safes});
+
+        vm.startMappingRecording();
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
             _simulateForSigner({safes: safes, callsChain: callsChain});
         (StateDiff.MappingParent[] memory parents, string memory json) =
             StateDiff.collectStateDiff(StateDiff.CollectStateDiffOpts({accesses: accesses, simPayload: simPayload}));
+        vm.stopMappingRecording();
 
         _postSign({accesses: accesses, simPayload: simPayload});
         _postCheck({accesses: accesses, simPayload: simPayload});
@@ -513,7 +516,7 @@ abstract contract MultisigScript is Script {
         }
 
         // Return the number of root calls appended.
-        rootCallsCount = rootCallsIndex - rootCallsIndexSaved;
+        return rootCallsIndex - rootCallsIndexSaved;
     }
 
     /// @notice Builds the approve call (`approveHash`) for the given safe and call.
@@ -547,7 +550,7 @@ abstract contract MultisigScript is Script {
     function _printDataToSign(address safe, Call memory call) internal {
         bytes memory txData = _printDataHashes()
             ? _encodeTransactionData({safe: safe, call: call})
-            : _encodeEIP712Json({safe: safe, call: call});
+            : _encodeEip712Json({safe: safe, call: call});
 
         emit DataToSign({data: txData});
 
@@ -748,7 +751,7 @@ abstract contract MultisigScript is Script {
     /// @param call The call to encode.
     ///
     /// @return The EIP-712 JSON structure as bytes.
-    function _encodeEIP712Json(address safe, Call memory call) internal returns (bytes memory) {
+    function _encodeEip712Json(address safe, Call memory call) internal returns (bytes memory) {
         // EIP-712 type definitions for Safe transaction
         string memory types = '{"EIP712Domain":[' '{"name":"chainId","type":"uint256"},'
             '{"name":"verifyingContract","type":"address"}],' '"SafeTx":[' '{"name":"to","type":"address"},'
