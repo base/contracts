@@ -229,10 +229,7 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
     function _buildSingleL2CallNoValue() internal view returns (IMulticall3.Call3Value[] memory) {
         IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
         calls[0] = IMulticall3.Call3Value({
-            target: testL2Target,
-            allowFailure: false,
-            callData: abi.encodeCall(Counter.increment, ()),
-            value: 0
+            target: testL2Target, allowFailure: false, callData: abi.encodeCall(Counter.increment, ()), value: 0
         });
         return calls;
     }
@@ -240,16 +237,10 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
     function _buildMultipleL2CallsNoValue() internal view returns (IMulticall3.Call3Value[] memory) {
         IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](3);
         calls[0] = IMulticall3.Call3Value({
-            target: testL2Target,
-            allowFailure: false,
-            callData: abi.encodeCall(Counter.increment, ()),
-            value: 0
+            target: testL2Target, allowFailure: false, callData: abi.encodeCall(Counter.increment, ()), value: 0
         });
         calls[1] = IMulticall3.Call3Value({
-            target: testL2Target,
-            allowFailure: false,
-            callData: abi.encodeCall(Counter.increment, ()),
-            value: 0
+            target: testL2Target, allowFailure: false, callData: abi.encodeCall(Counter.increment, ()), value: 0
         });
         calls[2] = IMulticall3.Call3Value({
             target: testL2Target,
