@@ -341,6 +341,13 @@ contract AggregateVerifier is Clone, IDisputeGame {
     function challenge(uint256 gameIndex) external {
         // Can only challenge a game that has not been challenged or resolved yet.
         if (status != GameStatus.IN_PROGRESS) revert ClaimAlreadyResolved();
+
+        // This game cannot be blacklisted or retired.
+        if (ANCHOR_STATE_REGISTRY.isGameBlacklisted(IDisputeGame(address(this))) || ANCHOR_STATE_REGISTRY.isGameRetired(IDisputeGame(address(this)))) revert InvalidGame();
+
+        // The parent game cannot have been challenged
+        if (getParentGameStatus() == GameStatus.CHALLENGER_WINS) revert InvalidParentGame();
+        
         // The TEE prover must not be empty. You should nullify the game if you want to challenge.
         if (provingData.teeProver == address(0)) revert MissingTEEProof();
         if (provingData.zkProver != address(0)) revert AlreadyProven();

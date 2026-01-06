@@ -216,4 +216,66 @@ contract ChallengeTest is BaseTest {
         vm.expectRevert(ClaimAlreadyResolved.selector);
         game1.challenge(challengeIndex1);
     }
+
+    function testChallengeFailsIfParentGameStatusIsChallenged() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        
+        // create parent game
+        Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee")));
+        bytes memory parentProof = "parent-proof";
+        
+        AggregateVerifier parentGame = _createAggregateVerifierGame(
+            TEE_PROVER,
+            rootClaim1,
+            currentL2BlockNumber,
+            type(uint32).max
+        );
+
+        _provideProof(parentGame, TEE_PROVER, true, parentProof);
+
+        uint256 parentGameIndex = factory.gameCount() - 1;
+        currentL2BlockNumber += BLOCK_INTERVAL;
+
+        // create child game
+        Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk")));
+        bytes memory childProof = "child-proof";
+        
+        AggregateVerifier childGame = _createAggregateVerifierGame(
+            TEE_PROVER,
+            rootClaim2,
+            currentL2BlockNumber,
+            uint32(parentGameIndex)
+        );
+
+        _provideProof(childGame, TEE_PROVER, true, childProof);
+        
+        // blacklist parent game
+        anchorStateRegistry.blacklistDisputeGame(IDisputeGame(address(parentGame)));
+
+        // challenge child game
+        uint256 childGameIndex = factory.gameCount() - 1;
+        vm.expectRevert(InvalidParentGame.selector);
+        childGame.challenge(childGameIndex);
+    }
+
+    function testChallengeFailsIfGameItselfIsBlacklisted() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee")));
+        
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            type(uint32).max
+        );
+
+        // blacklist game
+        anchorStateRegistry.blacklistDisputeGame(IDisputeGame(address(game)));
+
+        // challenge game
+        uint256 gameIndex = factory.gameCount() - 1;
+        vm.expectRevert(InvalidGame.selector);
+        game.challenge(gameIndex);
+    }
 }
