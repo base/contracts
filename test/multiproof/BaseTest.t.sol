@@ -35,6 +35,10 @@ contract BaseTest is Test {
     address public immutable ZK_PROVER = makeAddr("zk-prover");
     address public immutable ATTACKER = makeAddr("attacker");
 
+    bytes32 public immutable TEE_IMAGE_HASH = keccak256("tee-image");
+    bytes32 public immutable ZK_IMAGE_HASH = keccak256("zk-image");
+    bytes32 public immutable CONFIG_HASH = keccak256("config");
+
     ProxyAdmin public proxyAdmin;
     MockSystemConfig public systemConfig;
 
@@ -104,6 +108,9 @@ contract BaseTest is Test {
             IAnchorStateRegistry(address(anchorStateRegistry)),
             IVerifier(address(teeVerifier)),
             IVerifier(address(zkVerifier)),
+            TEE_IMAGE_HASH,
+            ZK_IMAGE_HASH,
+            CONFIG_HASH,
             TEE_PROVER,
             L2_CHAIN_ID,
             BLOCK_INTERVAL

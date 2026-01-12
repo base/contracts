@@ -4,5 +4,5 @@ pragma solidity 0.8.15;
 import { Claim } from "optimism/src/dispute/lib/Types.sol";
 
 interface IVerifier {
-    function verify(bytes calldata proofBytes, Claim rootClaim, uint256 l2SequenceNumber) external view returns (bool);
+    function verify(bytes calldata proofBytes, bytes32 journal) external view returns (bool);
 }

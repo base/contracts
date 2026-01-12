@@ -82,8 +82,17 @@ contract AggregateVerifier is Clone, IDisputeGame {
     /// @notice The TEE prover.
     IVerifier public immutable TEE_VERIFIER;
 
+    /// @notice The hash of the TEE image.
+    bytes32 public immutable TEE_IMAGE_HASH;
+
     /// @notice The ZK prover.
     IVerifier public immutable ZK_VERIFIER;
+
+    /// @notice The hash of the ZK image.
+    bytes32 public immutable ZK_IMAGE_HASH;
+
+    /// @notice The hash of the rollup configuration.
+    bytes32 public immutable CONFIG_HASH;
 
     /// @notice The address that can submit a TEE proof.
     address public immutable TEE_PROPOSER;
@@ -126,6 +135,9 @@ contract AggregateVerifier is Clone, IDisputeGame {
     /// @param _anchorStateRegistry The anchor state registry.
     /// @param _teeVerifier The TEE verifier.
     /// @param _zkVerifier The ZK verifier.
+    /// @param _teeImageHash The hash of the TEE image.
+    /// @param _zkImageHash The hash of the ZK image.
+    /// @param _configHash The hash of the rollup configuration.
     /// @param _teeProposer The address that can submit a TEE proof.
     /// @param _l2ChainId The chain ID of the L2 network.
     /// @param _blockInterval The block interval.
@@ -134,6 +146,9 @@ contract AggregateVerifier is Clone, IDisputeGame {
         IAnchorStateRegistry _anchorStateRegistry,
         IVerifier _teeVerifier,
         IVerifier _zkVerifier,
+        bytes32 _teeImageHash,
+        bytes32 _zkImageHash,
+        bytes32 _configHash,
         address _teeProposer,
         uint256 _l2ChainId,
         uint256 _blockInterval
@@ -144,6 +159,9 @@ contract AggregateVerifier is Clone, IDisputeGame {
         DISPUTE_GAME_FACTORY = ANCHOR_STATE_REGISTRY.disputeGameFactory();
         TEE_VERIFIER = _teeVerifier;
         ZK_VERIFIER = _zkVerifier;
+        TEE_IMAGE_HASH = _teeImageHash;
+        ZK_IMAGE_HASH = _zkImageHash;
+        CONFIG_HASH = _configHash;
         TEE_PROPOSER = _teeProposer;
         L2_CHAIN_ID = _l2ChainId;
         BLOCK_INTERVAL = _blockInterval;
@@ -284,8 +302,19 @@ contract AggregateVerifier is Clone, IDisputeGame {
         // The game must be in progress.
         if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
 
+        bytes32 journal = keccak256(abi.encodePacked(
+            msg.sender, 
+            l1Head(),
+            startingOutputRoot.root,
+            startingOutputRoot.l2SequenceNumber,
+            rootClaim(),
+            l2SequenceNumber(),
+            CONFIG_HASH,
+            TEE_IMAGE_HASH
+        ));
+
         // Validate the proof.
-        if (!TEE_VERIFIER.verify(proofBytes, rootClaim(), l2SequenceNumber())) revert InvalidProof();
+        if (!TEE_VERIFIER.verify(proofBytes, journal)) revert InvalidProof();
 
         // Update proving data.
         provingData.teeProver = msg.sender;
@@ -300,8 +329,19 @@ contract AggregateVerifier is Clone, IDisputeGame {
         // The game must be in progress or challenged (to allow nullification).
         if (status == GameStatus.DEFENDER_WINS) revert ClaimAlreadyResolved();
 
+        bytes32 journal = keccak256(abi.encodePacked(
+            msg.sender, 
+            l1Head(),
+            startingOutputRoot.root,
+            startingOutputRoot.l2SequenceNumber,
+            rootClaim(),
+            l2SequenceNumber(),
+            CONFIG_HASH,
+            ZK_IMAGE_HASH
+        ));
+
         // Validate the proof.
-        if (!ZK_VERIFIER.verify(proofBytes, rootClaim(), l2SequenceNumber())) revert InvalidProof();
+        if (!ZK_VERIFIER.verify(proofBytes, journal)) revert InvalidProof();
 
         // Update proving data.
         provingData.zkProver = msg.sender;
