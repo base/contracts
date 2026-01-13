@@ -28,7 +28,6 @@ For contract deployment artifacts, see [base-org/contract-deployments](https://g
 [![GitHub Issues](https://img.shields.io/github/issues-raw/base-org/contracts.svg)](https://github.com/base/contracts/issues)
 
 ### setup and testing
-
 - If you don't have foundry installed, run `make install-foundry`.
 - `make deps`
 - Test contracts: `make test`
