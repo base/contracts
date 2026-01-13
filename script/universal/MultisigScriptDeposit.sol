@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-import {IMulticall3} from "lib/forge-std/src/interfaces/IMulticall3.sol";
+import {CBMulticall} from "src/utils/CBMulticall.sol";
 
 import {MultisigScript} from "./MultisigScript.sol";
+import {Enum} from "./IGnosisSafe.sol";
 
 /// @notice Interface for OptimismPortal2's depositTransaction function
 interface IOptimismPortal2 {
@@ -33,9 +34,9 @@ interface IOptimismPortal2 {
 ///              return vm.envAddress("OWNER_SAFE");
 ///          }
 ///
-///          function _buildL2Calls() internal view override returns (IMulticall3.Call3Value[] memory) {
-///              IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
-///              calls[0] = IMulticall3.Call3Value({
+///          function _buildL2Calls() internal view override returns (CBMulticall.Call3Value[] memory) {
+///              CBMulticall.Call3Value[] memory calls = new CBMulticall.Call3Value[](1);
+///              calls[0] = CBMulticall.Call3Value({
 ///                  target: L2_CONTRACT,
 ///                  allowFailure: false,
 ///                  callData: abi.encodeCall(IL2Contract.someFunction, (arg1, arg2)),
@@ -137,7 +138,7 @@ abstract contract MultisigScriptDeposit is MultisigScript {
     ///      The `value` field in each Call3Value struct specifies ETH to send with that
     ///      specific L2 call. The total ETH will be bridged via the deposit transaction.
     /// @return calls Array of calls to execute on L2 via CBMulticall
-    function _buildL2Calls() internal view virtual returns (IMulticall3.Call3Value[] memory);
+    function _buildL2Calls() internal view virtual returns (CBMulticall.Call3Value[] memory);
 
     //////////////////////////////////////////////////////////////////////////////////////
     ///                             Overridden Entry Points                            ///
@@ -183,20 +184,20 @@ abstract contract MultisigScriptDeposit is MultisigScript {
     ///      summed and sent with the deposit transaction. The CBMulticall.aggregate3Value
     ///      function on L2 automatically distributes the ETH to each call according to its
     ///      specified `value` field - no additional developer action is required.
-    function _buildCalls() internal view virtual override returns (IMulticall3.Call3Value[] memory) {
-        IMulticall3.Call3Value[] memory l2Calls = _buildL2Calls();
+    function _buildCalls() internal view virtual override returns (Call[] memory) {
+        CBMulticall.Call3Value[] memory l2Calls = _buildL2Calls();
         uint256 totalValue = _sumL2CallValues(l2Calls);
 
         // Encode L2 calls as a multicall
         // Note: We use aggregate3Value to support per-call ETH distribution on L2
-        bytes memory l2Data = abi.encodeCall(IMulticall3.aggregate3Value, (l2Calls));
+        bytes memory l2Data = abi.encodeCall(CBMulticall.aggregate3Value, (l2Calls));
 
         // Wrap in depositTransaction call to OptimismPortal
-        IMulticall3.Call3Value[] memory l1Calls = new IMulticall3.Call3Value[](1);
-        l1Calls[0] = IMulticall3.Call3Value({
+        Call[] memory l1Calls = new Call[](1);
+        l1Calls[0] = Call({
+            operation: Enum.Operation.Call,
             target: _optimismPortal(),
-            allowFailure: false,
-            callData: abi.encodeCall(
+            data: abi.encodeCall(
                 IOptimismPortal2.depositTransaction,
                 (
                     CB_MULTICALL, // L2 target: CBMulticall at same address on L2
@@ -244,8 +245,8 @@ abstract contract MultisigScriptDeposit is MultisigScript {
     /// @return estimatedGas The estimated gas limit with safety buffer applied
     function _estimateL2GasViaFork(string memory l2RpcUrl) internal returns (uint64) {
         // Build L2 call data
-        IMulticall3.Call3Value[] memory l2Calls = _buildL2Calls();
-        bytes memory l2Data = abi.encodeCall(IMulticall3.aggregate3Value, (l2Calls));
+        CBMulticall.Call3Value[] memory l2Calls = _buildL2Calls();
+        bytes memory l2Data = abi.encodeCall(CBMulticall.aggregate3Value, (l2Calls));
         uint256 totalValue = _sumL2CallValues(l2Calls);
 
         // Store current fork (if any) to restore later
@@ -291,7 +292,7 @@ abstract contract MultisigScriptDeposit is MultisigScript {
     /// @notice Sums the ETH values from an array of L2 calls
     /// @param l2Calls The array of L2 calls to sum values from
     /// @return total The total ETH value across all calls
-    function _sumL2CallValues(IMulticall3.Call3Value[] memory l2Calls) internal pure returns (uint256 total) {
+    function _sumL2CallValues(CBMulticall.Call3Value[] memory l2Calls) internal pure returns (uint256 total) {
         for (uint256 i; i < l2Calls.length; i++) {
             total += l2Calls[i].value;
         }

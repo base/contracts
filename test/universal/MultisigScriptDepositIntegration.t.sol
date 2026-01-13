@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IMulticall3} from "forge-std/interfaces/IMulticall3.sol";
+import {CBMulticall} from "src/utils/CBMulticall.sol";
 import {Test, console} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
@@ -18,14 +18,14 @@ contract MultisigScriptDepositIntegrationTest is Test, MultisigScriptDeposit {
     function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal pure override {}
 
     /// @notice Build simple L2 calls for testing estimation
-    function _buildL2Calls() internal pure override returns (IMulticall3.Call3Value[] memory) {
-        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](2);
+    function _buildL2Calls() internal pure override returns (CBMulticall.Call3Value[] memory) {
+        CBMulticall.Call3Value[] memory calls = new CBMulticall.Call3Value[](2);
 
         // Call 1: Simple ETH transfer (minimal gas)
-        calls[0] = IMulticall3.Call3Value({target: address(0xdead), allowFailure: false, callData: "", value: 0});
+        calls[0] = CBMulticall.Call3Value({target: address(0xdead), allowFailure: false, callData: "", value: 0});
 
         // Call 2: Another simple call
-        calls[1] = IMulticall3.Call3Value({
+        calls[1] = CBMulticall.Call3Value({
             target: address(0xbeef),
             allowFailure: false,
             callData: abi.encodeWithSignature("nonExistentFunction()"),

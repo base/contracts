@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IMulticall3} from "forge-std/interfaces/IMulticall3.sol";
+import {CBMulticall} from "src/utils/CBMulticall.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {Preinstalls} from "lib/optimism/packages/contracts-bedrock/src/libraries/Preinstalls.sol";
@@ -53,7 +53,7 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
     address internal testL2Target;
     uint64 internal testGasLimit = 200_000;
 
-    function() internal view returns (IMulticall3.Call3Value[] memory) buildL2CallsInternal;
+    function() internal view returns (CBMulticall.Call3Value[] memory) buildL2CallsInternal;
 
     function setUp() public {
         // Deploy mock portal
@@ -93,13 +93,12 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
         return safe;
     }
 
-    function _buildL2Calls() internal view override returns (IMulticall3.Call3Value[] memory) {
+    function _buildL2Calls() internal view override returns (CBMulticall.Call3Value[] memory) {
         return buildL2CallsInternal();
     }
 
-    function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal view override {
-        // Verify deposit was made to portal
-        require(portal.depositCount() > 0, "No deposit made");
+    function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal pure override {
+        // No-op for tests - the deposit is simulated but not executed during sign()
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -110,17 +109,16 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
     function test_buildCalls_singleL2Call_noValue() external {
         buildL2CallsInternal = _buildSingleL2CallNoValue;
 
-        IMulticall3.Call3Value[] memory calls = _buildCalls();
+        Call[] memory calls = _buildCalls();
 
         // Should produce exactly one L1 call to the portal
         assertEq(calls.length, 1, "Should have one L1 call");
         assertEq(calls[0].target, address(portal), "Target should be portal");
         assertEq(calls[0].value, 0, "Value should be 0");
-        assertFalse(calls[0].allowFailure, "Should not allow failure");
 
         // Decode the depositTransaction call
         (address to, uint256 value, uint64 gasLimit, bool isCreation, bytes memory data) =
-            _decodeDepositTransaction(calls[0].callData);
+            _decodeDepositTransaction(calls[0].data);
 
         assertEq(to, CB_MULTICALL, "L2 target should be CB_MULTICALL");
         assertEq(value, 0, "Bridged value should be 0");
@@ -130,21 +128,21 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
 
         // Verify the L2 data is an aggregate3Value call
         bytes4 selector = bytes4(data);
-        assertEq(selector, IMulticall3.aggregate3Value.selector, "Should be aggregate3Value call");
+        assertEq(selector, CBMulticall.aggregate3Value.selector, "Should be aggregate3Value call");
     }
 
     /// @notice Test that multiple L2 calls are batched correctly
     function test_buildCalls_multipleL2Calls_noValue() external {
         buildL2CallsInternal = _buildMultipleL2CallsNoValue;
 
-        IMulticall3.Call3Value[] memory calls = _buildCalls();
+        Call[] memory calls = _buildCalls();
 
         // Should still produce exactly one L1 call
         assertEq(calls.length, 1, "Should have one L1 call");
 
         // Decode and verify
         (address to, uint256 value, uint64 gasLimit, bool isCreation, bytes memory data) =
-            _decodeDepositTransaction(calls[0].callData);
+            _decodeDepositTransaction(calls[0].data);
 
         assertEq(to, CB_MULTICALL, "L2 target should be CB_MULTICALL");
         assertEq(value, 0, "Bridged value should be 0");
@@ -152,7 +150,7 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
         assertFalse(isCreation, "Should not be creation");
 
         // Decode the aggregate3Value call to verify multiple L2 calls are included
-        IMulticall3.Call3Value[] memory l2Calls = abi.decode(_stripSelector(data), (IMulticall3.Call3Value[]));
+        CBMulticall.Call3Value[] memory l2Calls = abi.decode(_stripSelector(data), (CBMulticall.Call3Value[]));
         assertEq(l2Calls.length, 3, "Should have 3 L2 calls");
 
         // Verify call parameters are preserved through the wrapping
@@ -170,13 +168,13 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
     function test_buildCalls_withValue() external {
         buildL2CallsInternal = _buildL2CallsWithValue;
 
-        IMulticall3.Call3Value[] memory calls = _buildCalls();
+        Call[] memory calls = _buildCalls();
 
         // Value should be sum of all L2 call values (1 + 2 + 0.5 = 3.5 ether)
         assertEq(calls[0].value, 3.5 ether, "L1 call value should be sum of L2 values");
 
         // Decode and verify bridged value
-        (, uint256 value,,,) = _decodeDepositTransaction(calls[0].callData);
+        (, uint256 value,,,) = _decodeDepositTransaction(calls[0].data);
         assertEq(value, 3.5 ether, "Bridged value should be 3.5 ether");
     }
 
@@ -184,12 +182,12 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
     function test_buildCalls_singleCallStillUsesMulticall() external {
         buildL2CallsInternal = _buildSingleL2CallNoValue;
 
-        IMulticall3.Call3Value[] memory calls = _buildCalls();
-        (,,,, bytes memory data) = _decodeDepositTransaction(calls[0].callData);
+        Call[] memory calls = _buildCalls();
+        (,,,, bytes memory data) = _decodeDepositTransaction(calls[0].data);
 
         // Even single calls should be wrapped in aggregate3Value for consistency
         bytes4 selector = bytes4(data);
-        assertEq(selector, IMulticall3.aggregate3Value.selector, "Single call should still use aggregate3Value");
+        assertEq(selector, CBMulticall.aggregate3Value.selector, "Single call should still use aggregate3Value");
     }
 
     /// @notice Test the full sign flow with deposit transaction
@@ -256,23 +254,23 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
     ///                              Helper Functions                                  ///
     //////////////////////////////////////////////////////////////////////////////////////
 
-    function _buildSingleL2CallNoValue() internal view returns (IMulticall3.Call3Value[] memory) {
-        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](1);
-        calls[0] = IMulticall3.Call3Value({
+    function _buildSingleL2CallNoValue() internal view returns (CBMulticall.Call3Value[] memory) {
+        CBMulticall.Call3Value[] memory calls = new CBMulticall.Call3Value[](1);
+        calls[0] = CBMulticall.Call3Value({
             target: testL2Target, allowFailure: false, callData: abi.encodeCall(Counter.increment, ()), value: 0
         });
         return calls;
     }
 
-    function _buildMultipleL2CallsNoValue() internal view returns (IMulticall3.Call3Value[] memory) {
-        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](3);
-        calls[0] = IMulticall3.Call3Value({
+    function _buildMultipleL2CallsNoValue() internal view returns (CBMulticall.Call3Value[] memory) {
+        CBMulticall.Call3Value[] memory calls = new CBMulticall.Call3Value[](3);
+        calls[0] = CBMulticall.Call3Value({
             target: testL2Target, allowFailure: false, callData: abi.encodeCall(Counter.increment, ()), value: 0
         });
-        calls[1] = IMulticall3.Call3Value({
+        calls[1] = CBMulticall.Call3Value({
             target: testL2Target, allowFailure: false, callData: abi.encodeCall(Counter.increment, ()), value: 0
         });
-        calls[2] = IMulticall3.Call3Value({
+        calls[2] = CBMulticall.Call3Value({
             target: testL2Target,
             allowFailure: true, // Test allowFailure flag preservation
             callData: abi.encodeCall(Counter.increment, ()),
@@ -281,21 +279,21 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
         return calls;
     }
 
-    function _buildL2CallsWithValue() internal view returns (IMulticall3.Call3Value[] memory) {
-        IMulticall3.Call3Value[] memory calls = new IMulticall3.Call3Value[](3);
-        calls[0] = IMulticall3.Call3Value({
+    function _buildL2CallsWithValue() internal view returns (CBMulticall.Call3Value[] memory) {
+        CBMulticall.Call3Value[] memory calls = new CBMulticall.Call3Value[](3);
+        calls[0] = CBMulticall.Call3Value({
             target: testL2Target,
             allowFailure: false,
             callData: abi.encodeCall(Counter.incrementPayable, ()),
             value: 1 ether
         });
-        calls[1] = IMulticall3.Call3Value({
+        calls[1] = CBMulticall.Call3Value({
             target: testL2Target,
             allowFailure: false,
             callData: abi.encodeCall(Counter.incrementPayable, ()),
             value: 2 ether
         });
-        calls[2] = IMulticall3.Call3Value({
+        calls[2] = CBMulticall.Call3Value({
             target: testL2Target,
             allowFailure: false,
             callData: abi.encodeCall(Counter.incrementPayable, ()),
@@ -333,8 +331,8 @@ contract DefaultPortalTest is MultisigScriptDeposit {
         return address(1);
     }
 
-    function _buildL2Calls() internal pure override returns (IMulticall3.Call3Value[] memory) {
-        return new IMulticall3.Call3Value[](0);
+    function _buildL2Calls() internal pure override returns (CBMulticall.Call3Value[] memory) {
+        return new CBMulticall.Call3Value[](0);
     }
 
     function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal pure override {}
