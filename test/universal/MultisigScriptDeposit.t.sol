@@ -86,6 +86,9 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
         return testGasLimit;
     }
 
+    /// @notice Skip gas estimation since we override _l2GasLimit() directly
+    function _ensureL2GasLimitCached() internal override {}
+
     function _ownerSafe() internal view override returns (address) {
         return safe;
     }
@@ -222,6 +225,33 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
         assertTrue(success, "Sign with value should succeed");
     }
 
+    /// @notice Test default _optimismPortal() returns correct address for mainnet
+    function test_optimismPortal_mainnet() external {
+        // Create a separate test contract that uses default _optimismPortal()
+        vm.chainId(1);
+        DefaultPortalTest defaultTest = new DefaultPortalTest();
+        assertEq(
+            defaultTest.getOptimismPortal(), 0x49048044D57e1C92A77f79988d21Fa8fAF74E97e, "Should return mainnet portal"
+        );
+    }
+
+    /// @notice Test default _optimismPortal() returns correct address for sepolia
+    function test_optimismPortal_sepolia() external {
+        vm.chainId(11155111);
+        DefaultPortalTest defaultTest = new DefaultPortalTest();
+        assertEq(
+            defaultTest.getOptimismPortal(), 0x49f53e41452C74589E85cA1677426Ba426459e85, "Should return sepolia portal"
+        );
+    }
+
+    /// @notice Test default _optimismPortal() reverts for unknown chain
+    function test_optimismPortal_unknownChain_reverts() external {
+        vm.chainId(999999);
+        DefaultPortalTest defaultTest = new DefaultPortalTest();
+        vm.expectRevert("MultisigScriptDeposit: unsupported chain, override _optimismPortal()");
+        defaultTest.getOptimismPortal();
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////
     ///                              Helper Functions                                  ///
     //////////////////////////////////////////////////////////////////////////////////////
@@ -296,3 +326,21 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
     }
 }
 
+/// @notice Helper contract to test default _optimismPortal() implementation
+/// @dev This contract does NOT override _optimismPortal(), so it uses the default chain-based logic
+contract DefaultPortalTest is MultisigScriptDeposit {
+    function _ownerSafe() internal pure override returns (address) {
+        return address(1);
+    }
+
+    function _buildL2Calls() internal pure override returns (IMulticall3.Call3Value[] memory) {
+        return new IMulticall3.Call3Value[](0);
+    }
+
+    function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal pure override {}
+
+    /// @notice Expose _optimismPortal() for testing
+    function getOptimismPortal() external view returns (address) {
+        return _optimismPortal();
+    }
+}

@@ -219,7 +219,7 @@ abstract contract MultisigScript is Script {
     /// multisig (see step 2).
     ///
     /// @param safes A list of nested safes (excluding the executing safe returned by `_ownerSafe`).
-    function sign(address[] memory safes) public {
+    function sign(address[] memory safes) public virtual {
         safes = _appendOwnerSafe({safes: safes});
 
         // Snapshot and restore Safe nonce after simulation, otherwise the data logged to sign
@@ -278,7 +278,7 @@ abstract contract MultisigScript is Script {
     ///
     /// @param safes      A list of nested safes (excluding the executing safe returned by `_ownerSafe`).
     /// @param signatures The signatures from step 1 (concatenated, 65-bytes per sig)
-    function approve(address[] memory safes, bytes memory signatures) public {
+    function approve(address[] memory safes, bytes memory signatures) public virtual {
         safes = _appendOwnerSafe({safes: safes});
         (bytes[] memory datas, uint256 value) = _transactionDatas({safes: safes});
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
@@ -295,7 +295,7 @@ abstract contract MultisigScript is Script {
     /// Differs from `run` in that you can override the safe nonce for simulation purposes.
     ///
     /// @param signatures The signatures from step 1 (concatenated, 65-bytes per sig)
-    function simulate(bytes memory signatures) public {
+    function simulate(bytes memory signatures) public virtual {
         address ownerSafe = _ownerSafe();
         (bytes[] memory datas, uint256 value) = _transactionDatas({safes: _toArray(ownerSafe)});
 
@@ -316,7 +316,7 @@ abstract contract MultisigScript is Script {
     /// submitted onchain (nested case, see step 2, in which case `signatures` can be empty).
     ///
     /// @param signatures The signatures from step 1 (concatenated, 65-bytes per sig)
-    function run(bytes memory signatures) public {
+    function run(bytes memory signatures) public virtual {
         address ownerSafe = _ownerSafe();
         (bytes[] memory datas, uint256 value) = _transactionDatas({safes: _toArray(ownerSafe)});
 
