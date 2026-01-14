@@ -86,9 +86,6 @@ contract MultisigScriptDepositTest is Test, MultisigScriptDeposit {
         return testGasLimit;
     }
 
-    /// @notice Skip gas estimation since we override _l2GasLimit() directly
-    function _ensureL2GasLimitCached() internal override {}
-
     function _ownerSafe() internal view override returns (address) {
         return safe;
     }

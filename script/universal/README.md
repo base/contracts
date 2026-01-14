@@ -18,9 +18,9 @@ This is the core script for building Forge scripts that interact with Gnosis Saf
 
 An extension of `MultisigScript` for L1 → L2 deposit transactions. Task writers define L2 calls via `_buildL2Calls()`, and the framework automatically wraps them in an `OptimismPortal.depositTransaction` call. Features:
 
-- **Automatic Gas Estimation**: Forks L2 to estimate gas (requires `L2_RPC_URL` env var).
 - **ETH Bridging**: Supports bridging ETH along with the message.
 - **Chain-Aware Defaults**: Provides default `OptimismPortal` addresses for Mainnet and Sepolia.
+- **Gas Limit**: Set via `L2_GAS_LIMIT` env var (all signers must use the same value).
 
 ### `Simulation.sol`
 
@@ -42,15 +42,3 @@ _Deprecated_. Use `MultisigScript.sol` instead. This was an earlier version of t
 ## Usage
 
 These scripts are typically imported by specific task scripts in the `contract-deployments` repository. A typical task script inherits from `MultisigScript` and implements the `_buildCalls` method to define the actions to be taken.
-
-## Testing
-
-### Integration Test for L2 Gas Estimation
-
-To test the L2 gas estimation with a real RPC endpoint:
-
-```bash
-L2_RPC_URL=https://sepolia.base.org forge test --match-test test_integration_gasEstimation -vvv
-```
-
-This test is automatically skipped in CI when `L2_RPC_URL` is not set.

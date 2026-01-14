@@ -225,7 +225,7 @@ abstract contract MultisigScript is Script {
     /// multisig (see step 2).
     ///
     /// @param safes A list of nested safes (excluding the executing safe returned by `_ownerSafe`).
-    function sign(address[] memory safes) public virtual {
+    function sign(address[] memory safes) public {
         safes = _appendOwnerSafe({safes: safes});
 
         // Snapshot and restore Safe nonce after simulation, otherwise the data logged to sign
@@ -285,7 +285,7 @@ abstract contract MultisigScript is Script {
     ///
     /// @param safes      A list of nested safes (excluding the executing safe returned by `_ownerSafe`).
     /// @param signatures The signatures from step 1 (concatenated, 65-bytes per sig)
-    function approve(address[] memory safes, bytes memory signatures) public virtual {
+    function approve(address[] memory safes, bytes memory signatures) public {
         safes = _appendOwnerSafe({safes: safes});
 
         Call[] memory callsChain = _buildCallsChain({safes: safes});
@@ -304,7 +304,7 @@ abstract contract MultisigScript is Script {
     /// Differs from `run` in that you can override the safe nonce for simulation purposes.
     ///
     /// @param signatures The signatures from step 1 (concatenated, 65-bytes per sig)
-    function simulate(bytes memory signatures) public virtual {
+    function simulate(bytes memory signatures) public {
         address ownerSafe = _ownerSafe();
         Call[] memory callsChain = _buildCallsChain({safes: _toArray(ownerSafe)});
 
@@ -324,7 +324,7 @@ abstract contract MultisigScript is Script {
     /// submitted onchain (nested case, see step 2, in which case `signatures` can be empty).
     ///
     /// @param signatures The signatures from step 1 (concatenated, 65-bytes per sig)
-    function run(bytes memory signatures) public virtual {
+    function run(bytes memory signatures) public {
         address ownerSafe = _ownerSafe();
         Call[] memory callsChain = _buildCallsChain({safes: _toArray(ownerSafe)});
 
