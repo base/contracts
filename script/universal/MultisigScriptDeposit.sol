@@ -170,5 +170,6 @@ abstract contract MultisigScriptDeposit is MultisigScript {
         for (uint256 i; i < l2Calls.length; i++) {
             total += l2Calls[i].value;
         }
+        return total;
     }
 }
