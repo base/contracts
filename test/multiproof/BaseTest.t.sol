@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test, console2} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import "src/AggregateVerifier.sol";
-import "src/Errors.sol";
 
 import {IVerifier} from "src/interfaces/IVerifier.sol";
 
@@ -13,7 +12,7 @@ import {MockSystemConfig} from "src/mocks/MockSystemConfig.sol";
 
 // Optimism
 import {IDisputeGame, DisputeGameFactory} from "optimism/src/dispute/DisputeGameFactory.sol";
-import {GameType, Duration, Claim} from "optimism/src/dispute/lib/Types.sol";
+import {GameType, Claim} from "optimism/src/dispute/lib/Types.sol";
 import {
     ISystemConfig,
     IDisputeGameFactory,
