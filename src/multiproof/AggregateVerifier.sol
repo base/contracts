@@ -65,6 +65,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @param game The game used to nullify this proposal.
     event Nullified(address indexed nullifier, IDisputeGame game);
 
+    /// @notice Emitted when the credit is claimed.
+    /// @param recipient The address of the recipient.
+    /// @param amount The amount of credit claimed.
+    event CreditClaimed(address indexed recipient, uint256 amount);
+
     ////////////////////////////////////////////////////////////////
     //                         State Vars                         //
     ////////////////////////////////////////////////////////////////
@@ -486,12 +491,17 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
             if (IDisputeGame(provingData.counteredByGameAddress).status() != GameStatus.DEFENDER_WINS) revert InvalidCounteredByGame();
         }
 
+        uint256 balanceToClaim = address(this).balance;
+
         // The game must have credit to claim.
-        if (address(this).balance == 0) revert NoCreditToClaim();
+        if (balanceToClaim == 0) revert NoCreditToClaim();
 
         // Transfer the credit to the bond recipient.
-        (bool success,) = bondRecipient.call{value: address(this).balance}(hex"");
+        (bool success,) = bondRecipient.call{value: balanceToClaim}(hex"");
         if (!success) revert BondTransferFailed();
+
+        // Emit the credit claimed event.
+        emit CreditClaimed(bondRecipient, balanceToClaim);
     }
 
     function closeGame() public {
