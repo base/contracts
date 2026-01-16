@@ -538,11 +538,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
                 return GameStatus.CHALLENGER_WINS;
             }
             return parentGame.status();
-        } else {
-            // If this is the first dispute game (i.e. parent game index is `uint32.max`), then the
-            // parent game's status is considered as `DEFENDER_WINS`.
-            return GameStatus.DEFENDER_WINS;
         }
+        // If this is the first dispute game (i.e. parent game index is `uint32.max`), then the
+        // parent game's status is considered as `DEFENDER_WINS`.
+        return GameStatus.DEFENDER_WINS;
     }
 
     /// @notice Determines if the game is finished.
