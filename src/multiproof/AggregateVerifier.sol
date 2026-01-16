@@ -56,7 +56,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     //                         Immutables                         //
     ////////////////////////////////////////////////////////////////
     /// @notice The anchor state registry.
-    IAnchorStateRegistry public immutable ANCHOR_STATE_REGISTRY;
+    IAnchorStateRegistry internal immutable ANCHOR_STATE_REGISTRY;
 
     /// @notice The dispute game factory.
     IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
@@ -500,10 +500,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         return provingData.zkProver;
     }
 
-    /// @notice Getter for the game type.
+    /// @notice The game type.
     /// @dev For compliance with the IDisputeGame interface.
     function gameType() external view returns (GameType) {
         return GAME_TYPE;
+    }
+
+    /// @notice The anchor state registry.
+    /// @dev Needed for anchorStateRegistry.isGameRegistered()
+    function anchorStateRegistry() external view returns (IAnchorStateRegistry) {
+        return ANCHOR_STATE_REGISTRY;
     }
 
     /// @notice Determines if the game is finished.
