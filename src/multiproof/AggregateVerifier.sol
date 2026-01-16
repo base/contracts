@@ -246,13 +246,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
             GameType.unwrap(ANCHOR_STATE_REGISTRY.respectedGameType()) == GameType.unwrap(GAME_TYPE);
     }
 
-    /// @notice The L2 block number for which this game is proposing an output root.
-    function l2BlockNumber() public pure returns (uint256 l2BlockNumber_) {
-        l2BlockNumber_ = _getArgUint256(0x54);
-    }
-
+    /// @notice The L2 sequence number for which this game is proposing an output root (in this case - the block number).
     function l2SequenceNumber() public pure returns (uint256 l2SequenceNumber_) {
-        l2SequenceNumber_ = l2BlockNumber();
+        l2SequenceNumber_ = _getArgUint256(0x54);
     }
 
     /// @notice The parent index of the game.
