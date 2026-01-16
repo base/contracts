@@ -136,40 +136,40 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
     address public bondRecipient;
 
-    /// @param _gameType The game type.
-    /// @param _anchorStateRegistry The anchor state registry.
-    /// @param _teeVerifier The TEE verifier.
-    /// @param _zkVerifier The ZK verifier.
-    /// @param _teeImageHash The hash of the TEE image.
-    /// @param _zkImageHash The hash of the ZK image.
-    /// @param _configHash The hash of the rollup configuration.
-    /// @param _teeProposer The address that can submit a TEE proof.
-    /// @param _l2ChainId The chain ID of the L2 network.
-    /// @param _blockInterval The block interval.
+    /// @param gameType The game type.
+    /// @param anchorStateRegistry The anchor state registry.
+    /// @param teeVerifier The TEE verifier.
+    /// @param zkVerifier The ZK verifier.
+    /// @param teeImageHash The hash of the TEE image.
+    /// @param zkImageHash The hash of the ZK image.
+    /// @param configHash The hash of the rollup configuration.
+    /// @param teeProposer The address that can submit a TEE proof.
+    /// @param l2ChainId The chain ID of the L2 network.
+    /// @param blockInterval The block interval.
     constructor(
-        GameType _gameType,
-        IAnchorStateRegistry _anchorStateRegistry,
-        IVerifier _teeVerifier,
-        IVerifier _zkVerifier,
-        bytes32 _teeImageHash,
-        bytes32 _zkImageHash,
-        bytes32 _configHash,
-        address _teeProposer,
-        uint256 _l2ChainId,
-        uint256 _blockInterval
+        GameType gameType,
+        IAnchorStateRegistry anchorStateRegistry,
+        IVerifier teeVerifier,
+        IVerifier zkVerifier,
+        bytes32 teeImageHash,
+        bytes32 zkImageHash,
+        bytes32 configHash,
+        address teeProposer,
+        uint256 l2ChainId,
+        uint256 blockInterval
     ) {
         // Set up initial game state.
-        GAME_TYPE = _gameType;
-        ANCHOR_STATE_REGISTRY = _anchorStateRegistry;
+        GAME_TYPE = gameType;
+        ANCHOR_STATE_REGISTRY = anchorStateRegistry;
         DISPUTE_GAME_FACTORY = ANCHOR_STATE_REGISTRY.disputeGameFactory();
-        TEE_VERIFIER = _teeVerifier;
-        ZK_VERIFIER = _zkVerifier;
-        TEE_IMAGE_HASH = _teeImageHash;
-        ZK_IMAGE_HASH = _zkImageHash;
-        CONFIG_HASH = _configHash;
-        TEE_PROPOSER = _teeProposer;
-        L2_CHAIN_ID = _l2ChainId;
-        BLOCK_INTERVAL = _blockInterval;
+        TEE_VERIFIER = teeVerifier;
+        ZK_VERIFIER = zkVerifier;
+        TEE_IMAGE_HASH = teeImageHash;
+        ZK_IMAGE_HASH = zkImageHash;
+        CONFIG_HASH = configHash;
+        TEE_PROPOSER = teeProposer;
+        L2_CHAIN_ID = l2ChainId;
+        BLOCK_INTERVAL = blockInterval;
     }
 
     /// @notice Initializes the contract.
