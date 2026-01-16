@@ -75,7 +75,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     uint64 public constant FAST_FINALIZATION_DELAY = 1 days;
 
     /// @notice The size of the initialize call data.
-    uint256 private constant INITIALIZE_CALLDATA_SIZE = 0x7E;
+    uint256 internal constant INITIALIZE_CALLDATA_SIZE = 0x7E;
 
     /// @notice The anchor state registry.
     IAnchorStateRegistry public immutable ANCHOR_STATE_REGISTRY;
@@ -102,7 +102,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     address public immutable TEE_PROPOSER;
 
     /// @notice The game type ID.
-    GameType public immutable GAME_TYPE;
+    GameType internal immutable GAME_TYPE;
 
     /// @notice The chain ID of the L2 network this contract argues about.
     uint256 public immutable L2_CHAIN_ID;
@@ -592,7 +592,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @return rootClaim_ The root claim of the DisputeGame.
     /// @return extraData_ Any extra data supplied to the dispute game contract by the creator.
     function gameData() external view returns (GameType gameType_, Claim rootClaim_, bytes memory extraData_) {
-        gameType_ = gameType();
+        gameType_ = GAME_TYPE;
         rootClaim_ = rootClaim();
         extraData_ = extraData();
     }
@@ -603,5 +603,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
     function zkProver() external view returns (address zkProver_) {
         zkProver_ = provingData.zkProver;
+    }
+
+    /// @notice Getter for the game type.
+    /// @dev For compliance with the IDisputeGame interface.
+    /// @return gameType_ The type of proof system being used.
+    function gameType() external view returns (GameType gameType_) {
+        gameType_ = GAME_TYPE;
     }
 }
