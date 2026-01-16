@@ -531,7 +531,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
     /// @notice Returns the status of the parent game.
     /// @dev If the parent game index is `uint32.max`, then the parent game's status is considered as `DEFENDER_WINS`.
-    function getParentGameStatus() internal view returns (GameStatus) {
+    function _getParentGameStatus() internal view returns (GameStatus) {
         if (parentIndex() != type(uint32).max) {
             (,, IDisputeGame parentGame) = DISPUTE_GAME_FACTORY.gameAtIndex(parentIndex());
             if (ANCHOR_STATE_REGISTRY.isGameBlacklisted(parentGame) || ANCHOR_STATE_REGISTRY.isGameRetired(parentGame)) {
