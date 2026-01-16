@@ -123,6 +123,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice Flag for the `initialize` function to prevent re-initialization.
     bool internal initialized;
 
+    /// @notice A boolean for whether or not the game type was respected when the game was created.
+    bool public wasRespectedGameTypeWhenCreated;
+    
     /// @notice The claim made by the proposer.
     ProvingData public provingData;
 
@@ -130,8 +133,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @dev This should match the claim root of the parent game.
     Proposal public startingOutputRoot;
 
-    /// @notice A boolean for whether or not the game type was respected when the game was created.
-    bool public wasRespectedGameTypeWhenCreated;
 
     address public bondRecipient;
 
