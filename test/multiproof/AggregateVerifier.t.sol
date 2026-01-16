@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import "test/BaseTest.t.sol";
+import {BadExtraData} from "optimism/src/dispute/lib/Errors.sol";
+import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
+import {Claim, GameStatus, Hash, Timestamp} from "optimism/src/dispute/lib/Types.sol";
+
+import {AggregateVerifier} from "src/AggregateVerifier.sol";
+
+import {BaseTest} from "test/BaseTest.t.sol";
 
 contract AggregateVerifierTest is BaseTest {
     function testInitializeWithTEEProof() public {
@@ -73,7 +79,7 @@ contract AggregateVerifierTest is BaseTest {
         AggregateVerifier game =
             _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max);
 
-        vm.expectRevert(NotAuthorized.selector);
+        vm.expectRevert(AggregateVerifier.NotAuthorized.selector);
         _provideProof(game, ZK_PROVER, true, proof);
     }
 
@@ -88,7 +94,7 @@ contract AggregateVerifierTest is BaseTest {
         _provideProof(game, TEE_PROVER, true, proof);
 
         // Cannot claim bond before resolving
-        vm.expectRevert(BondRecipientEmpty.selector);
+        vm.expectRevert(AggregateVerifier.BondRecipientEmpty.selector);
         game.claimCredit();
 
         // Resolve after 7 days
@@ -186,7 +192,7 @@ contract AggregateVerifierTest is BaseTest {
 
         vm.warp(block.timestamp + 7 days - 1);
         // Cannot resolve yet
-        vm.expectRevert(GameNotOver.selector);
+        vm.expectRevert(AggregateVerifier.GameNotOver.selector);
         game.resolve();
 
         // Provide ZK proof
@@ -215,7 +221,7 @@ contract AggregateVerifierTest is BaseTest {
         Claim rootClaimChild = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
 
         // Cannot create a child game without a proof for the parent
-        vm.expectRevert(InvalidParentGame.selector);
+        vm.expectRevert(AggregateVerifier.InvalidParentGame.selector);
         _createAggregateVerifierGame(TEE_PROVER, rootClaimChild, currentL2BlockNumber, uint32(parentGameIndex));
 
         // Provide proof for the parent game

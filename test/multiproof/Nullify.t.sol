@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import "test/BaseTest.t.sol";
+import {ClaimAlreadyResolved} from "optimism/src/dispute/lib/Errors.sol";
+import {Claim, GameStatus} from "optimism/src/dispute/lib/Types.sol";
+
+import {AggregateVerifier} from "src/AggregateVerifier.sol";
+
+import {BaseTest} from "test/BaseTest.t.sol";
 
 contract NullifyTest is BaseTest {
     function testNullifyWithTEEProof() public {
@@ -80,7 +85,7 @@ contract NullifyTest is BaseTest {
         _provideProof(game2, TEE_PROVER, true, teeProof);
 
         uint256 gameIndex = factory.gameCount() - 1;
-        vm.expectRevert(MissingTEEProof.selector);
+        vm.expectRevert(AggregateVerifier.MissingTEEProof.selector);
         game1.nullify(gameIndex, AggregateVerifier.ProofType.TEE);
     }
 
@@ -102,7 +107,7 @@ contract NullifyTest is BaseTest {
         _provideProof(game2, ZK_PROVER, false, zkProof);
 
         uint256 gameIndex = factory.gameCount() - 1;
-        vm.expectRevert(MissingZKProof.selector);
+        vm.expectRevert(AggregateVerifier.MissingZKProof.selector);
         game1.nullify(gameIndex, AggregateVerifier.ProofType.ZK);
     }
 

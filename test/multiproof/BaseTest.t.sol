@@ -2,28 +2,25 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
-import "src/AggregateVerifier.sol";
-
-import {IVerifier} from "src/interfaces/IVerifier.sol";
-
-// Mocks
-import {MockVerifier} from "src/mocks/MockVerifier.sol";
-import {MockSystemConfig} from "src/mocks/MockSystemConfig.sol";
 
 // Optimism
-import {IDisputeGame, DisputeGameFactory} from "optimism/src/dispute/DisputeGameFactory.sol";
-import {GameType, Claim} from "optimism/src/dispute/lib/Types.sol";
-import {
-    ISystemConfig,
-    IDisputeGameFactory,
-    Hash,
-    Proposal,
-    AnchorStateRegistry
-} from "optimism/src/dispute/AnchorStateRegistry.sol";
+import {AnchorStateRegistry} from "optimism/src/dispute/AnchorStateRegistry.sol";
+import {DisputeGameFactory} from "optimism/src/dispute/DisputeGameFactory.sol";
+import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
+import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
+import {IDisputeGameFactory} from "optimism/interfaces/dispute/IDisputeGameFactory.sol";
+import {ISystemConfig} from "optimism/interfaces/L1/ISystemConfig.sol";
+import {Claim, GameStatus, GameType, Hash, Proposal, Timestamp} from "optimism/src/dispute/lib/Types.sol";
 
 // OpenZeppelin
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+import {AggregateVerifier} from "src/AggregateVerifier.sol";
+import {IVerifier} from "src/interfaces/IVerifier.sol";
+
+import {MockSystemConfig} from "src/mocks/MockSystemConfig.sol";
+import {MockVerifier} from "src/mocks/MockVerifier.sol";
 
 contract BaseTest is Test {
     // Constants

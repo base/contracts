@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import "test/BaseTest.t.sol";
+import {ClaimAlreadyResolved} from "optimism/src/dispute/lib/Errors.sol";
+import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
+import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
+import {IDisputeGameFactory} from "optimism/interfaces/dispute/IDisputeGameFactory.sol";
+import {Claim, GameStatus, Hash} from "optimism/src/dispute/lib/Types.sol";
+
+import {AggregateVerifier} from "src/AggregateVerifier.sol";
+
+import {BaseTest} from "test/BaseTest.t.sol";
 
 contract ChallengeTest is BaseTest {
     function testChallengeTEEProofWithZKProof() public {
@@ -70,7 +78,7 @@ contract ChallengeTest is BaseTest {
 
         uint256 gameIndex = factory.gameCount() - 1;
 
-        vm.expectRevert(MissingTEEProof.selector);
+        vm.expectRevert(AggregateVerifier.MissingTEEProof.selector);
         game1.challenge(gameIndex);
     }
 
@@ -84,7 +92,7 @@ contract ChallengeTest is BaseTest {
         Hash uuid = factory.getGameUUID(
             AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, abi.encodePacked(currentL2BlockNumber, type(uint32).max)
         );
-        vm.expectRevert(abi.encodeWithSelector(GameAlreadyExists.selector, uuid));
+        vm.expectRevert(abi.encodeWithSelector(IDisputeGameFactory.GameAlreadyExists.selector, uuid));
         _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max);
     }
 
@@ -111,7 +119,7 @@ contract ChallengeTest is BaseTest {
         _provideProof(game2, ZK_PROVER, false, zkProof);
         uint256 gameIndex = factory.gameCount() - 1;
 
-        vm.expectRevert(IncorrectParentIndex.selector);
+        vm.expectRevert(AggregateVerifier.IncorrectParentIndex.selector);
         game1.challenge(gameIndex);
     }
 
@@ -136,7 +144,7 @@ contract ChallengeTest is BaseTest {
 
         uint256 gameIndex = factory.gameCount() - 1;
 
-        vm.expectRevert(MissingZKProof.selector);
+        vm.expectRevert(AggregateVerifier.MissingZKProof.selector);
         game1.challenge(gameIndex);
     }
 
@@ -198,7 +206,7 @@ contract ChallengeTest is BaseTest {
 
         // challenge child game
         uint256 childGameIndex = factory.gameCount() - 1;
-        vm.expectRevert(InvalidParentGame.selector);
+        vm.expectRevert(AggregateVerifier.InvalidParentGame.selector);
         childGame.challenge(childGameIndex);
     }
 
@@ -215,7 +223,7 @@ contract ChallengeTest is BaseTest {
 
         // challenge game
         uint256 gameIndex = factory.gameCount() - 1;
-        vm.expectRevert(InvalidGame.selector);
+        vm.expectRevert(AggregateVerifier.InvalidGame.selector);
         game.challenge(gameIndex);
     }
 }

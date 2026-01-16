@@ -1,17 +1,28 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
-// Libraries
-import {Clone} from "solady/utils/Clone.sol";
-import {Claim, GameType, Hash, Proposal, Timestamp} from "optimism/src/dispute/lib/Types.sol";
-import "./Errors.sol";
 
-// Interfaces
-import {GameStatus, IDisputeGame, IDisputeGameFactory} from "optimism/src/dispute/AnchorStateRegistry.sol";
+// Optimism
+import {
+    AlreadyInitialized,
+    BondTransferFailed,
+    ClaimAlreadyResolved,
+    GameNotFinalized,
+    GameNotInProgress,
+    GameNotResolved,
+    GamePaused,
+    NoCreditToClaim
+} from "optimism/src/dispute/lib/Errors.sol";
+import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
+import {IDisputeGameFactory} from "optimism/interfaces/dispute/IDisputeGameFactory.sol";
 import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
-import {IVerifier} from "./interfaces/IVerifier.sol";
+import {Claim, GameStatus, GameType, Hash, Proposal, Timestamp} from "optimism/src/dispute/lib/Types.sol";
 
+// Solady
+import {Clone} from "solady/utils/Clone.sol";
 import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
+
+import {IVerifier} from "./interfaces/IVerifier.sol";
 
 contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     ////////////////////////////////////////////////////////////////
@@ -140,6 +151,63 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @param recipient The address of the recipient.
     /// @param amount The amount of credit claimed.
     event CreditClaimed(address indexed recipient, uint256 amount);
+
+    ////////////////////////////////////////////////////////////////
+    //                         Errors                             //
+    ////////////////////////////////////////////////////////////////
+    /// @notice When the parent game is invalid.
+    error InvalidParentGame();
+
+    /// @notice When the block number is unexpected.
+    error UnexpectedBlockNumber(uint256 expectedBlockNumber, uint256 actualBlockNumber);
+
+    /// @notice When the game is over.
+    error GameOver();
+
+    /// @notice When the game is not over.
+    error GameNotOver();
+
+    /// @notice When the parent game has not resolved.
+    error ParentGameNotResolved();
+
+    /// @notice When there is no TEE proof.
+    error MissingTEEProof();
+
+    /// @notice When there is no ZK proof.
+    error MissingZKProof();
+
+    /// @notice When the parent index is not the same.
+    error IncorrectParentIndex();
+
+    /// @notice When the block number is not the same.
+    error IncorrectBlockNumber();
+
+    /// @notice When the root claim is not different.
+    error IncorrectRootClaim();
+
+    /// @notice When the game is invalid.
+    error InvalidGame();
+
+    /// @notice When the caller is not authorized.
+    error NotAuthorized();
+
+    /// @notice When the proof has already been verified.
+    error AlreadyProven();
+
+    /// @notice When the proof is invalid.
+    error InvalidProof();
+
+    /// @notice When no proof was provided.
+    error NoProofProvided();
+
+    /// @notice When an invalid proof type is provided.
+    error InvalidProofType();
+
+    /// @notice When the bond recipient is empty.
+    error BondRecipientEmpty();
+
+    /// @notice When the countered by game is invalid.
+    error InvalidCounteredByGame();
 
     /// @param gameType The game type.
     /// @param anchorStateRegistry The anchor state registry.
