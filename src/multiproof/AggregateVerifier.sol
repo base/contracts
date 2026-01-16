@@ -1,30 +1,23 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 // Libraries
-import { Clone } from "solady/utils/Clone.sol";
-import {
-    Claim,
-    GameType,
-    Hash,
-    Proposal,
-    Timestamp
-} from "optimism/src/dispute/lib/Types.sol";
+import {Clone} from "solady/utils/Clone.sol";
+import {Claim, GameType, Hash, Proposal, Timestamp} from "optimism/src/dispute/lib/Types.sol";
 import "./Errors.sol";
 
 // Interfaces
-import { GameStatus, IDisputeGame, IDisputeGameFactory } from "optimism/src/dispute/AnchorStateRegistry.sol";
+import {GameStatus, IDisputeGame, IDisputeGameFactory} from "optimism/src/dispute/AnchorStateRegistry.sol";
 import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
 import {IVerifier} from "./interfaces/IVerifier.sol";
 
-import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
-import { ReentrancyGuard } from "solady/utils/ReentrancyGuard.sol";
-
+import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
+import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
 
 contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     ////////////////////////////////////////////////////////////////
     //                         Enums                              //
     ////////////////////////////////////////////////////////////////
-    
+
     /// @notice The type of proof. Can be expanded for different types of ZK proofs.
     enum ProofType {
         TEE,
@@ -89,7 +82,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice The chain ID of the L2 network this contract argues about.
     uint256 public immutable L2_CHAIN_ID;
 
-    /// @notice The block interval between each proposal. 
+    /// @notice The block interval between each proposal.
     /// @dev    The parent's block number + BLOCK_INTERVAL = this proposal's block number.
     uint256 public immutable BLOCK_INTERVAL;
 
@@ -113,7 +106,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
     /// @notice A boolean for whether or not the game type was respected when the game was created.
     bool public wasRespectedGameTypeWhenCreated;
-    
+
     /// @notice The claim made by the proposer.
     ProvingData public provingData;
 
@@ -219,7 +212,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
             // Parent game must be respected, not blacklisted, and not retired.
             if (
-                !ANCHOR_STATE_REGISTRY.isGameRespected(parentGame) || ANCHOR_STATE_REGISTRY.isGameBlacklisted(parentGame)
+                !ANCHOR_STATE_REGISTRY.isGameRespected(parentGame)
+                    || ANCHOR_STATE_REGISTRY.isGameBlacklisted(parentGame)
                     || ANCHOR_STATE_REGISTRY.isGameRetired(parentGame)
             ) {
                 revert InvalidParentGame();
@@ -229,16 +223,17 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
             if (parentGame.status() == GameStatus.CHALLENGER_WINS) revert InvalidParentGame();
 
             // The parent game must have a proof.
-            if (AggregateVerifier(address(parentGame)).teeProver() == address(0) && AggregateVerifier(address(parentGame)).zkProver() == address(0)) revert InvalidParentGame();
+            if (
+                AggregateVerifier(address(parentGame)).teeProver() == address(0)
+                    && AggregateVerifier(address(parentGame)).zkProver() == address(0)
+            ) revert InvalidParentGame();
 
             startingOutputRoot = Proposal({
-                l2SequenceNumber: parentGame.l2SequenceNumber(),
-                root: Hash.wrap(parentGame.rootClaim().raw())
+                l2SequenceNumber: parentGame.l2SequenceNumber(), root: Hash.wrap(parentGame.rootClaim().raw())
             });
         } else {
             // When there is no parent game, the starting output root is the anchor state for the game type.
-            (startingOutputRoot.root, startingOutputRoot.l2SequenceNumber) =
-                ANCHOR_STATE_REGISTRY.getAnchorRoot();
+            (startingOutputRoot.root, startingOutputRoot.l2SequenceNumber) = ANCHOR_STATE_REGISTRY.getAnchorRoot();
         }
 
         // The block number must be BLOCK_INTERVAL blocks after the starting block number.
@@ -274,8 +269,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
             // Bond can be reclaimed after a ZK proof is provided.
             bondRecipient = gameCreator();
-        }
-        else {
+        } else {
             revert InvalidProofType();
         }
 
@@ -321,15 +315,18 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         if (status != GameStatus.IN_PROGRESS) revert ClaimAlreadyResolved();
 
         // This game cannot be blacklisted or retired.
-        if (ANCHOR_STATE_REGISTRY.isGameBlacklisted(IDisputeGame(address(this))) || ANCHOR_STATE_REGISTRY.isGameRetired(IDisputeGame(address(this)))) revert InvalidGame();
+        if (
+            ANCHOR_STATE_REGISTRY.isGameBlacklisted(IDisputeGame(address(this)))
+                || ANCHOR_STATE_REGISTRY.isGameRetired(IDisputeGame(address(this)))
+        ) revert InvalidGame();
 
         // The parent game cannot have been challenged
         if (_getParentGameStatus() == GameStatus.CHALLENGER_WINS) revert InvalidParentGame();
-        
+
         // The TEE prover must not be empty. You should nullify the game if you want to challenge.
         if (provingData.teeProver == address(0)) revert MissingTEEProof();
         if (provingData.zkProver != address(0)) revert AlreadyProven();
-        
+
         (,, IDisputeGame game) = DISPUTE_GAME_FACTORY.gameAtIndex(gameIndex);
 
         AggregateVerifier challengingGame = AggregateVerifier(address(game));
@@ -347,9 +344,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         if (challengingGame.zkProver() == address(0)) revert MissingZKProof();
 
         // The game must be respected, not blacklisted, and not retired.
-        if (!ANCHOR_STATE_REGISTRY.isGameRespected(game) || ANCHOR_STATE_REGISTRY.isGameBlacklisted(game) || ANCHOR_STATE_REGISTRY.isGameRetired(game)) {
+        if (
+            !ANCHOR_STATE_REGISTRY.isGameRespected(game) || ANCHOR_STATE_REGISTRY.isGameBlacklisted(game)
+                || ANCHOR_STATE_REGISTRY.isGameRetired(game)
+        ) {
             revert InvalidGame();
-        }   
+        }
 
         // Update the counteredBy address
         provingData.counteredByGameAddress = address(challengingGame);
@@ -379,11 +379,14 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
         // Can only nullify a game that has a proof of the same type.
         if (proofType == ProofType.TEE) {
-            if (provingData.teeProver == address(0) || AggregateVerifier(address(game)).teeProver() == address(0)) revert MissingTEEProof();
+            if (provingData.teeProver == address(0) || AggregateVerifier(address(game)).teeProver() == address(0)) {
+                revert MissingTEEProof();
+            }
         } else if (proofType == ProofType.ZK) {
-            if (provingData.zkProver == address(0) || AggregateVerifier(address(game)).zkProver() == address(0)) revert MissingZKProof();
-        }
-        else {
+            if (provingData.zkProver == address(0) || AggregateVerifier(address(game)).zkProver() == address(0)) {
+                revert MissingZKProof();
+            }
+        } else {
             revert InvalidProofType();
         }
 
@@ -398,7 +401,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         if (game.rootClaim().raw() == rootClaim().raw()) revert IncorrectRootClaim();
 
         // The game must be respected, not blacklisted, and not retired.
-        if (!ANCHOR_STATE_REGISTRY.isGameRespected(game) || ANCHOR_STATE_REGISTRY.isGameBlacklisted(game) || ANCHOR_STATE_REGISTRY.isGameRetired(game)) {
+        if (
+            !ANCHOR_STATE_REGISTRY.isGameRespected(game) || ANCHOR_STATE_REGISTRY.isGameBlacklisted(game)
+                || ANCHOR_STATE_REGISTRY.isGameRetired(game)
+        ) {
             revert InvalidGame();
         }
 
@@ -413,14 +419,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     }
 
     /// @notice Claim the credit belonging to the bond recipient. Reverts if the game isn't
-    ///         finalized or if the bond transfer fails. 
+    ///         finalized or if the bond transfer fails.
     function claimCredit() external nonReentrant {
         // The bond recipient must not be empty.
         if (bondRecipient == address(0)) revert BondRecipientEmpty();
 
         // If this game was challenged, the countered by game must be valid.
         if (provingData.counteredByGameAddress != address(0)) {
-            if (IDisputeGame(provingData.counteredByGameAddress).status() != GameStatus.DEFENDER_WINS) revert InvalidCounteredByGame();
+            if (IDisputeGame(provingData.counteredByGameAddress).status() != GameStatus.DEFENDER_WINS) {
+                revert InvalidCounteredByGame();
+            }
         }
 
         uint256 balanceToClaim = address(this).balance;
@@ -438,7 +446,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
     /// @notice Closes the game by trying to update the anchor state.
     function closeGame() external {
-        // We won't close the game if the system is currently paused. 
+        // We won't close the game if the system is currently paused.
         if (ANCHOR_STATE_REGISTRY.paused()) {
             revert GamePaused();
         }
@@ -458,7 +466,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // Try to update the anchor game first. Won't always succeed because delays can lead
         // to situations in which this game might not be eligible to be a new anchor game.
         // eip150-safe
-        try ANCHOR_STATE_REGISTRY.setAnchorState(IDisputeGame(address(this))) { } catch { }
+        try ANCHOR_STATE_REGISTRY.setAnchorState(IDisputeGame(address(this))) {} catch {}
     }
 
     /// @notice The starting block number of the game.
@@ -521,12 +529,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice Getter for the extra data.
     function extraData() public pure returns (bytes memory) {
         // The extra data starts at the second word within the cwia calldata and
-        // is 36 bytes long. 
+        // is 36 bytes long.
         // 32 bytes are for the l2BlockNumber
         // 4 bytes are for the parentIndex
         return _getArgBytes(0x54, 0x24);
     }
-    
+
     /// @notice The L2 sequence number for which this game is proposing an output root (in this case - the block number).
     function l2SequenceNumber() public pure returns (uint256) {
         return _getArgUint256(0x54);
@@ -546,16 +554,18 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // The game must be in progress.
         if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
 
-        bytes32 journal = keccak256(abi.encodePacked(
-            msg.sender, 
-            l1Head(),
-            startingOutputRoot.root,
-            startingOutputRoot.l2SequenceNumber,
-            rootClaim(),
-            l2SequenceNumber(),
-            CONFIG_HASH,
-            TEE_IMAGE_HASH
-        ));
+        bytes32 journal = keccak256(
+            abi.encodePacked(
+                msg.sender,
+                l1Head(),
+                startingOutputRoot.root,
+                startingOutputRoot.l2SequenceNumber,
+                rootClaim(),
+                l2SequenceNumber(),
+                CONFIG_HASH,
+                TEE_IMAGE_HASH
+            )
+        );
 
         // Validate the proof.
         if (!TEE_VERIFIER.verify(proofBytes, journal)) revert InvalidProof();
@@ -573,16 +583,18 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // The game must be in progress or challenged (to allow nullification).
         if (status == GameStatus.DEFENDER_WINS) revert ClaimAlreadyResolved();
 
-        bytes32 journal = keccak256(abi.encodePacked(
-            msg.sender, 
-            l1Head(),
-            startingOutputRoot.root,
-            startingOutputRoot.l2SequenceNumber,
-            rootClaim(),
-            l2SequenceNumber(),
-            CONFIG_HASH,
-            ZK_IMAGE_HASH
-        ));
+        bytes32 journal = keccak256(
+            abi.encodePacked(
+                msg.sender,
+                l1Head(),
+                startingOutputRoot.root,
+                startingOutputRoot.l2SequenceNumber,
+                rootClaim(),
+                l2SequenceNumber(),
+                CONFIG_HASH,
+                ZK_IMAGE_HASH
+            )
+        );
 
         // Validate the proof.
         if (!ZK_VERIFIER.verify(proofBytes, journal)) revert InvalidProof();
@@ -601,7 +613,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         } else {
             revert NoProofProvided();
         }
-        provingData.expectedResolution = Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, provingData.expectedResolution.raw())));
+        provingData.expectedResolution =
+            Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, provingData.expectedResolution.raw())));
     }
 
     /// @notice Returns the status of the parent game.
@@ -609,7 +622,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     function _getParentGameStatus() internal view returns (GameStatus) {
         if (parentIndex() != type(uint32).max) {
             (,, IDisputeGame parentGame) = DISPUTE_GAME_FACTORY.gameAtIndex(parentIndex());
-            if (ANCHOR_STATE_REGISTRY.isGameBlacklisted(parentGame) || ANCHOR_STATE_REGISTRY.isGameRetired(parentGame)) {
+            if (ANCHOR_STATE_REGISTRY.isGameBlacklisted(parentGame) || ANCHOR_STATE_REGISTRY.isGameRetired(parentGame))
+            {
                 return GameStatus.CHALLENGER_WINS;
             }
             return parentGame.status();

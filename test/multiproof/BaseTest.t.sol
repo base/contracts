@@ -1,24 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Test, console2 } from "forge-std/Test.sol";
+import {Test, console2} from "forge-std/Test.sol";
 import "src/AggregateVerifier.sol";
 import "src/Errors.sol";
 
 import {IVerifier} from "src/interfaces/IVerifier.sol";
 
 // Mocks
-import { MockVerifier } from "src/mocks/MockVerifier.sol";
-import { MockSystemConfig } from "src/mocks/MockSystemConfig.sol";
+import {MockVerifier} from "src/mocks/MockVerifier.sol";
+import {MockSystemConfig} from "src/mocks/MockSystemConfig.sol";
 
 // Optimism
-import { IDisputeGame, DisputeGameFactory } from "optimism/src/dispute/DisputeGameFactory.sol";
-import { GameType, Duration, Claim } from "optimism/src/dispute/lib/Types.sol";
-import { ISystemConfig, IDisputeGameFactory, Hash, Proposal, AnchorStateRegistry } from "optimism/src/dispute/AnchorStateRegistry.sol";
+import {IDisputeGame, DisputeGameFactory} from "optimism/src/dispute/DisputeGameFactory.sol";
+import {GameType, Duration, Claim} from "optimism/src/dispute/lib/Types.sol";
+import {
+    ISystemConfig,
+    IDisputeGameFactory,
+    Hash,
+    Proposal,
+    AnchorStateRegistry
+} from "optimism/src/dispute/AnchorStateRegistry.sol";
 
 // OpenZeppelin
-import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract BaseTest is Test {
     // Constants
@@ -74,19 +80,13 @@ contract BaseTest is Test {
         proxyAdmin = new ProxyAdmin();
 
         // Deploy proxy for anchor state registry
-        TransparentUpgradeableProxy anchorStateRegistryProxy = new TransparentUpgradeableProxy(
-            address(_anchorStateRegistry),
-            address(proxyAdmin),
-            ""
-        );
+        TransparentUpgradeableProxy anchorStateRegistryProxy =
+            new TransparentUpgradeableProxy(address(_anchorStateRegistry), address(proxyAdmin), "");
         anchorStateRegistry = AnchorStateRegistry(address(anchorStateRegistryProxy));
-        
+
         // Deploy proxy for factory
-        TransparentUpgradeableProxy factoryProxy = new TransparentUpgradeableProxy(
-            address(_factory),
-            address(proxyAdmin),
-            ""
-        );
+        TransparentUpgradeableProxy factoryProxy =
+            new TransparentUpgradeableProxy(address(_factory), address(proxyAdmin), "");
         factory = DisputeGameFactory(address(factoryProxy));
 
         // Deploy the verifiers
@@ -96,12 +96,18 @@ contract BaseTest is Test {
 
     function _initializeProxies() internal {
         // Initialize the proxies
-        anchorStateRegistry.initialize(ISystemConfig(address(systemConfig)), IDisputeGameFactory(address(factory)), Proposal({root: Hash.wrap(keccak256(abi.encode(currentL2BlockNumber))), l2SequenceNumber: currentL2BlockNumber}), GameType.wrap(0));
+        anchorStateRegistry.initialize(
+            ISystemConfig(address(systemConfig)),
+            IDisputeGameFactory(address(factory)),
+            Proposal({
+                root: Hash.wrap(keccak256(abi.encode(currentL2BlockNumber))), l2SequenceNumber: currentL2BlockNumber
+            }),
+            GameType.wrap(0)
+        );
         factory.initialize(address(this));
     }
 
     function _deployAndSetAggregateVerifier() internal {
-
         // Deploy the dispute game relay implementation
         AggregateVerifier aggregateVerifierImpl = new AggregateVerifier(
             AGGREGATE_VERIFIER_GAME_TYPE,
@@ -124,24 +130,17 @@ contract BaseTest is Test {
     }
 
     // Helper function to create a game via factory
-    function _createAggregateVerifierGame(
-        address creator,
-        Claim rootClaim,
-        uint256 l2BlockNumber,
-        uint32 parentIndex
-    ) internal returns (AggregateVerifier game) {
-        bytes memory extraData = abi.encodePacked(
-            uint256(l2BlockNumber),
-            uint32(parentIndex)
-        );
-        
+    function _createAggregateVerifierGame(address creator, Claim rootClaim, uint256 l2BlockNumber, uint32 parentIndex)
+        internal
+        returns (AggregateVerifier game)
+    {
+        bytes memory extraData = abi.encodePacked(uint256(l2BlockNumber), uint32(parentIndex));
+
         vm.deal(creator, INIT_BOND);
         vm.prank(creator);
-        return AggregateVerifier(address(factory.create{value: INIT_BOND}(
-            AGGREGATE_VERIFIER_GAME_TYPE,
-            rootClaim,
-            extraData
-        )));
+        return AggregateVerifier(
+            address(factory.create{value: INIT_BOND}(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData))
+        );
     }
 
     function _provideProof(AggregateVerifier game, address prover, bool isTeeProof, bytes memory proof) internal {
