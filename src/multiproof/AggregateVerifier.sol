@@ -17,8 +17,9 @@ import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegi
 import {IVerifier} from "./interfaces/IVerifier.sol";
 
 import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
+import { ReentrancyGuard } from "solady/utils/ReentrancyGuard.sol";
 
-contract AggregateVerifier is Clone, IDisputeGame {
+contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     ////////////////////////////////////////////////////////////////
     //                         Enums                              //
     ////////////////////////////////////////////////////////////////
@@ -476,7 +477,7 @@ contract AggregateVerifier is Clone, IDisputeGame {
 
     /// @notice Claim the credit belonging to the bond recipient. Reverts if the game isn't
     ///         finalized or if the bond transfer fails. 
-    function claimCredit() external {
+    function claimCredit() nonReentrant external {
         // The bond recipient must not be empty.
         if (bondRecipient == address(0)) revert BondRecipientEmpty();
 
