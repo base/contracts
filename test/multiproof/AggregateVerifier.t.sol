@@ -57,6 +57,18 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(address(game).balance, INIT_BOND);
     }
 
+    function testInitializeFailsIfInvalidCallDataSize() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
+        
+        vm.deal(TEE_PROVER, INIT_BOND);
+        bytes memory extraData = "";
+
+        vm.prank(TEE_PROVER);
+        vm.expectRevert(BadExtraData.selector);
+        factory.create{value: INIT_BOND}(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData);
+    }
+
     function testInitializeFailsIfNotTEEProposer() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
