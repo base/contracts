@@ -248,23 +248,23 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     }
 
     /// @notice The L2 sequence number for which this game is proposing an output root (in this case - the block number).
-    function l2SequenceNumber() public pure returns (uint256 l2SequenceNumber_) {
-        l2SequenceNumber_ = _getArgUint256(0x54);
+    function l2SequenceNumber() public pure returns (uint256) {
+        return _getArgUint256(0x54);
     }
 
     /// @notice The parent index of the game.
-    function parentIndex() public pure returns (uint32 parentIndex_) {
-        parentIndex_ = _getArgUint32(0x74);
+    function parentIndex() public pure returns (uint32) {
+        return _getArgUint32(0x74);
     }
 
     /// @notice The starting block number of the game.
-    function startingBlockNumber() external view returns (uint256 startingBlockNumber_) {
-        startingBlockNumber_ = startingOutputRoot.l2SequenceNumber;
+    function startingBlockNumber() external view returns (uint256) {
+        return startingOutputRoot.l2SequenceNumber;
     }
 
     /// @notice The starting output root of the game.
-    function startingRootHash() external view returns (Hash startingRootHash_) {
-        startingRootHash_ = startingOutputRoot.root;
+    function startingRootHash() external view returns (Hash) {
+        return startingOutputRoot.root;
     }
 
     ////////////////////////////////////////////////////////////////
@@ -521,7 +521,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
     /// @notice Returns the status of the parent game.
     /// @dev If the parent game index is `uint32.max`, then the parent game's status is considered as `DEFENDER_WINS`.
-    function getParentGameStatus() private view returns (GameStatus) {
+    function getParentGameStatus() internal view returns (GameStatus) {
         if (parentIndex() != type(uint32).max) {
             (,, IDisputeGame parentGame) = DISPUTE_GAME_FACTORY.gameAtIndex(parentIndex());
             if (ANCHOR_STATE_REGISTRY.isGameBlacklisted(parentGame) || ANCHOR_STATE_REGISTRY.isGameRetired(parentGame)) {
@@ -555,33 +555,33 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice Getter for the creator of the dispute game.
     /// @dev `clones-with-immutable-args` argument #1
     /// @return creator_ The creator of the dispute game.
-    function gameCreator() public pure returns (address creator_) {
-        creator_ = _getArgAddress(0x00);
+    function gameCreator() public pure returns (address) {
+        return _getArgAddress(0x00);
     }
 
     /// @notice Getter for the root claim.
     /// @dev `clones-with-immutable-args` argument #2
     /// @return rootClaim_ The root claim of the DisputeGame.
-    function rootClaim() public pure returns (Claim rootClaim_) {
-        rootClaim_ = Claim.wrap(_getArgBytes32(0x14));
+    function rootClaim() public pure returns (Claim) {
+        return Claim.wrap(_getArgBytes32(0x14));
     }
 
     /// @notice Getter for the parent hash of the L1 block when the dispute game was created.
     /// @dev `clones-with-immutable-args` argument #3
     /// @return l1Head_ The parent hash of the L1 block when the dispute game was created.
-    function l1Head() public pure returns (Hash l1Head_) {
-        l1Head_ = Hash.wrap(_getArgBytes32(0x34));
+    function l1Head() public pure returns (Hash) {
+        return Hash.wrap(_getArgBytes32(0x34));
     }
 
     /// @notice Getter for the extra data.
     /// @dev `clones-with-immutable-args` argument #4
     /// @return extraData_ Any extra data supplied to the dispute game contract by the creator.
-    function extraData() public pure returns (bytes memory extraData_) {
+    function extraData() public pure returns (bytes memory) {
         // The extra data starts at the second word within the cwia calldata and
         // is 36 bytes long. 
         // 32 bytes are for the l2BlockNumber
         // 4 bytes are for the parentIndex
-        extraData_ = _getArgBytes(0x54, 0x24);
+        return _getArgBytes(0x54, 0x24);
     }
 
     /// @notice A compliant implementation of this interface should return the components of the
@@ -591,24 +591,22 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @return gameType_ The type of proof system being used.
     /// @return rootClaim_ The root claim of the DisputeGame.
     /// @return extraData_ Any extra data supplied to the dispute game contract by the creator.
-    function gameData() external view returns (GameType gameType_, Claim rootClaim_, bytes memory extraData_) {
-        gameType_ = GAME_TYPE;
-        rootClaim_ = rootClaim();
-        extraData_ = extraData();
+    function gameData() external view returns (GameType, Claim, bytes memory) {
+        return (GAME_TYPE, rootClaim(), extraData());
     }
 
-    function teeProver() external view returns (address teeProver_) {
-        teeProver_ = provingData.teeProver;
+    function teeProver() external view returns (address) {
+        return provingData.teeProver;
     }
 
-    function zkProver() external view returns (address zkProver_) {
-        zkProver_ = provingData.zkProver;
+    function zkProver() external view returns (address) {
+        return provingData.zkProver;
     }
 
     /// @notice Getter for the game type.
     /// @dev For compliance with the IDisputeGame interface.
     /// @return gameType_ The type of proof system being used.
-    function gameType() external view returns (GameType gameType_) {
-        gameType_ = GAME_TYPE;
+    function gameType() external view returns (GameType) {
+        return GAME_TYPE;
     }
 }
