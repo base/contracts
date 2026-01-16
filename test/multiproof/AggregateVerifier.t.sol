@@ -222,12 +222,14 @@ contract AggregateVerifierTest is BaseTest {
 
         // Cannot create a child game without a proof for the parent
         vm.expectRevert(AggregateVerifier.InvalidParentGame.selector);
+        // forge-lint: disable-next-line(unsafe-typecast)
         _createAggregateVerifierGame(TEE_PROVER, rootClaimChild, currentL2BlockNumber, uint32(parentGameIndex));
 
         // Provide proof for the parent game
         _provideProof(parentGame, TEE_PROVER, true, proof);
 
         // Create the child game
+        // forge-lint: disable-next-line(unsafe-typecast)
         _createAggregateVerifierGame(TEE_PROVER, rootClaimChild, currentL2BlockNumber, uint32(parentGameIndex));
     }
 }

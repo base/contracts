@@ -114,6 +114,7 @@ contract ChallengeTest is BaseTest {
         bytes memory zkProof = "zk-proof";
 
         AggregateVerifier game2 =
+        // forge-lint: disable-next-line(unsafe-typecast)
             _createAggregateVerifierGame(ZK_PROVER, rootClaim2, nextBlockNumber, uint32(game1Index));
 
         _provideProof(game2, ZK_PROVER, false, zkProof);
@@ -197,6 +198,7 @@ contract ChallengeTest is BaseTest {
         bytes memory childProof = "child-proof";
 
         AggregateVerifier childGame =
+        // forge-lint: disable-next-line(unsafe-typecast)
             _createAggregateVerifierGame(TEE_PROVER, rootClaim2, currentL2BlockNumber, uint32(parentGameIndex));
 
         _provideProof(childGame, TEE_PROVER, true, childProof);
