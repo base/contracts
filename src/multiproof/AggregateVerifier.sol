@@ -74,6 +74,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice The fast finalization delay.
     uint64 public constant FAST_FINALIZATION_DELAY = 1 days;
 
+    /// @notice The size of the initialize call data.
+    uint256 private constant INITIALIZE_CALLDATA_SIZE = 0x7E;
+
     /// @notice The anchor state registry.
     IAnchorStateRegistry internal immutable ANCHOR_STATE_REGISTRY;
 
@@ -189,7 +192,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // - 0x04 extraData (parentIndex)
         // - 0x02 CWIA bytes
         assembly {
-            if iszero(eq(calldatasize(), 0x7E)) {
+            if iszero(eq(calldatasize(), INITIALIZE_CALLDATA_SIZE)) {
                 // Store the selector for `BadExtraData()` & revert
                 mstore(0x00, 0x9824bdab)
                 revert(0x1C, 0x04)
