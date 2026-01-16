@@ -78,7 +78,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     uint256 private constant INITIALIZE_CALLDATA_SIZE = 0x7E;
 
     /// @notice The anchor state registry.
-    IAnchorStateRegistry internal immutable ANCHOR_STATE_REGISTRY;
+    IAnchorStateRegistry public immutable ANCHOR_STATE_REGISTRY;
 
     /// @notice The dispute game factory.
     IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
@@ -102,14 +102,14 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     address public immutable TEE_PROPOSER;
 
     /// @notice The game type ID.
-    GameType internal immutable GAME_TYPE;
+    GameType public immutable GAME_TYPE;
 
     /// @notice The chain ID of the L2 network this contract argues about.
-    uint256 internal immutable L2_CHAIN_ID;
+    uint256 public immutable L2_CHAIN_ID;
 
     /// @notice The block interval between each proposal. 
     /// @dev    The parent's block number + BLOCK_INTERVAL = this proposal's block number.
-    uint256 internal immutable BLOCK_INTERVAL;
+    uint256 public immutable BLOCK_INTERVAL;
 
     /// @notice The starting timestamp of the game.
     Timestamp public createdAt;
@@ -551,14 +551,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         provingData.expectedResolution = Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, provingData.expectedResolution.raw())));
     }
 
-    /// @notice Getter for the game type.
-    /// @dev The reference impl should be entirely different depending on the type (fault, validity)
-    ///      i.e. The game type should indicate the security model.
-    /// @return gameType_ The type of proof system being used.
-    function gameType() public view returns (GameType gameType_) {
-        gameType_ = GAME_TYPE;
-    }
-
     /// @notice Getter for the creator of the dispute game.
     /// @dev `clones-with-immutable-args` argument #1
     /// @return creator_ The creator of the dispute game.
@@ -610,21 +602,5 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
     function zkProver() external view returns (address zkProver_) {
         zkProver_ = provingData.zkProver;
-    }
-    
-    ////////////////////////////////////////////////////////////////
-    //                     IMMUTABLE GETTERS                      //
-    ////////////////////////////////////////////////////////////////
-
-    function l2ChainId() external view returns (uint256 l2ChainId_) {
-        l2ChainId_ = L2_CHAIN_ID;
-    }
-
-    function blockInterval() external view returns (uint256 blockInterval_) {
-        blockInterval_ = BLOCK_INTERVAL;
-    }
-
-    function anchorStateRegistry() external view returns (IAnchorStateRegistry anchorStateRegistry_) {
-        anchorStateRegistry_ = ANCHOR_STATE_REGISTRY;
     }
 }
