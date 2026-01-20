@@ -209,8 +209,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice When the countered by game is invalid.
     error InvalidCounteredByGame();
 
-    /// @param gameType The game type.
-    /// @param anchorStateRegistry The anchor state registry.
+    /// @param gameType_ The game type.
+    /// @param anchorStateRegistry_ The anchor state registry.
     /// @param teeVerifier The TEE verifier.
     /// @param zkVerifier The ZK verifier.
     /// @param teeImageHash The hash of the TEE image.
@@ -220,8 +220,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @param l2ChainId The chain ID of the L2 network.
     /// @param blockInterval The block interval.
     constructor(
-        GameType gameType,
-        IAnchorStateRegistry anchorStateRegistry,
+        GameType gameType_,
+        IAnchorStateRegistry anchorStateRegistry_,
         IVerifier teeVerifier,
         IVerifier zkVerifier,
         bytes32 teeImageHash,
@@ -232,8 +232,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         uint256 blockInterval
     ) {
         // Set up initial game state.
-        GAME_TYPE = gameType;
-        ANCHOR_STATE_REGISTRY = anchorStateRegistry;
+        GAME_TYPE = gameType_;
+        ANCHOR_STATE_REGISTRY = anchorStateRegistry_;
         DISPUTE_GAME_FACTORY = ANCHOR_STATE_REGISTRY.disputeGameFactory();
         TEE_VERIFIER = teeVerifier;
         ZK_VERIFIER = zkVerifier;
