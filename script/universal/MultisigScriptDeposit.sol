@@ -132,6 +132,7 @@ abstract contract MultisigScriptDeposit is MultisigScript {
     ///      specified `value` field - no additional developer action is required.
     function _buildCalls() internal view virtual override returns (Call[] memory) {
         CBMulticall.Call3Value[] memory l2Calls = _buildL2Calls();
+        require(l2Calls.length > 0, "MultisigScriptDeposit: no L2 calls");
         uint256 totalValue = _sumL2CallValues(l2Calls);
 
         // Encode L2 calls as a multicall
