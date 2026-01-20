@@ -14,6 +14,14 @@ This is the core script for building Forge scripts that interact with Gnosis Saf
 - **Workflows**: Provides standard functions for `sign` (generating signatures), `approve` (onchain approval for nested Safes), `simulate` (dry-run with state overrides), and `run` (execution).
 - **Simulation**: Integrates with `Simulation.sol` to provide detailed simulation links and state diffs.
 
+### `MultisigScriptDeposit.sol`
+
+An extension of `MultisigScript` for L1 → L2 deposit transactions. Task writers define L2 calls via `_buildL2Calls()`, and the framework automatically wraps them in an `OptimismPortal.depositTransaction` call. Features:
+
+- **ETH Bridging**: Supports bridging ETH along with the message.
+- **Chain-Aware Defaults**: Provides default `OptimismPortal` addresses for Mainnet and Sepolia.
+- **Gas Limit**: Set via `L2_GAS_LIMIT` env var (all signers must use the same value).
+
 ### `Simulation.sol`
 
 A library for simulating multisig transactions with state overrides. It is particularly useful for:
