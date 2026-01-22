@@ -176,15 +176,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice When there is no ZK proof.
     error MissingZKProof();
 
-    /// @notice When the parent index is not the same.
-    error IncorrectParentIndex();
-
-    /// @notice When the block number is not the same.
-    error IncorrectBlockNumber();
-
-    /// @notice When the root claim is not different.
-    error IncorrectRootClaim();
-
     /// @notice When the game is invalid.
     error InvalidGame();
 
@@ -267,25 +258,19 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // - 0x02 CWIA bytes
         assembly {
             if iszero(eq(calldatasize(), INITIALIZE_CALLDATA_SIZE)) {
-                // Store the selector for `BadExtraData()` & revert
+                // Store the selector for `BadExtraData()` & revert.
                 mstore(0x00, 0x9824bdab)
                 revert(0x1C, 0x04)
             }
         }
 
-        // The first game is initialized with a parent index of uint32.max
+        // The first game is initialized with a parent index of uint32.max.
         if (parentIndex() != type(uint32).max) {
-            // For subsequent games, get the parent game's information
+            // For subsequent games, get the parent game's information.
             (,, IDisputeGame parentGame) = DISPUTE_GAME_FACTORY.gameAtIndex(parentIndex());
 
             // Parent game must be respected, not blacklisted, and not retired.
-            if (
-                !ANCHOR_STATE_REGISTRY.isGameRespected(parentGame)
-                    || ANCHOR_STATE_REGISTRY.isGameBlacklisted(parentGame)
-                    || ANCHOR_STATE_REGISTRY.isGameRetired(parentGame)
-            ) {
-                revert InvalidParentGame();
-            }
+            if (!_isValidGame(parentGame)) revert InvalidParentGame();
 
             // The parent game must be a valid game.
             if (parentGame.status() == GameStatus.CHALLENGER_WINS) revert InvalidParentGame();
@@ -312,10 +297,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // Set the game as initialized.
         initialized = true;
 
-        // Set the game's starting timestamp
+        // Set the game's starting timestamp.
         createdAt = Timestamp.wrap(uint64(block.timestamp));
 
-        // Game cannot resolve without a proof
+        // Game cannot resolve without a proof.
         provingData.expectedResolution = Timestamp.wrap(type(uint64).max);
 
         wasRespectedGameTypeWhenCreated =
@@ -383,43 +368,27 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         if (status != GameStatus.IN_PROGRESS) revert ClaimAlreadyResolved();
 
         // This game cannot be blacklisted or retired.
-        if (
-            ANCHOR_STATE_REGISTRY.isGameBlacklisted(IDisputeGame(address(this)))
-                || ANCHOR_STATE_REGISTRY.isGameRetired(IDisputeGame(address(this)))
-        ) revert InvalidGame();
+        if (!_isValidGame(IDisputeGame(address(this)))) revert InvalidGame();
 
-        // The parent game cannot have been challenged
+        // The parent game cannot have been challenged.
         if (_getParentGameStatus() == GameStatus.CHALLENGER_WINS) revert InvalidParentGame();
 
-        // The TEE prover must not be empty. You should nullify the game if you want to challenge.
+        // The TEE prover must not be empty.
+        // You should nullify the game if a ZK proof has already been provided.
         if (provingData.teeProver == address(0)) revert MissingTEEProof();
         if (provingData.zkProver != address(0)) revert AlreadyProven();
 
         (,, IDisputeGame game) = DISPUTE_GAME_FACTORY.gameAtIndex(gameIndex);
 
         AggregateVerifier challengingGame = AggregateVerifier(address(game));
-        // The parent index must be the same.
-        if (challengingGame.parentIndex() != parentIndex()) revert IncorrectParentIndex();
 
-        // The block number must be the same.
-        if (challengingGame.l2SequenceNumber() != l2SequenceNumber()) revert IncorrectBlockNumber();
-
-        // The root claim must be different.
-        // Not actually reachable as the factory prevents the same proposal from being created.
-        if (challengingGame.rootClaim().raw() == rootClaim().raw()) revert IncorrectRootClaim();
+        // The game must be a valid game used to challenge.
+        if (!_isValidChallengingGame(challengingGame)) revert InvalidGame();
 
         // The ZK prover must not be empty.
         if (challengingGame.zkProver() == address(0)) revert MissingZKProof();
 
-        // The game must be respected, not blacklisted, and not retired.
-        if (
-            !ANCHOR_STATE_REGISTRY.isGameRespected(game) || ANCHOR_STATE_REGISTRY.isGameBlacklisted(game)
-                || ANCHOR_STATE_REGISTRY.isGameRetired(game)
-        ) {
-            revert InvalidGame();
-        }
-
-        // Update the counteredBy address
+        // Update the counteredBy address.
         provingData.counteredByGameAddress = address(challengingGame);
 
         // Set the game as challenged.
@@ -429,7 +398,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // Bond cannot be claimed until the game used to challenge resolves as DEFENDER_WINS.
         bondRecipient = challengingGame.zkProver();
 
-        // Emit the challenged event
+        // Emit the challenged event.
         emit Challenged(challengingGame.zkProver(), game);
     }
 
@@ -440,7 +409,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     ///      block number but a different root claim as the current game.
     function nullify(uint256 gameIndex, ProofType proofType) external {
         // Can only nullify a game that has not resolved yet.
-        // We can nullify a challenged game in case of a soundness issue
+        // We can nullify a challenged game in case of a soundness issue.
         if (status == GameStatus.DEFENDER_WINS) revert ClaimAlreadyResolved();
 
         (,, IDisputeGame game) = DISPUTE_GAME_FACTORY.gameAtIndex(gameIndex);
@@ -458,29 +427,14 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
             revert InvalidProofType();
         }
 
-        // The parent index must be the same.
-        if (AggregateVerifier(address(game)).parentIndex() != parentIndex()) revert IncorrectParentIndex();
-
-        // The block number must be the same.
-        if (game.l2SequenceNumber() != l2SequenceNumber()) revert IncorrectBlockNumber();
-
-        // The root claim must be different.
-        // Not actually reachable as the factory prevents the same proposal from being created.
-        if (game.rootClaim().raw() == rootClaim().raw()) revert IncorrectRootClaim();
-
-        // The game must be respected, not blacklisted, and not retired.
-        if (
-            !ANCHOR_STATE_REGISTRY.isGameRespected(game) || ANCHOR_STATE_REGISTRY.isGameBlacklisted(game)
-                || ANCHOR_STATE_REGISTRY.isGameRetired(game)
-        ) {
-            revert InvalidGame();
-        }
+        // The game must be a valid game used to nullify.
+        if (!_isValidChallengingGame(game)) revert InvalidGame();
 
         // Set the game as challenged so that child games can't resolve.
         status = GameStatus.CHALLENGER_WINS;
         // Refund the bond. This can override a challenge.
         bondRecipient = gameCreator();
-        // To allow bond to be claimed in case challenging game is nullified
+        // To allow bond to be refunded as the challenging game is no longer valid.
         delete provingData.counteredByGameAddress;
 
         emit Nullified(msg.sender, game);
@@ -705,5 +659,26 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // If this is the first dispute game (i.e. parent game index is `uint32.max`), then the
         // parent game's status is considered as `DEFENDER_WINS`.
         return GameStatus.DEFENDER_WINS;
+    }
+
+    /// @notice Checks if the game is respected, not blacklisted, and not retired.
+    /// @param game The game to check.
+    function _isValidGame(IDisputeGame game) internal view returns (bool) {
+        return ANCHOR_STATE_REGISTRY.isGameRespected(game) && !ANCHOR_STATE_REGISTRY.isGameBlacklisted(game)
+            && !ANCHOR_STATE_REGISTRY.isGameRetired(game);
+    }
+
+    /// @notice Checks if the game is a valid game used to challenge or nullify.
+    /// @param game The game to check.
+    function _isValidChallengingGame(IDisputeGame game) internal view returns (bool) {
+        return
+        // The parent game must be the same.
+        AggregateVerifier(address(game)).parentIndex() == parentIndex() && 
+            // The block number must be the same.
+            game.l2SequenceNumber() == l2SequenceNumber() && 
+            // The root claim must be different.
+            game.rootClaim().raw() != rootClaim().raw() && 
+            // The game must be valid.
+            _isValidGame(game);
     }
 }

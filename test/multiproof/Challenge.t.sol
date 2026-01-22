@@ -115,12 +115,12 @@ contract ChallengeTest is BaseTest {
 
         AggregateVerifier game2 =
         // forge-lint: disable-next-line(unsafe-typecast)
-            _createAggregateVerifierGame(ZK_PROVER, rootClaim2, nextBlockNumber, uint32(game1Index));
+        _createAggregateVerifierGame(ZK_PROVER, rootClaim2, nextBlockNumber, uint32(game1Index));
 
         _provideProof(game2, ZK_PROVER, false, zkProof);
         uint256 gameIndex = factory.gameCount() - 1;
 
-        vm.expectRevert(AggregateVerifier.IncorrectParentIndex.selector);
+        vm.expectRevert(AggregateVerifier.InvalidGame.selector);
         game1.challenge(gameIndex);
     }
 
@@ -199,7 +199,7 @@ contract ChallengeTest is BaseTest {
 
         AggregateVerifier childGame =
         // forge-lint: disable-next-line(unsafe-typecast)
-            _createAggregateVerifierGame(TEE_PROVER, rootClaim2, currentL2BlockNumber, uint32(parentGameIndex));
+        _createAggregateVerifierGame(TEE_PROVER, rootClaim2, currentL2BlockNumber, uint32(parentGameIndex));
 
         _provideProof(childGame, TEE_PROVER, true, childProof);
 
