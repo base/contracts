@@ -7,7 +7,7 @@ import {Script} from "lib/forge-std/src/Script.sol";
 import {stdJson} from "lib/forge-std/src/StdJson.sol";
 import {Vm} from "lib/forge-std/src/Vm.sol";
 
-import {CBMulticall} from "../../src/utils/CBMulticall.sol";
+import {ICBMulticall, Call3, Call3Value} from "../../src/utils/ICBMulticall.sol";
 
 import {IGnosisSafe, Enum} from "./IGnosisSafe.sol";
 import {Signatures} from "./Signatures.sol";
@@ -406,7 +406,7 @@ abstract contract MultisigScript is Script {
             return scriptCalls[0];
         }
 
-        CBMulticall.Call3[] memory rootCalls = new CBMulticall.Call3[](scriptCalls.length);
+        Call3[] memory rootCalls = new Call3[](scriptCalls.length);
         uint256 rootCallsIndex;
 
         Call[] memory currentGroup = new Call[](scriptCalls.length);
@@ -453,7 +453,7 @@ abstract contract MultisigScript is Script {
         return Call({
             operation: Enum.Operation.DelegateCall,
             target: CB_MULTICALL,
-            data: abi.encodeCall(CBMulticall.aggregateDelegateCalls, (rootCalls)),
+            data: abi.encodeCall(ICBMulticall.aggregateDelegateCalls, (rootCalls)),
             value: 0
         });
     }
@@ -469,7 +469,7 @@ abstract contract MultisigScript is Script {
     /// @return rootCallsCount The number of root calls appended.
     function _aggregateCalls(
         Call3Type groupType,
-        CBMulticall.Call3[] memory rootCalls,
+        Call3[] memory rootCalls,
         uint256 rootCallsIndex,
         Call[] memory currentGroup,
         uint256 currentGroupIndex
@@ -485,29 +485,29 @@ abstract contract MultisigScript is Script {
         }
         // Otherwise aggregate the calls into a single Multicall call.
         else {
-            CBMulticall.Call3 memory rootCall;
+            Call3 memory rootCall;
 
             if (groupType == Call3Type.CALL) {
-                CBMulticall.Call3[] memory call3s = new CBMulticall.Call3[](currentGroupIndex);
+                Call3[] memory call3s = new Call3[](currentGroupIndex);
                 for (uint256 j; j < currentGroupIndex; j++) {
                     call3s[j] = _toCall3(currentGroup[j]);
                 }
 
-                rootCall = CBMulticall.Call3({
+                rootCall = Call3({
                     target: CB_MULTICALL,
                     allowFailure: false,
-                    callData: abi.encodeCall(CBMulticall.aggregate3, (call3s))
+                    callData: abi.encodeCall(ICBMulticall.aggregate3, (call3s))
                 });
             } else {
-                CBMulticall.Call3Value[] memory call3Values = new CBMulticall.Call3Value[](currentGroupIndex);
+                Call3Value[] memory call3Values = new Call3Value[](currentGroupIndex);
                 for (uint256 j; j < currentGroupIndex; j++) {
                     call3Values[j] = _toCall3Value(currentGroup[j]);
                 }
 
-                rootCall = CBMulticall.Call3({
+                rootCall = Call3({
                     target: CB_MULTICALL,
                     allowFailure: false,
-                    callData: abi.encodeCall(CBMulticall.aggregate3Value, (call3Values))
+                    callData: abi.encodeCall(ICBMulticall.aggregate3Value, (call3Values))
                 });
             }
 
@@ -620,7 +620,7 @@ abstract contract MultisigScript is Script {
 
         // Build the `execTransaction` calls chain for all the safe-to-safe approvals followed by the final script call.
         Call[] memory execTransactionCalls = _buildExecTransactionCalls({safes: safes, callsChain: callsChain});
-        bytes memory txData = abi.encodeCall(CBMulticall.aggregate3, (_toCall3s(execTransactionCalls)));
+        bytes memory txData = abi.encodeCall(ICBMulticall.aggregate3, (_toCall3s(execTransactionCalls)));
         console.logBytes(txData);
 
         console.log("---\nSimulation link:");
@@ -895,44 +895,43 @@ abstract contract MultisigScript is Script {
         return Call3Type.CALL_VALUE;
     }
 
-    /// @notice Converts the given call to the format expected by the `CBMulticall.aggregate3` function.
+    /// @notice Converts the given call to the format expected by the `ICBMulticall.aggregate3` function.
     ///
-    /// @param call The call to convert to the format expected by the `CBMulticall.aggregate3` function.
+    /// @param call The call to convert to the format expected by the `ICBMulticall.aggregate3` function.
     ///
-    /// @return The call in the format expected by the `CBMulticall.aggregate3` function.
-    function _toCall3(Call memory call) internal pure returns (CBMulticall.Call3 memory) {
+    /// @return The call in the format expected by the `ICBMulticall.aggregate3` function.
+    function _toCall3(Call memory call) internal pure returns (Call3 memory) {
         require(call.operation == Enum.Operation.Call, "MultisigScript::_toCall3: Operation must be Call");
         require(call.value == 0, "MultisigScript::_toCall3: Value must be 0");
 
-        return CBMulticall.Call3({target: call.target, allowFailure: false, callData: call.data});
+        return Call3({target: call.target, allowFailure: false, callData: call.data});
     }
 
-    /// @notice Converts the given call to the format expected by the `CBMulticall.aggregate3Value` function.
+    /// @notice Converts the given call to the format expected by the `ICBMulticall.aggregate3Value` function.
     ///
-    /// @param call The call to convert to the format expected by the `CBMulticall.aggregate3Value` function.
+    /// @param call The call to convert to the format expected by the `ICBMulticall.aggregate3Value` function.
     ///
-    /// @return The call in the format expected by the `CBMulticall.aggregate3Value` function.
-    function _toCall3Value(Call memory call) internal pure returns (CBMulticall.Call3Value memory) {
+    /// @return The call in the format expected by the `ICBMulticall.aggregate3Value` function.
+    function _toCall3Value(Call memory call) internal pure returns (Call3Value memory) {
         require(call.operation == Enum.Operation.Call, "MultisigScript::_toCall3Value: Operation must be Call");
         require(call.value > 0, "MultisigScript::_toCall3Value: Value must be greater than 0");
 
-        return
-            CBMulticall.Call3Value({target: call.target, allowFailure: false, value: call.value, callData: call.data});
+        return Call3Value({target: call.target, allowFailure: false, value: call.value, callData: call.data});
     }
 
-    /// @notice Converts the given call to the format expected by the `CBMulticall.aggregateDelegateCalls` function.
+    /// @notice Converts the given call to the format expected by the `ICBMulticall.aggregateDelegateCalls` function.
     ///
-    /// @param call The call to convert to the format expected by the `CBMulticall.aggregateDelegateCalls` function.
+    /// @param call The call to convert to the format expected by the `ICBMulticall.aggregateDelegateCalls` function.
     ///
-    /// @return The call in the format expected by the `CBMulticall.aggregateDelegateCalls` function.
-    function _toDelegateCall3(Call memory call) internal pure returns (CBMulticall.Call3 memory) {
+    /// @return The call in the format expected by the `ICBMulticall.aggregateDelegateCalls` function.
+    function _toDelegateCall3(Call memory call) internal pure returns (Call3 memory) {
         require(
             call.operation == Enum.Operation.DelegateCall,
             "MultisigScript::_toDelegateCall3: Operation must be DelegateCall"
         );
         require(call.value == 0, "MultisigScript::_toDelegateCall3: Value must be 0");
 
-        return CBMulticall.Call3({target: call.target, allowFailure: false, callData: call.data});
+        return Call3({target: call.target, allowFailure: false, callData: call.data});
     }
 
     /// @notice Converts the given calls to the format expected by the `aggregate3` function.
@@ -940,8 +939,8 @@ abstract contract MultisigScript is Script {
     /// @param calls The calls to get the call3 values for.
     ///
     /// @return The calls in the format expected by the `aggregate3` function.
-    function _toCall3s(Call[] memory calls) internal pure returns (CBMulticall.Call3[] memory) {
-        CBMulticall.Call3[] memory call3s = new CBMulticall.Call3[](calls.length);
+    function _toCall3s(Call[] memory calls) internal pure returns (Call3[] memory) {
+        Call3[] memory call3s = new Call3[](calls.length);
         for (uint256 i; i < calls.length; i++) {
             call3s[i] = _toCall3(calls[i]);
         }
@@ -954,8 +953,8 @@ abstract contract MultisigScript is Script {
     /// @param calls The calls to get the call3 values for.
     ///
     /// @return The calls in the format expected by the `aggregate3` function.
-    function _toCall3Values(Call[] memory calls) internal pure returns (CBMulticall.Call3Value[] memory) {
-        CBMulticall.Call3Value[] memory call3Values = new CBMulticall.Call3Value[](calls.length);
+    function _toCall3Values(Call[] memory calls) internal pure returns (Call3Value[] memory) {
+        Call3Value[] memory call3Values = new Call3Value[](calls.length);
         for (uint256 i; i < calls.length; i++) {
             call3Values[i] = _toCall3Value(calls[i]);
         }
@@ -968,8 +967,8 @@ abstract contract MultisigScript is Script {
     /// @param calls The calls to get the call3 values for.
     ///
     /// @return The calls in the format expected by the `aggregateDelegateCalls` function.
-    function _toDelegateCall3s(Call[] memory calls) internal pure returns (CBMulticall.Call3[] memory) {
-        CBMulticall.Call3[] memory delegateCall3s = new CBMulticall.Call3[](calls.length);
+    function _toDelegateCall3s(Call[] memory calls) internal pure returns (Call3[] memory) {
+        Call3[] memory delegateCall3s = new Call3[](calls.length);
         for (uint256 i; i < calls.length; i++) {
             delegateCall3s[i] = _toDelegateCall3(calls[i]);
         }

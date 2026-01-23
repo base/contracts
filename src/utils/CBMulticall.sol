@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import {ICBMulticall, Call, Call3, Call3Value, Result} from "./ICBMulticall.sol";
+
 /// @title CBMulticall
 ///
 /// @notice Aggregate results from multiple function calls
@@ -10,30 +12,7 @@ pragma solidity 0.8.15;
 ///      permissioned calls that require a value set. When routing a call through a multisig, for example, it's
 ///      beneficial to be able to DELEGATECALL from the multisig to this contract, thus maintaining the multisig as the
 ///      `msg.sender` while still allowing the calls to utilize ETH already held by the multisig.
-contract CBMulticall {
-    struct Call {
-        address target;
-        bytes callData;
-    }
-
-    struct Call3 {
-        address target;
-        bool allowFailure;
-        bytes callData;
-    }
-
-    struct Call3Value {
-        address target;
-        bool allowFailure;
-        uint256 value;
-        bytes callData;
-    }
-
-    struct Result {
-        bool success;
-        bytes returnData;
-    }
-
+contract CBMulticall is ICBMulticall {
     address private immutable THIS_CB_MULTICALL;
 
     error MustDelegateCall();
