@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-import {CBMulticall} from "src/utils/CBMulticall.sol";
+import {ICBMulticall, Call3Value} from "src/utils/ICBMulticall.sol";
 
 import {MultisigScript} from "./MultisigScript.sol";
 import {Enum} from "./IGnosisSafe.sol";
@@ -34,9 +34,9 @@ interface IOptimismPortal2 {
 ///              return vm.envAddress("OWNER_SAFE");
 ///          }
 ///
-///          function _buildL2Calls() internal view override returns (CBMulticall.Call3Value[] memory) {
-///              CBMulticall.Call3Value[] memory calls = new CBMulticall.Call3Value[](1);
-///              calls[0] = CBMulticall.Call3Value({
+///          function _buildL2Calls() internal view override returns (Call3Value[] memory) {
+///              Call3Value[] memory calls = new Call3Value[](1);
+///              calls[0] = Call3Value({
 ///                  target: L2_CONTRACT,
 ///                  allowFailure: false,
 ///                  callData: abi.encodeCall(IL2Contract.someFunction, (arg1, arg2)),
@@ -112,7 +112,7 @@ abstract contract MultisigScriptDeposit is MultisigScript {
     ///      The `value` field in each Call3Value struct specifies ETH to send with that
     ///      specific L2 call. The total ETH will be bridged via the deposit transaction.
     /// @return calls Array of calls to execute on L2 via CBMulticall
-    function _buildL2Calls() internal view virtual returns (CBMulticall.Call3Value[] memory);
+    function _buildL2Calls() internal view virtual returns (Call3Value[] memory);
 
     //////////////////////////////////////////////////////////////////////////////////////
     ///                              Overridden Functions                              ///
@@ -131,13 +131,13 @@ abstract contract MultisigScriptDeposit is MultisigScript {
     ///      function on L2 automatically distributes the ETH to each call according to its
     ///      specified `value` field - no additional developer action is required.
     function _buildCalls() internal view virtual override returns (Call[] memory) {
-        CBMulticall.Call3Value[] memory l2Calls = _buildL2Calls();
+        Call3Value[] memory l2Calls = _buildL2Calls();
         require(l2Calls.length > 0, "MultisigScriptDeposit: no L2 calls");
         uint256 totalValue = _sumL2CallValues(l2Calls);
 
         // Encode L2 calls as a multicall
         // Note: We use aggregate3Value to support per-call ETH distribution on L2
-        bytes memory l2Data = abi.encodeCall(CBMulticall.aggregate3Value, (l2Calls));
+        bytes memory l2Data = abi.encodeCall(ICBMulticall.aggregate3Value, (l2Calls));
 
         // Wrap in depositTransaction call to OptimismPortal
         Call[] memory l1Calls = new Call[](1);
@@ -167,7 +167,7 @@ abstract contract MultisigScriptDeposit is MultisigScript {
     /// @notice Sums the ETH values from an array of L2 calls
     /// @param l2Calls The array of L2 calls to sum values from
     /// @return total The total ETH value across all calls
-    function _sumL2CallValues(CBMulticall.Call3Value[] memory l2Calls) internal pure returns (uint256 total) {
+    function _sumL2CallValues(Call3Value[] memory l2Calls) internal pure returns (uint256 total) {
         for (uint256 i; i < l2Calls.length; i++) {
             total += l2Calls[i].value;
         }
