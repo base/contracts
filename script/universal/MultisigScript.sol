@@ -149,6 +149,9 @@ import {Simulation} from "./Simulation.sol";
 ///     │        │        │        │        │        │          │            run()             │
 ///     │        │        │        │        │        │          │─────────────────────────────>│
 abstract contract MultisigScript is Script {
+    /// @dev Storage slot for Safe's transaction nonce. Must match Simulation.SAFE_NONCE_SLOT.
+    ///      See Simulation library for documentation on Safe version compatibility.
+    ///      Valid for: Safe v1.3.0 - v1.4.1
     bytes32 internal constant SAFE_NONCE_SLOT = bytes32(uint256(5));
     address internal constant CB_MULTICALL = 0xA8B8CA1d6F0F5Ce63dCEA9121A01b302c5801303;
 
