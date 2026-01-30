@@ -43,7 +43,7 @@ library Simulation {
     ///      Valid for: Safe v1.3.0 - v1.4.1
     /// @custom:warning These storage slots are internal implementation details of Safe contracts
     ///                 and may change in future Safe versions. Verify compatibility before use.
-    uint256 internal constant SAFE_APPROVED_HASHES_SLOT = 8;
+    bytes32 internal constant SAFE_APPROVED_HASHES_SLOT = bytes32(uint256(8));
 
     //////////////////////////////////////////////////////////////////////////////////////
     ///                               Structs                                          ///
