@@ -199,8 +199,7 @@ library Simulation {
         return addOverride({
             state: state,
             storageOverride: StorageOverride({
-                key: computeApprovedHashSlot({owner: owner, dataHash: dataHash}),
-                value: bytes32(uint256(0x1))
+                key: computeApprovedHashSlot({owner: owner, dataHash: dataHash}), value: bytes32(uint256(0x1))
             })
         });
     }
@@ -245,9 +244,8 @@ library Simulation {
         if (IGnosisSafe(safe).nonce() == nonce) return state;
 
         // set the nonce to the desired value
-        return addOverride({
-            state: state, storageOverride: StorageOverride({key: SAFE_NONCE_SLOT, value: bytes32(nonce)})
-        });
+        return
+            addOverride({state: state, storageOverride: StorageOverride({key: SAFE_NONCE_SLOT, value: bytes32(nonce)})});
     }
 
     /// @notice Appends a new storage override to an existing state override
