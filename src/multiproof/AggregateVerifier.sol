@@ -596,7 +596,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         );
 
         // Validate the proof.
-        if (!TEE_VERIFIER.verify(proofBytes, journal)) revert InvalidProof();
+        if (!TEE_VERIFIER.verify(proofBytes, TEE_IMAGE_HASH, journal)) revert InvalidProof();
 
         // Update proving data.
         provingData.teeProver = msg.sender;
@@ -625,7 +625,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         );
 
         // Validate the proof.
-        if (!ZK_VERIFIER.verify(proofBytes, journal)) revert InvalidProof();
+        if (!ZK_VERIFIER.verify(proofBytes, ZK_IMAGE_HASH, journal)) revert InvalidProof();
 
         // Update proving data.
         provingData.zkProver = msg.sender;
