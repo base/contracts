@@ -33,8 +33,8 @@ library StateDiff {
         MappingParent[] memory parents = new MappingParent[](1);
         // Account for the msg.sender approval override
         parents[0] = MappingParent({
-            slot: keccak256(abi.encode(msg.sender, uint256(8))),
-            parent: bytes32(uint256(8)),
+            slot: keccak256(abi.encode(msg.sender, Simulation.SAFE_APPROVED_HASHES_SLOT)),
+            parent: Simulation.SAFE_APPROVED_HASHES_SLOT,
             key: bytes32(bytes20(msg.sender))
         });
 

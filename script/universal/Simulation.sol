@@ -17,6 +17,38 @@ import {IGnosisSafe} from "./IGnosisSafe.sol";
 ///      - Generating Tenderly simulation links for external transaction analysis
 ///      - Managing Gnosis Safe parameters (threshold, nonce, approvals) during simulation
 library Simulation {
+    //////////////////////////////////////////////////////////////////////////////////////
+    ///                          Safe Storage Slot Constants                           ///
+    //////////////////////////////////////////////////////////////////////////////////////
+
+    /// @notice Storage slot for Safe's signature threshold
+    /// @dev Slot 4 in Safe's storage layout. The threshold determines how many owner signatures
+    ///      are required to execute a transaction.
+    ///      Valid for: Safe v1.3.0 - v1.4.1
+    /// @custom:warning These storage slots are internal implementation details of Safe contracts
+    ///                 and may change in future Safe versions. Verify compatibility before use.
+    bytes32 internal constant SAFE_THRESHOLD_SLOT = bytes32(uint256(4));
+
+    /// @notice Storage slot for Safe's transaction nonce
+    /// @dev Slot 5 in Safe's storage layout. The nonce is incremented after each successful
+    ///      transaction execution to prevent replay attacks.
+    ///      Valid for: Safe v1.3.0 - v1.4.1
+    /// @custom:warning These storage slots are internal implementation details of Safe contracts
+    ///                 and may change in future Safe versions. Verify compatibility before use.
+    bytes32 internal constant SAFE_NONCE_SLOT = bytes32(uint256(5));
+
+    /// @notice Base storage slot for Safe's approvedHashes mapping
+    /// @dev Slot 8 in Safe's storage layout. The approvedHashes mapping stores pre-approved
+    ///      transaction hashes per owner: mapping(address => mapping(bytes32 => uint256))
+    ///      Valid for: Safe v1.3.0 - v1.4.1
+    /// @custom:warning These storage slots are internal implementation details of Safe contracts
+    ///                 and may change in future Safe versions. Verify compatibility before use.
+    bytes32 internal constant SAFE_APPROVED_HASHES_SLOT = bytes32(uint256(8));
+
+    //////////////////////////////////////////////////////////////////////////////////////
+    ///                               Structs                                          ///
+    //////////////////////////////////////////////////////////////////////////////////////
+
     /// @notice Represents state overrides for a specific contract during simulation. Used to modify contract storage
     ///         slots temporarily for testing purposes
     struct StateOverride {
@@ -49,6 +81,33 @@ library Simulation {
 
     /// @notice Foundry VM instance for state manipulation during simulations
     Vm internal constant VM = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
+    //////////////////////////////////////////////////////////////////////////////////////
+    ///                          Storage Slot Helpers                                  ///
+    //////////////////////////////////////////////////////////////////////////////////////
+
+    /// @notice Computes the storage slot key for a Safe's approvedHashes mapping entry
+    ///
+    /// @dev Safe's approvedHashes is a nested mapping: mapping(address => mapping(bytes32 => uint256))
+    ///      For Solidity mappings, the storage slot is computed as:
+    ///        slot(mapping[key]) = keccak256(abi.encode(key, baseSlot))
+    ///      For nested mappings, this is applied recursively:
+    ///        slot(mapping[owner][dataHash]) = keccak256(abi.encode(dataHash, keccak256(abi.encode(owner, baseSlot))))
+    ///
+    ///      The formula breaks down as:
+    ///        1. innerSlot = keccak256(abi.encode(owner, SAFE_APPROVED_HASHES_SLOT))
+    ///           This gives the slot for the inner mapping (owner's approved hashes)
+    ///        2. finalSlot = keccak256(abi.encode(dataHash, innerSlot))
+    ///           This gives the slot for the specific dataHash within owner's mapping
+    ///
+    /// @param owner    The address of the Safe owner who approved the hash
+    /// @param dataHash The transaction hash that was approved
+    ///
+    /// @return The storage slot key where the approval value (0 or 1) is stored
+    function computeApprovedHashSlot(address owner, bytes32 dataHash) internal pure returns (bytes32) {
+        bytes32 innerMappingSlot = keccak256(abi.encode(owner, SAFE_APPROVED_HASHES_SLOT));
+        return keccak256(abi.encode(dataHash, innerMappingSlot));
+    }
 
     /// @notice Executes a simulation using the provided payload and returns state changes
     ///
@@ -140,8 +199,7 @@ library Simulation {
         return addOverride({
             state: state,
             storageOverride: StorageOverride({
-                key: keccak256(abi.encode(dataHash, keccak256(abi.encode(owner, uint256(8))))),
-                value: bytes32(uint256(0x1))
+                key: computeApprovedHashSlot({owner: owner, dataHash: dataHash}), value: bytes32(uint256(0x1))
             })
         });
     }
@@ -162,9 +220,9 @@ library Simulation {
         // get the threshold and check if we need to override it
         if (IGnosisSafe(safe).getThreshold() == 1) return state;
 
-        // set the threshold (slot 4) to 1
+        // set the threshold to 1
         return addOverride({
-            state: state, storageOverride: StorageOverride({key: bytes32(uint256(0x4)), value: bytes32(uint256(0x1))})
+            state: state, storageOverride: StorageOverride({key: SAFE_THRESHOLD_SLOT, value: bytes32(uint256(0x1))})
         });
     }
 
@@ -185,10 +243,9 @@ library Simulation {
         // get the nonce and check if we need to override it
         if (IGnosisSafe(safe).nonce() == nonce) return state;
 
-        // set the nonce (slot 5) to the desired value
-        return addOverride({
-            state: state, storageOverride: StorageOverride({key: bytes32(uint256(0x5)), value: bytes32(nonce)})
-        });
+        // set the nonce to the desired value
+        return
+            addOverride({state: state, storageOverride: StorageOverride({key: SAFE_NONCE_SLOT, value: bytes32(nonce)})});
     }
 
     /// @notice Appends a new storage override to an existing state override

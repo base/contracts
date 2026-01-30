@@ -149,7 +149,6 @@ import {Simulation} from "./Simulation.sol";
 ///     │        │        │        │        │        │          │            run()             │
 ///     │        │        │        │        │        │          │─────────────────────────────>│
 abstract contract MultisigScript is Script {
-    bytes32 internal constant SAFE_NONCE_SLOT = bytes32(uint256(5));
     address internal constant CB_MULTICALL = 0xA8B8CA1d6F0F5Ce63dCEA9121A01b302c5801303;
 
     /// @notice A struct representing a call to a contract.
@@ -250,7 +249,7 @@ abstract contract MultisigScript is Script {
 
         // Restore the original nonce.
         for (uint256 i; i < safes.length; i++) {
-            vm.store({target: safes[i], slot: SAFE_NONCE_SLOT, value: bytes32(originalNonces[i])});
+            vm.store({target: safes[i], slot: Simulation.SAFE_NONCE_SLOT, value: bytes32(originalNonces[i])});
         }
 
         bytes memory txData = _encodeTransactionData({safe: safes[0], call: callsChain[0]});
@@ -308,7 +307,7 @@ abstract contract MultisigScript is Script {
         address ownerSafe = _ownerSafe();
         Call[] memory callsChain = _buildCallsChain({safes: _toArray(ownerSafe)});
 
-        vm.store({target: ownerSafe, slot: SAFE_NONCE_SLOT, value: bytes32(_getNonce({safe: ownerSafe}))});
+        vm.store({target: ownerSafe, slot: Simulation.SAFE_NONCE_SLOT, value: bytes32(_getNonce({safe: ownerSafe}))});
 
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
             _executeTransaction({safe: ownerSafe, call: callsChain[0], signatures: signatures, broadcast: false});
