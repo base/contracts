@@ -24,7 +24,7 @@ import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
 
 import {IVerifier} from "./interfaces/IVerifier.sol";
 
-contract AggregateVerifier is Clone, ReentrancyGuard {
+contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     ////////////////////////////////////////////////////////////////
     //                         Enums                              //
     ////////////////////////////////////////////////////////////////
@@ -131,10 +131,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     ////////////////////////////////////////////////////////////////
     //                         Events                             //
     ////////////////////////////////////////////////////////////////
-
-    /// @notice Emitted when the game is resolved.
-    /// @param status The status of the game.
-    event Resolved(GameStatus indexed status);
 
     /// @notice Emitted when a proposal with a TEE proof is challenged with a ZK proof.
     /// @param challenger The address of the challenger.
