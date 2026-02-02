@@ -24,7 +24,7 @@ import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
 
 import {IVerifier} from "./interfaces/IVerifier.sol";
 
-contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
+contract AggregateVerifier is Clone, ReentrancyGuard {
     ////////////////////////////////////////////////////////////////
     //                         Enums                              //
     ////////////////////////////////////////////////////////////////
@@ -132,6 +132,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     //                         Events                             //
     ////////////////////////////////////////////////////////////////
 
+    /// @notice Emitted when the game is resolved.
+    /// @param status The status of the game.
+    event Resolved(GameStatus indexed status);
+
     /// @notice Emitted when a proposal with a TEE proof is challenged with a ZK proof.
     /// @param challenger The address of the challenger.
     /// @param game The game used to challenge this proposal.
@@ -237,8 +241,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     }
 
     /// @notice Initializes the contract.
+    /// @param proof The proof.
     /// @dev This function may only be called once.
-    function initialize() external payable virtual {
+    /// @dev First byte of the proof is the proof type.
+    function initialize(bytes calldata proof) external payable virtual {
         // The game must not have already been initialized.
         if (initialized) revert AlreadyInitialized();
 
@@ -256,8 +262,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // - 0x20 extraData (l2BlockNumber)
         // - 0x04 extraData (parentIndex)
         // - 0x02 CWIA bytes
+
+        // - 0x20 proof length location
+        // - 0x20 proof length
+        // - ((proof.length + 32 - 1)/ 32) * 32 (round up to the nearest 32 bytes)
+        uint256 proofLength = (proof.length + 32 - 1) / 32 * 32;
         assembly {
-            if iszero(eq(calldatasize(), INITIALIZE_CALLDATA_SIZE)) {
+            if iszero(eq(calldatasize(), add(INITIALIZE_CALLDATA_SIZE, add(0x40, proofLength)))) {
                 // Store the selector for `BadExtraData()` & revert.
                 mstore(0x00, 0x9824bdab)
                 revert(0x1C, 0x04)
@@ -276,6 +287,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
             if (parentGame.status() == GameStatus.CHALLENGER_WINS) revert InvalidParentGame();
 
             // The parent game must have a proof.
+            // Should not be reachable since a proof is required to initialize.
             if (
                 AggregateVerifier(address(parentGame)).teeProver() == address(0)
                     && AggregateVerifier(address(parentGame)).zkProver() == address(0)
@@ -300,11 +312,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // Set the game's starting timestamp.
         createdAt = Timestamp.wrap(uint64(block.timestamp));
 
-        // Game cannot resolve without a proof.
-        provingData.expectedResolution = Timestamp.wrap(type(uint64).max);
-
+        // Set the game as respected if the game type is respected.
         wasRespectedGameTypeWhenCreated =
             GameType.unwrap(ANCHOR_STATE_REGISTRY.respectedGameType()) == GameType.unwrap(GAME_TYPE);
+
+        // Set expected resolution.
+        provingData.expectedResolution = Timestamp.wrap(type(uint64).max);
+
+        // Verify the proof.
+        ProofType proofType = ProofType(uint8(proof[0]));
+        _verifyProof(proof[1:], proofType, gameCreator());
     }
 
     /// @notice Verifies a proof for the current game.
@@ -314,22 +331,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // The game must not be over.
         if (gameOver()) revert GameOver();
 
-        if (proofType == ProofType.TEE) {
-            if (msg.sender != TEE_PROPOSER) revert NotAuthorized();
-            _verifyTeeProof(proofBytes);
-        } else if (proofType == ProofType.ZK) {
-            _verifyZkProof(proofBytes);
-
-            // Bond can be reclaimed after a ZK proof is provided.
-            bondRecipient = gameCreator();
-        } else {
-            revert InvalidProofType();
-        }
-
-        _updateExpectedResolution();
-
-        // Emit the proved event.
-        emit Proved(msg.sender, proofType);
+        _verifyProof(proofBytes, proofType, msg.sender);
     }
 
     /// @notice Resolves the game after a proof has been provided and enough time has passed.
@@ -380,10 +382,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
         (,, IDisputeGame game) = DISPUTE_GAME_FACTORY.gameAtIndex(gameIndex);
 
-        AggregateVerifier challengingGame = AggregateVerifier(address(game));
-
         // The game must be a valid game used to challenge.
-        if (!_isValidChallengingGame(challengingGame)) revert InvalidGame();
+        if (!_isValidChallengingGame(game)) revert InvalidGame();
+
+        AggregateVerifier challengingGame = AggregateVerifier(address(game));
 
         // The ZK prover must not be empty.
         if (challengingGame.zkProver() == address(0)) revert MissingZKProof();
@@ -573,9 +575,28 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         return _getArgUint32(0x74);
     }
 
+    function _verifyProof(bytes calldata proofBytes, ProofType proofType, address prover) internal {
+        if (proofType == ProofType.TEE) {
+            if (prover != TEE_PROPOSER) revert NotAuthorized();
+            _verifyTeeProof(proofBytes, prover);
+        } else if (proofType == ProofType.ZK) {
+            _verifyZkProof(proofBytes, prover);
+
+            // Bond can be reclaimed after a ZK proof is provided.
+            bondRecipient = gameCreator();
+        } else {
+            revert InvalidProofType();
+        }
+
+        _updateExpectedResolution();
+
+        // Emit the proved event.
+        emit Proved(prover, proofType);
+    }
+
     /// @notice Verifies a TEE proof for the current game.
     /// @param proofBytes The proof.
-    function _verifyTeeProof(bytes calldata proofBytes) internal {
+    function _verifyTeeProof(bytes calldata proofBytes, address prover) internal {
         // Only one TEE proof can be submitted.
         if (provingData.teeProver != address(0)) revert AlreadyProven();
 
@@ -584,7 +605,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
         bytes32 journal = keccak256(
             abi.encodePacked(
-                msg.sender,
+                prover,
                 l1Head(),
                 startingOutputRoot.root,
                 startingOutputRoot.l2SequenceNumber,
@@ -599,12 +620,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         if (!TEE_VERIFIER.verify(proofBytes, TEE_IMAGE_HASH, journal)) revert InvalidProof();
 
         // Update proving data.
-        provingData.teeProver = msg.sender;
+        provingData.teeProver = prover;
     }
 
     /// @notice Verifies a ZK proof for the current game.
     /// @param proofBytes The proof.
-    function _verifyZkProof(bytes calldata proofBytes) internal {
+    function _verifyZkProof(bytes calldata proofBytes, address prover) internal {
         // Only one ZK proof can be submitted.
         if (provingData.zkProver != address(0)) revert AlreadyProven();
 
@@ -613,7 +634,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
         bytes32 journal = keccak256(
             abi.encodePacked(
-                msg.sender,
+                prover,
                 l1Head(),
                 startingOutputRoot.root,
                 startingOutputRoot.l2SequenceNumber,
@@ -628,7 +649,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         if (!ZK_VERIFIER.verify(proofBytes, ZK_IMAGE_HASH, journal)) revert InvalidProof();
 
         // Update proving data.
-        provingData.zkProver = msg.sender;
+        provingData.zkProver = prover;
     }
 
     /// @notice Updates the expected resolution timestamp.

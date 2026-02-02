@@ -3,6 +3,7 @@ pragma solidity 0.8.15;
 
 import {BadExtraData} from "optimism/src/dispute/lib/Errors.sol";
 import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
+import {IDisputeGameFactory} from "optimism/interfaces/dispute/IDisputeGameFactory.sol";
 import {Claim, GameStatus, Hash, Timestamp} from "optimism/src/dispute/lib/Types.sol";
 
 import {AggregateVerifier} from "src/AggregateVerifier.sol";
@@ -16,9 +17,7 @@ contract AggregateVerifierTest is BaseTest {
         bytes memory proof = "tee-proof";
 
         AggregateVerifier game =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max);
-
-        _provideProof(game, TEE_PROVER, true, proof);
+            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.TEE);
 
         assertEq(game.wasRespectedGameTypeWhenCreated(), true);
         assertEq(address(game.teeProver()), TEE_PROVER);
@@ -41,8 +40,7 @@ contract AggregateVerifierTest is BaseTest {
         bytes memory proof = "zk-proof";
 
         AggregateVerifier game =
-            _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max);
-        _provideProof(game, ZK_PROVER, false, proof);
+            _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.ZK);
 
         assertEq(game.wasRespectedGameTypeWhenCreated(), true);
         assertEq(address(game.teeProver()), address(0));
@@ -65,10 +63,11 @@ contract AggregateVerifierTest is BaseTest {
 
         vm.deal(TEE_PROVER, INIT_BOND);
         bytes memory extraData = "";
+        bytes memory initData = "";
 
         vm.prank(TEE_PROVER);
         vm.expectRevert(BadExtraData.selector);
-        factory.create{value: INIT_BOND}(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData);
+        factory.create{value: INIT_BOND}(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, initData);
     }
 
     function testInitializeFailsIfNotTEEProposer() public {
@@ -76,11 +75,8 @@ contract AggregateVerifierTest is BaseTest {
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
         bytes memory proof = "tee-proof";
 
-        AggregateVerifier game =
-            _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max);
-
         vm.expectRevert(AggregateVerifier.NotAuthorized.selector);
-        _provideProof(game, ZK_PROVER, true, proof);
+        _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.TEE);
     }
 
     function testUpdatingAnchorStateRegistryWithTEEProof() public {
@@ -89,9 +85,7 @@ contract AggregateVerifierTest is BaseTest {
         bytes memory proof = "tee-proof";
 
         AggregateVerifier game =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max);
-
-        _provideProof(game, TEE_PROVER, true, proof);
+            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.TEE);
 
         // Cannot claim bond before resolving
         vm.expectRevert(AggregateVerifier.BondRecipientEmpty.selector);
@@ -122,9 +116,7 @@ contract AggregateVerifierTest is BaseTest {
         bytes memory proof = "zk-proof";
 
         AggregateVerifier game =
-            _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max);
-
-        _provideProof(game, ZK_PROVER, false, proof);
+            _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.ZK);
 
         // Reclaim bond
         uint256 balanceBefore = game.gameCreator().balance;
@@ -152,10 +144,9 @@ contract AggregateVerifierTest is BaseTest {
         bytes memory zkProof = "zk-proof";
 
         AggregateVerifier game =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max);
+            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof, AggregateVerifier.ProofType.TEE);
 
-        _provideProof(game, TEE_PROVER, true, teeProof);
-        _provideProof(game, ZK_PROVER, false, zkProof);
+        _provideProof(game, ZK_PROVER, AggregateVerifier.ProofType.ZK, zkProof);
 
         // Reclaim bond
         uint256 balanceBefore = game.gameCreator().balance;
@@ -183,9 +174,7 @@ contract AggregateVerifierTest is BaseTest {
         bytes memory zkProof = "zk-proof";
 
         AggregateVerifier game =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max);
-
-        _provideProof(game, TEE_PROVER, true, teeProof);
+            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof, AggregateVerifier.ProofType.TEE);
 
         (,,, Timestamp originalExpectedResolution) = game.provingData();
         assertEq(originalExpectedResolution.raw(), block.timestamp + 7 days);
@@ -196,7 +185,7 @@ contract AggregateVerifierTest is BaseTest {
         game.resolve();
 
         // Provide ZK proof
-        _provideProof(game, ZK_PROVER, false, zkProof);
+        _provideProof(game, ZK_PROVER, AggregateVerifier.ProofType.ZK, zkProof);
 
         // Proof should not have increased expected resolution
         (,,, Timestamp expectedResolution) = game.provingData();
@@ -208,28 +197,18 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
     }
 
-    function testParentGameMustHaveAProof() public {
+    function testCannotCreateSameProposal() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory proof = "tee-proof";
+        bytes memory teeProof = "tee-proof";
+        bytes memory zkProof = "zk-proof";
 
-        AggregateVerifier parentGame =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max);
+        _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof, AggregateVerifier.ProofType.TEE);
 
-        uint256 parentGameIndex = factory.gameCount() - 1;
-        currentL2BlockNumber += BLOCK_INTERVAL;
-        Claim rootClaimChild = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-
-        // Cannot create a child game without a proof for the parent
-        vm.expectRevert(AggregateVerifier.InvalidParentGame.selector);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        _createAggregateVerifierGame(TEE_PROVER, rootClaimChild, currentL2BlockNumber, uint32(parentGameIndex));
-
-        // Provide proof for the parent game
-        _provideProof(parentGame, TEE_PROVER, true, proof);
-
-        // Create the child game
-        // forge-lint: disable-next-line(unsafe-typecast)
-        _createAggregateVerifierGame(TEE_PROVER, rootClaimChild, currentL2BlockNumber, uint32(parentGameIndex));
+        Hash uuid = factory.getGameUUID(
+            AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, abi.encodePacked(currentL2BlockNumber, type(uint32).max)
+        );
+        vm.expectRevert(abi.encodeWithSelector(IDisputeGameFactory.GameAlreadyExists.selector, uuid));
+        _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, zkProof, AggregateVerifier.ProofType.ZK);
     }
 }

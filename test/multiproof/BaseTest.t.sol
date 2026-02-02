@@ -126,25 +126,22 @@ contract BaseTest is Test {
     }
 
     // Helper function to create a game via factory
-    function _createAggregateVerifierGame(address creator, Claim rootClaim, uint256 l2BlockNumber, uint32 parentIndex)
+    function _createAggregateVerifierGame(address creator, Claim rootClaim, uint256 l2BlockNumber, uint32 parentIndex, bytes memory proof, AggregateVerifier.ProofType proofType)
         internal
         returns (AggregateVerifier game)
     {
         bytes memory extraData = abi.encodePacked(uint256(l2BlockNumber), uint32(parentIndex));
+        bytes memory initData = abi.encodePacked(uint8(proofType), proof);
 
         vm.deal(creator, INIT_BOND);
         vm.prank(creator);
         return AggregateVerifier(
-            address(factory.create{value: INIT_BOND}(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData))
+            address(factory.create{value: INIT_BOND}(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, initData))
         );
     }
 
-    function _provideProof(AggregateVerifier game, address prover, bool isTeeProof, bytes memory proof) internal {
+    function _provideProof(AggregateVerifier game, address prover, AggregateVerifier.ProofType proofType, bytes memory proof) internal {
         vm.prank(prover);
-        if (isTeeProof) {
-            game.verifyProof(proof, AggregateVerifier.ProofType.TEE);
-        } else {
-            game.verifyProof(proof, AggregateVerifier.ProofType.ZK);
-        }
+        game.verifyProof(proof, proofType);
     }
 }
