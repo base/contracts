@@ -126,10 +126,14 @@ contract BaseTest is Test {
     }
 
     // Helper function to create a game via factory
-    function _createAggregateVerifierGame(address creator, Claim rootClaim, uint256 l2BlockNumber, uint32 parentIndex, bytes memory proof, AggregateVerifier.ProofType proofType)
-        internal
-        returns (AggregateVerifier game)
-    {
+    function _createAggregateVerifierGame(
+        address creator,
+        Claim rootClaim,
+        uint256 l2BlockNumber,
+        uint32 parentIndex,
+        bytes memory proof,
+        AggregateVerifier.ProofType proofType
+    ) internal returns (AggregateVerifier game) {
         bytes memory extraData = abi.encodePacked(uint256(l2BlockNumber), uint32(parentIndex));
         bytes memory initData = abi.encodePacked(uint8(proofType), proof);
 
@@ -140,7 +144,12 @@ contract BaseTest is Test {
         );
     }
 
-    function _provideProof(AggregateVerifier game, address prover, AggregateVerifier.ProofType proofType, bytes memory proof) internal {
+    function _provideProof(
+        AggregateVerifier game,
+        address prover,
+        AggregateVerifier.ProofType proofType,
+        bytes memory proof
+    ) internal {
         vm.prank(prover);
         game.verifyProof(proof, proofType);
     }
