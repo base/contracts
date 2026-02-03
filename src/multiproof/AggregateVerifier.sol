@@ -316,18 +316,17 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         provingData.expectedResolution = Timestamp.wrap(type(uint64).max);
 
         // Verify the proof.
-        ProofType proofType = ProofType(uint8(proof[0]));
-        _verifyProof(proof[1:], proofType, gameCreator());
+        _verifyProof(proof[1:], ProofType(uint8(proof[0])), gameCreator());
     }
 
     /// @notice Verifies a proof for the current game.
     /// @param proofBytes The proof.
-    /// @param proofType The type of proof.
-    function verifyProof(bytes calldata proofBytes, ProofType proofType) external {
+    /// @dev The first byte of the proof is the proof type.
+    function verifyProof(bytes calldata proofBytes) external {
         // The game must not be over.
         if (gameOver()) revert GameOver();
 
-        _verifyProof(proofBytes, proofType, msg.sender);
+        _verifyProof(proofBytes[1:], ProofType(uint8(proofBytes[0])), msg.sender);
     }
 
     /// @notice Resolves the game after a proof has been provided and enough time has passed.

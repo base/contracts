@@ -151,6 +151,7 @@ contract BaseTest is Test {
         bytes memory proof
     ) internal {
         vm.prank(prover);
-        game.verifyProof(proof, proofType);
+        bytes memory proofBytes = abi.encodePacked(uint8(proofType), proof);
+        game.verifyProof(proofBytes);
     }
 }
