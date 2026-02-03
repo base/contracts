@@ -688,8 +688,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @param game The game to check.
     function _isValidChallengingGame(IDisputeGame game) internal view returns (bool) {
         return
-        // The parent game must be the same.
-        AggregateVerifier(address(game)).parentIndex() == parentIndex() && 
+        // The game type must be the same.
+        game.gameType().raw() == GAME_TYPE.raw() &&
+            // The parent game must be the same.
+            AggregateVerifier(address(game)).parentIndex() == parentIndex() && 
             // The block number must be the same.
             game.l2SequenceNumber() == l2SequenceNumber() && 
             // The root claim must be different.
