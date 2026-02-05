@@ -14,6 +14,7 @@ import {TEEVerifier} from "../src/tee/TEEVerifier.sol";
 import {AggregateVerifier} from "../src/AggregateVerifier.sol";
 import {IVerifier} from "../src/interfaces/IVerifier.sol";
 import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
+import {IDelayedWETH} from "optimism/interfaces/dispute/IDelayedWETH.sol";
 import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
 import {GameType, Hash} from "optimism/src/dispute/lib/Types.sol";
 
@@ -81,6 +82,25 @@ contract MockAnchorStateRegistry {
     }
 }
 
+/// @title MockDelayedWETH
+/// @notice Minimal mock for testing - implements the IDelayedWETH interface
+/// @dev For testing purposes only. The real DelayedWETH handles bond deposits and withdrawals.
+contract MockDelayedWETH {
+    /// @notice Accepts ETH deposits (no-op for testing)
+    function deposit() external payable {}
+
+    /// @notice Mock unlock - no-op for testing
+    function unlock(address, uint256) external {}
+
+    /// @notice Mock withdraw - transfers ETH back
+    function withdraw(address recipient, uint256 amount) external {
+        payable(recipient).transfer(amount);
+    }
+
+    /// @notice Allow contract to receive ETH
+    receive() external payable {}
+}
+
 // Import the REAL DisputeGameFactory
 import {DisputeGameFactory} from "optimism/src/dispute/DisputeGameFactory.sol";
 
@@ -122,6 +142,7 @@ contract DeployAllForTesting is Script {
     address public teeVerifier;
     address public disputeGameFactory;
     address public mockAnchorRegistry;
+    address public mockDelayedWETH;
     address public aggregateVerifier;
 
     function _loadConfig() internal view returns (DeployConfig memory cfg) {
@@ -223,11 +244,16 @@ contract DeployAllForTesting is Script {
         address zkVerifier = address(new MockVerifier());
         console.log("MockVerifier (ZK):", zkVerifier);
 
+        // 6.5. Mock DelayedWETH for bond handling
+        mockDelayedWETH = address(new MockDelayedWETH());
+        console.log("MockDelayedWETH:", mockDelayedWETH);
+
         // 7. AggregateVerifier
         aggregateVerifier = address(
             new AggregateVerifier(
                 cfg.gameType,
                 IAnchorStateRegistry(mockAnchorRegistry),
+                IDelayedWETH(payable(mockDelayedWETH)),
                 IVerifier(teeVerifier),
                 IVerifier(zkVerifier),
                 cfg.teeImageHash,
@@ -258,6 +284,7 @@ contract DeployAllForTesting is Script {
         console.log("\nInfrastructure:");
         console.log("  DisputeGameFactory (real):", disputeGameFactory);
         console.log("  AnchorStateRegistry (mock):", mockAnchorRegistry);
+        console.log("  DelayedWETH (mock):", mockDelayedWETH);
         console.log("\nGame:");
         console.log("  AggregateVerifier:", aggregateVerifier);
         console.log("  Game Type:", gameType);

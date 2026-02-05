@@ -5,12 +5,6 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {SystemConfigGlobal} from "./SystemConfigGlobal.sol";
 
-/// @title IEIP2935
-/// @notice Interface for the EIP-2935 blockhash history contract.
-interface IEIP2935 {
-    function get(uint256 blockNumber) external view returns (bytes32);
-}
-
 /// @title TEEVerifier
 /// @notice Stateless TEE proof verifier that validates signatures against registered signers.
 /// @dev This contract is designed to be used as the TEE_VERIFIER in the AggregateVerifier.
@@ -28,7 +22,7 @@ contract TEEVerifier is IVerifier {
     /// @notice The EIP-2935 blockhash history contract address (deployed post-Pectra).
     /// @dev This contract stores blockhashes for the last ~8192 blocks, extending the
     ///      256-block window of the native blockhash() opcode.
-    address public constant EIP2935_CONTRACT = 0x0F792be4B0c0cb4DAE440Ef133E90C0eCD48CCCC;
+    address public constant EIP2935_CONTRACT = 0x0000F90827F1C53a10cb7A02335B175320002935;
 
     /// @notice The maximum number of blocks that blockhash() can look back.
     uint256 public constant BLOCKHASH_WINDOW = 256;
@@ -115,7 +109,14 @@ contract TEEVerifier is IVerifier {
         if (block.number > l1OriginNumber && block.number - l1OriginNumber <= BLOCKHASH_WINDOW) {
             actualHash = blockhash(l1OriginNumber);
         } else if (block.number > l1OriginNumber && block.number - l1OriginNumber <= EIP2935_WINDOW) {
-            actualHash = IEIP2935(EIP2935_CONTRACT).get(l1OriginNumber);
+            // EIP-2935 expects raw calldata: exactly 32 bytes containing the block number.
+            // Using a Solidity interface would add a 4-byte function selector, causing a revert.
+            // We use a low-level staticcall with raw 32-byte calldata instead.
+            (bool success, bytes memory result) = EIP2935_CONTRACT.staticcall(abi.encode(l1OriginNumber));
+            if (!success || result.length != 32) {
+                revert L1OriginTooOld(l1OriginNumber, block.number);
+            }
+            actualHash = abi.decode(result, (bytes32));
         } else {
             revert L1OriginTooOld(l1OriginNumber, block.number);
         }
