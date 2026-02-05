@@ -333,7 +333,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
         // Deposit the bond.
         bondAmount = msg.value;
-        DELAYED_WETH.deposit{ value: msg.value }();
+        DELAYED_WETH.deposit{value: msg.value}();
 
         // Verify the proof.
         _verifyProof(proof[1:], ProofType(uint8(proof[0])), gameCreator());
@@ -716,7 +716,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     function _isValidChallengingGame(IDisputeGame game) internal view returns (bool) {
         return
         // The game type must be the same.
-        game.gameType().raw() == GAME_TYPE.raw() &&
+        game.gameType().raw() == GAME_TYPE.raw() && 
             // The parent game must be the same.
             AggregateVerifier(address(game)).parentIndex() == parentIndex() && 
             // The block number must be the same.
