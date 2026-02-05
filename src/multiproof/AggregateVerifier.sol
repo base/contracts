@@ -468,6 +468,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
         // If this game was challenged, the countered by game must be valid.
         if (provingData.counteredByGameAddress != address(0)) {
+            if (!_isValidChallengingGame(IDisputeGame(provingData.counteredByGameAddress))) {
+                revert InvalidCounteredByGame();
+            }
             if (IDisputeGame(provingData.counteredByGameAddress).status() != GameStatus.DEFENDER_WINS) {
                 revert InvalidCounteredByGame();
             }
