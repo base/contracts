@@ -591,7 +591,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     }
 
     /// @notice Verifies a TEE proof for the current game.
-    /// @param proofBytes The proof.
+    /// @param proofBytes The proof: l1OriginHash (32) + l1OriginNumber (32) + signature (65).
     function _verifyTeeProof(bytes calldata proofBytes, address prover) internal {
         // Only one TEE proof can be submitted.
         if (provingData.teeProver != address(0)) revert AlreadyProven();
@@ -602,7 +602,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         bytes32 journal = keccak256(
             abi.encodePacked(
                 prover,
-                l1Head(),
+                bytes32(proofBytes[0:32]),
+                uint256(bytes32(proofBytes[32:64])),
                 startingOutputRoot.root,
                 startingOutputRoot.l2SequenceNumber,
                 rootClaim(),
@@ -620,7 +621,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     }
 
     /// @notice Verifies a ZK proof for the current game.
-    /// @param proofBytes The proof.
+    /// @param proofBytes The proof: l1OriginHash (32) + l1OriginNumber (32) + zkProof (variable).
     function _verifyZkProof(bytes calldata proofBytes, address prover) internal {
         // Only one ZK proof can be submitted.
         if (provingData.zkProver != address(0)) revert AlreadyProven();
@@ -631,7 +632,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         bytes32 journal = keccak256(
             abi.encodePacked(
                 prover,
-                l1Head(),
+                bytes32(proofBytes[0:32]),
+                uint256(bytes32(proofBytes[32:64])),
                 startingOutputRoot.root,
                 startingOutputRoot.l2SequenceNumber,
                 rootClaim(),
