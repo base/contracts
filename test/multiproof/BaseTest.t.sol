@@ -5,8 +5,10 @@ import {Test} from "forge-std/Test.sol";
 
 // Optimism
 import {AnchorStateRegistry} from "optimism/src/dispute/AnchorStateRegistry.sol";
+import {DelayedWETH} from "optimism/src/dispute/DelayedWETH.sol";
 import {DisputeGameFactory} from "optimism/src/dispute/DisputeGameFactory.sol";
 import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
+import {IDelayedWETH} from "optimism/interfaces/dispute/IDelayedWETH.sol";
 import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
 import {IDisputeGameFactory} from "optimism/interfaces/dispute/IDisputeGameFactory.sol";
 import {ISystemConfig} from "optimism/interfaces/L1/ISystemConfig.sol";
@@ -28,6 +30,7 @@ contract BaseTest is Test {
     uint256 public constant L2_CHAIN_ID = 8453;
     uint256 public constant BLOCK_INTERVAL = 100;
     uint256 public constant INIT_BOND = 1 ether;
+    uint256 public constant DELAYED_WETH_DELAY = 1 days;
     // Finality delay handled by the AggregateVerifier
     uint256 public constant FINALITY_DELAY = 0 days;
 
@@ -46,6 +49,7 @@ contract BaseTest is Test {
 
     DisputeGameFactory public factory;
     AnchorStateRegistry public anchorStateRegistry;
+    DelayedWETH public delayedWETH;
 
     MockVerifier public teeVerifier;
     MockVerifier public zkVerifier;
@@ -66,9 +70,10 @@ contract BaseTest is Test {
     function _deployContractsAndProxies() internal {
         // Deploy the system config
         systemConfig = new MockSystemConfig();
-
         // Deploy the relay anchor state registry
         AnchorStateRegistry _anchorStateRegistry = new AnchorStateRegistry(FINALITY_DELAY);
+        // Deploy the delayed WETH
+        DelayedWETH _delayedWETH = new DelayedWETH(DELAYED_WETH_DELAY);
         // Deploy the dispute game factory
         DisputeGameFactory _factory = new DisputeGameFactory();
 
@@ -84,6 +89,11 @@ contract BaseTest is Test {
         TransparentUpgradeableProxy factoryProxy =
             new TransparentUpgradeableProxy(address(_factory), address(proxyAdmin), "");
         factory = DisputeGameFactory(address(factoryProxy));
+
+        // Deploy proxy for delayed WETH
+        TransparentUpgradeableProxy delayedWETHProxy =
+            new TransparentUpgradeableProxy(address(_delayedWETH), address(proxyAdmin), "");
+        delayedWETH = DelayedWETH(payable(address(delayedWETHProxy)));
 
         // Deploy the verifiers
         teeVerifier = new MockVerifier();
@@ -101,6 +111,7 @@ contract BaseTest is Test {
             GameType.wrap(0)
         );
         factory.initialize(address(this));
+        delayedWETH.initialize(ISystemConfig(address(systemConfig)));
     }
 
     function _deployAndSetAggregateVerifier() internal {
@@ -108,6 +119,7 @@ contract BaseTest is Test {
         AggregateVerifier aggregateVerifierImpl = new AggregateVerifier(
             AGGREGATE_VERIFIER_GAME_TYPE,
             IAnchorStateRegistry(address(anchorStateRegistry)),
+            IDelayedWETH(payable(address(delayedWETH))),
             IVerifier(address(teeVerifier)),
             IVerifier(address(zkVerifier)),
             TEE_IMAGE_HASH,

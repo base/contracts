@@ -46,10 +46,12 @@ contract ChallengeTest is BaseTest {
         game2.resolve();
         assertEq(uint8(game2.status()), uint8(GameStatus.DEFENDER_WINS));
         assertEq(ZK_PROVER.balance, 0);
-        assertEq(address(game1).balance, INIT_BOND);
+        assertEq(delayedWETH.balanceOf(address(game1)), INIT_BOND);
+        game1.claimCredit();
+        vm.warp(block.timestamp + DELAYED_WETH_DELAY);
         game1.claimCredit();
         assertEq(ZK_PROVER.balance, INIT_BOND);
-        assertEq(address(game1).balance, 0);
+        assertEq(delayedWETH.balanceOf(address(game1)), 0);
     }
 
     function testChallengeFailsIfNoTEEProof() public {

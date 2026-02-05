@@ -32,7 +32,7 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(game.extraData(), abi.encodePacked(currentL2BlockNumber, type(uint32).max));
         assertEq(game.bondRecipient(), address(0));
         assertEq(anchorStateRegistry.isGameProper(IDisputeGame(address(game))), true);
-        assertEq(address(game).balance, INIT_BOND);
+        assertEq(delayedWETH.balanceOf(address(game)), INIT_BOND);
     }
 
     function testInitializeWithZKProof() public {
@@ -56,7 +56,7 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(game.extraData(), abi.encodePacked(currentL2BlockNumber, type(uint32).max));
         assertEq(game.bondRecipient(), ZK_PROVER);
         assertEq(anchorStateRegistry.isGameProper(IDisputeGame(address(game))), true);
-        assertEq(address(game).balance, INIT_BOND);
+        assertEq(delayedWETH.balanceOf(address(game)), INIT_BOND);
     }
 
     function testInitializeFailsIfInvalidCallDataSize() public {
@@ -101,11 +101,13 @@ contract AggregateVerifierTest is BaseTest {
         game.resolve();
         assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
 
-        // Reclaim bond after resolving
+        // Unlock and reclaim bond after resolving
         uint256 balanceBefore = game.gameCreator().balance;
         game.claimCredit();
+        vm.warp(block.timestamp + DELAYED_WETH_DELAY);
+        game.claimCredit();
         assertEq(game.gameCreator().balance, balanceBefore + INIT_BOND);
-        assertEq(address(game).balance, 0);
+        assertEq(delayedWETH.balanceOf(address(game)), 0);
 
         // Update AnchorStateRegistry
         vm.warp(block.timestamp + 1);
@@ -124,13 +126,15 @@ contract AggregateVerifierTest is BaseTest {
             ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.ZK
         );
 
-        // Reclaim bond
+        // Unlock and reclaim bond after delay
         uint256 balanceBefore = game.gameCreator().balance;
         game.claimCredit();
+        vm.warp(block.timestamp + DELAYED_WETH_DELAY);
+        game.claimCredit();
         assertEq(game.gameCreator().balance, balanceBefore + INIT_BOND);
-        assertEq(address(game).balance, 0);
+        assertEq(delayedWETH.balanceOf(address(game)), 0);
 
-        // Resolve after 7 days
+        // Resolve after another 7 days
         vm.warp(block.timestamp + 7 days);
         game.resolve();
         assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
@@ -155,11 +159,9 @@ contract AggregateVerifierTest is BaseTest {
 
         _provideProof(game, ZK_PROVER, AggregateVerifier.ProofType.ZK, zkProof);
 
-        // Reclaim bond
+        // Unlock bond
         uint256 balanceBefore = game.gameCreator().balance;
         game.claimCredit();
-        assertEq(game.gameCreator().balance, balanceBefore + INIT_BOND);
-        assertEq(address(game).balance, 0);
 
         // Resolve after 1 day
         vm.warp(block.timestamp + 1 days);
@@ -172,6 +174,12 @@ contract AggregateVerifierTest is BaseTest {
         (Hash root, uint256 l2SequenceNumber) = anchorStateRegistry.getAnchorRoot();
         assertEq(root.raw(), rootClaim.raw());
         assertEq(l2SequenceNumber, currentL2BlockNumber);
+
+        // Unlock and reclaim bond after delay
+        vm.warp(block.timestamp + DELAYED_WETH_DELAY);
+        game.claimCredit();
+        assertEq(game.gameCreator().balance, balanceBefore + INIT_BOND);
+        assertEq(delayedWETH.balanceOf(address(game)), 0);
     }
 
     function testProofCannotIncreaseExpectedResolution() public {
