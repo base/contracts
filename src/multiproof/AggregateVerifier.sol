@@ -12,6 +12,7 @@ import {
     GamePaused,
     NoCreditToClaim
 } from "optimism/src/dispute/lib/Errors.sol";
+import {IDelayedWETH} from "optimism/interfaces/dispute/IDelayedWETH.sol";
 import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
 import {IDisputeGameFactory} from "optimism/interfaces/dispute/IDisputeGameFactory.sol";
 import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
@@ -72,6 +73,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice The dispute game factory.
     IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
 
+    /// @notice The delayed WETH contract.
+    IDelayedWETH public immutable DELAYED_WETH;
+
     /// @notice The TEE prover.
     IVerifier public immutable TEE_VERIFIER;
 
@@ -127,6 +131,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
     /// @notice The address that can claim the bond.
     address public bondRecipient;
+
+    /// @notice Whether or not the bond has been unlocked.
+    bool public bondUnlocked;
+
+    /// @notice Whether or not the bond has been claimed.
+    bool public bondClaimed;
+
+    /// @notice The amount of the bond.
+    uint256 public bondAmount;
 
     ////////////////////////////////////////////////////////////////
     //                         Events                             //
@@ -202,6 +215,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
     /// @param gameType_ The game type.
     /// @param anchorStateRegistry_ The anchor state registry.
+    /// @param delayedWETH The delayed WETH contract.
     /// @param teeVerifier The TEE verifier.
     /// @param zkVerifier The ZK verifier.
     /// @param teeImageHash The hash of the TEE image.
@@ -213,6 +227,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     constructor(
         GameType gameType_,
         IAnchorStateRegistry anchorStateRegistry_,
+        IDelayedWETH delayedWETH,
         IVerifier teeVerifier,
         IVerifier zkVerifier,
         bytes32 teeImageHash,
@@ -226,6 +241,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         GAME_TYPE = gameType_;
         ANCHOR_STATE_REGISTRY = anchorStateRegistry_;
         DISPUTE_GAME_FACTORY = ANCHOR_STATE_REGISTRY.disputeGameFactory();
+        DELAYED_WETH = delayedWETH;
         TEE_VERIFIER = teeVerifier;
         ZK_VERIFIER = zkVerifier;
         TEE_IMAGE_HASH = teeImageHash;
@@ -315,19 +331,22 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // Set expected resolution.
         provingData.expectedResolution = Timestamp.wrap(type(uint64).max);
 
+        // Deposit the bond.
+        bondAmount = msg.value;
+        DELAYED_WETH.deposit{value: msg.value}();
+
         // Verify the proof.
-        ProofType proofType = ProofType(uint8(proof[0]));
-        _verifyProof(proof[1:], proofType, gameCreator());
+        _verifyProof(proof[1:], ProofType(uint8(proof[0])), gameCreator());
     }
 
     /// @notice Verifies a proof for the current game.
     /// @param proofBytes The proof.
-    /// @param proofType The type of proof.
-    function verifyProof(bytes calldata proofBytes, ProofType proofType) external {
+    /// @dev The first byte of the proof is the proof type.
+    function verifyProof(bytes calldata proofBytes) external {
         // The game must not be over.
         if (gameOver()) revert GameOver();
 
-        _verifyProof(proofBytes, proofType, msg.sender);
+        _verifyProof(proofBytes[1:], ProofType(uint8(proofBytes[0])), msg.sender);
     }
 
     /// @notice Resolves the game after a proof has been provided and enough time has passed.
@@ -441,27 +460,37 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice Claim the credit belonging to the bond recipient. Reverts if the game isn't
     ///         finalized or if the bond transfer fails.
     function claimCredit() external nonReentrant {
+        // The bond must not have been claimed yet.
+        if (bondClaimed) revert NoCreditToClaim();
+
         // The bond recipient must not be empty.
         if (bondRecipient == address(0)) revert BondRecipientEmpty();
 
         // If this game was challenged, the countered by game must be valid.
         if (provingData.counteredByGameAddress != address(0)) {
+            if (!_isValidChallengingGame(IDisputeGame(provingData.counteredByGameAddress))) {
+                revert InvalidCounteredByGame();
+            }
             if (IDisputeGame(provingData.counteredByGameAddress).status() != GameStatus.DEFENDER_WINS) {
                 revert InvalidCounteredByGame();
             }
         }
 
-        uint256 balanceToClaim = address(this).balance;
+        if (!bondUnlocked) {
+            DELAYED_WETH.unlock(bondRecipient, bondAmount);
+            bondUnlocked = true;
+            return;
+        }
 
-        // The game must have credit to claim.
-        if (balanceToClaim == 0) revert NoCreditToClaim();
+        bondClaimed = true;
+        DELAYED_WETH.withdraw(bondRecipient, bondAmount);
 
         // Transfer the credit to the bond recipient.
-        (bool success,) = bondRecipient.call{value: balanceToClaim}(hex"");
+        (bool success,) = bondRecipient.call{value: bondAmount}(hex"");
         if (!success) revert BondTransferFailed();
 
         // Emit the credit claimed event.
-        emit CreditClaimed(bondRecipient, balanceToClaim);
+        emit CreditClaimed(bondRecipient, bondAmount);
     }
 
     /// @notice Closes the game by trying to update the anchor state.
@@ -691,8 +720,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @param game The game to check.
     function _isValidChallengingGame(IDisputeGame game) internal view returns (bool) {
         return
-        // The parent game must be the same.
-        AggregateVerifier(address(game)).parentIndex() == parentIndex() && 
+        // The game type must be the same.
+        game.gameType().raw() == GAME_TYPE.raw() && 
+            // The parent game must be the same.
+            AggregateVerifier(address(game)).parentIndex() == parentIndex() && 
             // The block number must be the same.
             game.l2SequenceNumber() == l2SequenceNumber() && 
             // The root claim must be different.

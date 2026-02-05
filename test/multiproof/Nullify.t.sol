@@ -34,8 +34,10 @@ contract NullifyTest is BaseTest {
 
         uint256 balanceBefore = game1.gameCreator().balance;
         game1.claimCredit();
+        vm.warp(block.timestamp + DELAYED_WETH_DELAY);
+        game1.claimCredit();
         assertEq(game1.gameCreator().balance, balanceBefore + INIT_BOND);
-        assertEq(address(game1).balance, 0);
+        assertEq(delayedWETH.balanceOf(address(game1)), 0);
     }
 
     function testNullifyWithZKProof() public {
@@ -63,8 +65,10 @@ contract NullifyTest is BaseTest {
 
         uint256 balanceBefore = game1.gameCreator().balance;
         game1.claimCredit();
+        vm.warp(block.timestamp + DELAYED_WETH_DELAY);
+        game1.claimCredit();
         assertEq(game1.gameCreator().balance, balanceBefore + INIT_BOND);
-        assertEq(address(game1).balance, 0);
+        assertEq(delayedWETH.balanceOf(address(game1)), 0);
     }
 
     function testTEENullifyFailsIfNoTEEProof() public {
@@ -168,7 +172,9 @@ contract NullifyTest is BaseTest {
 
         uint256 balanceBefore = game1.gameCreator().balance;
         game1.claimCredit();
+        vm.warp(block.timestamp + DELAYED_WETH_DELAY);
+        game1.claimCredit();
         assertEq(game1.gameCreator().balance, balanceBefore + INIT_BOND);
-        assertEq(address(game1).balance, 0);
+        assertEq(delayedWETH.balanceOf(address(game1)), 0);
     }
 }
