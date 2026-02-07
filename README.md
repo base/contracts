@@ -1,4 +1,4 @@
-![Base](logo.webp)
+![Base](logo.png)
 
 # contracts
 
@@ -8,11 +8,11 @@ For contract deployment artifacts, see [base-org/contract-deployments](https://g
 
 <!-- Badge row 1 - status -->
 
-[![GitHub contributors](https://img.shields.io/github/contributors/base-org/contracts)](https://github.com/base-org/contracts/graphs/contributors)
-[![GitHub commit activity](https://img.shields.io/github/commit-activity/w/base-org/contracts)](https://github.com/base-org/contracts/graphs/contributors)
-[![GitHub Stars](https://img.shields.io/github/stars/base-org/contracts.svg)](https://github.com/base-org/contracts/stargazers)
+[![GitHub contributors](https://img.shields.io/github/contributors/base-org/contracts)](https://github.com/base/contracts/graphs/contributors)
+[![GitHub commit activity](https://img.shields.io/github/commit-activity/w/base-org/contracts)](https://github.com/base/contracts/graphs/contributors)
+[![GitHub Stars](https://img.shields.io/github/stars/base-org/contracts.svg)](https://github.com/base/contracts/stargazers)
 ![GitHub repo size](https://img.shields.io/github/repo-size/base-org/contracts)
-[![GitHub](https://img.shields.io/github/license/base-org/contracts?color=blue)](https://github.com/base-org/contracts/blob/main/LICENSE)
+[![GitHub](https://img.shields.io/github/license/base-org/contracts?color=blue)](https://github.com/base/contracts/blob/main/LICENSE)
 
 <!-- Badge row 2 - links and profiles -->
 
@@ -24,12 +24,11 @@ For contract deployment artifacts, see [base-org/contract-deployments](https://g
 
 <!-- Badge row 3 - detailed status -->
 
-[![GitHub pull requests by-label](https://img.shields.io/github/issues-pr-raw/base-org/contracts)](https://github.com/base-org/contracts/pulls)
-[![GitHub Issues](https://img.shields.io/github/issues-raw/base-org/contracts.svg)](https://github.com/base-org/contracts/issues)
+[![GitHub pull requests by-label](https://img.shields.io/github/issues-pr-raw/base-org/contracts)](https://github.com/base/contracts/pulls)
+[![GitHub Issues](https://img.shields.io/github/issues-raw/base-org/contracts.svg)](https://github.com/base/contracts/issues)
 
 ### setup and testing
 
 - If you don't have foundry installed, run `make install-foundry`.
-- Copy `.env.example` to `.env` and fill in the variables.
 - `make deps`
 - Test contracts: `make test`

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "./BaseSmartEscrow.t.sol";
+import {BaseSmartEscrowTest} from "test/smart-escrow/BaseSmartEscrow.t.sol";
 
 contract UpdateBeneficiarySmartEscrow is BaseSmartEscrowTest {
     function test_updateBeneficiary_succeeds() public {
@@ -31,7 +31,7 @@ contract UpdateBeneficiarySmartEscrow is BaseSmartEscrowTest {
 
         vm.prank(beneficiaryOwner);
         smartEscrow.updateBeneficiary(address(0));
-        
+
         // Beneficiary remains the same
         assertEq(smartEscrow.beneficiary(), beneficiary);
     }
@@ -40,7 +40,7 @@ contract UpdateBeneficiarySmartEscrow is BaseSmartEscrowTest {
         vm.expectRevert(accessControlErrorMessage(escrowOwner, BENEFICIARY_OWNER_ROLE));
         vm.prank(escrowOwner);
         smartEscrow.updateBeneficiary(alice);
-        
+
         // Beneficiary owner remains the same
         assertEq(smartEscrow.beneficiary(), beneficiary);
     }

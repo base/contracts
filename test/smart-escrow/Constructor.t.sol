@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "./BaseSmartEscrow.t.sol";
+import {SmartEscrow} from "src/smart-escrow/SmartEscrow.sol";
+
+import {BaseSmartEscrowTest} from "test/smart-escrow/BaseSmartEscrow.t.sol";
 
 contract ConstructorSmartEscrow is BaseSmartEscrowTest {
     function test_constructor_zeroAddressBenefactor_fails() public {
@@ -185,7 +187,8 @@ contract ConstructorSmartEscrow is BaseSmartEscrowTest {
     }
 
     function test_constructor_vestingPeriodExceedsContractDuration_fails() public {
-        bytes4 vestingPeriodExceedsContractDurationSelector = bytes4(keccak256("VestingPeriodExceedsContractDuration(uint256)"));
+        bytes4 vestingPeriodExceedsContractDurationSelector =
+            bytes4(keccak256("VestingPeriodExceedsContractDuration(uint256)"));
         vm.expectRevert(abi.encodeWithSelector(vestingPeriodExceedsContractDurationSelector, end));
         new SmartEscrow(
             benefactor,

@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 /* Testing utilities */
 import {Test} from "forge-std/Test.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 contract CommonTest is Test {
     address alice = address(128);
@@ -18,11 +17,11 @@ contract CommonTest is Test {
     uint256 constant ZERO_VALUE = 0;
     uint64 constant NON_ZERO_GASLIMIT = 50000;
 
-    string EMPTY_STRING = "";
-    string NON_EMPTY_STRING = "non-empty";
-    bytes NULL_BYTES = bytes("");
-    bytes NON_NULL_BYTES = abi.encodePacked(uint256(1));
-    
+    string constant EMPTY_STRING = "";
+    string constant NON_EMPTY_STRING = "non-empty";
+    bytes constant NULL_BYTES = bytes("");
+    bytes constant NON_NULL_BYTES = abi.encodePacked(uint256(1));
+
     function setUp() public virtual {
         // Give alice and bob some ETH
         vm.deal(alice, 1 << 16);

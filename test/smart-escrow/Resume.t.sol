@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "./BaseSmartEscrow.t.sol";
+import {BaseSmartEscrowTest} from "test/smart-escrow/BaseSmartEscrow.t.sol";
 
 contract ResumeSmartEscrow is BaseSmartEscrowTest {
     function test_resume_succeeds() public {
@@ -38,7 +38,7 @@ contract ResumeSmartEscrow is BaseSmartEscrowTest {
         bytes4 selector = bytes4(keccak256("ContractIsTerminated()"));
         vm.expectRevert(abi.encodeWithSelector(selector));
         smartEscrow.release();
-        
+
         // All tokens should remain in the contract
         assertEq(OP_TOKEN.balanceOf(address(smartEscrow)), totalTokensToRelease);
     }

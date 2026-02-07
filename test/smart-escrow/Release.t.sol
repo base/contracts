@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import "./BaseSmartEscrow.t.sol";
+import {BaseSmartEscrowTest} from "test/smart-escrow/BaseSmartEscrow.t.sol";
 
 contract ReleaseSmartEscrow is BaseSmartEscrowTest {
     function test_release_beforeScheduleStart_succeeds() public {
@@ -57,6 +57,7 @@ contract ReleaseSmartEscrow is BaseSmartEscrowTest {
     }
 
     function testFuzz_release(uint256 timestamp) public {
+        vm.assume(timestamp < type(uint64).max - 1);
         vm.warp(timestamp);
         uint256 releasable = smartEscrow.releasable();
         smartEscrow.release();
