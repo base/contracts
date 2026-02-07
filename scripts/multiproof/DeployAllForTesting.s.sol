@@ -1,130 +1,41 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {Script} from "forge-std/Script.sol";
-import {console2 as console} from "forge-std/console2.sol";
-import {stdJson} from "forge-std/StdJson.sol";
-
-// TEE contracts
 import {CertManager} from "@nitro-validator/CertManager.sol";
-import {SystemConfigGlobal} from "../src/tee/SystemConfigGlobal.sol";
-import {TEEVerifier} from "../src/tee/TEEVerifier.sol";
-
-// Dispute game
-import {AggregateVerifier} from "../src/AggregateVerifier.sol";
-import {IVerifier} from "../src/interfaces/IVerifier.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Script} from "forge-std/Script.sol";
+import {stdJson} from "forge-std/StdJson.sol";
+import {console2 as console} from "forge-std/console2.sol";
 import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
 import {IDelayedWETH} from "optimism/interfaces/dispute/IDelayedWETH.sol";
 import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
+import {DisputeGameFactory} from "optimism/src/dispute/DisputeGameFactory.sol";
 import {GameType, Hash} from "optimism/src/dispute/lib/Types.sol";
 
-// Mocks
+import {AggregateVerifier} from "../src/AggregateVerifier.sol";
+import {IVerifier} from "../src/interfaces/IVerifier.sol";
 import {MockVerifier} from "../src/mocks/MockVerifier.sol";
+import {DevSystemConfigGlobal} from "../src/tee/DevSystemConfigGlobal.sol";
+import {SystemConfigGlobal} from "../src/tee/SystemConfigGlobal.sol";
+import {TEEVerifier} from "../src/tee/TEEVerifier.sol";
 
-// Proxy - using OpenZeppelin for simpler deployment
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-
-/// @title MockAnchorStateRegistry
-/// @notice Minimal mock for testing - stores anchor state and factory reference
-/// @dev We use a mock instead of the real AnchorStateRegistry because:
-///      1. The real contract requires deploying the entire Optimism L1 stack
-///         (SystemConfig, SuperchainConfig, ProxyAdmin, Guardian roles, etc.)
-///      2. The real contract has "stack too deep" compilation issues that require
-///         special compiler settings (via-ir) which significantly slow builds
-///      3. For TEE prover testing, we only need getAnchorRoot() and setAnchorState()
-contract MockAnchorStateRegistry {
-    Hash public anchorRoot;
-    uint256 public anchorL2BlockNumber;
-    address public factory;
-    GameType public respectedGameType;
-
-    function initialize(address _factory, Hash _anchorRoot, uint256 _anchorL2BlockNumber, GameType _gameType) external {
-        factory = _factory;
-        anchorRoot = _anchorRoot;
-        anchorL2BlockNumber = _anchorL2BlockNumber;
-        respectedGameType = _gameType;
-    }
-
-    // This is the key function AggregateVerifier calls
-    function getAnchorRoot() external view returns (Hash, uint256) {
-        return (anchorRoot, anchorL2BlockNumber);
-    }
-
-    function disputeGameFactory() external view returns (address) {
-        return factory;
-    }
-
-    function setRespectedGameType(GameType _gameType) external {
-        respectedGameType = _gameType;
-    }
-
-    /// @notice Update the anchor state (for testing purposes)
-    function setAnchorState(Hash _anchorRoot, uint256 _anchorL2BlockNumber) external {
-        anchorRoot = _anchorRoot;
-        anchorL2BlockNumber = _anchorL2BlockNumber;
-    }
-
-    // Stub implementations that AggregateVerifier may call
-    function isGameRegistered(IDisputeGame) external pure returns (bool) {
-        return true;
-    }
-
-    function isGameBlacklisted(IDisputeGame) external pure returns (bool) {
-        return false;
-    }
-
-    function isGameRetired(IDisputeGame) external pure returns (bool) {
-        return false;
-    }
-
-    function isGameRespected(IDisputeGame) external pure returns (bool) {
-        return true;
-    }
-}
-
-/// @title MockDelayedWETH
-/// @notice Minimal mock for testing - implements the IDelayedWETH interface
-/// @dev For testing purposes only. The real DelayedWETH handles bond deposits and withdrawals.
-contract MockDelayedWETH {
-    /// @notice Accepts ETH deposits (no-op for testing)
-    function deposit() external payable {}
-
-    /// @notice Mock unlock - no-op for testing
-    function unlock(address, uint256) external {}
-
-    /// @notice Mock withdraw - transfers ETH back
-    function withdraw(address recipient, uint256 amount) external {
-        payable(recipient).transfer(amount);
-    }
-
-    /// @notice Allow contract to receive ETH
-    receive() external payable {}
-}
-
-// Import the REAL DisputeGameFactory
-import {DisputeGameFactory} from "optimism/src/dispute/DisputeGameFactory.sol";
-
-/// @title MinimalProxyAdmin
-/// @notice Minimal contract to satisfy DisputeGameFactory's proxy admin check
-/// @dev DisputeGameFactory.initialize() requires msg.sender == proxyAdmin() or proxyAdminOwner()
-///      We deploy this minimal contract and set it as the proxy admin via vm.store
-contract MinimalProxyAdmin {
-    address public owner;
-
-    constructor(address _owner) {
-        owner = _owner;
-    }
-}
+import {MinimalProxyAdmin} from "./mocks/MinimalProxyAdmin.sol";
+import {MockAnchorStateRegistry} from "./mocks/MockAnchorStateRegistry.sol";
+import {MockDelayedWETH} from "./mocks/MockDelayedWETH.sol";
 
 /// @title DeployAllForTesting
 /// @notice Deploys everything needed for e2e testing, using mocks for optimism contracts.
+/// @dev Uses the REAL DisputeGameFactory but mocks AnchorStateRegistry and DelayedWETH.
 contract DeployAllForTesting is Script {
     using stdJson for string;
+
+    /// @notice Constant from Optimism's Constants.sol - the storage slot for proxy admin.
+    bytes32 internal constant PROXY_OWNER_ADDRESS = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     uint256 public constant BLOCK_INTERVAL = 100;
     uint256 public constant INIT_BOND = 0.001 ether;
 
-    // Config struct to reduce stack variables
+    /// @notice Config struct to reduce stack variables.
     struct DeployConfig {
         address owner;
         bytes32 teeImageHash;
@@ -144,20 +55,6 @@ contract DeployAllForTesting is Script {
     address public mockAnchorRegistry;
     address public mockDelayedWETH;
     address public aggregateVerifier;
-
-    function _loadConfig() internal view returns (DeployConfig memory cfg) {
-        string memory configPath = vm.envOr("DEPLOY_CONFIG_PATH", string("deploy-config/sepolia.json"));
-        string memory config = vm.readFile(configPath);
-
-        cfg.owner = config.readAddress(".finalSystemOwner");
-        cfg.teeImageHash = config.readBytes32(".teeImageHash");
-        cfg.teeProposer = config.readAddressOr(".teeProposer", cfg.owner);
-        cfg.gameTypeRaw = config.readUintOr(".gameType", 621);
-        cfg.gameType = GameType.wrap(uint32(cfg.gameTypeRaw));
-        cfg.genesisOutputRoot = config.readBytes32Or(".genesisOutputRoot", bytes32(uint256(1)));
-        cfg.genesisBlockNumber = config.readUintOr(".genesisBlockNumber", 0);
-        cfg.configHash = config.readBytes32Or(".configHash", bytes32(0));
-    }
 
     function run() public {
         DeployConfig memory cfg = _loadConfig();
@@ -180,13 +77,27 @@ contract DeployAllForTesting is Script {
         _writeOutput();
     }
 
+    function _loadConfig() internal view returns (DeployConfig memory cfg) {
+        string memory configPath = vm.envOr("DEPLOY_CONFIG_PATH", string("deploy-config/sepolia.json"));
+        string memory config = vm.readFile(configPath);
+
+        cfg.owner = config.readAddress(".finalSystemOwner");
+        cfg.teeImageHash = config.readBytes32(".teeImageHash");
+        cfg.teeProposer = config.readAddressOr(".teeProposer", cfg.owner);
+        cfg.gameTypeRaw = config.readUintOr(".gameType", 621);
+        cfg.gameType = GameType.wrap(uint32(cfg.gameTypeRaw));
+        cfg.genesisOutputRoot = config.readBytes32Or(".genesisOutputRoot", bytes32(uint256(1)));
+        cfg.genesisBlockNumber = config.readUintOr(".genesisBlockNumber", 0);
+        cfg.configHash = config.readBytes32Or(".configHash", bytes32(0));
+    }
+
     function _deployTEEContracts(address owner) internal {
         // 1. CertManager
         certManager = address(new CertManager());
         console.log("CertManager:", certManager);
 
-        // 2. SystemConfigGlobal with proxy
-        address scgImpl = address(new SystemConfigGlobal(CertManager(certManager)));
+        // 2. DevSystemConfigGlobal (dev version) with proxy
+        address scgImpl = address(new DevSystemConfigGlobal(CertManager(certManager)));
         systemConfigGlobalProxy = address(
             new TransparentUpgradeableProxy(
                 scgImpl,
@@ -194,15 +105,12 @@ contract DeployAllForTesting is Script {
                 abi.encodeCall(SystemConfigGlobal.initialize, (owner, owner))
             )
         );
-        console.log("SystemConfigGlobal:", systemConfigGlobalProxy);
+        console.log("DevSystemConfigGlobal:", systemConfigGlobalProxy);
 
         // 3. TEEVerifier
         teeVerifier = address(new TEEVerifier(SystemConfigGlobal(systemConfigGlobalProxy)));
         console.log("TEEVerifier:", teeVerifier);
     }
-
-    // Constant from Optimism's Constants.sol - the storage slot for proxy admin
-    bytes32 constant PROXY_OWNER_ADDRESS = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     function _deployInfrastructure(DeployConfig memory cfg) internal {
         // 4. REAL DisputeGameFactory (behind proxy)
@@ -279,7 +187,7 @@ contract DeployAllForTesting is Script {
         console.log("========================================");
         console.log("\nTEE Contracts:");
         console.log("  CertManager:", certManager);
-        console.log("  SystemConfigGlobal:", systemConfigGlobalProxy);
+        console.log("  DevSystemConfigGlobal:", systemConfigGlobalProxy);
         console.log("  TEEVerifier:", teeVerifier);
         console.log("\nInfrastructure:");
         console.log("  DisputeGameFactory (real):", disputeGameFactory);
