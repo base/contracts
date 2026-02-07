@@ -111,6 +111,7 @@ contract TEEVerifier is IVerifier {
         bytes32 actualHash;
         uint256 blockAge = block.number - l1OriginNumber;
 
+        // Prefer blockhash() over EIP-2935 when possible since it's cheaper (no external call).
         if (blockAge <= BLOCKHASH_WINDOW) {
             actualHash = blockhash(l1OriginNumber);
         } else if (blockAge <= EIP2935_WINDOW) {
