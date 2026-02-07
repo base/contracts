@@ -8,7 +8,7 @@ pragma solidity 0.8.15;
 contract MinimalProxyAdmin {
     address public owner;
 
-    constructor(address _owner) {
-        owner = _owner;
+    constructor(address initialOwner) {
+        owner = initialOwner;
     }
 }

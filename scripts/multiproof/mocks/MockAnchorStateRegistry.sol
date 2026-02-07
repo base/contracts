@@ -20,15 +20,20 @@ contract MockAnchorStateRegistry {
     GameType public respectedGameType;
 
     /// @notice Initializes the mock registry.
-    /// @param _factory The dispute game factory address.
-    /// @param _anchorRoot The initial anchor root.
-    /// @param _anchorL2BlockNumber The initial anchor L2 block number.
-    /// @param _gameType The respected game type.
-    function initialize(address _factory, Hash _anchorRoot, uint256 _anchorL2BlockNumber, GameType _gameType) external {
-        factory = _factory;
-        anchorRoot = _anchorRoot;
-        anchorL2BlockNumber = _anchorL2BlockNumber;
-        respectedGameType = _gameType;
+    /// @param newFactory The dispute game factory address.
+    /// @param newAnchorRoot The initial anchor root.
+    /// @param newAnchorL2BlockNumber The initial anchor L2 block number.
+    /// @param gameType The respected game type.
+    function initialize(
+        address newFactory,
+        Hash newAnchorRoot,
+        uint256 newAnchorL2BlockNumber,
+        GameType gameType
+    ) external {
+        factory = newFactory;
+        anchorRoot = newAnchorRoot;
+        anchorL2BlockNumber = newAnchorL2BlockNumber;
+        respectedGameType = gameType;
     }
 
     /// @notice Returns the anchor root and block number.
@@ -44,17 +49,17 @@ contract MockAnchorStateRegistry {
     }
 
     /// @notice Sets the respected game type.
-    /// @param _gameType The new game type.
-    function setRespectedGameType(GameType _gameType) external {
-        respectedGameType = _gameType;
+    /// @param gameType The new game type.
+    function setRespectedGameType(GameType gameType) external {
+        respectedGameType = gameType;
     }
 
     /// @notice Updates the anchor state (for testing purposes).
-    /// @param _anchorRoot The new anchor root.
-    /// @param _anchorL2BlockNumber The new anchor L2 block number.
-    function setAnchorState(Hash _anchorRoot, uint256 _anchorL2BlockNumber) external {
-        anchorRoot = _anchorRoot;
-        anchorL2BlockNumber = _anchorL2BlockNumber;
+    /// @param newAnchorRoot The new anchor root.
+    /// @param newAnchorL2BlockNumber The new anchor L2 block number.
+    function setAnchorState(Hash newAnchorRoot, uint256 newAnchorL2BlockNumber) external {
+        anchorRoot = newAnchorRoot;
+        anchorL2BlockNumber = newAnchorL2BlockNumber;
     }
 
     /// @notice Checks if a game is registered.
