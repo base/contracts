@@ -14,7 +14,7 @@ contract AggregateVerifierTest is BaseTest {
     function testInitializeWithTEEProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory proof = "tee-proof";
+        bytes memory proof = _generateProof("tee-proof");
 
         AggregateVerifier game = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.TEE
@@ -38,7 +38,7 @@ contract AggregateVerifierTest is BaseTest {
     function testInitializeWithZKProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory proof = "zk-proof";
+        bytes memory proof = _generateProof("zk-proof");
 
         AggregateVerifier game = _createAggregateVerifierGame(
             ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.ZK
@@ -75,7 +75,7 @@ contract AggregateVerifierTest is BaseTest {
     function testInitializeFailsIfNotTEEProposer() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory proof = "tee-proof";
+        bytes memory proof = _generateProof("tee-proof");
 
         vm.expectRevert(AggregateVerifier.NotAuthorized.selector);
         _createAggregateVerifierGame(
@@ -86,7 +86,7 @@ contract AggregateVerifierTest is BaseTest {
     function testUpdatingAnchorStateRegistryWithTEEProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory proof = "tee-proof";
+        bytes memory proof = _generateProof("tee-proof");
 
         AggregateVerifier game = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.TEE
@@ -120,7 +120,7 @@ contract AggregateVerifierTest is BaseTest {
     function testUpdatingAnchorStateRegistryWithZKProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory proof = "zk-proof";
+        bytes memory proof = _generateProof("zk-proof");
 
         AggregateVerifier game = _createAggregateVerifierGame(
             ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.ZK
@@ -150,8 +150,8 @@ contract AggregateVerifierTest is BaseTest {
     function testUpdatingAnchorStateRegistryWithBothProofs() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory teeProof = "tee-proof";
-        bytes memory zkProof = "zk-proof";
+        bytes memory teeProof = _generateProof("tee-proof");
+        bytes memory zkProof = _generateProof("zk-proof");
 
         AggregateVerifier game = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof, AggregateVerifier.ProofType.TEE
@@ -185,8 +185,8 @@ contract AggregateVerifierTest is BaseTest {
     function testProofCannotIncreaseExpectedResolution() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory teeProof = "tee-proof";
-        bytes memory zkProof = "zk-proof";
+        bytes memory teeProof = _generateProof("tee-proof");
+        bytes memory zkProof = _generateProof("zk-proof");
 
         AggregateVerifier game = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof, AggregateVerifier.ProofType.TEE
@@ -216,8 +216,8 @@ contract AggregateVerifierTest is BaseTest {
     function testCannotCreateSameProposal() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory teeProof = "tee-proof";
-        bytes memory zkProof = "zk-proof";
+        bytes memory teeProof = _generateProof("tee-proof");
+        bytes memory zkProof = _generateProof("zk-proof");
 
         _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof, AggregateVerifier.ProofType.TEE

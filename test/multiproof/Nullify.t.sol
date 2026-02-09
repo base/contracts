@@ -13,14 +13,14 @@ contract NullifyTest is BaseTest {
         currentL2BlockNumber += BLOCK_INTERVAL;
 
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee1")));
-        bytes memory teeProof1 = "tee-proof-1";
+        bytes memory teeProof1 = _generateProof("tee-proof-1");
 
         AggregateVerifier game1 = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, teeProof1, AggregateVerifier.ProofType.TEE
         );
 
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
-        bytes memory teeProof2 = "tee-proof-2";
+        bytes memory teeProof2 = _generateProof("tee-proof-2");
 
         _createAggregateVerifierGame(
             TEE_PROVER, rootClaim2, currentL2BlockNumber, type(uint32).max, teeProof2, AggregateVerifier.ProofType.TEE
@@ -44,14 +44,14 @@ contract NullifyTest is BaseTest {
         currentL2BlockNumber += BLOCK_INTERVAL;
 
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk1")));
-        bytes memory zkProof1 = "zk-proof-1";
+        bytes memory zkProof1 = _generateProof("zk-proof-1");
 
         AggregateVerifier game1 = _createAggregateVerifierGame(
             ZK_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, zkProof1, AggregateVerifier.ProofType.ZK
         );
 
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk2")));
-        bytes memory zkProof2 = "zk-proof-2";
+        bytes memory zkProof2 = _generateProof("zk-proof-2");
 
         _createAggregateVerifierGame(
             ZK_PROVER, rootClaim2, currentL2BlockNumber, type(uint32).max, zkProof2, AggregateVerifier.ProofType.ZK
@@ -75,14 +75,14 @@ contract NullifyTest is BaseTest {
         currentL2BlockNumber += BLOCK_INTERVAL;
 
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk1")));
-        bytes memory zkProof = "zk-proof";
+        bytes memory zkProof = _generateProof("zk-proof");
 
         AggregateVerifier game1 = _createAggregateVerifierGame(
             ZK_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, zkProof, AggregateVerifier.ProofType.ZK
         );
 
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
-        bytes memory teeProof = "tee-proof";
+        bytes memory teeProof = _generateProof("tee-proof");
 
         _createAggregateVerifierGame(
             TEE_PROVER, rootClaim2, currentL2BlockNumber, type(uint32).max, teeProof, AggregateVerifier.ProofType.TEE
@@ -97,14 +97,14 @@ contract NullifyTest is BaseTest {
         currentL2BlockNumber += BLOCK_INTERVAL;
 
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee1")));
-        bytes memory teeProof = "tee-proof";
+        bytes memory teeProof = _generateProof("tee-proof");
 
         AggregateVerifier game1 = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, teeProof, AggregateVerifier.ProofType.TEE
         );
 
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
-        bytes memory zkProof = "zk-proof";
+        bytes memory zkProof = _generateProof("zk-proof");
 
         _createAggregateVerifierGame(
             ZK_PROVER, rootClaim2, currentL2BlockNumber, type(uint32).max, zkProof, AggregateVerifier.ProofType.ZK
@@ -119,7 +119,7 @@ contract NullifyTest is BaseTest {
         currentL2BlockNumber += BLOCK_INTERVAL;
 
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee1")));
-        bytes memory teeProof1 = "tee-proof-1";
+        bytes memory teeProof1 = _generateProof("tee-proof-1");
 
         AggregateVerifier game1 = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, teeProof1, AggregateVerifier.ProofType.TEE
@@ -131,7 +131,7 @@ contract NullifyTest is BaseTest {
 
         // Try to nullify game1
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk")));
-        bytes memory teeProof2 = "tee-proof-2";
+        bytes memory teeProof2 = _generateProof("tee-proof-2");
 
         _createAggregateVerifierGame(
             TEE_PROVER, rootClaim2, currentL2BlockNumber, type(uint32).max, teeProof2, AggregateVerifier.ProofType.TEE
@@ -146,7 +146,7 @@ contract NullifyTest is BaseTest {
         currentL2BlockNumber += BLOCK_INTERVAL;
 
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee1")));
-        bytes memory teeProof1 = "tee-proof-1";
+        bytes memory teeProof1 = _generateProof("tee-proof-1");
 
         AggregateVerifier game1 = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, teeProof1, AggregateVerifier.ProofType.TEE
@@ -154,7 +154,7 @@ contract NullifyTest is BaseTest {
 
         // Challenge game1
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk")));
-        bytes memory zkProof = "zk-proof";
+        bytes memory zkProof = _generateProof("zk-proof");
 
         _createAggregateVerifierGame(
             ZK_PROVER, rootClaim2, currentL2BlockNumber, type(uint32).max, zkProof, AggregateVerifier.ProofType.ZK

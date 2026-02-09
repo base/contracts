@@ -166,4 +166,20 @@ contract BaseTest is Test {
         bytes memory proofBytes = abi.encodePacked(uint8(proofType), proof);
         game.verifyProof(proofBytes);
     }
+
+    /// @notice Generates a properly formatted proof for testing.
+    /// @dev The proof format is: l1OriginHash (32) + l1OriginNumber (32) + additional data.
+    ///      Since MockVerifier always returns true, we just need the correct structure.
+    /// @param salt A salt to make proofs unique.
+    /// @return proof The formatted proof bytes.
+    function _generateProof(bytes memory salt) internal view returns (bytes memory) {
+        // Use the previous block hash as l1OriginHash
+        bytes32 l1OriginHash = blockhash(block.number - 1);
+        // Use the previous block number as l1OriginNumber
+        uint256 l1OriginNumber = block.number - 1;
+        // Add some padding/signature data (65 bytes minimum for a signature)
+        bytes memory signature = abi.encodePacked(salt, bytes32(0), bytes32(0), uint8(27));
+
+        return abi.encodePacked(l1OriginHash, l1OriginNumber, signature);
+    }
 }
