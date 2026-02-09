@@ -26,6 +26,7 @@ contract TEEVerifierTest is Test {
 
     bytes32 internal constant PCR0_HASH = keccak256("test-pcr0");
     bytes32 internal constant IMAGE_ID = PCR0_HASH; // imageId must match PCR0 hash
+    address internal immutable PROPOSER = makeAddr("proposer");
 
     address internal owner;
 
@@ -54,6 +55,9 @@ contract TEEVerifierTest is Test {
         // Register the signer with PCR0 hash
         systemConfigGlobal.addDevSigner(signerAddress, PCR0_HASH);
 
+        // Set the proposer as valid
+        systemConfigGlobal.setProposer(PROPOSER, true);
+
         // Deploy TEEVerifier
         verifier = new TEEVerifier(SystemConfigGlobal(address(systemConfigGlobal)));
     }
@@ -70,8 +74,8 @@ contract TEEVerifierTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        // Construct proof: l1OriginHash (32) + l1OriginNumber (32) + signature (65)
-        bytes memory proofBytes = abi.encodePacked(l1OriginHash, l1OriginNumber, signature);
+        // Construct proof: proposer (20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65)
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, signature);
 
         // Verify should return true
         bool result = verifier.verify(proofBytes, IMAGE_ID, journal);
@@ -88,9 +92,28 @@ contract TEEVerifierTest is Test {
         bytes memory invalidSignature = new bytes(65);
         invalidSignature[64] = bytes1(uint8(27)); // Set v to 27
 
-        bytes memory proofBytes = abi.encodePacked(l1OriginHash, l1OriginNumber, invalidSignature);
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, invalidSignature);
 
         vm.expectRevert(TEEVerifier.InvalidSignature.selector);
+        verifier.verify(proofBytes, IMAGE_ID, journal);
+    }
+
+    function testVerifyFailsWithInvalidProposer() public {
+        // Create a journal hash
+        bytes32 journal = keccak256("test-journal");
+
+        // Get current block info for L1 origin
+        uint256 l1OriginNumber = block.number - 1;
+        bytes32 l1OriginHash = blockhash(l1OriginNumber);
+
+        // Sign the journal with the signer's private key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        // Construct proof: proposer (20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65)
+        bytes memory proofBytes = abi.encodePacked(address(0), l1OriginHash, l1OriginNumber, signature);
+
+        vm.expectRevert(abi.encodeWithSelector(TEEVerifier.InvalidProposer.selector, address(0)));
         verifier.verify(proofBytes, IMAGE_ID, journal);
     }
 
@@ -107,7 +130,7 @@ contract TEEVerifierTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(unregisteredKey, journal);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        bytes memory proofBytes = abi.encodePacked(l1OriginHash, l1OriginNumber, signature);
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, signature);
 
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.InvalidSigner.selector, unregisteredSigner));
         verifier.verify(proofBytes, IMAGE_ID, journal);
@@ -122,7 +145,7 @@ contract TEEVerifierTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        bytes memory proofBytes = abi.encodePacked(l1OriginHash, l1OriginNumber, signature);
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, signature);
 
         // Use a different imageId that doesn't match the registered PCR0
         bytes32 wrongImageId = keccak256("wrong-image-id");
@@ -141,7 +164,7 @@ contract TEEVerifierTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        bytes memory proofBytes = abi.encodePacked(l1OriginHash, l1OriginNumber, signature);
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, signature);
 
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.L1OriginInFuture.selector, l1OriginNumber, block.number));
         verifier.verify(proofBytes, IMAGE_ID, journal);
@@ -160,7 +183,7 @@ contract TEEVerifierTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        bytes memory proofBytes = abi.encodePacked(l1OriginHash, l1OriginNumber, signature);
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, signature);
 
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.L1OriginTooOld.selector, l1OriginNumber, block.number));
         verifier.verify(proofBytes, IMAGE_ID, journal);
@@ -175,7 +198,7 @@ contract TEEVerifierTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        bytes memory proofBytes = abi.encodePacked(wrongHash, l1OriginNumber, signature);
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, wrongHash, l1OriginNumber, signature);
 
         bytes32 actualHash = blockhash(l1OriginNumber);
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.L1OriginHashMismatch.selector, wrongHash, actualHash));
@@ -205,7 +228,7 @@ contract TEEVerifierTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        bytes memory proofBytes = abi.encodePacked(l1OriginHash, l1OriginNumber, signature);
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, signature);
 
         bool result = verifier.verify(proofBytes, IMAGE_ID, journal);
         assertTrue(result);
@@ -230,7 +253,7 @@ contract TEEVerifierTest is Test {
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
         bytes memory signature = abi.encodePacked(r, s, v);
-        bytes memory proofBytes = abi.encodePacked(expectedHash, l1OriginNumber, signature);
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, expectedHash, l1OriginNumber, signature);
 
         bool result = verifier.verify(proofBytes, IMAGE_ID, journal);
         assertTrue(result);

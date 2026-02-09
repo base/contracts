@@ -53,6 +53,9 @@ contract TEEVerifier is IVerifier {
     /// @notice Thrown when the proof format is invalid.
     error InvalidProofFormat();
 
+    /// @notice Thrown when the proposer is not a valid registered proposer.
+    error InvalidProposer(address proposer);
+
     /// @notice Constructs the TEEVerifier contract.
     /// @param systemConfigGlobal The SystemConfigGlobal contract address.
     constructor(SystemConfigGlobal systemConfigGlobal) {
@@ -60,16 +63,17 @@ contract TEEVerifier is IVerifier {
     }
 
     /// @notice Verifies a TEE proof for a state transition.
-    /// @param proofBytes The proof: l1OriginHash (32) + l1OriginNumber (32) + signature (65) = 129 bytes.
+    /// @param proofBytes The proof: proposer (20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65) = 149 bytes.
     /// @param imageId The claimed TEE image hash (PCR0). Must match the signer's registered PCR0.
     /// @param journal The keccak256 hash of the proof's public inputs.
     /// @return valid Whether the proof is valid.
     function verify(bytes calldata proofBytes, bytes32 imageId, bytes32 journal) external view override returns (bool) {
-        if (proofBytes.length < 129) revert InvalidProofFormat();
+        if (proofBytes.length < 149) revert InvalidProofFormat();
 
-        bytes32 l1OriginHash = bytes32(proofBytes[0:32]);
-        uint256 l1OriginNumber = uint256(bytes32(proofBytes[32:64]));
-        bytes calldata signature = proofBytes[64:129];
+        address proposer = address(bytes20(proofBytes[0:20]));
+        bytes32 l1OriginHash = bytes32(proofBytes[20:52]);
+        uint256 l1OriginNumber = uint256(bytes32(proofBytes[52:84]));
+        bytes calldata signature = proofBytes[84:149];
 
         // Verify claimed L1 origin hash matches actual blockhash
         _verifyL1Origin(l1OriginHash, l1OriginNumber);
@@ -80,6 +84,10 @@ contract TEEVerifier is IVerifier {
 
         if (err != ECDSA.RecoverError.NoError) {
             revert InvalidSignature();
+        }
+
+        if (!SYSTEM_CONFIG_GLOBAL.isValidProposer(proposer)) {
+            revert InvalidProposer(proposer);
         }
 
         // Get the PCR0 the signer was registered with
