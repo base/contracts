@@ -72,17 +72,6 @@ contract AggregateVerifierTest is BaseTest {
         factory.create{value: INIT_BOND}(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, initData);
     }
 
-    function testInitializeFailsIfNotTEEProposer() public {
-        currentL2BlockNumber += BLOCK_INTERVAL;
-        Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory proof = _generateProof("tee-proof");
-
-        vm.expectRevert(AggregateVerifier.NotAuthorized.selector);
-        _createAggregateVerifierGame(
-            ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.TEE
-        );
-    }
-
     function testUpdatingAnchorStateRegistryWithTEEProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));

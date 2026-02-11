@@ -167,7 +167,6 @@ contract DeployAllForTesting is Script {
                 cfg.teeImageHash,
                 bytes32(0), // zkImageHash (unused for testing)
                 cfg.configHash,
-                cfg.teeProposer,
                 8453, // l2ChainId (Base mainnet)
                 BLOCK_INTERVAL
             )

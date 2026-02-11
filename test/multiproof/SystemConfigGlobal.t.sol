@@ -39,7 +39,7 @@ contract SystemConfigGlobalTest is Test {
     event SignerDeregistered(address indexed signer);
     event PCR0Registered(bytes32 indexed pcr0Hash);
     event PCR0Deregistered(bytes32 indexed pcr0Hash);
-    event ProposerSet(address indexed proposer);
+    event ProposerSet(address indexed proposer, bool isValid);
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -174,12 +174,12 @@ contract SystemConfigGlobalTest is Test {
         address newProposer = makeAddr("proposer");
 
         vm.expectEmit(true, false, false, false);
-        emit ProposerSet(newProposer);
+        emit ProposerSet(newProposer, true);
 
         vm.prank(owner);
-        systemConfigGlobal.setProposer(newProposer);
+        systemConfigGlobal.setProposer(newProposer, true);
 
-        assertEq(systemConfigGlobal.proposer(), newProposer);
+        assertTrue(systemConfigGlobal.isValidProposer(newProposer));
     }
 
     function testSetProposerFailsIfNotOwner() public {
@@ -187,11 +187,11 @@ contract SystemConfigGlobalTest is Test {
 
         vm.prank(manager);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        systemConfigGlobal.setProposer(newProposer);
+        systemConfigGlobal.setProposer(newProposer, true);
 
         vm.prank(unauthorized);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        systemConfigGlobal.setProposer(newProposer);
+        systemConfigGlobal.setProposer(newProposer, true);
     }
 
     // ============ isValidSigner Tests ============

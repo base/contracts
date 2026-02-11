@@ -20,9 +20,6 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, NitroValidator {
     /// @notice Maximum age of an attestation document (60 minutes).
     uint256 public constant MAX_AGE = 60 minutes;
 
-    /// @notice The address of the proposer.
-    address public proposer;
-
     /// @notice Mapping of valid PCR0s (enclave image hashes) attested from AWS Nitro.
     /// @dev Only attestations with a PCR0 in this mapping can register signers.
     mapping(bytes32 => bool) public validPCR0s;
@@ -31,6 +28,9 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, NitroValidator {
     /// @dev A non-zero value indicates the signer is valid and was registered with that PCR0.
     ///      This replaces the old validSigners(address => bool) mapping to enable imageId validation.
     mapping(address => bytes32) public signerPCR0;
+
+    /// @notice Mapping of whether an address is a valid proposer.
+    mapping(address => bool) public isValidProposer;
 
     /// @notice Emitted when a signer is registered.
     event SignerRegistered(address indexed signer, bytes32 indexed pcr0);
@@ -45,7 +45,7 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, NitroValidator {
     event PCR0Deregistered(bytes32 indexed pcr0Hash);
 
     /// @notice Emitted when the proposer is set.
-    event ProposerSet(address indexed proposer);
+    event ProposerSet(address indexed proposer, bool isValid);
 
     /// @notice Thrown when the PCR0 in the attestation is not registered as valid.
     error InvalidPCR0();
@@ -60,10 +60,11 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, NitroValidator {
     }
 
     /// @notice Sets the proposer address.
-    /// @param newProposer The new proposer address.
-    function setProposer(address newProposer) external onlyOwner {
-        proposer = newProposer;
-        emit ProposerSet(newProposer);
+    /// @param proposer The proposer address.
+    /// @param isValid Whether the proposer is valid.
+    function setProposer(address proposer, bool isValid) external onlyOwner {
+        isValidProposer[proposer] = isValid;
+        emit ProposerSet(proposer, isValid);
     }
 
     /// @notice Registers a PCR0 (enclave image hash) as valid.
