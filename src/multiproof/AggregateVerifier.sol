@@ -61,6 +61,17 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     /// @notice The fast finalization delay.
     uint64 public constant FAST_FINALIZATION_DELAY = 1 days;
 
+    /// @notice The EIP-2935 blockhash history contract address (deployed post-Pectra).
+    /// @dev This contract stores blockhashes for the last ~8192 blocks, extending the
+    ///      256-block window of the native blockhash() opcode.
+    address public constant EIP2935_CONTRACT = 0x0000F90827F1C53a10cb7A02335B175320002935;
+
+    /// @notice The maximum number of blocks that blockhash() can look back.
+    uint256 public constant BLOCKHASH_WINDOW = 256;
+
+    /// @notice The maximum number of blocks that EIP-2935 can look back (~8192).
+    uint256 public constant EIP2935_WINDOW = 8191;
+
     ////////////////////////////////////////////////////////////////
     //                         Immutables                         //
     ////////////////////////////////////////////////////////////////
@@ -227,6 +238,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
     /// @notice When the countered by game is not resolved.
     error CounteredByGameNotResolved();
+
+    /// @notice Thrown when the L1 origin block is too old to verify.
+    error L1OriginTooOld(uint256 l1OriginNumber, uint256 currentBlock);
+
+    /// @notice Thrown when the L1 origin block number is in the future.
+    error L1OriginInFuture(uint256 l1OriginNumber, uint256 currentBlock);
+
+    /// @notice Thrown when the L1 origin hash doesn't match the actual blockhash.
+    error L1OriginHashMismatch(bytes32 claimed, bytes32 actual);
 
     /// @param gameType_ The game type.
     /// @param anchorStateRegistry_ The anchor state registry.
@@ -690,11 +710,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     /// @notice Verifies a TEE proof for the current game.
     /// @param proofBytes The proof: prover(20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65).
     function _verifyTeeProof(bytes calldata proofBytes, address prover, bytes32 startingRoot, uint256 startingL2SequenceNumber, bytes32 endingRoot, uint256 endingL2SequenceNumber, bytes memory intermediateRoots) internal view {
+        bytes32 l1OriginHash = bytes32(proofBytes[:32]);
+        uint256 l1OriginNumber = uint256(bytes32(proofBytes[32:64]));
+        // Verify claimed L1 origin hash matches actual blockhash
+        _verifyL1Origin(l1OriginHash, l1OriginNumber);
+
         bytes32 journal = keccak256(
             abi.encodePacked(
                 prover,
-                bytes32(proofBytes[0:32]),
-                uint256(bytes32(proofBytes[32:64])),
+                l1OriginHash,
+                l1OriginNumber,
                 startingRoot,
                 startingL2SequenceNumber,
                 endingRoot,
@@ -713,11 +738,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     /// @notice Verifies a ZK proof for the current game.
     /// @param proofBytes The proof: l1OriginHash (32) + l1OriginNumber (32) + zkProof (variable).
     function _verifyZkProof(bytes calldata proofBytes, address prover, bytes32 startingRoot, uint256 startingL2SequenceNumber, bytes32 endingRoot, uint256 endingL2SequenceNumber, bytes memory intermediateRoots) internal view {
+        bytes32 l1OriginHash = bytes32(proofBytes[:32]);
+        uint256 l1OriginNumber = uint256(bytes32(proofBytes[32:64]));
+        // Verify claimed L1 origin hash matches actual blockhash
+        _verifyL1Origin(l1OriginHash, l1OriginNumber);
+
         bytes32 journal = keccak256(
             abi.encodePacked(
                 prover,
-                bytes32(proofBytes[0:32]),
-                uint256(bytes32(proofBytes[32:64])),
+                l1OriginHash,
+                l1OriginNumber,
                 startingRoot,
                 startingL2SequenceNumber,
                 endingRoot,
@@ -769,5 +799,42 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             game.rootClaim().raw() != rootClaim().raw() && 
             // The game must be valid.
             _isValidGame(game);
+    }
+
+    /// @notice Verifies that the claimed L1 origin hash matches the actual blockhash.
+    /// @param l1OriginHash The L1 block hash claimed in the proof.
+    /// @param l1OriginNumber The L1 block number claimed in the proof.
+    function _verifyL1Origin(bytes32 l1OriginHash, uint256 l1OriginNumber) internal view {
+        // Check for future block
+        if (l1OriginNumber >= block.number) {
+            revert L1OriginInFuture(l1OriginNumber, block.number);
+        }
+
+        bytes32 actualHash;
+        uint256 blockAge = block.number - l1OriginNumber;
+
+        // Prefer blockhash() over EIP-2935 when possible since it's cheaper (no external call).
+        if (blockAge <= BLOCKHASH_WINDOW) {
+            actualHash = blockhash(l1OriginNumber);
+        } else if (blockAge <= EIP2935_WINDOW) {
+            // EIP-2935 expects raw calldata: exactly 32 bytes containing the block number.
+            // Using a Solidity interface would add a 4-byte function selector, causing a revert.
+            // We use a low-level staticcall with raw 32-byte calldata instead.
+            (bool success, bytes memory result) = EIP2935_CONTRACT.staticcall(abi.encode(l1OriginNumber));
+            if (!success || result.length != 32) {
+                revert L1OriginTooOld(l1OriginNumber, block.number);
+            }
+            actualHash = abi.decode(result, (bytes32));
+        } else {
+            revert L1OriginTooOld(l1OriginNumber, block.number);
+        }
+
+        if (actualHash == bytes32(0)) {
+            revert L1OriginTooOld(l1OriginNumber, block.number);
+        }
+
+        if (actualHash != l1OriginHash) {
+            revert L1OriginHashMismatch(l1OriginHash, actualHash);
+        }
     }
 }
