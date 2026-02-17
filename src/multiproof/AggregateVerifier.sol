@@ -25,7 +25,7 @@ import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
 
 import {IVerifier} from "./interfaces/IVerifier.sol";
 
-contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
+contract AggregateVerifier is Clone, ReentrancyGuard {
     ////////////////////////////////////////////////////////////////
     //                         Enums                              //
     ////////////////////////////////////////////////////////////////
@@ -61,9 +61,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice The fast finalization delay.
     uint64 public constant FAST_FINALIZATION_DELAY = 1 days;
 
-    /// @notice The size of the initialize call data.
-    uint256 internal constant INITIALIZE_CALLDATA_SIZE = 0x7E;
-
     ////////////////////////////////////////////////////////////////
     //                         Immutables                         //
     ////////////////////////////////////////////////////////////////
@@ -97,6 +94,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice The block interval between each proposal.
     /// @dev    The parent's block number + BLOCK_INTERVAL = this proposal's block number.
     uint256 public immutable BLOCK_INTERVAL;
+
+    /// @notice The block interval for intermediate proposals.
+    /// @dev    BLOCK_INTERVAL must be divisible by INTERMEDIATE_BLOCK_INTERVAL.
+    uint256 public immutable INTERMEDIATE_BLOCK_INTERVAL;
+
+    /// @notice The size of the initialize call data.
+    uint256 internal immutable INITIALIZE_CALLDATA_SIZE;
 
     /// @notice The game type ID.
     GameType internal immutable GAME_TYPE;
@@ -142,6 +146,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     //                         Events                             //
     ////////////////////////////////////////////////////////////////
 
+    /// @notice Emitted when the game is resolved.
+    /// @param status The status of the game.
+    event Resolved(GameStatus status);
+    
     /// @notice Emitted when a proposal with a TEE proof is challenged with a ZK proof.
     /// @param challenger The address of the challenger.
     /// @param game The game used to challenge this proposal.
@@ -154,8 +162,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
     /// @notice Emitted when the game is nullified.
     /// @param nullifier The address of the nullifier.
-    /// @param game The game used to nullify this proposal.
-    event Nullified(address indexed nullifier, IDisputeGame game);
+    /// @param intermediateRootIndex The index of the intermediate root.
+    /// @param intermediateRoot The intermediate root.
+    event Nullified(address indexed nullifier, uint256 intermediateRootIndex, bytes32 intermediateRoot);
 
     /// @notice Emitted when the credit is claimed.
     /// @param recipient The address of the recipient.
@@ -207,6 +216,18 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice When the countered by game is invalid.
     error InvalidCounteredByGame();
 
+    /// @notice When the block interval or intermediate block interval is invalid.
+    error InvalidBlockInterval(uint256 blockInterval, uint256 intermediateBlockInterval);
+
+    /// @notice When the intermediate root index is invalid.
+    error InvalidIntermediateRootIndex();
+
+    /// @notice When the intermediate root is the same as the proposed intermediate root.
+    error IntermediateRootSameAsProposed();
+
+    /// @notice When the countered by game is not resolved.
+    error CounteredByGameNotResolved();
+
     /// @param gameType_ The game type.
     /// @param anchorStateRegistry_ The anchor state registry.
     /// @param delayedWETH The delayed WETH contract.
@@ -227,7 +248,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         bytes32 zkImageHash,
         bytes32 configHash,
         uint256 l2ChainId,
-        uint256 blockInterval
+        uint256 blockInterval,
+        uint256 intermediateBlockInterval
     ) {
         // Set up initial game state.
         GAME_TYPE = gameType_;
@@ -241,6 +263,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         CONFIG_HASH = configHash;
         L2_CHAIN_ID = l2ChainId;
         BLOCK_INTERVAL = blockInterval;
+        INTERMEDIATE_BLOCK_INTERVAL = intermediateBlockInterval;
+
+        if (BLOCK_INTERVAL == 0 || intermediateBlockInterval == 0 || BLOCK_INTERVAL % INTERMEDIATE_BLOCK_INTERVAL != 0) {
+            revert InvalidBlockInterval(BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
+        }
+
+        INITIALIZE_CALLDATA_SIZE = 0x7E + 0x20 * intermediateOutputRootsCount();
     }
 
     /// @notice Initializes the contract.
@@ -264,14 +293,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // - 0x20 l1 head
         // - 0x20 extraData (l2BlockNumber)
         // - 0x04 extraData (parentIndex)
+        // - 0x20 x (BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL) extraData (intermediate roots)
         // - 0x02 CWIA bytes
 
         // - 0x20 proof length location
         // - 0x20 proof length
         // - ((proof.length + 32 - 1)/ 32) * 32 (round up to the nearest 32 bytes)
         uint256 proofLength = (proof.length + 32 - 1) / 32 * 32;
+        uint256 expectedCallDataSize = INITIALIZE_CALLDATA_SIZE + 0x40 + proofLength;
         assembly {
-            if iszero(eq(calldatasize(), add(INITIALIZE_CALLDATA_SIZE, add(0x40, proofLength)))) {
+            if iszero(eq(calldatasize(), expectedCallDataSize)) {
                 // Store the selector for `BadExtraData()` & revert.
                 mstore(0x00, 0x9824bdab)
                 revert(0x1C, 0x04)
@@ -283,11 +314,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
             // For subsequent games, get the parent game's information.
             (,, IDisputeGame parentGame) = DISPUTE_GAME_FACTORY.gameAtIndex(parentIndex());
 
-            // Parent game must be respected, not blacklisted, and not retired.
+            // Parent game must be respected, not blacklisted, not retired, and not challenged.
             if (!_isValidGame(parentGame)) revert InvalidParentGame();
-
-            // The parent game must be a valid game.
-            if (parentGame.status() == GameStatus.CHALLENGER_WINS) revert InvalidParentGame();
 
             // The parent game must have a proof.
             // Should not be reachable since a proof is required to initialize.
@@ -327,17 +355,20 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         DELAYED_WETH.deposit{value: msg.value}();
 
         // Verify the proof.
-        _verifyProof(proof[1:], ProofType(uint8(proof[0])), gameCreator());
+        _verifyProposalProof(proof[1:], ProofType(uint8(proof[0])), gameCreator());
     }
 
     /// @notice Verifies a proof for the current game.
     /// @param proofBytes The proof.
     /// @dev The first byte of the proof is the proof type.
-    function verifyProof(bytes calldata proofBytes) external {
+    function verifyProposalProof(bytes calldata proofBytes) external {
+        // The game must be in progress.
+        if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
+        
         // The game must not be over.
         if (gameOver()) revert GameOver();
 
-        _verifyProof(proofBytes[1:], ProofType(uint8(proofBytes[0])), msg.sender);
+        _verifyProposalProof(proofBytes[1:], ProofType(uint8(proofBytes[0])), msg.sender);
     }
 
     /// @notice Resolves the game after a proof has been provided and enough time has passed.
@@ -411,41 +442,44 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     }
 
     /// @notice Nullifies the game if a soundness issue is found.
-    /// @param gameIndex The index of the game used to nullify.
-    /// @param proofType The type of proof used to nullify.
-    /// @dev The game used to nullify must have a proof for the same
-    ///      block number but a different root claim as the current game.
-    function nullify(uint256 gameIndex, ProofType proofType) external {
-        // Can only nullify a game that has not resolved yet.
-        // We can nullify a challenged game in case of a soundness issue.
-        if (status == GameStatus.DEFENDER_WINS) revert ClaimAlreadyResolved();
+    /// @param proofBytes The proof.
+    /// @param intermediateRootIndex Index of the intermediate root to challenge.
+    /// @param intermediateRootToProve The intermediate root that the proof claims to be correct.
+    /// @dev The first byte of the proof is the proof type.
+    function nullify(bytes calldata proofBytes, uint256 intermediateRootIndex, bytes32 intermediateRootToProve) external {
+        if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
 
-        (,, IDisputeGame game) = DISPUTE_GAME_FACTORY.gameAtIndex(gameIndex);
+        if (intermediateRootIndex >= intermediateOutputRootsCount()) revert InvalidIntermediateRootIndex();
 
+        bytes32 proposedIntermediateRoot = intermediateOutputRoot(intermediateRootIndex);
+        if (proposedIntermediateRoot == intermediateRootToProve) revert IntermediateRootSameAsProposed();
+
+        bytes32 startingRoot = intermediateRootIndex == 0 ? startingOutputRoot.root.raw() : intermediateOutputRoot(intermediateRootIndex - 1);
+        uint256 startingL2SequenceNumber = startingOutputRoot.l2SequenceNumber + intermediateRootIndex * INTERMEDIATE_BLOCK_INTERVAL;
+        uint256 endingL2SequenceNumber = startingL2SequenceNumber + INTERMEDIATE_BLOCK_INTERVAL;
+
+        ProofType proofType = ProofType(uint8(proofBytes[0]));
         // Can only nullify a game that has a proof of the same type.
         if (proofType == ProofType.TEE) {
-            if (provingData.teeProver == address(0) || AggregateVerifier(address(game)).teeProver() == address(0)) {
+            if (provingData.teeProver == address(0)) {
                 revert MissingTEEProof();
             }
+            _verifyTeeProof(proofBytes[1:], msg.sender, startingRoot, startingL2SequenceNumber, intermediateRootToProve, endingL2SequenceNumber, abi.encodePacked(intermediateRootToProve));
         } else if (proofType == ProofType.ZK) {
-            if (provingData.zkProver == address(0) || AggregateVerifier(address(game)).zkProver() == address(0)) {
+            if (provingData.zkProver == address(0)) {
                 revert MissingZKProof();
             }
+            _verifyZkProof(proofBytes[1:], msg.sender, startingRoot, startingL2SequenceNumber, intermediateRootToProve, endingL2SequenceNumber, abi.encodePacked(intermediateRootToProve));
         } else {
             revert InvalidProofType();
         }
-
-        // The game must be a valid game used to nullify.
-        if (!_isValidChallengingGame(game)) revert InvalidGame();
 
         // Set the game as challenged so that child games can't resolve.
         status = GameStatus.CHALLENGER_WINS;
         // Refund the bond. This can override a challenge.
         bondRecipient = gameCreator();
-        // To allow bond to be refunded as the challenging game is no longer valid.
-        delete provingData.counteredByGameAddress;
 
-        emit Nullified(msg.sender, game);
+        emit Nullified(msg.sender, intermediateRootIndex, intermediateRootToProve);
     }
 
     /// @notice Claim the credit belonging to the bond recipient. Reverts if the game isn't
@@ -457,13 +491,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         // The bond recipient must not be empty.
         if (bondRecipient == address(0)) revert BondRecipientEmpty();
 
-        // If this game was challenged, the countered by game must be valid.
+        // If this game was challenged, the countered by game must be valid or else the bond is refunded.
         if (provingData.counteredByGameAddress != address(0)) {
-            if (!_isValidChallengingGame(IDisputeGame(provingData.counteredByGameAddress))) {
-                revert InvalidCounteredByGame();
+            GameStatus counteredByGameStatus = IDisputeGame(provingData.counteredByGameAddress).status();
+            if (counteredByGameStatus == GameStatus.IN_PROGRESS) {
+                revert CounteredByGameNotResolved();
             }
-            if (IDisputeGame(provingData.counteredByGameAddress).status() != GameStatus.DEFENDER_WINS) {
-                revert InvalidCounteredByGame();
+            // If the countered by game is invalid or not resolved, the bond is refunded.
+            if (!_isValidChallengingGame(IDisputeGame(provingData.counteredByGameAddress))) {
+                bondRecipient = gameCreator();
             }
         }
 
@@ -474,6 +510,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         }
 
         bondClaimed = true;
+        // This can fail if this game was challenged and the countered by game is blacklisted/retired after it resolved to DEFENDER_WINS. The centralized functions in DELAYED_WETH will handle this as it's a already a very centralized action to blacklist/retire a valid challenging game.
         DELAYED_WETH.withdraw(bondRecipient, bondAmount);
 
         // Transfer the credit to the bond recipient.
@@ -557,6 +594,24 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         return provingData.expectedResolution.raw() <= block.timestamp;
     }
 
+    /// @notice The number of intermediate output roots.
+    /// @dev At least one as the proposal's root claim is considered an intermediate root.
+    function intermediateOutputRootsCount() public view returns (uint256) {
+        return (BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL);
+    }
+
+    /// @notice The intermediate output roots of the game.
+    function intermediateOutputRoots() public view returns (bytes memory) {
+        return _getArgBytes(0x94, 0x20 * intermediateOutputRootsCount());
+    }
+
+    /// @notice The intermediate output root at the given index.
+    /// @param index The index of the intermediate output root.
+    function intermediateOutputRoot(uint256 index) public view returns (bytes32) {
+        if (index >= intermediateOutputRootsCount()) revert InvalidIntermediateRootIndex();
+        return _getArgBytes32(0x94 + 0x20 * index);
+    }
+
     /// @notice Getter for the creator of the dispute game.
     function gameCreator() public pure returns (address) {
         return _getArgAddress(0x00);
@@ -573,12 +628,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     }
 
     /// @notice Getter for the extra data.
-    function extraData() public pure returns (bytes memory) {
+    function extraData() public view returns (bytes memory) {
         // The extra data starts at the second word within the cwia calldata and
-        // is 36 bytes long.
+        // is 36 + 32 x intermediateRootsCount() bytes long.
         // 32 bytes are for the l2BlockNumber
         // 4 bytes are for the parentIndex
-        return _getArgBytes(0x54, 0x24);
+        // 32 bytes are for each intermediate root
+        return _getArgBytes(0x54, 0x24 + 0x20 * intermediateOutputRootsCount());
     }
 
     /// @notice The L2 sequence number for which this game is proposing an output root (in this case - the block number).
@@ -591,12 +647,20 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         return _getArgUint32(0x74);
     }
 
-    function _verifyProof(bytes calldata proofBytes, ProofType proofType, address prover) internal {
+    function _verifyProposalProof(bytes calldata proofBytes, ProofType proofType, address prover) internal {
         if (proofType == ProofType.TEE) {
-            _verifyTeeProof(proofBytes, prover);
+            // Only one TEE proof can be submitted.
+            if (provingData.teeProver != address(0)) revert AlreadyProven();
+            _verifyTeeProof(proofBytes, prover, startingOutputRoot.root.raw(), startingOutputRoot.l2SequenceNumber, rootClaim().raw(), l2SequenceNumber(), intermediateOutputRoots());
+            // Update proving data.
+            provingData.teeProver = prover;
         } else if (proofType == ProofType.ZK) {
-            _verifyZkProof(proofBytes, prover);
+            // Only one ZK proof can be submitted.
+            if (provingData.zkProver != address(0)) revert AlreadyProven();
+            _verifyZkProof(proofBytes, prover, startingOutputRoot.root.raw(), startingOutputRoot.l2SequenceNumber, rootClaim().raw(), l2SequenceNumber(), intermediateOutputRoots());
 
+            // Update proving data.
+            provingData.zkProver = prover;
             // Bond can be reclaimed after a ZK proof is provided.
             bondRecipient = gameCreator();
         } else {
@@ -607,67 +671,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
         // Emit the proved event.
         emit Proved(prover, proofType);
-    }
-
-    /// @notice Verifies a TEE proof for the current game.
-    /// @param proofBytes The proof: prover(20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65).
-    function _verifyTeeProof(bytes calldata proofBytes, address prover) internal {
-        // Only one TEE proof can be submitted.
-        if (provingData.teeProver != address(0)) revert AlreadyProven();
-
-        // The game must be in progress.
-        if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
-
-        bytes32 journal = keccak256(
-            abi.encodePacked(
-                prover,
-                bytes32(proofBytes[0:32]),
-                uint256(bytes32(proofBytes[32:64])),
-                startingOutputRoot.root,
-                startingOutputRoot.l2SequenceNumber,
-                rootClaim(),
-                l2SequenceNumber(),
-                CONFIG_HASH,
-                TEE_IMAGE_HASH
-            )
-        );
-
-        // Validate the proof.
-        bytes memory proof = abi.encodePacked(prover, proofBytes);
-        if (!TEE_VERIFIER.verify(proof, TEE_IMAGE_HASH, journal)) revert InvalidProof();
-
-        // Update proving data.
-        provingData.teeProver = prover;
-    }
-
-    /// @notice Verifies a ZK proof for the current game.
-    /// @param proofBytes The proof: l1OriginHash (32) + l1OriginNumber (32) + zkProof (variable).
-    function _verifyZkProof(bytes calldata proofBytes, address prover) internal {
-        // Only one ZK proof can be submitted.
-        if (provingData.zkProver != address(0)) revert AlreadyProven();
-
-        // The game must be in progress or challenged (to allow nullification).
-        if (status == GameStatus.DEFENDER_WINS) revert ClaimAlreadyResolved();
-
-        bytes32 journal = keccak256(
-            abi.encodePacked(
-                prover,
-                bytes32(proofBytes[0:32]),
-                uint256(bytes32(proofBytes[32:64])),
-                startingOutputRoot.root,
-                startingOutputRoot.l2SequenceNumber,
-                rootClaim(),
-                l2SequenceNumber(),
-                CONFIG_HASH,
-                ZK_IMAGE_HASH
-            )
-        );
-
-        // Validate the proof.
-        if (!ZK_VERIFIER.verify(proofBytes, ZK_IMAGE_HASH, journal)) revert InvalidProof();
-
-        // Update proving data.
-        provingData.zkProver = prover;
     }
 
     /// @notice Updates the expected resolution timestamp.
@@ -682,6 +685,51 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         }
         provingData.expectedResolution =
             Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, provingData.expectedResolution.raw())));
+    }
+
+    /// @notice Verifies a TEE proof for the current game.
+    /// @param proofBytes The proof: prover(20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65).
+    function _verifyTeeProof(bytes calldata proofBytes, address prover, bytes32 startingRoot, uint256 startingL2SequenceNumber, bytes32 endingRoot, uint256 endingL2SequenceNumber, bytes memory intermediateRoots) internal view {
+        bytes32 journal = keccak256(
+            abi.encodePacked(
+                prover,
+                bytes32(proofBytes[0:32]),
+                uint256(bytes32(proofBytes[32:64])),
+                startingRoot,
+                startingL2SequenceNumber,
+                endingRoot,
+                endingL2SequenceNumber,
+                intermediateRoots,
+                CONFIG_HASH,
+                TEE_IMAGE_HASH
+            )
+        );
+
+        // Validate the proof.
+        bytes memory proof = abi.encodePacked(prover, proofBytes);
+        if (!TEE_VERIFIER.verify(proof, TEE_IMAGE_HASH, journal)) revert InvalidProof();
+    }
+
+    /// @notice Verifies a ZK proof for the current game.
+    /// @param proofBytes The proof: l1OriginHash (32) + l1OriginNumber (32) + zkProof (variable).
+    function _verifyZkProof(bytes calldata proofBytes, address prover, bytes32 startingRoot, uint256 startingL2SequenceNumber, bytes32 endingRoot, uint256 endingL2SequenceNumber, bytes memory intermediateRoots) internal view {
+        bytes32 journal = keccak256(
+            abi.encodePacked(
+                prover,
+                bytes32(proofBytes[0:32]),
+                uint256(bytes32(proofBytes[32:64])),
+                startingRoot,
+                startingL2SequenceNumber,
+                endingRoot,
+                endingL2SequenceNumber,
+                intermediateRoots,
+                CONFIG_HASH,
+                ZK_IMAGE_HASH
+            )
+        );
+
+        // Validate the proof.
+        if (!ZK_VERIFIER.verify(proofBytes, ZK_IMAGE_HASH, journal)) revert InvalidProof();
     }
 
     /// @notice Returns the status of the parent game.
@@ -704,7 +752,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @param game The game to check.
     function _isValidGame(IDisputeGame game) internal view returns (bool) {
         return ANCHOR_STATE_REGISTRY.isGameRespected(game) && !ANCHOR_STATE_REGISTRY.isGameBlacklisted(game)
-            && !ANCHOR_STATE_REGISTRY.isGameRetired(game);
+            && !ANCHOR_STATE_REGISTRY.isGameRetired(game) && (game.status() != GameStatus.CHALLENGER_WINS);
     }
 
     /// @notice Checks if the game is a valid game used to challenge or nullify.
