@@ -236,6 +236,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     /// @notice When the intermediate root is the same as the proposed intermediate root.
     error IntermediateRootSameAsProposed();
 
+    /// @notice When the intermediate root does not match the claim.
+    error IntermediateRootMismatch(bytes32 intermediateRoot, bytes32 claim);
+
     /// @notice When the countered by game is not resolved.
     error CounteredByGameNotResolved();
 
@@ -327,6 +330,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
                 mstore(0x00, 0x9824bdab)
                 revert(0x1C, 0x04)
             }
+        }
+
+        // Last intermediate root has to match the proposal's claim
+        if (intermediateOutputRoot(intermediateOutputRootsCount() - 1) != rootClaim().raw()) {
+            revert IntermediateRootMismatch(intermediateOutputRoot(intermediateOutputRootsCount() - 1), rootClaim().raw());
         }
 
         // The first game is initialized with a parent index of uint32.max.
@@ -622,14 +630,24 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
     /// @notice The intermediate output roots of the game.
     function intermediateOutputRoots() public view returns (bytes memory) {
-        return _getArgBytes(0x94, 0x20 * intermediateOutputRootsCount());
+        return _getArgBytes(0x78, 0x20 * intermediateOutputRootsCount());
     }
 
     /// @notice The intermediate output root at the given index.
     /// @param index The index of the intermediate output root.
     function intermediateOutputRoot(uint256 index) public view returns (bytes32) {
         if (index >= intermediateOutputRootsCount()) revert InvalidIntermediateRootIndex();
-        return _getArgBytes32(0x94 + 0x20 * index);
+        return _getArgBytes32(0x78 + 0x20 * index);
+    }
+
+    /// @notice Getter for the extra data.
+    function extraData() public view returns (bytes memory) {
+        // The extra data starts at the second word within the cwia calldata and
+        // is 36 + 32 x intermediateRootsCount() bytes long.
+        // 32 bytes are for the l2BlockNumber
+        // 4 bytes are for the parentIndex
+        // 32 bytes are for each intermediate root
+        return _getArgBytes(0x54, 0x24 + 0x20 * intermediateOutputRootsCount());
     }
 
     /// @notice Getter for the creator of the dispute game.
@@ -645,16 +663,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     /// @notice Getter for the parent hash of the L1 block when the dispute game was created.
     function l1Head() public pure returns (Hash) {
         return Hash.wrap(_getArgBytes32(0x34));
-    }
-
-    /// @notice Getter for the extra data.
-    function extraData() public view returns (bytes memory) {
-        // The extra data starts at the second word within the cwia calldata and
-        // is 36 + 32 x intermediateRootsCount() bytes long.
-        // 32 bytes are for the l2BlockNumber
-        // 4 bytes are for the parentIndex
-        // 32 bytes are for each intermediate root
-        return _getArgBytes(0x54, 0x24 + 0x20 * intermediateOutputRootsCount());
     }
 
     /// @notice The L2 sequence number for which this game is proposing an output root (in this case - the block number).

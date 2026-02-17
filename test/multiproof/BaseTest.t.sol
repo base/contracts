@@ -28,7 +28,11 @@ contract BaseTest is Test {
     // Constants
     GameType public constant AGGREGATE_VERIFIER_GAME_TYPE = GameType.wrap(621);
     uint256 public constant L2_CHAIN_ID = 8453;
+
+    // MUST HAVE: BLOCK_INTERVAL % INTERMEDIATE_BLOCK_INTERVAL == 0
     uint256 public constant BLOCK_INTERVAL = 100;
+    uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 10;
+
     uint256 public constant INIT_BOND = 1 ether;
     uint256 public constant DELAYED_WETH_DELAY = 1 days;
     // Finality delay handled by the AggregateVerifier
@@ -126,7 +130,8 @@ contract BaseTest is Test {
             ZK_IMAGE_HASH,
             CONFIG_HASH,
             L2_CHAIN_ID,
-            BLOCK_INTERVAL
+            BLOCK_INTERVAL,
+            INTERMEDIATE_BLOCK_INTERVAL
         );
 
         // Set the implementation for the aggregate verifier
@@ -142,36 +147,34 @@ contract BaseTest is Test {
         Claim rootClaim,
         uint256 l2BlockNumber,
         uint32 parentIndex,
-        bytes memory proof,
-        AggregateVerifier.ProofType proofType
+        bytes memory proof
     ) internal returns (AggregateVerifier game) {
-        bytes memory extraData = abi.encodePacked(uint256(l2BlockNumber), uint32(parentIndex));
-        bytes memory initData = abi.encodePacked(uint8(proofType), proof);
+        bytes memory intermediateRoots = abi.encodePacked(_generateIntermediateRootsExceptLast(l2BlockNumber), rootClaim.raw());
+        bytes memory extraData = abi.encodePacked(uint256(l2BlockNumber), uint32(parentIndex), intermediateRoots);
 
         vm.deal(creator, INIT_BOND);
         vm.prank(creator);
         return AggregateVerifier(
-            address(factory.create{value: INIT_BOND}(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, initData))
+            address(factory.create{value: INIT_BOND}(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, proof))
         );
     }
 
     function _provideProof(
         AggregateVerifier game,
         address prover,
-        AggregateVerifier.ProofType proofType,
-        bytes memory proof
+        bytes memory proofBytes
     ) internal {
         vm.prank(prover);
-        bytes memory proofBytes = abi.encodePacked(uint8(proofType), proof);
-        game.verifyProof(proofBytes);
+        game.verifyProposalProof(proofBytes);
     }
 
     /// @notice Generates a properly formatted proof for testing.
     /// @dev The proof format is: l1OriginHash (32) + l1OriginNumber (32) + additional data.
     ///      Since MockVerifier always returns true, we just need the correct structure.
     /// @param salt A salt to make proofs unique.
+    /// @param proofType The type of proof to generate.
     /// @return proof The formatted proof bytes.
-    function _generateProof(bytes memory salt) internal view returns (bytes memory) {
+    function _generateProof(bytes memory salt, AggregateVerifier.ProofType proofType) internal view returns (bytes memory) {
         // Use the previous block hash as l1OriginHash
         bytes32 l1OriginHash = blockhash(block.number - 1);
         // Use the previous block number as l1OriginNumber
@@ -179,6 +182,15 @@ contract BaseTest is Test {
         // Add some padding/signature data (65 bytes minimum for a signature)
         bytes memory signature = abi.encodePacked(salt, bytes32(0), bytes32(0), uint8(27));
 
-        return abi.encodePacked(l1OriginHash, l1OriginNumber, signature);
+        return abi.encodePacked(uint8(proofType), l1OriginHash, l1OriginNumber, signature);
+    }
+
+    function _generateIntermediateRootsExceptLast(uint256 l2BlockNumber) internal pure returns (bytes memory) {
+        bytes memory intermediateRoots;
+        uint256 startingL2BlockNumber = l2BlockNumber - BLOCK_INTERVAL;
+        for (uint256 i = 1; i < BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL; i++) {
+            intermediateRoots = abi.encodePacked(intermediateRoots, keccak256(abi.encode(startingL2BlockNumber + INTERMEDIATE_BLOCK_INTERVAL * i)));
+        }
+        return intermediateRoots;
     }
 }

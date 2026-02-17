@@ -33,6 +33,7 @@ contract DeployAllForTesting is Script {
     bytes32 internal constant PROXY_OWNER_ADDRESS = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     uint256 public constant BLOCK_INTERVAL = 100;
+    uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 10;
     uint256 public constant INIT_BOND = 0.001 ether;
 
     /// @notice Config struct to reduce stack variables.
@@ -168,7 +169,8 @@ contract DeployAllForTesting is Script {
                 bytes32(0), // zkImageHash (unused for testing)
                 cfg.configHash,
                 8453, // l2ChainId (Base mainnet)
-                BLOCK_INTERVAL
+                BLOCK_INTERVAL,
+                INTERMEDIATE_BLOCK_INTERVAL
             )
         );
         console.log("AggregateVerifier:", aggregateVerifier);
