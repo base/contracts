@@ -149,7 +149,8 @@ contract BaseTest is Test {
         uint32 parentIndex,
         bytes memory proof
     ) internal returns (AggregateVerifier game) {
-        bytes memory intermediateRoots = abi.encodePacked(_generateIntermediateRootsExceptLast(l2BlockNumber), rootClaim.raw());
+        bytes memory intermediateRoots =
+            abi.encodePacked(_generateIntermediateRootsExceptLast(l2BlockNumber), rootClaim.raw());
         bytes memory extraData = abi.encodePacked(uint256(l2BlockNumber), uint32(parentIndex), intermediateRoots);
 
         vm.deal(creator, INIT_BOND);
@@ -159,11 +160,7 @@ contract BaseTest is Test {
         );
     }
 
-    function _provideProof(
-        AggregateVerifier game,
-        address prover,
-        bytes memory proofBytes
-    ) internal {
+    function _provideProof(AggregateVerifier game, address prover, bytes memory proofBytes) internal {
         vm.prank(prover);
         game.verifyProposalProof(proofBytes);
     }
@@ -174,7 +171,11 @@ contract BaseTest is Test {
     /// @param salt A salt to make proofs unique.
     /// @param proofType The type of proof to generate.
     /// @return proof The formatted proof bytes.
-    function _generateProof(bytes memory salt, AggregateVerifier.ProofType proofType) internal view returns (bytes memory) {
+    function _generateProof(bytes memory salt, AggregateVerifier.ProofType proofType)
+        internal
+        view
+        returns (bytes memory)
+    {
         // Use the previous block hash as l1OriginHash
         bytes32 l1OriginHash = blockhash(block.number - 1);
         // Use the previous block number as l1OriginNumber
@@ -189,7 +190,9 @@ contract BaseTest is Test {
         bytes memory intermediateRoots;
         uint256 startingL2BlockNumber = l2BlockNumber - BLOCK_INTERVAL;
         for (uint256 i = 1; i < BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL; i++) {
-            intermediateRoots = abi.encodePacked(intermediateRoots, keccak256(abi.encode(startingL2BlockNumber + INTERMEDIATE_BLOCK_INTERVAL * i)));
+            intermediateRoots = abi.encodePacked(
+                intermediateRoots, keccak256(abi.encode(startingL2BlockNumber + INTERMEDIATE_BLOCK_INTERVAL * i))
+            );
         }
         return intermediateRoots;
     }

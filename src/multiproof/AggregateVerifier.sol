@@ -160,7 +160,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     /// @notice Emitted when the game is resolved.
     /// @param status The status of the game.
     event Resolved(GameStatus status);
-    
+
     /// @notice Emitted when a proposal with a TEE proof is challenged with a ZK proof.
     /// @param challenger The address of the challenger.
     /// @param game The game used to challenge this proposal.
@@ -288,7 +288,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         BLOCK_INTERVAL = blockInterval;
         INTERMEDIATE_BLOCK_INTERVAL = intermediateBlockInterval;
 
-        if (BLOCK_INTERVAL == 0 || intermediateBlockInterval == 0 || BLOCK_INTERVAL % INTERMEDIATE_BLOCK_INTERVAL != 0) {
+        if (BLOCK_INTERVAL == 0 || intermediateBlockInterval == 0 || BLOCK_INTERVAL % INTERMEDIATE_BLOCK_INTERVAL != 0)
+        {
             revert InvalidBlockInterval(BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
         }
 
@@ -334,7 +335,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
         // Last intermediate root has to match the proposal's claim
         if (intermediateOutputRoot(intermediateOutputRootsCount() - 1) != rootClaim().raw()) {
-            revert IntermediateRootMismatch(intermediateOutputRoot(intermediateOutputRootsCount() - 1), rootClaim().raw());
+            revert IntermediateRootMismatch(
+                intermediateOutputRoot(intermediateOutputRootsCount() - 1), rootClaim().raw()
+            );
         }
 
         // The first game is initialized with a parent index of uint32.max.
@@ -392,7 +395,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     function verifyProposalProof(bytes calldata proofBytes) external {
         // The game must be in progress.
         if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
-        
+
         // The game must not be over.
         if (gameOver()) revert GameOver();
 
@@ -474,7 +477,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     /// @param intermediateRootIndex Index of the intermediate root to challenge.
     /// @param intermediateRootToProve The intermediate root that the proof claims to be correct.
     /// @dev The first byte of the proof is the proof type.
-    function nullify(bytes calldata proofBytes, uint256 intermediateRootIndex, bytes32 intermediateRootToProve) external {
+    function nullify(bytes calldata proofBytes, uint256 intermediateRootIndex, bytes32 intermediateRootToProve)
+        external
+    {
         if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
 
         if (intermediateRootIndex >= intermediateOutputRootsCount()) revert InvalidIntermediateRootIndex();
@@ -482,8 +487,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         bytes32 proposedIntermediateRoot = intermediateOutputRoot(intermediateRootIndex);
         if (proposedIntermediateRoot == intermediateRootToProve) revert IntermediateRootSameAsProposed();
 
-        bytes32 startingRoot = intermediateRootIndex == 0 ? startingOutputRoot.root.raw() : intermediateOutputRoot(intermediateRootIndex - 1);
-        uint256 startingL2SequenceNumber = startingOutputRoot.l2SequenceNumber + intermediateRootIndex * INTERMEDIATE_BLOCK_INTERVAL;
+        bytes32 startingRoot = intermediateRootIndex == 0
+            ? startingOutputRoot.root.raw()
+            : intermediateOutputRoot(intermediateRootIndex - 1);
+        uint256 startingL2SequenceNumber =
+            startingOutputRoot.l2SequenceNumber + intermediateRootIndex * INTERMEDIATE_BLOCK_INTERVAL;
         uint256 endingL2SequenceNumber = startingL2SequenceNumber + INTERMEDIATE_BLOCK_INTERVAL;
 
         ProofType proofType = ProofType(uint8(proofBytes[0]));
@@ -492,12 +500,28 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             if (provingData.teeProver == address(0)) {
                 revert MissingTEEProof();
             }
-            _verifyTeeProof(proofBytes[1:], msg.sender, startingRoot, startingL2SequenceNumber, intermediateRootToProve, endingL2SequenceNumber, abi.encodePacked(intermediateRootToProve));
+            _verifyTeeProof(
+                proofBytes[1:],
+                msg.sender,
+                startingRoot,
+                startingL2SequenceNumber,
+                intermediateRootToProve,
+                endingL2SequenceNumber,
+                abi.encodePacked(intermediateRootToProve)
+            );
         } else if (proofType == ProofType.ZK) {
             if (provingData.zkProver == address(0)) {
                 revert MissingZKProof();
             }
-            _verifyZkProof(proofBytes[1:], msg.sender, startingRoot, startingL2SequenceNumber, intermediateRootToProve, endingL2SequenceNumber, abi.encodePacked(intermediateRootToProve));
+            _verifyZkProof(
+                proofBytes[1:],
+                msg.sender,
+                startingRoot,
+                startingL2SequenceNumber,
+                intermediateRootToProve,
+                endingL2SequenceNumber,
+                abi.encodePacked(intermediateRootToProve)
+            );
         } else {
             revert InvalidProofType();
         }
@@ -679,13 +703,29 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         if (proofType == ProofType.TEE) {
             // Only one TEE proof can be submitted.
             if (provingData.teeProver != address(0)) revert AlreadyProven();
-            _verifyTeeProof(proofBytes, prover, startingOutputRoot.root.raw(), startingOutputRoot.l2SequenceNumber, rootClaim().raw(), l2SequenceNumber(), intermediateOutputRoots());
+            _verifyTeeProof(
+                proofBytes,
+                prover,
+                startingOutputRoot.root.raw(),
+                startingOutputRoot.l2SequenceNumber,
+                rootClaim().raw(),
+                l2SequenceNumber(),
+                intermediateOutputRoots()
+            );
             // Update proving data.
             provingData.teeProver = prover;
         } else if (proofType == ProofType.ZK) {
             // Only one ZK proof can be submitted.
             if (provingData.zkProver != address(0)) revert AlreadyProven();
-            _verifyZkProof(proofBytes, prover, startingOutputRoot.root.raw(), startingOutputRoot.l2SequenceNumber, rootClaim().raw(), l2SequenceNumber(), intermediateOutputRoots());
+            _verifyZkProof(
+                proofBytes,
+                prover,
+                startingOutputRoot.root.raw(),
+                startingOutputRoot.l2SequenceNumber,
+                rootClaim().raw(),
+                l2SequenceNumber(),
+                intermediateOutputRoots()
+            );
 
             // Update proving data.
             provingData.zkProver = prover;
@@ -717,7 +757,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
     /// @notice Verifies a TEE proof for the current game.
     /// @param proofBytes The proof: prover(20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65).
-    function _verifyTeeProof(bytes calldata proofBytes, address prover, bytes32 startingRoot, uint256 startingL2SequenceNumber, bytes32 endingRoot, uint256 endingL2SequenceNumber, bytes memory intermediateRoots) internal view {
+    function _verifyTeeProof(
+        bytes calldata proofBytes,
+        address prover,
+        bytes32 startingRoot,
+        uint256 startingL2SequenceNumber,
+        bytes32 endingRoot,
+        uint256 endingL2SequenceNumber,
+        bytes memory intermediateRoots
+    ) internal view {
         bytes32 l1OriginHash = bytes32(proofBytes[:32]);
         uint256 l1OriginNumber = uint256(bytes32(proofBytes[32:64]));
         // Verify claimed L1 origin hash matches actual blockhash
@@ -745,7 +793,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
     /// @notice Verifies a ZK proof for the current game.
     /// @param proofBytes The proof: l1OriginHash (32) + l1OriginNumber (32) + zkProof (variable).
-    function _verifyZkProof(bytes calldata proofBytes, address prover, bytes32 startingRoot, uint256 startingL2SequenceNumber, bytes32 endingRoot, uint256 endingL2SequenceNumber, bytes memory intermediateRoots) internal view {
+    function _verifyZkProof(
+        bytes calldata proofBytes,
+        address prover,
+        bytes32 startingRoot,
+        uint256 startingL2SequenceNumber,
+        bytes32 endingRoot,
+        uint256 endingL2SequenceNumber,
+        bytes memory intermediateRoots
+    ) internal view {
         bytes32 l1OriginHash = bytes32(proofBytes[:32]);
         uint256 l1OriginNumber = uint256(bytes32(proofBytes[32:64]));
         // Verify claimed L1 origin hash matches actual blockhash
