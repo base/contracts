@@ -125,7 +125,6 @@ contract BaseTest is Test {
             TEE_IMAGE_HASH,
             ZK_IMAGE_HASH,
             CONFIG_HASH,
-            TEE_PROVER,
             L2_CHAIN_ID,
             BLOCK_INTERVAL
         );

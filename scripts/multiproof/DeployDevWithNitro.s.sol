@@ -272,7 +272,6 @@ contract DeployDevWithNitro is Script {
                 cfg.teeImageHash,
                 bytes32(0), // zkImageHash (unused)
                 cfg.configHash,
-                cfg.teeProposer,
                 8453, // l2ChainId (Base mainnet)
                 BLOCK_INTERVAL
             )

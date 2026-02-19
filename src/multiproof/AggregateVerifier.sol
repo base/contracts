@@ -91,9 +91,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice The hash of the rollup configuration.
     bytes32 public immutable CONFIG_HASH;
 
-    /// @notice The address that can submit a TEE proof.
-    address public immutable TEE_PROPOSER;
-
     /// @notice The chain ID of the L2 network this contract argues about.
     uint256 public immutable L2_CHAIN_ID;
 
@@ -192,9 +189,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @notice When the game is invalid.
     error InvalidGame();
 
-    /// @notice When the caller is not authorized.
-    error NotAuthorized();
-
     /// @notice When the proof has already been verified.
     error AlreadyProven();
 
@@ -221,7 +215,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     /// @param teeImageHash The hash of the TEE image.
     /// @param zkImageHash The hash of the ZK image.
     /// @param configHash The hash of the rollup configuration.
-    /// @param teeProposer The address that can submit a TEE proof.
     /// @param l2ChainId The chain ID of the L2 network.
     /// @param blockInterval The block interval.
     constructor(
@@ -233,7 +226,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         bytes32 teeImageHash,
         bytes32 zkImageHash,
         bytes32 configHash,
-        address teeProposer,
         uint256 l2ChainId,
         uint256 blockInterval
     ) {
@@ -247,7 +239,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         TEE_IMAGE_HASH = teeImageHash;
         ZK_IMAGE_HASH = zkImageHash;
         CONFIG_HASH = configHash;
-        TEE_PROPOSER = teeProposer;
         L2_CHAIN_ID = l2ChainId;
         BLOCK_INTERVAL = blockInterval;
     }
@@ -602,7 +593,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
 
     function _verifyProof(bytes calldata proofBytes, ProofType proofType, address prover) internal {
         if (proofType == ProofType.TEE) {
-            if (prover != TEE_PROPOSER) revert NotAuthorized();
             _verifyTeeProof(proofBytes, prover);
         } else if (proofType == ProofType.ZK) {
             _verifyZkProof(proofBytes, prover);
@@ -620,7 +610,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
     }
 
     /// @notice Verifies a TEE proof for the current game.
-    /// @param proofBytes The proof: l1OriginHash (32) + l1OriginNumber (32) + signature (65).
+    /// @param proofBytes The proof: prover(20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65).
     function _verifyTeeProof(bytes calldata proofBytes, address prover) internal {
         // Only one TEE proof can be submitted.
         if (provingData.teeProver != address(0)) revert AlreadyProven();
@@ -643,7 +633,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, IDisputeGame {
         );
 
         // Validate the proof.
-        if (!TEE_VERIFIER.verify(proofBytes, TEE_IMAGE_HASH, journal)) revert InvalidProof();
+        bytes memory proof = abi.encodePacked(prover, proofBytes);
+        if (!TEE_VERIFIER.verify(proof, TEE_IMAGE_HASH, journal)) revert InvalidProof();
 
         // Update proving data.
         provingData.teeProver = prover;
