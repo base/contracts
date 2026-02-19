@@ -1,6 +1,57 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+/**
+ * @title DeployDevNoNitro
+ * @notice Development deployment WITHOUT AWS Nitro attestation validation.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════════
+ *                              DEPLOYMENT TYPE: DEV (NO NITRO)
+ * ══════════════════════════════════════════════════════════════════════════════════
+ *
+ * This script deploys infrastructure using DevSystemConfigGlobal, which BYPASSES
+ * AWS Nitro attestation validation. Signers can be registered with a simple call
+ * to addDevSigner() without needing a real Nitro enclave or attestation document.
+ *
+ * USE THIS SCRIPT WHEN:
+ * - Running local development or testing
+ * - You don't have access to an AWS Nitro enclave
+ * - You want to quickly test the prover without attestation overhead
+ *
+ * DO NOT USE THIS SCRIPT FOR:
+ * - Production deployments
+ * - Security testing of the attestation flow
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────
+ * SIGNER REGISTRATION (SIMPLIFIED)
+ * ─────────────────────────────────────────────────────────────────────────────────
+ *
+ * After deployment, register a signer with a single call:
+ *
+ *   cast send $SYSTEM_CONFIG_GLOBAL \
+ *     "addDevSigner(address,bytes32)" $SIGNER_ADDRESS $TEE_IMAGE_HASH \
+ *     --private-key $OWNER_KEY --rpc-url $RPC_URL
+ *
+ * No attestation, PCR0 registration, or certificate validation required.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────
+ * COMPARISON WITH DeployDevWithNitro
+ * ─────────────────────────────────────────────────────────────────────────────────
+ *
+ * | Feature                    | DeployDevNoNitro      | DeployDevWithNitro    |
+ * |----------------------------|----------------------|------------------------|
+ * | SystemConfigGlobal         | DevSystemConfigGlobal | SystemConfigGlobal    |
+ * | Signer registration        | addDevSigner()        | registerSigner()      |
+ * | Requires Nitro enclave     | No                    | Yes                   |
+ * | Validates AWS cert chain   | No                    | Yes                   |
+ * | PCR0 pre-registration      | No                    | Yes                   |
+ * | Attestation freshness      | N/A                   | < 60 minutes          |
+ *
+ * Both scripts use mocks for AnchorStateRegistry, DelayedWETH, and ZK Verifier.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════════
+ */
+
 import {CertManager} from "@nitro-validator/CertManager.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Script} from "forge-std/Script.sol";
@@ -23,10 +74,10 @@ import {MinimalProxyAdmin} from "./mocks/MinimalProxyAdmin.sol";
 import {MockAnchorStateRegistry} from "./mocks/MockAnchorStateRegistry.sol";
 import {MockDelayedWETH} from "./mocks/MockDelayedWETH.sol";
 
-/// @title DeployAllForTesting
-/// @notice Deploys everything needed for e2e testing, using mocks for optimism contracts.
-/// @dev Uses the REAL DisputeGameFactory but mocks AnchorStateRegistry and DelayedWETH.
-contract DeployAllForTesting is Script {
+/// @title DeployDevNoNitro
+/// @notice Development deployment WITHOUT AWS Nitro attestation validation.
+/// @dev Uses DevSystemConfigGlobal which allows addDevSigner() to bypass attestation.
+contract DeployDevNoNitro is Script {
     using stdJson for string;
 
     /// @notice Constant from Optimism's Constants.sol - the storage slot for proxy admin.
@@ -59,11 +110,13 @@ contract DeployAllForTesting is Script {
     function run() public {
         DeployConfig memory cfg = _loadConfig();
 
-        console.log("=== Deploying Complete Test Infrastructure ===");
+        console.log("=== Deploying Dev Infrastructure (NO NITRO) ===");
         console.log("Chain ID:", block.chainid);
         console.log("Owner:", cfg.owner);
         console.log("TEE Proposer:", cfg.teeProposer);
         console.log("Game Type:", cfg.gameTypeRaw);
+        console.log("");
+        console.log("NOTE: Using DevSystemConfigGlobal - NO attestation required.");
 
         vm.startBroadcast();
 
@@ -78,7 +131,7 @@ contract DeployAllForTesting is Script {
     }
 
     function _loadConfig() internal view returns (DeployConfig memory cfg) {
-        string memory configPath = vm.envOr("DEPLOY_CONFIG_PATH", string("deploy-config/sepolia.json"));
+        string memory configPath = vm.envOr("DEPLOY_CONFIG_PATH", string("deploy-config/sepolia-no-nitro.json"));
         string memory config = vm.readFile(configPath);
 
         cfg.owner = config.readAddress(".finalSystemOwner");
@@ -92,11 +145,11 @@ contract DeployAllForTesting is Script {
     }
 
     function _deployTEEContracts(address owner) internal {
-        // 1. CertManager
+        // 1. CertManager (not used in dev mode, but deployed for interface compatibility)
         certManager = address(new CertManager());
         console.log("CertManager:", certManager);
 
-        // 2. DevSystemConfigGlobal (dev version) with proxy
+        // 2. DevSystemConfigGlobal - allows addDevSigner() to bypass attestation
         address scgImpl = address(new DevSystemConfigGlobal(CertManager(certManager)));
         systemConfigGlobalProxy = address(
             new TransparentUpgradeableProxy(
@@ -114,33 +167,22 @@ contract DeployAllForTesting is Script {
 
     function _deployInfrastructure(DeployConfig memory cfg) internal {
         // 4. REAL DisputeGameFactory (behind proxy)
-        // The constructor calls _disableInitializers(), so we must use a proxy
         address factoryImpl = address(new DisputeGameFactory());
-
-        // Deploy a minimal proxy admin that returns cfg.owner as owner
         MinimalProxyAdmin proxyAdmin = new MinimalProxyAdmin(cfg.owner);
 
-        // Deploy proxy - but DON'T initialize yet (empty initData)
-        // We need to set the proxy admin storage slot first
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             factoryImpl,
-            address(proxyAdmin), // Use our MinimalProxyAdmin as the admin
-            "" // Don't call initialize yet
+            address(proxyAdmin),
+            ""
         );
 
-        // Set the PROXY_OWNER_ADDRESS slot on the proxy so initialize() passes the access check
         vm.store(address(proxy), PROXY_OWNER_ADDRESS, bytes32(uint256(uint160(address(proxyAdmin)))));
-
-        // Now initialize - caller is checked against proxyAdmin or proxyAdminOwner
         DisputeGameFactory(address(proxy)).initialize(cfg.owner);
 
         disputeGameFactory = address(proxy);
-        console.log("DisputeGameFactory (REAL):", disputeGameFactory);
+        console.log("DisputeGameFactory:", disputeGameFactory);
 
-        // 5. Mock AnchorStateRegistry - still mocked because:
-        //    - The real one needs SystemConfig, SuperchainConfig, etc.
-        //    - We only need getAnchorRoot() for the prover
-        //    - Manual setAnchorState() is useful for testing
+        // 5. Mock AnchorStateRegistry
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
         mockAnchorRegistry = address(asr);
         asr.initialize(disputeGameFactory, Hash.wrap(cfg.genesisOutputRoot), cfg.genesisBlockNumber, cfg.gameType);
@@ -165,7 +207,7 @@ contract DeployAllForTesting is Script {
                 IVerifier(teeVerifier),
                 IVerifier(zkVerifier),
                 cfg.teeImageHash,
-                bytes32(0), // zkImageHash (unused for testing)
+                bytes32(0), // zkImageHash (unused)
                 cfg.configHash,
                 cfg.teeProposer,
                 8453, // l2ChainId (Base mainnet)
@@ -173,9 +215,8 @@ contract DeployAllForTesting is Script {
             )
         );
         console.log("AggregateVerifier:", aggregateVerifier);
-        console.log("ConfigHash:", vm.toString(cfg.configHash));
 
-        // 8. Register AggregateVerifier with the real factory
+        // 8. Register AggregateVerifier with the factory
         DisputeGameFactory(disputeGameFactory).setImplementation(cfg.gameType, IDisputeGame(aggregateVerifier));
         DisputeGameFactory(disputeGameFactory).setInitBond(cfg.gameType, INIT_BOND);
         console.log("Registered AggregateVerifier with factory");
@@ -183,29 +224,32 @@ contract DeployAllForTesting is Script {
 
     function _printSummary(bytes32 teeImageHash, uint256 gameType, bytes32 configHash) internal view {
         console.log("\n========================================");
-        console.log("         DEPLOYMENT COMPLETE");
+        console.log("    DEV DEPLOYMENT COMPLETE (NO NITRO)");
         console.log("========================================");
         console.log("\nTEE Contracts:");
         console.log("  CertManager:", certManager);
         console.log("  DevSystemConfigGlobal:", systemConfigGlobalProxy);
         console.log("  TEEVerifier:", teeVerifier);
         console.log("\nInfrastructure:");
-        console.log("  DisputeGameFactory (real):", disputeGameFactory);
+        console.log("  DisputeGameFactory:", disputeGameFactory);
         console.log("  AnchorStateRegistry (mock):", mockAnchorRegistry);
         console.log("  DelayedWETH (mock):", mockDelayedWETH);
         console.log("\nGame:");
         console.log("  AggregateVerifier:", aggregateVerifier);
         console.log("  Game Type:", gameType);
-        console.log("  ConfigHash:", vm.toString(configHash));
+        console.log("  TEE Image Hash:", vm.toString(teeImageHash));
+        console.log("  Config Hash:", vm.toString(configHash));
         console.log("========================================");
-        console.log("\nNEXT STEP - Register dev signer:");
-        console.log("cast send", systemConfigGlobalProxy);
+        console.log("\n>>> NEXT STEP - Register dev signer (NO ATTESTATION NEEDED) <<<");
+        console.log("\ncast send", systemConfigGlobalProxy);
         console.log('  "addDevSigner(address,bytes32)" <SIGNER_ADDRESS>');
         console.log(" ", vm.toString(teeImageHash));
+        console.log("  --private-key <OWNER_KEY> --rpc-url <RPC>");
+        console.log("\n========================================\n");
     }
 
     function _writeOutput() internal {
-        string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-all.json");
+        string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-dev-no-nitro.json");
         string memory output = string.concat(
             '{"CertManager":"',
             vm.toString(certManager),
@@ -217,11 +261,13 @@ contract DeployAllForTesting is Script {
             vm.toString(disputeGameFactory),
             '","AnchorStateRegistry":"',
             vm.toString(mockAnchorRegistry),
+            '","DelayedWETH":"',
+            vm.toString(mockDelayedWETH),
             '","AggregateVerifier":"',
             vm.toString(aggregateVerifier),
             '"}'
         );
         vm.writeFile(outPath, output);
-        console.log("\nDeployment saved to:", outPath);
+        console.log("Deployment saved to:", outPath);
     }
 }
