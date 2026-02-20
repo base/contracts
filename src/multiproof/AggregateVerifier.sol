@@ -37,22 +37,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     }
 
     ////////////////////////////////////////////////////////////////
-    //                         Structs                            //
-    ////////////////////////////////////////////////////////////////
-
-    /// @notice The `ProvingData` struct represents the data associated with the proofs for a claim.
-    /// @param counteredByGameAddress The address of the game that countered this game.
-    /// @param teeProver The address that provided a TEE proof.
-    /// @param zkProver The address that provided a ZK proof.
-    /// @param expectedResolution The timestamp of the game's expected resolution.
-    struct ProvingData {
-        address counteredByGameAddress;
-        address teeProver;
-        address zkProver;
-        Timestamp expectedResolution;
-    }
-
-    ////////////////////////////////////////////////////////////////
     //                         Constants                          //
     ////////////////////////////////////////////////////////////////
     /// @notice The slow finalization delay.
@@ -134,9 +118,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     /// @notice A boolean for whether or not the game type was respected when the game was created.
     bool public wasRespectedGameTypeWhenCreated;
 
-    /// @notice The claim made by the proposer.
-    ProvingData public provingData;
-
     /// @notice The starting output root of the game that is proven from in case of a challenge.
     /// @dev This should match the claim root of the parent game.
     Proposal public startingOutputRoot;
@@ -152,6 +133,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
     /// @notice The amount of the bond.
     uint256 public bondAmount;
+
+    /// @notice The address of the game that countered this game.
+    address public counteredByGameAddress;
+
+    /// @notice The address that provided a proof of the given type.
+    mapping(ProofType => address) internal proofTypeToProver;
+
+    /// @notice The timestamp of the game's expected resolution.
+    Timestamp public expectedResolution;
 
     ////////////////////////////////////////////////////////////////
     //                         Events                             //
@@ -344,13 +334,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             // Parent game must be respected, not blacklisted, not retired, and not challenged.
             if (!_isValidGame(parentGame)) revert InvalidParentGame();
 
-            // The parent game must have a proof.
-            // Should not be reachable since a proof is required to initialize.
-            if (
-                AggregateVerifier(address(parentGame)).teeProver() == address(0)
-                    && AggregateVerifier(address(parentGame)).zkProver() == address(0)
-            ) revert InvalidParentGame();
-
             startingOutputRoot = Proposal({
                 l2SequenceNumber: parentGame.l2SequenceNumber(), root: Hash.wrap(parentGame.rootClaim().raw())
             });
@@ -375,7 +358,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             GameType.unwrap(ANCHOR_STATE_REGISTRY.respectedGameType()) == GameType.unwrap(GAME_TYPE);
 
         // Set expected resolution.
-        provingData.expectedResolution = Timestamp.wrap(type(uint64).max);
+        expectedResolution = Timestamp.wrap(type(uint64).max);
 
         // Verify the proof.
         ProofType proofType = ProofType(uint8(proof[0]));
@@ -410,13 +393,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         if (gameOver()) revert GameOver();
 
         ProofType proofType = ProofType(uint8(proofBytes[0]));
-        if (proofType == ProofType.TEE) {
-            if (provingData.teeProver != address(0)) revert AlreadyProven(ProofType.TEE);
-        } else if (proofType == ProofType.ZK) {
-            if (provingData.zkProver != address(0)) revert AlreadyProven(ProofType.ZK);
-        } else {
-            revert InvalidProofType();
-        }
+        if (proofTypeToProver[proofType] != address(0)) revert AlreadyProven(proofType);
 
         _verifyProof(
             proofBytes[1:],
@@ -476,8 +453,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
         // The TEE prover must not be empty.
         // You should nullify the game if a ZK proof has already been provided.
-        if (provingData.teeProver == address(0)) revert MissingProof(ProofType.TEE);
-        if (provingData.zkProver != address(0)) revert AlreadyProven(ProofType.ZK);
+        if (proofTypeToProver[ProofType.TEE] == address(0)) revert MissingProof(ProofType.TEE);
+        if (proofTypeToProver[ProofType.ZK] != address(0)) revert AlreadyProven(ProofType.ZK);
 
         (,, IDisputeGame game) = DISPUTE_GAME_FACTORY.gameAtIndex(gameIndex);
 
@@ -490,7 +467,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         if (challengingGame.zkProver() == address(0)) revert MissingProof(ProofType.ZK);
 
         // Update the counteredBy address.
-        provingData.counteredByGameAddress = address(challengingGame);
+        counteredByGameAddress = address(challengingGame);
 
         // Set the game as challenged.
         status = GameStatus.CHALLENGER_WINS;
@@ -518,21 +495,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         bytes32 proposedIntermediateRoot = intermediateOutputRoot(intermediateRootIndex);
         if (proposedIntermediateRoot == intermediateRootToProve) revert IntermediateRootSameAsProposed();
 
+        ProofType proofType = ProofType(uint8(proofBytes[0]));
+        if (proofTypeToProver[proofType] == address(0)) revert MissingProof(proofType);
+
         bytes32 startingRoot = intermediateRootIndex == 0
             ? startingOutputRoot.root.raw()
             : intermediateOutputRoot(intermediateRootIndex - 1);
         uint256 startingL2SequenceNumber =
             startingOutputRoot.l2SequenceNumber + intermediateRootIndex * INTERMEDIATE_BLOCK_INTERVAL;
         uint256 endingL2SequenceNumber = startingL2SequenceNumber + INTERMEDIATE_BLOCK_INTERVAL;
-
-        ProofType proofType = ProofType(uint8(proofBytes[0]));
-        if (proofType == ProofType.TEE) {
-            if (provingData.teeProver == address(0)) revert MissingProof(ProofType.TEE);
-        } else if (proofType == ProofType.ZK) {
-            if (provingData.zkProver == address(0)) revert MissingProof(ProofType.ZK);
-        } else {
-            revert InvalidProofType();
-        }
 
         _verifyProof(
             proofBytes[1:],
@@ -563,13 +534,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         if (bondRecipient == address(0)) revert BondRecipientEmpty();
 
         // If this game was challenged, the countered by game must be valid or else the bond is refunded.
-        if (provingData.counteredByGameAddress != address(0)) {
-            GameStatus counteredByGameStatus = IDisputeGame(provingData.counteredByGameAddress).status();
+        if (counteredByGameAddress != address(0)) {
+            GameStatus counteredByGameStatus = IDisputeGame(counteredByGameAddress).status();
             if (counteredByGameStatus == GameStatus.IN_PROGRESS) {
                 revert CounteredByGameNotResolved();
             }
             // If the countered by game is invalid or not resolved, the bond is refunded.
-            if (!_isValidChallengingGame(IDisputeGame(provingData.counteredByGameAddress))) {
+            if (!_isValidChallengingGame(IDisputeGame(counteredByGameAddress))) {
                 bondRecipient = gameCreator();
             }
         }
@@ -581,7 +552,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         }
 
         bondClaimed = true;
-        // This can fail if this game was challenged and the countered by game is blacklisted/retired after it resolved to DEFENDER_WINS. The centralized functions in DELAYED_WETH will handle this as it's a already a very centralized action to blacklist/retire a valid challenging game.
+        // This can fail if this game was challenged and the countered by game is 
+        // blacklisted/retired after it resolved to DEFENDER_WINS. 
+        // The centralized functions in DELAYED_WETH will handle this as it's a already 
+        // a very centralized action to blacklist/retire a valid challenging game.
         DELAYED_WETH.withdraw(bondRecipient, bondAmount);
 
         // Transfer the credit to the bond recipient.
@@ -640,12 +614,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
     /// @notice Address that provided a TEE proof.
     function teeProver() external view returns (address) {
-        return provingData.teeProver;
+        return proofTypeToProver[ProofType.TEE];
     }
 
     /// @notice Address that provided a ZK proof.
     function zkProver() external view returns (address) {
-        return provingData.zkProver;
+        return proofTypeToProver[ProofType.ZK];
     }
 
     /// @notice The game type.
@@ -662,7 +636,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
     /// @notice Determines if the game is finished.
     function gameOver() public view returns (bool) {
-        return provingData.expectedResolution.raw() <= block.timestamp;
+        return expectedResolution.raw() <= block.timestamp;
     }
 
     /// @notice The number of intermediate output roots.
@@ -720,27 +694,23 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
     /// @notice Updates the expected resolution timestamp.
     function _updateExpectedResolution() internal {
-        uint64 newResolution = uint64(block.timestamp);
-        if (provingData.teeProver != address(0) && provingData.zkProver != address(0)) {
-            newResolution += FAST_FINALIZATION_DELAY;
-        } else if (provingData.teeProver != address(0) || provingData.zkProver != address(0)) {
-            newResolution += SLOW_FINALIZATION_DELAY;
-        } else {
-            revert NoProofProvided();
-        }
-        provingData.expectedResolution =
-            Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, provingData.expectedResolution.raw())));
+        bool hasTee = proofTypeToProver[ProofType.TEE] != address(0);
+        bool hasZk = proofTypeToProver[ProofType.ZK] != address(0);
+        
+        if (!hasTee && !hasZk) revert NoProofProvided();
+        
+        uint64 delay = (hasTee && hasZk) ? FAST_FINALIZATION_DELAY : SLOW_FINALIZATION_DELAY;
+        uint64 newResolution = uint64(block.timestamp) + delay;
+        expectedResolution =
+            Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, expectedResolution.raw())));
     }
 
     function _updateProvingData(ProofType proofType, address prover) internal {
-        if (proofType == ProofType.TEE) {
-            provingData.teeProver = prover;
-        } else if (proofType == ProofType.ZK) {
-            provingData.zkProver = prover;
-            // Bond can be reclaimed after a ZK proof is provided.
+        proofTypeToProver[proofType] = prover;
+
+        // Bond can be reclaimed after a ZK proof is provided.
+        if (proofType == ProofType.ZK) {
             bondRecipient = gameCreator();
-        } else {
-            revert InvalidProofType();
         }
 
         _updateExpectedResolution();
@@ -756,6 +726,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         uint256 endingL2SequenceNumber,
         bytes memory intermediateRoots
     ) internal view {
+        if (proofBytes.length < 65) revert InvalidProof();
+
         bytes32 l1OriginHash = bytes32(proofBytes[:32]);
         uint256 l1OriginNumber = uint256(bytes32(proofBytes[32:64]));
         // Verify claimed L1 origin hash matches actual blockhash
