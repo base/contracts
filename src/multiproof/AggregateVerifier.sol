@@ -386,7 +386,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         DELAYED_WETH.deposit{value: msg.value}();
 
         // Verify the proof.
-        _verifyProposalProof(proof[1:], ProofType(uint8(proof[0])), gameCreator());
+        ProofType proofType = ProofType(uint8(proof[0]));
+        _verifyProof(proof[1:], proofType, gameCreator(), startingOutputRoot.root.raw(), startingOutputRoot.l2SequenceNumber, rootClaim().raw(), l2SequenceNumber(), intermediateOutputRoots());
+
+        _updateProvingData(proofType, gameCreator());
+
+        emit Proved(gameCreator(), proofType);
     }
 
     /// @notice Verifies a proof for the current game.
@@ -399,7 +404,19 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         // The game must not be over.
         if (gameOver()) revert GameOver();
 
-        _verifyProposalProof(proofBytes[1:], ProofType(uint8(proofBytes[0])), msg.sender);
+        ProofType proofType = ProofType(uint8(proofBytes[0]));
+        if (proofType == ProofType.TEE) {
+            if (provingData.teeProver != address(0)) revert AlreadyProven();
+        } else if (proofType == ProofType.ZK) {
+            if (provingData.zkProver != address(0)) revert AlreadyProven();
+        } else {
+            revert InvalidProofType();
+        }
+
+        _verifyProof(proofBytes[1:], proofType, msg.sender, startingOutputRoot.root.raw(), startingOutputRoot.l2SequenceNumber, rootClaim().raw(), l2SequenceNumber(), intermediateOutputRoots());
+        _updateProvingData(proofType, msg.sender);
+
+        emit Proved(msg.sender, proofType);
     }
 
     /// @notice Resolves the game after a proof has been provided and enough time has passed.
@@ -495,36 +512,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         uint256 endingL2SequenceNumber = startingL2SequenceNumber + INTERMEDIATE_BLOCK_INTERVAL;
 
         ProofType proofType = ProofType(uint8(proofBytes[0]));
-        // Can only nullify a game that has a proof of the same type.
         if (proofType == ProofType.TEE) {
-            if (provingData.teeProver == address(0)) {
-                revert MissingTEEProof();
-            }
-            _verifyTeeProof(
-                proofBytes[1:],
-                msg.sender,
-                startingRoot,
-                startingL2SequenceNumber,
-                intermediateRootToProve,
-                endingL2SequenceNumber,
-                abi.encodePacked(intermediateRootToProve)
-            );
+            if (provingData.teeProver == address(0)) revert MissingTEEProof();
         } else if (proofType == ProofType.ZK) {
-            if (provingData.zkProver == address(0)) {
-                revert MissingZKProof();
-            }
-            _verifyZkProof(
-                proofBytes[1:],
-                msg.sender,
-                startingRoot,
-                startingL2SequenceNumber,
-                intermediateRootToProve,
-                endingL2SequenceNumber,
-                abi.encodePacked(intermediateRootToProve)
-            );
+            if (provingData.zkProver == address(0)) revert MissingZKProof();
         } else {
             revert InvalidProofType();
         }
+        
+        _verifyProof(proofBytes[1:], proofType, msg.sender, startingRoot, startingL2SequenceNumber, intermediateRootToProve, endingL2SequenceNumber, abi.encodePacked(intermediateRootToProve));
 
         // Set the game as challenged so that child games can't resolve.
         status = GameStatus.CHALLENGER_WINS;
@@ -699,48 +695,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         return _getArgUint32(0x74);
     }
 
-    function _verifyProposalProof(bytes calldata proofBytes, ProofType proofType, address prover) internal {
-        if (proofType == ProofType.TEE) {
-            // Only one TEE proof can be submitted.
-            if (provingData.teeProver != address(0)) revert AlreadyProven();
-            _verifyTeeProof(
-                proofBytes,
-                prover,
-                startingOutputRoot.root.raw(),
-                startingOutputRoot.l2SequenceNumber,
-                rootClaim().raw(),
-                l2SequenceNumber(),
-                intermediateOutputRoots()
-            );
-            // Update proving data.
-            provingData.teeProver = prover;
-        } else if (proofType == ProofType.ZK) {
-            // Only one ZK proof can be submitted.
-            if (provingData.zkProver != address(0)) revert AlreadyProven();
-            _verifyZkProof(
-                proofBytes,
-                prover,
-                startingOutputRoot.root.raw(),
-                startingOutputRoot.l2SequenceNumber,
-                rootClaim().raw(),
-                l2SequenceNumber(),
-                intermediateOutputRoots()
-            );
-
-            // Update proving data.
-            provingData.zkProver = prover;
-            // Bond can be reclaimed after a ZK proof is provided.
-            bondRecipient = gameCreator();
-        } else {
-            revert InvalidProofType();
-        }
-
-        _updateExpectedResolution();
-
-        // Emit the proved event.
-        emit Proved(prover, proofType);
-    }
-
     /// @notice Updates the expected resolution timestamp.
     function _updateExpectedResolution() internal {
         uint64 newResolution = uint64(block.timestamp);
@@ -755,22 +709,68 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, provingData.expectedResolution.raw())));
     }
 
+    function _updateProvingData(ProofType proofType, address prover) internal {
+        if (proofType == ProofType.TEE) {
+            provingData.teeProver = prover;
+        } else if (proofType == ProofType.ZK) {
+            provingData.zkProver = prover;
+            // Bond can be reclaimed after a ZK proof is provided.
+            bondRecipient = gameCreator();
+        } else {
+            revert InvalidProofType();
+        }
+
+        _updateExpectedResolution();
+    }
+
+    function _verifyProof(bytes calldata proofBytes, ProofType proofType, address prover, bytes32 startingRoot, uint256 startingL2SequenceNumber, bytes32 endingRoot, uint256 endingL2SequenceNumber, bytes memory intermediateRoots) internal view {
+        bytes32 l1OriginHash = bytes32(proofBytes[:32]);
+        uint256 l1OriginNumber = uint256(bytes32(proofBytes[32:64]));
+        // Verify claimed L1 origin hash matches actual blockhash
+        _verifyL1Origin(l1OriginHash, l1OriginNumber);
+
+        if (proofType == ProofType.TEE) {
+            _verifyTeeProof(
+                proofBytes,
+                prover,
+                l1OriginHash,
+                l1OriginNumber,
+                startingRoot,
+                startingL2SequenceNumber,
+                endingRoot,
+                endingL2SequenceNumber,
+                intermediateRoots
+            );
+        } else if (proofType == ProofType.ZK) {
+            _verifyZkProof(
+                proofBytes,
+                prover,
+                l1OriginHash,
+                l1OriginNumber,
+                startingRoot,
+                startingL2SequenceNumber,
+                endingRoot,
+                endingL2SequenceNumber,
+                intermediateRoots
+            );
+        } else {
+            revert InvalidProofType();
+        }
+    }
+
     /// @notice Verifies a TEE proof for the current game.
     /// @param proofBytes The proof: prover(20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65).
     function _verifyTeeProof(
         bytes calldata proofBytes,
         address prover,
+        bytes32 l1OriginHash,
+        uint256 l1OriginNumber,
         bytes32 startingRoot,
         uint256 startingL2SequenceNumber,
         bytes32 endingRoot,
         uint256 endingL2SequenceNumber,
         bytes memory intermediateRoots
     ) internal view {
-        bytes32 l1OriginHash = bytes32(proofBytes[:32]);
-        uint256 l1OriginNumber = uint256(bytes32(proofBytes[32:64]));
-        // Verify claimed L1 origin hash matches actual blockhash
-        _verifyL1Origin(l1OriginHash, l1OriginNumber);
-
         bytes32 journal = keccak256(
             abi.encodePacked(
                 prover,
@@ -796,17 +796,14 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     function _verifyZkProof(
         bytes calldata proofBytes,
         address prover,
+        bytes32 l1OriginHash,
+        uint256 l1OriginNumber,
         bytes32 startingRoot,
         uint256 startingL2SequenceNumber,
         bytes32 endingRoot,
         uint256 endingL2SequenceNumber,
         bytes memory intermediateRoots
     ) internal view {
-        bytes32 l1OriginHash = bytes32(proofBytes[:32]);
-        uint256 l1OriginNumber = uint256(bytes32(proofBytes[32:64]));
-        // Verify claimed L1 origin hash matches actual blockhash
-        _verifyL1Origin(l1OriginHash, l1OriginNumber);
-
         bytes32 journal = keccak256(
             abi.encodePacked(
                 prover,
