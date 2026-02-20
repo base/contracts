@@ -70,7 +70,9 @@ contract ChallengeTest is BaseTest {
 
         uint256 gameIndex = factory.gameCount() - 1;
 
-        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE));
+        vm.expectRevert(
+            abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE)
+        );
         game1.challenge(gameIndex);
     }
 

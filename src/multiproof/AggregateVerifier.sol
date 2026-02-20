@@ -271,8 +271,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         uint256 blockInterval,
         uint256 intermediateBlockInterval
     ) {
-        if (blockInterval == 0 || intermediateBlockInterval == 0 || blockInterval % intermediateBlockInterval != 0)
-        {
+        if (blockInterval == 0 || intermediateBlockInterval == 0 || blockInterval % intermediateBlockInterval != 0) {
             revert InvalidBlockInterval(blockInterval, intermediateBlockInterval);
         }
 
@@ -289,7 +288,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         L2_CHAIN_ID = l2ChainId;
         BLOCK_INTERVAL = blockInterval;
         INTERMEDIATE_BLOCK_INTERVAL = intermediateBlockInterval;
-        
+
         INITIALIZE_CALLDATA_SIZE = 0x7E + 0x20 * intermediateOutputRootsCount();
     }
 
@@ -384,7 +383,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
         // Verify the proof.
         ProofType proofType = ProofType(uint8(proof[0]));
-        _verifyProof(proof[1:], proofType, gameCreator(), startingOutputRoot.root.raw(), startingOutputRoot.l2SequenceNumber, rootClaim().raw(), l2SequenceNumber(), intermediateOutputRoots());
+        _verifyProof(
+            proof[1:],
+            proofType,
+            gameCreator(),
+            startingOutputRoot.root.raw(),
+            startingOutputRoot.l2SequenceNumber,
+            rootClaim().raw(),
+            l2SequenceNumber(),
+            intermediateOutputRoots()
+        );
 
         _updateProvingData(proofType, gameCreator());
 
@@ -410,7 +418,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             revert InvalidProofType();
         }
 
-        _verifyProof(proofBytes[1:], proofType, msg.sender, startingOutputRoot.root.raw(), startingOutputRoot.l2SequenceNumber, rootClaim().raw(), l2SequenceNumber(), intermediateOutputRoots());
+        _verifyProof(
+            proofBytes[1:],
+            proofType,
+            msg.sender,
+            startingOutputRoot.root.raw(),
+            startingOutputRoot.l2SequenceNumber,
+            rootClaim().raw(),
+            l2SequenceNumber(),
+            intermediateOutputRoots()
+        );
         _updateProvingData(proofType, msg.sender);
 
         emit Proved(msg.sender, proofType);
@@ -516,8 +533,17 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         } else {
             revert InvalidProofType();
         }
-        
-        _verifyProof(proofBytes[1:], proofType, msg.sender, startingRoot, startingL2SequenceNumber, intermediateRootToProve, endingL2SequenceNumber, abi.encodePacked(intermediateRootToProve));
+
+        _verifyProof(
+            proofBytes[1:],
+            proofType,
+            msg.sender,
+            startingRoot,
+            startingL2SequenceNumber,
+            intermediateRootToProve,
+            endingL2SequenceNumber,
+            abi.encodePacked(intermediateRootToProve)
+        );
 
         // Set the game as challenged so that child games can't resolve.
         status = GameStatus.CHALLENGER_WINS;
@@ -720,7 +746,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         _updateExpectedResolution();
     }
 
-    function _verifyProof(bytes calldata proofBytes, ProofType proofType, address prover, bytes32 startingRoot, uint256 startingL2SequenceNumber, bytes32 endingRoot, uint256 endingL2SequenceNumber, bytes memory intermediateRoots) internal view {
+    function _verifyProof(
+        bytes calldata proofBytes,
+        ProofType proofType,
+        address prover,
+        bytes32 startingRoot,
+        uint256 startingL2SequenceNumber,
+        bytes32 endingRoot,
+        uint256 endingL2SequenceNumber,
+        bytes memory intermediateRoots
+    ) internal view {
         bytes32 l1OriginHash = bytes32(proofBytes[:32]);
         uint256 l1OriginNumber = uint256(bytes32(proofBytes[32:64]));
         // Verify claimed L1 origin hash matches actual blockhash

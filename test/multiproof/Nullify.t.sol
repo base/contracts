@@ -71,7 +71,9 @@ contract NullifyTest is BaseTest {
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
         bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
 
-        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE));
+        vm.expectRevert(
+            abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE)
+        );
         game1.nullify(teeProof, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
     }
 

@@ -307,7 +307,9 @@ contract AggregateVerifierTest is BaseTest {
 
     function testDeployWithInvalidBlockIntervals() public {
         // Case 1: BLOCK_INTERVAL is 0
-        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, 0, INTERMEDIATE_BLOCK_INTERVAL));
+        vm.expectRevert(
+            abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, 0, INTERMEDIATE_BLOCK_INTERVAL)
+        );
         new AggregateVerifier(
             AGGREGATE_VERIFIER_GAME_TYPE,
             IAnchorStateRegistry(address(anchorStateRegistry)),
