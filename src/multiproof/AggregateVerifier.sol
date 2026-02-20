@@ -377,10 +377,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         // Set expected resolution.
         provingData.expectedResolution = Timestamp.wrap(type(uint64).max);
 
-        // Deposit the bond.
-        bondAmount = msg.value;
-        DELAYED_WETH.deposit{value: msg.value}();
-
         // Verify the proof.
         ProofType proofType = ProofType(uint8(proof[0]));
         _verifyProof(
@@ -397,6 +393,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         _updateProvingData(proofType, gameCreator());
 
         emit Proved(gameCreator(), proofType);
+
+        // Deposit the bond.
+        bondAmount = msg.value;
+        DELAYED_WETH.deposit{value: msg.value}();
     }
 
     /// @notice Verifies a proof for the current game.
