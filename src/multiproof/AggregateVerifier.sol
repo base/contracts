@@ -185,8 +185,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     ////////////////////////////////////////////////////////////////
     //                         Errors                             //
     ////////////////////////////////////////////////////////////////
-    /// @notice When the parent game is invalid.
-    error InvalidParentGame();
+    /// @notice When the block interval or intermediate block interval is invalid.
+    error InvalidBlockInterval(uint256 blockInterval, uint256 intermediateBlockInterval);
 
     /// @notice When the block number is unexpected.
     error UnexpectedBlockNumber(uint256 expectedBlockNumber, uint256 actualBlockNumber);
@@ -197,38 +197,38 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     /// @notice When the game is not over.
     error GameNotOver();
 
-    /// @notice When the parent game has not resolved.
-    error ParentGameNotResolved();
-
-    /// @notice When there is no TEE proof.
-    error MissingTEEProof();
-
-    /// @notice When there is no ZK proof.
-    error MissingZKProof();
-
     /// @notice When the game is invalid.
     error InvalidGame();
 
+    /// @notice When the parent game is invalid.
+    error InvalidParentGame();
+
+    /// @notice When the parent game has not resolved.
+    error ParentGameNotResolved();
+
+    /// @notice When there is no proof of the given type.
+    error MissingProof(ProofType proofType);
+
     /// @notice When the proof has already been verified.
-    error AlreadyProven();
+    error AlreadyProven(ProofType proofType);
 
     /// @notice When the proof is invalid.
     error InvalidProof();
 
-    /// @notice When no proof was provided.
-    error NoProofProvided();
-
     /// @notice When an invalid proof type is provided.
     error InvalidProofType();
 
-    /// @notice When the bond recipient is empty.
-    error BondRecipientEmpty();
+    /// @notice When no proof was provided.
+    error NoProofProvided();
 
     /// @notice When the countered by game is invalid.
     error InvalidCounteredByGame();
 
-    /// @notice When the block interval or intermediate block interval is invalid.
-    error InvalidBlockInterval(uint256 blockInterval, uint256 intermediateBlockInterval);
+    /// @notice When the countered by game is not resolved.
+    error CounteredByGameNotResolved();
+
+    /// @notice When the bond recipient is empty.
+    error BondRecipientEmpty();
 
     /// @notice When the intermediate root index is invalid.
     error InvalidIntermediateRootIndex();
@@ -238,9 +238,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
     /// @notice When the intermediate root does not match the claim.
     error IntermediateRootMismatch(bytes32 intermediateRoot, bytes32 claim);
-
-    /// @notice When the countered by game is not resolved.
-    error CounteredByGameNotResolved();
 
     /// @notice Thrown when the L1 origin block is too old to verify.
     error L1OriginTooOld(uint256 l1OriginNumber, uint256 currentBlock);
@@ -274,6 +271,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         uint256 blockInterval,
         uint256 intermediateBlockInterval
     ) {
+        if (blockInterval == 0 || intermediateBlockInterval == 0 || blockInterval % intermediateBlockInterval != 0)
+        {
+            revert InvalidBlockInterval(blockInterval, intermediateBlockInterval);
+        }
+
         // Set up initial game state.
         GAME_TYPE = gameType_;
         ANCHOR_STATE_REGISTRY = anchorStateRegistry_;
@@ -287,12 +289,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         L2_CHAIN_ID = l2ChainId;
         BLOCK_INTERVAL = blockInterval;
         INTERMEDIATE_BLOCK_INTERVAL = intermediateBlockInterval;
-
-        if (BLOCK_INTERVAL == 0 || intermediateBlockInterval == 0 || BLOCK_INTERVAL % INTERMEDIATE_BLOCK_INTERVAL != 0)
-        {
-            revert InvalidBlockInterval(BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
-        }
-
+        
         INITIALIZE_CALLDATA_SIZE = 0x7E + 0x20 * intermediateOutputRootsCount();
     }
 
@@ -406,9 +403,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
         ProofType proofType = ProofType(uint8(proofBytes[0]));
         if (proofType == ProofType.TEE) {
-            if (provingData.teeProver != address(0)) revert AlreadyProven();
+            if (provingData.teeProver != address(0)) revert AlreadyProven(ProofType.TEE);
         } else if (proofType == ProofType.ZK) {
-            if (provingData.zkProver != address(0)) revert AlreadyProven();
+            if (provingData.zkProver != address(0)) revert AlreadyProven(ProofType.ZK);
         } else {
             revert InvalidProofType();
         }
@@ -462,8 +459,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
         // The TEE prover must not be empty.
         // You should nullify the game if a ZK proof has already been provided.
-        if (provingData.teeProver == address(0)) revert MissingTEEProof();
-        if (provingData.zkProver != address(0)) revert AlreadyProven();
+        if (provingData.teeProver == address(0)) revert MissingProof(ProofType.TEE);
+        if (provingData.zkProver != address(0)) revert AlreadyProven(ProofType.ZK);
 
         (,, IDisputeGame game) = DISPUTE_GAME_FACTORY.gameAtIndex(gameIndex);
 
@@ -473,7 +470,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         AggregateVerifier challengingGame = AggregateVerifier(address(game));
 
         // The ZK prover must not be empty.
-        if (challengingGame.zkProver() == address(0)) revert MissingZKProof();
+        if (challengingGame.zkProver() == address(0)) revert MissingProof(ProofType.ZK);
 
         // Update the counteredBy address.
         provingData.counteredByGameAddress = address(challengingGame);
@@ -513,9 +510,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
         ProofType proofType = ProofType(uint8(proofBytes[0]));
         if (proofType == ProofType.TEE) {
-            if (provingData.teeProver == address(0)) revert MissingTEEProof();
+            if (provingData.teeProver == address(0)) revert MissingProof(ProofType.TEE);
         } else if (proofType == ProofType.ZK) {
-            if (provingData.zkProver == address(0)) revert MissingZKProof();
+            if (provingData.zkProver == address(0)) revert MissingProof(ProofType.ZK);
         } else {
             revert InvalidProofType();
         }

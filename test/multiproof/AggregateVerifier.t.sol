@@ -2,11 +2,14 @@
 pragma solidity 0.8.15;
 
 import {BadExtraData} from "optimism/src/dispute/lib/Errors.sol";
+import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
+import {IDelayedWETH} from "optimism/interfaces/dispute/IDelayedWETH.sol";
 import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
 import {IDisputeGameFactory} from "optimism/interfaces/dispute/IDisputeGameFactory.sol";
 import {Claim, GameStatus, Hash, Timestamp} from "optimism/src/dispute/lib/Types.sol";
 
 import {AggregateVerifier} from "src/AggregateVerifier.sol";
+import {IVerifier} from "src/interfaces/IVerifier.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
 
@@ -300,5 +303,55 @@ contract AggregateVerifierTest is BaseTest {
         bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), expectedHash, l1OriginNumber);
 
         _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proofBytes);
+    }
+
+    function testDeployWithInvalidBlockIntervals() public {
+        // Case 1: BLOCK_INTERVAL is 0
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, 0, INTERMEDIATE_BLOCK_INTERVAL));
+        new AggregateVerifier(
+            AGGREGATE_VERIFIER_GAME_TYPE,
+            IAnchorStateRegistry(address(anchorStateRegistry)),
+            IDelayedWETH(payable(address(delayedWETH))),
+            IVerifier(address(teeVerifier)),
+            IVerifier(address(zkVerifier)),
+            TEE_IMAGE_HASH,
+            ZK_IMAGE_HASH,
+            CONFIG_HASH,
+            L2_CHAIN_ID,
+            0,
+            INTERMEDIATE_BLOCK_INTERVAL
+        );
+
+        // Case 2: INTERMEDIATE_BLOCK_INTERVAL is 0
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, BLOCK_INTERVAL, 0));
+        new AggregateVerifier(
+            AGGREGATE_VERIFIER_GAME_TYPE,
+            IAnchorStateRegistry(address(anchorStateRegistry)),
+            IDelayedWETH(payable(address(delayedWETH))),
+            IVerifier(address(teeVerifier)),
+            IVerifier(address(zkVerifier)),
+            TEE_IMAGE_HASH,
+            ZK_IMAGE_HASH,
+            CONFIG_HASH,
+            L2_CHAIN_ID,
+            BLOCK_INTERVAL,
+            0
+        );
+
+        // Case 3: BLOCK_INTERVAL is not divisible by INTERMEDIATE_BLOCK_INTERVAL
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, 3, 2));
+        new AggregateVerifier(
+            AGGREGATE_VERIFIER_GAME_TYPE,
+            IAnchorStateRegistry(address(anchorStateRegistry)),
+            IDelayedWETH(payable(address(delayedWETH))),
+            IVerifier(address(teeVerifier)),
+            IVerifier(address(zkVerifier)),
+            TEE_IMAGE_HASH,
+            ZK_IMAGE_HASH,
+            CONFIG_HASH,
+            L2_CHAIN_ID,
+            3,
+            2
+        );
     }
 }

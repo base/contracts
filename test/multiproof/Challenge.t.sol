@@ -70,7 +70,7 @@ contract ChallengeTest is BaseTest {
 
         uint256 gameIndex = factory.gameCount() - 1;
 
-        vm.expectRevert(AggregateVerifier.MissingTEEProof.selector);
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE));
         game1.challenge(gameIndex);
     }
 
@@ -114,7 +114,7 @@ contract ChallengeTest is BaseTest {
 
         uint256 gameIndex = factory.gameCount() - 1;
 
-        vm.expectRevert(AggregateVerifier.MissingZKProof.selector);
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.ZK));
         game1.challenge(gameIndex);
     }
 
