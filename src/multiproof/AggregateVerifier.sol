@@ -364,23 +364,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             revert UnexpectedBlockNumber(startingOutputRoot.l2SequenceNumber + BLOCK_INTERVAL, l2SequenceNumber());
         }
 
-        // Verify the proof.
-        ProofType proofType = ProofType(uint8(proof[0]));
-        _verifyProof(
-            proof[1:],
-            proofType,
-            gameCreator(),
-            startingOutputRoot.root.raw(),
-            startingOutputRoot.l2SequenceNumber,
-            rootClaim().raw(),
-            l2SequenceNumber(),
-            intermediateOutputRoots()
-        );
-
-        _updateProvingData(proofType, gameCreator());
-
-        emit Proved(gameCreator(), proofType);
-        
         // Set the game as initialized.
         initialized = true;
 
@@ -397,6 +380,23 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         // Deposit the bond.
         bondAmount = msg.value;
         DELAYED_WETH.deposit{value: msg.value}();
+
+        // Verify the proof.
+        ProofType proofType = ProofType(uint8(proof[0]));
+        _verifyProof(
+            proof[1:],
+            proofType,
+            gameCreator(),
+            startingOutputRoot.root.raw(),
+            startingOutputRoot.l2SequenceNumber,
+            rootClaim().raw(),
+            l2SequenceNumber(),
+            intermediateOutputRoots()
+        );
+
+        _updateProvingData(proofType, gameCreator());
+
+        emit Proved(gameCreator(), proofType);
     }
 
     /// @notice Verifies a proof for the current game.
