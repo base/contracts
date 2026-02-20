@@ -17,17 +17,6 @@ import {SystemConfigGlobal} from "./SystemConfigGlobal.sol";
 ///      The contract is intentionally stateless - all state related to output proposals is
 ///      managed by the calling contract (e.g., AggregateVerifier).
 contract TEEVerifier is IVerifier {
-    /// @notice The EIP-2935 blockhash history contract address (deployed post-Pectra).
-    /// @dev This contract stores blockhashes for the last ~8192 blocks, extending the
-    ///      256-block window of the native blockhash() opcode.
-    address public constant EIP2935_CONTRACT = 0x0000F90827F1C53a10cb7A02335B175320002935;
-
-    /// @notice The maximum number of blocks that blockhash() can look back.
-    uint256 public constant BLOCKHASH_WINDOW = 256;
-
-    /// @notice The maximum number of blocks that EIP-2935 can look back (~8192).
-    uint256 public constant EIP2935_WINDOW = 8191;
-
     /// @notice The SystemConfigGlobal contract that manages valid TEE signers.
     /// @dev Signers are registered via AWS Nitro attestation in SystemConfigGlobal.
     SystemConfigGlobal public immutable SYSTEM_CONFIG_GLOBAL;
@@ -40,15 +29,6 @@ contract TEEVerifier is IVerifier {
 
     /// @notice Thrown when the signer's registered PCR0 does not match the claimed imageId.
     error ImageIdMismatch(bytes32 signerPCR0, bytes32 claimedImageId);
-
-    /// @notice Thrown when the L1 origin block is too old to verify.
-    error L1OriginTooOld(uint256 l1OriginNumber, uint256 currentBlock);
-
-    /// @notice Thrown when the L1 origin block number is in the future.
-    error L1OriginInFuture(uint256 l1OriginNumber, uint256 currentBlock);
-
-    /// @notice Thrown when the L1 origin hash doesn't match the actual blockhash.
-    error L1OriginHashMismatch(bytes32 claimed, bytes32 actual);
 
     /// @notice Thrown when the proof format is invalid.
     error InvalidProofFormat();
@@ -71,12 +51,7 @@ contract TEEVerifier is IVerifier {
         if (proofBytes.length < 149) revert InvalidProofFormat();
 
         address proposer = address(bytes20(proofBytes[0:20]));
-        bytes32 l1OriginHash = bytes32(proofBytes[20:52]);
-        uint256 l1OriginNumber = uint256(bytes32(proofBytes[52:84]));
         bytes calldata signature = proofBytes[84:149];
-
-        // Verify claimed L1 origin hash matches actual blockhash
-        _verifyL1Origin(l1OriginHash, l1OriginNumber);
 
         // Recover the signer from the signature
         // The signature should be over the journal hash directly (not eth-signed-message prefixed)
@@ -105,42 +80,5 @@ contract TEEVerifier is IVerifier {
         }
 
         return true;
-    }
-
-    /// @notice Verifies that the claimed L1 origin hash matches the actual blockhash.
-    /// @param l1OriginHash The L1 block hash claimed in the proof.
-    /// @param l1OriginNumber The L1 block number claimed in the proof.
-    function _verifyL1Origin(bytes32 l1OriginHash, uint256 l1OriginNumber) private view {
-        // Check for future block
-        if (l1OriginNumber >= block.number) {
-            revert L1OriginInFuture(l1OriginNumber, block.number);
-        }
-
-        bytes32 actualHash;
-        uint256 blockAge = block.number - l1OriginNumber;
-
-        // Prefer blockhash() over EIP-2935 when possible since it's cheaper (no external call).
-        if (blockAge <= BLOCKHASH_WINDOW) {
-            actualHash = blockhash(l1OriginNumber);
-        } else if (blockAge <= EIP2935_WINDOW) {
-            // EIP-2935 expects raw calldata: exactly 32 bytes containing the block number.
-            // Using a Solidity interface would add a 4-byte function selector, causing a revert.
-            // We use a low-level staticcall with raw 32-byte calldata instead.
-            (bool success, bytes memory result) = EIP2935_CONTRACT.staticcall(abi.encode(l1OriginNumber));
-            if (!success || result.length != 32) {
-                revert L1OriginTooOld(l1OriginNumber, block.number);
-            }
-            actualHash = abi.decode(result, (bytes32));
-        } else {
-            revert L1OriginTooOld(l1OriginNumber, block.number);
-        }
-
-        if (actualHash == bytes32(0)) {
-            revert L1OriginTooOld(l1OriginNumber, block.number);
-        }
-
-        if (actualHash != l1OriginHash) {
-            revert L1OriginHashMismatch(l1OriginHash, actualHash);
-        }
     }
 }

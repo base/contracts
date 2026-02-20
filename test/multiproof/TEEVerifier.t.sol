@@ -154,57 +154,6 @@ contract TEEVerifierTest is Test {
         verifier.verify(proofBytes, wrongImageId, journal);
     }
 
-    function testVerifyFailsWithL1OriginInFuture() public {
-        bytes32 journal = keccak256("test-journal");
-
-        // Use a future block number
-        uint256 l1OriginNumber = block.number + 1;
-        bytes32 l1OriginHash = bytes32(uint256(1)); // Fake hash
-
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
-        bytes memory signature = abi.encodePacked(r, s, v);
-
-        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, signature);
-
-        vm.expectRevert(abi.encodeWithSelector(TEEVerifier.L1OriginInFuture.selector, l1OriginNumber, block.number));
-        verifier.verify(proofBytes, IMAGE_ID, journal);
-    }
-
-    function testVerifyFailsWithL1OriginTooOld() public {
-        // Roll forward many blocks to make old blocks unavailable
-        vm.roll(block.number + 300);
-
-        bytes32 journal = keccak256("test-journal");
-
-        // Use a block number that's too old (outside both blockhash window and EIP-2935 window)
-        uint256 l1OriginNumber = 1;
-        bytes32 l1OriginHash = bytes32(uint256(1)); // Fake hash
-
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
-        bytes memory signature = abi.encodePacked(r, s, v);
-
-        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, signature);
-
-        vm.expectRevert(abi.encodeWithSelector(TEEVerifier.L1OriginTooOld.selector, l1OriginNumber, block.number));
-        verifier.verify(proofBytes, IMAGE_ID, journal);
-    }
-
-    function testVerifyFailsWithL1OriginHashMismatch() public {
-        bytes32 journal = keccak256("test-journal");
-
-        uint256 l1OriginNumber = block.number - 1;
-        bytes32 wrongHash = bytes32(uint256(0xdeadbeef)); // Wrong hash
-
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
-        bytes memory signature = abi.encodePacked(r, s, v);
-
-        bytes memory proofBytes = abi.encodePacked(PROPOSER, wrongHash, l1OriginNumber, signature);
-
-        bytes32 actualHash = blockhash(l1OriginNumber);
-        vm.expectRevert(abi.encodeWithSelector(TEEVerifier.L1OriginHashMismatch.selector, wrongHash, actualHash));
-        verifier.verify(proofBytes, IMAGE_ID, journal);
-    }
-
     function testVerifyFailsWithInvalidProofFormat() public {
         bytes32 journal = keccak256("test-journal");
 
@@ -215,54 +164,7 @@ contract TEEVerifierTest is Test {
         verifier.verify(shortProof, IMAGE_ID, journal);
     }
 
-    function testVerifyWithBlockhashWindow() public {
-        // Test verification within the 256 block window
-        vm.roll(block.number + 100);
-
-        bytes32 journal = keccak256("test-journal");
-
-        // Use a block that's within the 256 block window
-        uint256 l1OriginNumber = block.number - 50;
-        bytes32 l1OriginHash = blockhash(l1OriginNumber);
-
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
-        bytes memory signature = abi.encodePacked(r, s, v);
-
-        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, signature);
-
-        bool result = verifier.verify(proofBytes, IMAGE_ID, journal);
-        assertTrue(result);
-    }
-
-    function testVerifyWithEIP2935Window() public {
-        // Roll forward past the 256 blockhash window
-        vm.roll(block.number + 300);
-
-        bytes32 journal = keccak256("test-journal");
-
-        // Use a block that's outside blockhash window but within EIP-2935 window
-        uint256 l1OriginNumber = block.number - 260; // 260 > 256, so blockhash() returns 0
-        bytes32 expectedHash = keccak256(abi.encodePacked("mock-blockhash", l1OriginNumber));
-
-        // Mock the EIP-2935 contract response
-        vm.mockCall(
-            verifier.EIP2935_CONTRACT(),
-            abi.encode(l1OriginNumber), // raw 32-byte calldata
-            abi.encode(expectedHash) // returns the blockhash
-        );
-
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
-        bytes memory signature = abi.encodePacked(r, s, v);
-        bytes memory proofBytes = abi.encodePacked(PROPOSER, expectedHash, l1OriginNumber, signature);
-
-        bool result = verifier.verify(proofBytes, IMAGE_ID, journal);
-        assertTrue(result);
-    }
-
     function testConstants() public view {
-        assertEq(verifier.EIP2935_CONTRACT(), 0x0000F90827F1C53a10cb7A02335B175320002935);
-        assertEq(verifier.BLOCKHASH_WINDOW(), 256);
-        assertEq(verifier.EIP2935_WINDOW(), 8191);
         assertEq(address(verifier.SYSTEM_CONFIG_GLOBAL()), address(systemConfigGlobal));
     }
 }

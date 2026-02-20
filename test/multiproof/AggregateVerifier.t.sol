@@ -14,11 +14,10 @@ contract AggregateVerifierTest is BaseTest {
     function testInitializeWithTEEProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory proof = _generateProof("tee-proof");
+        bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
 
-        AggregateVerifier game = _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.TEE
-        );
+        AggregateVerifier game =
+            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof);
 
         assertEq(game.wasRespectedGameTypeWhenCreated(), true);
         assertEq(address(game.teeProver()), TEE_PROVER);
@@ -29,7 +28,9 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(game.parentIndex(), type(uint32).max);
         assertEq(game.gameType().raw(), AGGREGATE_VERIFIER_GAME_TYPE.raw());
         assertEq(game.gameCreator(), TEE_PROVER);
-        assertEq(game.extraData(), abi.encodePacked(currentL2BlockNumber, type(uint32).max));
+        assertEq(
+            game.extraData(), abi.encodePacked(currentL2BlockNumber, type(uint32).max, game.intermediateOutputRoots())
+        );
         assertEq(game.bondRecipient(), address(0));
         assertEq(anchorStateRegistry.isGameProper(IDisputeGame(address(game))), true);
         assertEq(delayedWETH.balanceOf(address(game)), INIT_BOND);
@@ -38,11 +39,10 @@ contract AggregateVerifierTest is BaseTest {
     function testInitializeWithZKProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory proof = _generateProof("zk-proof");
+        bytes memory proof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
 
-        AggregateVerifier game = _createAggregateVerifierGame(
-            ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.ZK
-        );
+        AggregateVerifier game =
+            _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof);
 
         assertEq(game.wasRespectedGameTypeWhenCreated(), true);
         assertEq(address(game.teeProver()), address(0));
@@ -53,7 +53,9 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(game.parentIndex(), type(uint32).max);
         assertEq(game.gameType().raw(), AGGREGATE_VERIFIER_GAME_TYPE.raw());
         assertEq(game.gameCreator(), ZK_PROVER);
-        assertEq(game.extraData(), abi.encodePacked(currentL2BlockNumber, type(uint32).max));
+        assertEq(
+            game.extraData(), abi.encodePacked(currentL2BlockNumber, type(uint32).max, game.intermediateOutputRoots())
+        );
         assertEq(game.bondRecipient(), ZK_PROVER);
         assertEq(anchorStateRegistry.isGameProper(IDisputeGame(address(game))), true);
         assertEq(delayedWETH.balanceOf(address(game)), INIT_BOND);
@@ -75,11 +77,10 @@ contract AggregateVerifierTest is BaseTest {
     function testUpdatingAnchorStateRegistryWithTEEProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory proof = _generateProof("tee-proof");
+        bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
 
-        AggregateVerifier game = _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.TEE
-        );
+        AggregateVerifier game =
+            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof);
 
         // Cannot claim bond before resolving
         vm.expectRevert(AggregateVerifier.BondRecipientEmpty.selector);
@@ -109,11 +110,10 @@ contract AggregateVerifierTest is BaseTest {
     function testUpdatingAnchorStateRegistryWithZKProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory proof = _generateProof("zk-proof");
+        bytes memory proof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
 
-        AggregateVerifier game = _createAggregateVerifierGame(
-            ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof, AggregateVerifier.ProofType.ZK
-        );
+        AggregateVerifier game =
+            _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof);
 
         // Unlock and reclaim bond after delay
         uint256 balanceBefore = game.gameCreator().balance;
@@ -139,14 +139,13 @@ contract AggregateVerifierTest is BaseTest {
     function testUpdatingAnchorStateRegistryWithBothProofs() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory teeProof = _generateProof("tee-proof");
-        bytes memory zkProof = _generateProof("zk-proof");
+        bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
+        bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
 
-        AggregateVerifier game = _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof, AggregateVerifier.ProofType.TEE
-        );
+        AggregateVerifier game =
+            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof);
 
-        _provideProof(game, ZK_PROVER, AggregateVerifier.ProofType.ZK, zkProof);
+        _provideProof(game, ZK_PROVER, zkProof);
 
         // Unlock bond
         uint256 balanceBefore = game.gameCreator().balance;
@@ -174,12 +173,11 @@ contract AggregateVerifierTest is BaseTest {
     function testProofCannotIncreaseExpectedResolution() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory teeProof = _generateProof("tee-proof");
-        bytes memory zkProof = _generateProof("zk-proof");
+        bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
+        bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
 
-        AggregateVerifier game = _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof, AggregateVerifier.ProofType.TEE
-        );
+        AggregateVerifier game =
+            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof);
 
         (,,, Timestamp originalExpectedResolution) = game.provingData();
         assertEq(originalExpectedResolution.raw(), block.timestamp + 7 days);
@@ -190,7 +188,7 @@ contract AggregateVerifierTest is BaseTest {
         game.resolve();
 
         // Provide ZK proof
-        _provideProof(game, ZK_PROVER, AggregateVerifier.ProofType.ZK, zkProof);
+        _provideProof(game, ZK_PROVER, zkProof);
 
         // Proof should not have increased expected resolution
         (,,, Timestamp expectedResolution) = game.provingData();
@@ -205,19 +203,102 @@ contract AggregateVerifierTest is BaseTest {
     function testCannotCreateSameProposal() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-        bytes memory teeProof = _generateProof("tee-proof");
-        bytes memory zkProof = _generateProof("zk-proof");
+        bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
+        bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
 
-        _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof, AggregateVerifier.ProofType.TEE
-        );
+        AggregateVerifier game =
+            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof);
 
         Hash uuid = factory.getGameUUID(
-            AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, abi.encodePacked(currentL2BlockNumber, type(uint32).max)
+            AGGREGATE_VERIFIER_GAME_TYPE,
+            rootClaim,
+            abi.encodePacked(currentL2BlockNumber, type(uint32).max, game.intermediateOutputRoots())
         );
         vm.expectRevert(abi.encodeWithSelector(IDisputeGameFactory.GameAlreadyExists.selector, uuid));
-        _createAggregateVerifierGame(
-            ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, zkProof, AggregateVerifier.ProofType.ZK
+        _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, zkProof);
+    }
+
+    function testVerifyFailsWithL1OriginInFuture() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        // Use a future block number
+        uint256 l1OriginNumber = block.number + 1;
+        bytes32 l1OriginHash = bytes32(uint256(1)); // Fake hash
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
+
+        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(AggregateVerifier.L1OriginInFuture.selector, l1OriginNumber, block.number)
         );
+        _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proofBytes);
+    }
+
+    function testVerifyFailsWithL1OriginTooOld() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+
+        // Roll forward many blocks to make old blocks unavailable
+        vm.roll(block.number + 300);
+
+        // Use a block number that's too old (outside both blockhash window and EIP-2935 window)
+        uint256 l1OriginNumber = 1;
+        bytes32 l1OriginHash = bytes32(uint256(1)); // Fake hash
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
+
+        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber);
+
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginTooOld.selector, l1OriginNumber, block.number));
+        _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proofBytes);
+    }
+
+    function testVerifyFailsWithL1OriginHashMismatch() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        uint256 l1OriginNumber = block.number - 1;
+        bytes32 wrongHash = bytes32(uint256(0xdeadbeef)); // Wrong hash
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
+
+        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), wrongHash, l1OriginNumber);
+
+        bytes32 actualHash = blockhash(l1OriginNumber);
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginHashMismatch.selector, wrongHash, actualHash));
+        _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proofBytes);
+    }
+
+    function testVerifyWithBlockhashWindow() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+
+        // Test verification within the 256 block window
+        vm.roll(block.number + 100);
+
+        // Use a block that's within the 256 block window
+        uint256 l1OriginNumber = block.number - 50;
+        bytes32 l1OriginHash = blockhash(l1OriginNumber);
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
+
+        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber);
+
+        _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proofBytes);
+    }
+
+    function testVerifyWithEIP2935Window() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+
+        // Roll forward past the 256 blockhash window
+        vm.roll(block.number + 300);
+
+        // Use a block that's outside blockhash window but within EIP-2935 window
+        uint256 l1OriginNumber = block.number - 260; // 260 > 256, so blockhash() returns 0
+        bytes32 expectedHash = keccak256(abi.encodePacked("mock-blockhash", l1OriginNumber));
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
+
+        // Mock the EIP-2935 contract response
+        vm.mockCall(
+            0x0000F90827F1C53a10cb7A02335B175320002935, // EIP-2935 contract address
+            abi.encode(l1OriginNumber), // raw 32-byte calldata
+            abi.encode(expectedHash) // returns the blockhash
+        );
+
+        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), expectedHash, l1OriginNumber);
+
+        _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proofBytes);
     }
 }
