@@ -364,23 +364,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             revert UnexpectedBlockNumber(startingOutputRoot.l2SequenceNumber + BLOCK_INTERVAL, l2SequenceNumber());
         }
 
-        // Set the game as initialized.
-        initialized = true;
-
-        // Set the game's starting timestamp.
-        createdAt = Timestamp.wrap(uint64(block.timestamp));
-
-        // Set the game as respected if the game type is respected.
-        wasRespectedGameTypeWhenCreated =
-            GameType.unwrap(ANCHOR_STATE_REGISTRY.respectedGameType()) == GameType.unwrap(GAME_TYPE);
-
-        // Set expected resolution.
-        provingData.expectedResolution = Timestamp.wrap(type(uint64).max);
-
-        // Deposit the bond.
-        bondAmount = msg.value;
-        DELAYED_WETH.deposit{value: msg.value}();
-
         // Verify the proof.
         ProofType proofType = ProofType(uint8(proof[0]));
         _verifyProof(
@@ -397,6 +380,23 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         _updateProvingData(proofType, gameCreator());
 
         emit Proved(gameCreator(), proofType);
+        
+        // Set the game as initialized.
+        initialized = true;
+
+        // Set the game's starting timestamp.
+        createdAt = Timestamp.wrap(uint64(block.timestamp));
+
+        // Set the game as respected if the game type is respected.
+        wasRespectedGameTypeWhenCreated =
+            GameType.unwrap(ANCHOR_STATE_REGISTRY.respectedGameType()) == GameType.unwrap(GAME_TYPE);
+
+        // Set expected resolution.
+        provingData.expectedResolution = Timestamp.wrap(type(uint64).max);
+
+        // Deposit the bond.
+        bondAmount = msg.value;
+        DELAYED_WETH.deposit{value: msg.value}();
     }
 
     /// @notice Verifies a proof for the current game.
