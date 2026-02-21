@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
-import {FeeVault} from "lib/optimism/packages/contracts-bedrock/src/universal/FeeVault.sol";
+import {FeeVault} from "src/L2/FeeVault.sol";
+import { Types } from "src/libraries/Types.sol";
 
 contract FeeVaultRevert {
     address internal immutable _RECIPIENT;
@@ -14,8 +15,8 @@ contract FeeVaultRevert {
         return _RECIPIENT;
     }
 
-    function WITHDRAWAL_NETWORK() external pure returns (FeeVault.WithdrawalNetwork) {
-        return FeeVault.WithdrawalNetwork.L2;
+    function WITHDRAWAL_NETWORK() external pure returns (Types.WithdrawalNetwork) {
+        return Types.WithdrawalNetwork.L2;
     }
 
     function MIN_WITHDRAWAL_AMOUNT() external pure returns (uint256) {

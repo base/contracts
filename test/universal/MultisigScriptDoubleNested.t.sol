@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {Preinstalls} from "lib/optimism/packages/contracts-bedrock/src/libraries/Preinstalls.sol";
+import {Preinstalls} from "src/libraries/Preinstalls.sol";
 
 import {MultisigScript} from "script/universal/MultisigScript.sol";
 import {Simulation} from "script/universal/Simulation.sol";

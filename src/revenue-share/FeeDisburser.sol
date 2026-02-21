@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {L2StandardBridge} from "lib/optimism/packages/contracts-bedrock/src/L2/L2StandardBridge.sol";
-import {Predeploys} from "lib/optimism/packages/contracts-bedrock/src/libraries/Predeploys.sol";
-import {SafeCall} from "lib/optimism/packages/contracts-bedrock/src/libraries/SafeCall.sol";
-import {FeeVault} from "lib/optimism/packages/contracts-bedrock/src/universal/FeeVault.sol";
+import {IL2StandardBridge} from "interfaces/L2/IL2StandardBridge.sol";
+import {Predeploys} from "src/libraries/Predeploys.sol";
+import {SafeCall} from "src/libraries/SafeCall.sol";
+import {FeeVault} from "src/L2/FeeVault.sol";
+import { Types } from "src/libraries/Types.sol";
 
 /// @title FeeDisburser
 ///
@@ -159,7 +160,7 @@ contract FeeDisburser {
         );
 
         // Send remaining funds to L1 wallet on L1
-        L2StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE)).bridgeETHTo{value: address(this).balance}({
+        IL2StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE)).bridgeETHTo{value: address(this).balance}({
             _to: L1_WALLET, _minGasLimit: WITHDRAWAL_MIN_GAS, _extraData: bytes("")
         });
         emit FeesDisbursed({
@@ -179,7 +180,7 @@ contract FeeDisburser {
     /// @param feeVault The address of the FeeVault to withdraw from.
     function _feeVaultWithdrawal(address payable feeVault) internal {
         require(
-            FeeVault(feeVault).WITHDRAWAL_NETWORK() == FeeVault.WithdrawalNetwork.L2,
+            FeeVault(feeVault).WITHDRAWAL_NETWORK() == Types.WithdrawalNetwork.L2,
             "FeeDisburser: FeeVault must withdraw to L2"
         );
         require(

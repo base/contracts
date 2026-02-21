@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
 import {CBMulticall, Call, Call3, Call3Value, Result} from "src/utils/CBMulticall.sol";
 import {CommonTest} from "test/CommonTest.t.sol";
@@ -231,10 +231,6 @@ contract CBMulticallTest is CommonTest {
 
     function test_getCurrentBlockCoinbase() external view {
         assertEq(mc.getCurrentBlockCoinbase(), block.coinbase);
-    }
-
-    function test_getCurrentBlockDifficulty() external view {
-        assertEq(mc.getCurrentBlockDifficulty(), block.difficulty);
     }
 
     function test_getCurrentBlockGasLimit() external view {

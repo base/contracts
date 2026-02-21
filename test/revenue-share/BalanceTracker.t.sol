@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {Proxy} from "lib/optimism/packages/contracts-bedrock/src/universal/Proxy.sol";
+import {Proxy} from "src/universal/Proxy.sol";
 
 import {BalanceTracker} from "src/revenue-share/BalanceTracker.sol";
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
 contract MockReceiver {
     function bump(uint256 x) external pure returns (uint256) {

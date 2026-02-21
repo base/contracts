@@ -6,6 +6,7 @@ broadcast
 kout-proofs
 test/kontrol/logs
 out
+lib
 
 # Metrics
 coverage.out

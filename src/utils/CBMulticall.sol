@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
 import {ICBMulticall, Call, Call3, Call3Value, Result} from "./ICBMulticall.sol";
 
@@ -217,11 +217,6 @@ contract CBMulticall is ICBMulticall {
     /// @notice Returns the block coinbase
     function getCurrentBlockCoinbase() public view returns (address coinbase) {
         coinbase = block.coinbase;
-    }
-
-    /// @notice Returns the block difficulty
-    function getCurrentBlockDifficulty() public view returns (uint256 difficulty) {
-        difficulty = block.difficulty;
     }
 
     /// @notice Returns the block gas limit
