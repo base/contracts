@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 
-import { FeeDisburser } from "../src/FeeDisburser.sol";
-import { IFeeVault, Types } from "@eth-optimism-bedrock/interfaces/L2/IFeeVault.sol";
-import { Predeploys } from "@eth-optimism-bedrock/src/libraries/Predeploys.sol";
+import { FeeDisburser } from "src/revenue-share/FeeDisburser.sol";
+import { IFeeVault, Types } from "interfaces/L2/IFeeVault.sol";
+import { Predeploys } from "src/libraries/Predeploys.sol";
 
 /// @title FeeDisburserTest
 /// @notice Comprehensive unit and fuzz tests for the FeeDisburser contract
