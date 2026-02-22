@@ -182,7 +182,7 @@ contract AggregateVerifierTest is BaseTest {
         AggregateVerifier game =
             _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof);
 
-        (,,, Timestamp originalExpectedResolution) = game.provingData();
+        Timestamp originalExpectedResolution = game.expectedResolution();
         assertEq(originalExpectedResolution.raw(), block.timestamp + 7 days);
 
         vm.warp(block.timestamp + 7 days - 1);
@@ -194,7 +194,7 @@ contract AggregateVerifierTest is BaseTest {
         _provideProof(game, ZK_PROVER, zkProof);
 
         // Proof should not have increased expected resolution
-        (,,, Timestamp expectedResolution) = game.provingData();
+        Timestamp expectedResolution = game.expectedResolution();
         assertEq(expectedResolution.raw(), originalExpectedResolution.raw());
 
         // Resolve after 1 second
@@ -228,7 +228,7 @@ contract AggregateVerifierTest is BaseTest {
         bytes32 l1OriginHash = bytes32(uint256(1)); // Fake hash
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
 
-        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber);
+        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, rootClaim.raw());
 
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.L1OriginInFuture.selector, l1OriginNumber, block.number)
@@ -247,7 +247,7 @@ contract AggregateVerifierTest is BaseTest {
         bytes32 l1OriginHash = bytes32(uint256(1)); // Fake hash
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
 
-        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber);
+        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, rootClaim.raw());
 
         vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginTooOld.selector, l1OriginNumber, block.number));
         _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proofBytes);
@@ -259,7 +259,7 @@ contract AggregateVerifierTest is BaseTest {
         bytes32 wrongHash = bytes32(uint256(0xdeadbeef)); // Wrong hash
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
 
-        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), wrongHash, l1OriginNumber);
+        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), wrongHash, l1OriginNumber, rootClaim.raw());
 
         bytes32 actualHash = blockhash(l1OriginNumber);
         vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginHashMismatch.selector, wrongHash, actualHash));
@@ -277,7 +277,7 @@ contract AggregateVerifierTest is BaseTest {
         bytes32 l1OriginHash = blockhash(l1OriginNumber);
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
 
-        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber);
+        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, rootClaim.raw());
 
         _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proofBytes);
     }
@@ -300,7 +300,7 @@ contract AggregateVerifierTest is BaseTest {
             abi.encode(expectedHash) // returns the blockhash
         );
 
-        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), expectedHash, l1OriginNumber);
+        bytes memory proofBytes = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), expectedHash, l1OriginNumber, rootClaim.raw());
 
         _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proofBytes);
     }
