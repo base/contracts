@@ -17,8 +17,13 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, NitroValidator {
     using CborDecode for bytes;
     using LibCborElement for CborElement;
 
-    /// @notice Maximum age of an attestation document (60 minutes).
+    /// @notice Maximum age of an attestation document (60 minutes), in seconds.
     uint256 public constant MAX_AGE = 60 minutes;
+
+    /// @notice Conversion factor from milliseconds to seconds.
+    /// @dev AWS Nitro attestation timestamps are in milliseconds since epoch,
+    ///      but block.timestamp is in seconds.
+    uint256 private constant MS_PER_SECOND = 1000;
 
     /// @notice Mapping of valid PCR0s (enclave image hashes) attested from AWS Nitro.
     /// @dev Only attestations with a PCR0 in this mapping can register signers.
@@ -94,7 +99,8 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, NitroValidator {
         Ptrs memory ptrs = validateAttestation(attestationTbs, signature);
         bytes32 pcr0Hash = attestationTbs.keccak(ptrs.pcrs[0]);
         if (!validPCR0s[pcr0Hash]) revert InvalidPCR0();
-        if (ptrs.timestamp + MAX_AGE <= block.timestamp) revert AttestationTooOld();
+        // Convert attestation timestamp from milliseconds to seconds before comparing
+        if (ptrs.timestamp / MS_PER_SECOND + MAX_AGE <= block.timestamp) revert AttestationTooOld();
 
         // The publicKey is encoded in the form specified in section 4.3.6 of ANSI X9.62,
         // which is a 0x04 byte followed by the x and y coordinates of the public key.
