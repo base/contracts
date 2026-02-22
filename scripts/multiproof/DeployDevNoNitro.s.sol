@@ -122,6 +122,7 @@ contract DeployDevNoNitro is Script {
         vm.startBroadcast();
 
         _deployTEEContracts(cfg.owner);
+        _registerProposer(cfg.teeProposer);
         _deployInfrastructure(cfg);
         _deployAggregateVerifier(cfg);
 
@@ -164,6 +165,11 @@ contract DeployDevNoNitro is Script {
         // 3. TEEVerifier
         teeVerifier = address(new TEEVerifier(SystemConfigGlobal(systemConfigGlobalProxy)));
         console.log("TEEVerifier:", teeVerifier);
+    }
+
+    function _registerProposer(address teeProposer) internal {
+        SystemConfigGlobal(systemConfigGlobalProxy).setProposer(teeProposer, true);
+        console.log("Registered TEE proposer:", teeProposer);
     }
 
     function _deployInfrastructure(DeployConfig memory cfg) internal {
