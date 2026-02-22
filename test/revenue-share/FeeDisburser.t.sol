@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
+import { Test } from "forge-std/Test.sol";
+import { console } from "forge-std/console.sol";
 
-import {FeeDisburser} from "../src/FeeDisburser.sol";
-import {IFeeVault, Types} from "@eth-optimism-bedrock/interfaces/L2/IFeeVault.sol";
-import {Predeploys} from "@eth-optimism-bedrock/src/libraries/Predeploys.sol";
+import { FeeDisburser } from "../src/FeeDisburser.sol";
+import { IFeeVault, Types } from "@eth-optimism-bedrock/interfaces/L2/IFeeVault.sol";
+import { Predeploys } from "@eth-optimism-bedrock/src/libraries/Predeploys.sol";
 
 /// @title FeeDisburserTest
 /// @notice Comprehensive unit and fuzz tests for the FeeDisburser contract
@@ -49,7 +49,12 @@ contract FeeDisburserTest is Test {
     }
 
     /// @notice Helper to mock a FeeVault's view functions
-    function _mockFeeVault(address vault, address recipient, uint256 minWithdrawal, Types.WithdrawalNetwork network)
+    function _mockFeeVault(
+        address vault,
+        address recipient,
+        uint256 minWithdrawal,
+        Types.WithdrawalNetwork network
+    )
         internal
     {
         vm.mockCall(vault, abi.encodeWithSelector(IFeeVault.WITHDRAWAL_NETWORK.selector), abi.encode(network));
@@ -427,7 +432,7 @@ contract FeeDisburserTest is Test {
         emit FeesReceived(alice, amount);
 
         vm.prank(alice);
-        (bool success,) = address(feeDisburser).call{value: amount}("");
+        (bool success,) = address(feeDisburser).call{ value: amount }("");
         assertTrue(success);
 
         assertEq(address(feeDisburser).balance, amount);
@@ -441,7 +446,7 @@ contract FeeDisburserTest is Test {
         emit FeesReceived(Predeploys.SEQUENCER_FEE_WALLET, amount);
 
         vm.prank(Predeploys.SEQUENCER_FEE_WALLET);
-        (bool success,) = address(feeDisburser).call{value: amount}("");
+        (bool success,) = address(feeDisburser).call{ value: amount }("");
         assertTrue(success);
     }
 
@@ -453,7 +458,7 @@ contract FeeDisburserTest is Test {
         emit FeesReceived(Predeploys.BASE_FEE_VAULT, amount);
 
         vm.prank(Predeploys.BASE_FEE_VAULT);
-        (bool success,) = address(feeDisburser).call{value: amount}("");
+        (bool success,) = address(feeDisburser).call{ value: amount }("");
         assertTrue(success);
     }
 
@@ -465,7 +470,7 @@ contract FeeDisburserTest is Test {
         emit FeesReceived(Predeploys.L1_FEE_VAULT, amount);
 
         vm.prank(Predeploys.L1_FEE_VAULT);
-        (bool success,) = address(feeDisburser).call{value: amount}("");
+        (bool success,) = address(feeDisburser).call{ value: amount }("");
         assertTrue(success);
     }
 
@@ -474,7 +479,7 @@ contract FeeDisburserTest is Test {
         emit FeesReceived(alice, 0);
 
         vm.prank(alice);
-        (bool success,) = address(feeDisburser).call{value: 0}("");
+        (bool success,) = address(feeDisburser).call{ value: 0 }("");
         assertTrue(success);
     }
 
@@ -487,7 +492,7 @@ contract FeeDisburserTest is Test {
             vm.deal(alice, amount);
 
             vm.prank(alice);
-            (bool success,) = address(feeDisburser).call{value: amount}("");
+            (bool success,) = address(feeDisburser).call{ value: amount }("");
             assertTrue(success);
         }
 
@@ -606,7 +611,7 @@ contract FeeDisburserTest is Test {
         emit FeesReceived(_sender, _amount);
 
         vm.prank(_sender);
-        (bool success,) = address(feeDisburser).call{value: _amount}("");
+        (bool success,) = address(feeDisburser).call{ value: _amount }("");
         assertTrue(success);
 
         assertEq(address(feeDisburser).balance, _amount);

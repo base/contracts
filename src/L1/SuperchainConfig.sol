@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Interfaces
-import {ISemver} from "interfaces/universal/ISemver.sol";
+import { ISemver } from "interfaces/universal/ISemver.sol";
 
 /// @custom:proxied true
 /// @custom:audit none This contracts is not yet audited.
