@@ -188,7 +188,9 @@ contract SmartEscrow is AccessControlDefaultAdminRules {
             revert AddressIsZeroAddress();
         }
         if (start_ >= end_) revert StartTimeAfterEndTime({ startTimestamp: start_, endTimestamp: end_ });
-        if (cliffStart_ < start_) revert CliffStartTimeInvalid({ cliffStartTimestamp: cliffStart_, startTime: start_ });
+        if (cliffStart_ < start_) {
+            revert CliffStartTimeInvalid({ cliffStartTimestamp: cliffStart_, startTime: start_ });
+        }
         if (cliffStart_ >= end_) {
             revert CliffStartTimeAfterEndTime({ cliffStartTimestamp: cliffStart_, endTimestamp: end_ });
         }
