@@ -53,6 +53,9 @@ contract EOA_isSenderEOA_Test is EOA_TestInit {
         // Make sure that the private key is in the range of a valid secp256k1 private key.
         _privateKey = boundPrivateKey(_privateKey);
 
+        // Delegating to address(0) revokes the delegation per EIP-7702, so exclude it.
+        vm.assume(_7702Target != address(0));
+
         // Make sure that the sender is a 7702 EOA.
         address sender = vm.addr(_privateKey);
         vm.etch(sender, abi.encodePacked(hex"EF0100", _7702Target));
