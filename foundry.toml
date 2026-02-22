@@ -88,6 +88,9 @@ multiline_func_header='all'
 bracket_spacing=true
 wrap_comments=true
 
+[lint]
+lint_on_build = false
+
 ################################################################
 #                         PROFILE: CI                          #
 ################################################################
