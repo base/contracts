@@ -217,11 +217,13 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
 
         // Always try to upgrade the SuperchainConfig. Not always necessary but easier to do it
         // every time rather than adding or removing this code for each upgrade.
-        try DelegateCaller(superchainPAO).dcForward(
-            address(_opcm), abi.encodeCall(IOPContractsManager.upgradeSuperchainConfig, (superchainConfig))
-        ) {
-            // Great, the upgrade succeeded.
-        } catch (bytes memory reason) {
+        try DelegateCaller(superchainPAO)
+            .dcForward(
+                address(_opcm), abi.encodeCall(IOPContractsManager.upgradeSuperchainConfig, (superchainConfig))
+            ) {
+        // Great, the upgrade succeeded.
+        }
+        catch (bytes memory reason) {
             // Only acceptable revert reason is the SuperchainConfig already being up to date.
             assertTrue(
                 bytes4(reason)
@@ -239,9 +241,8 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         vm.etch(_delegateCaller, vm.getDeployedCode("test/mocks/Callers.sol:DelegateCaller"));
 
         // Upgrade the chain.
-        DelegateCaller(_delegateCaller).dcForward(
-            address(_opcm), abi.encodeCall(IOPContractsManager.upgrade, (opChains))
-        );
+        DelegateCaller(_delegateCaller)
+            .dcForward(address(_opcm), abi.encodeCall(IOPContractsManager.upgrade, (opChains)));
 
         // Reset the upgrader to the original code.
         vm.etch(_delegateCaller, upgraderCode);

@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {ICBMulticall, Call3Value} from "src/utils/ICBMulticall.sol";
-import {Test} from "forge-std/Test.sol";
-import {Vm} from "forge-std/Vm.sol";
-import {Preinstalls} from "src/libraries/Preinstalls.sol";
+import { ICBMulticall, Call3Value } from "src/utils/ICBMulticall.sol";
+import { Test } from "forge-std/Test.sol";
+import { Vm } from "forge-std/Vm.sol";
+import { Preinstalls } from "src/libraries/Preinstalls.sol";
 
-import {MultisigScriptDeposit} from "script/universal/MultisigScriptDeposit.sol";
-import {Simulation} from "script/universal/Simulation.sol";
-import {IGnosisSafe} from "script/universal/IGnosisSafe.sol";
+import { MultisigScriptDeposit } from "script/universal/MultisigScriptDeposit.sol";
+import { Simulation } from "script/universal/Simulation.sol";
+import { IGnosisSafe } from "script/universal/IGnosisSafe.sol";
 
-import {Counter} from "test/universal/Counter.sol";
+import { Counter } from "test/universal/Counter.sol";
 
 /// @notice Mock OptimismPortal for testing deposit transactions
 contract MockOptimismPortal {
@@ -24,7 +24,13 @@ contract MockOptimismPortal {
     bytes public lastData;
     uint256 public depositCount;
 
-    function depositTransaction(address _to, uint256 _value, uint64 _gasLimit, bool _isCreation, bytes memory _data)
+    function depositTransaction(
+        address _to,
+        uint256 _value,
+        uint64 _gasLimit,
+        bool _isCreation,
+        bytes memory _data
+    )
         external
         payable
     {
@@ -332,7 +338,7 @@ contract DefaultPortalTest is MultisigScriptDeposit {
         return new Call3Value[](0);
     }
 
-    function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal pure override {}
+    function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal pure override { }
 
     /// @notice Expose _optimismPortal() for testing
     function getOptimismPortal() external view returns (address) {

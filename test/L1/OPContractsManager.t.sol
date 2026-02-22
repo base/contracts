@@ -151,9 +151,7 @@ contract OPContractsManager_Upgrade_Harness is CommonTest, DisputeGames {
 
         opChainConfigs.push(
             IOPContractsManager.OpChainConfig({
-                systemConfigProxy: systemConfig,
-                cannonPrestate: cannonPrestate,
-                cannonKonaPrestate: cannonKonaPrestate
+                systemConfigProxy: systemConfig, cannonPrestate: cannonPrestate, cannonKonaPrestate: cannonKonaPrestate
             })
         );
 
@@ -173,8 +171,8 @@ contract OPContractsManager_Upgrade_Harness is CommonTest, DisputeGames {
             cannonAbsolutePrestate: IFaultDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.CANNON)))
                 .absolutePrestate(),
             permissionedAbsolutePrestate: IPermissionedDisputeGame(
-                address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON))
-            ).absolutePrestate(),
+                    address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON))
+                ).absolutePrestate(),
             permissionlessWethProxy: delayedWeth,
             permissionedCannonWethProxy: delayedWETHPermissionedGameProxy
         });
@@ -217,11 +215,13 @@ contract OPContractsManager_Upgrade_Harness is CommonTest, DisputeGames {
 
         // Execute the SuperchainConfig upgrade.
         // nosemgrep: sol-safety-trycatch-eip150
-        try DelegateCaller(superchainPAO).dcForward(
-            address(_opcm), abi.encodeCall(IOPContractsManager.upgradeSuperchainConfig, (superchainConfig))
-        ) {
-            // Great, the upgrade succeeded.
-        } catch (bytes memory reason) {
+        try DelegateCaller(superchainPAO)
+            .dcForward(
+                address(_opcm), abi.encodeCall(IOPContractsManager.upgradeSuperchainConfig, (superchainConfig))
+            ) {
+        // Great, the upgrade succeeded.
+        }
+        catch (bytes memory reason) {
             // Only acceptable revert reason is the SuperchainConfig already being up to date. This
             // try/catch is better than checking the version via the implementations struct because
             // the implementations struct interface can change between OPCM versions which would
@@ -246,9 +246,8 @@ contract OPContractsManager_Upgrade_Harness is CommonTest, DisputeGames {
         }
 
         // Execute the chain upgrade.
-        DelegateCaller(_delegateCaller).dcForward(
-            address(_opcm), abi.encodeCall(IOPContractsManager.upgrade, (opChainConfigs))
-        );
+        DelegateCaller(_delegateCaller)
+            .dcForward(address(_opcm), abi.encodeCall(IOPContractsManager.upgrade, (opChainConfigs)));
 
         // Return early if a revert was expected. Otherwise we'll get errors below.
         if (_revertBytes.length > 0) {
@@ -278,10 +277,9 @@ contract OPContractsManager_Upgrade_Harness is CommonTest, DisputeGames {
 
         // Create validationOverrides
         IOPContractsManagerStandardValidator.ValidationOverrides memory validationOverrides =
-        IOPContractsManagerStandardValidator.ValidationOverrides({
-            l1PAOMultisig: opChainConfigs[0].systemConfigProxy.proxyAdmin().owner(),
-            challenger: initialChallenger
-        });
+            IOPContractsManagerStandardValidator.ValidationOverrides({
+                l1PAOMultisig: opChainConfigs[0].systemConfigProxy.proxyAdmin().owner(), challenger: initialChallenger
+            });
 
         // Grab the validator before we do the error assertion because otherwise the assertion will
         // try to apply to this function call instead.
@@ -780,10 +778,11 @@ contract OPContractsManager_AddGameType_Test is OPContractsManager_TestInit {
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxy.__constructor__, (address(this))))
             })
         );
-        IProxy(payable(address(delayedWETH))).upgradeToAndCall(
-            address(opcm.implementations().delayedWETHImpl),
-            abi.encodeCall(IDelayedWETH.initialize, (chainDeployOutput1.systemConfigProxy))
-        );
+        IProxy(payable(address(delayedWETH)))
+            .upgradeToAndCall(
+                address(opcm.implementations().delayedWETHImpl),
+                abi.encodeCall(IDelayedWETH.initialize, (chainDeployOutput1.systemConfigProxy))
+            );
         IOPContractsManager.AddGameInput memory input = newGameInputFactory(GameTypes.CANNON);
         input.delayedWETH = delayedWETH;
         IOPContractsManager.AddGameOutput memory output = addGameType(input);
@@ -845,11 +844,9 @@ contract OPContractsManager_AddGameType_Test is OPContractsManager_TestInit {
         Claim claim = Claim.wrap(bytes32(uint256(9876)));
         uint256 l2SequenceNumber = uint256(123);
         IFaultDisputeGame game = IFaultDisputeGame(
-            payable(
-                createGame(
+            payable(createGame(
                     chainDeployOutput1.disputeGameFactoryProxy, agi.disputeGameType, proposer, claim, l2SequenceNumber
-                )
-            )
+                ))
         );
 
         // Verify immutable fields on the game proxy
@@ -1007,9 +1004,8 @@ contract OPContractsManager_UpdatePrestate_Test is OPContractsManager_TestInit {
             IDisputeGameFactory(chainDeployOutput1.systemConfigProxy.disputeGameFactory()).gameImpls(GameTypes.CANNON)
         ) != address(0);
         bool expectCannonKonaUpdated = address(
-            IDisputeGameFactory(chainDeployOutput1.systemConfigProxy.disputeGameFactory()).gameImpls(
-                GameTypes.CANNON_KONA
-            )
+            IDisputeGameFactory(chainDeployOutput1.systemConfigProxy.disputeGameFactory())
+                .gameImpls(GameTypes.CANNON_KONA)
         ) != address(0);
 
         // Retrieve current game args before updatePrestate
@@ -1036,9 +1032,8 @@ contract OPContractsManager_UpdatePrestate_Test is OPContractsManager_TestInit {
         }
 
         // Trigger the updatePrestate function.
-        DelegateCaller(proxyAdminOwner).dcForward(
-            address(prestateUpdater), abi.encodeCall(IOPContractsManager.updatePrestate, (inputs))
-        );
+        DelegateCaller(proxyAdminOwner)
+            .dcForward(address(prestateUpdater), abi.encodeCall(IOPContractsManager.updatePrestate, (inputs)));
 
         // Return early if a revert was expected. Otherwise we'll get errors below.
         if (_revertBytes.length > 0) {
@@ -1149,9 +1144,8 @@ contract OPContractsManager_UpdatePrestate_Test is OPContractsManager_TestInit {
         // Clear out the PermissionedDisputeGame implementation.
         address owner = chainDeployOutput1.disputeGameFactoryProxy.owner();
         vm.prank(owner);
-        chainDeployOutput1.disputeGameFactoryProxy.setImplementation(
-            GameTypes.PERMISSIONED_CANNON, IDisputeGame(payable(address(0)))
-        );
+        chainDeployOutput1.disputeGameFactoryProxy
+            .setImplementation(GameTypes.PERMISSIONED_CANNON, IDisputeGame(payable(address(0))));
 
         // Create the input for the function call.
         Claim prestate = Claim.wrap(bytes32(hex"ABBA"));
@@ -1165,19 +1159,16 @@ contract OPContractsManager_UpdatePrestate_Test is OPContractsManager_TestInit {
         vm.etch(address(proxyAdminOwner), vm.getDeployedCode("test/mocks/Callers.sol:DelegateCaller"));
 
         // Trigger the updatePrestate function.
-        DelegateCaller(proxyAdminOwner).dcForward(
-            address(prestateUpdater), abi.encodeCall(IOPContractsManager.updatePrestate, (inputs))
-        );
+        DelegateCaller(proxyAdminOwner)
+            .dcForward(address(prestateUpdater), abi.encodeCall(IOPContractsManager.updatePrestate, (inputs)));
 
         LibGameArgs.GameArgs memory permissionedGameArgs = LibGameArgs.decode(
-            IDisputeGameFactory(chainDeployOutput1.systemConfigProxy.disputeGameFactory()).gameArgs(
-                GameTypes.SUPER_PERMISSIONED_CANNON
-            )
+            IDisputeGameFactory(chainDeployOutput1.systemConfigProxy.disputeGameFactory())
+                .gameArgs(GameTypes.SUPER_PERMISSIONED_CANNON)
         );
         LibGameArgs.GameArgs memory cannonGameArgs = LibGameArgs.decode(
-            IDisputeGameFactory(chainDeployOutput1.systemConfigProxy.disputeGameFactory()).gameArgs(
-                GameTypes.SUPER_CANNON
-            )
+            IDisputeGameFactory(chainDeployOutput1.systemConfigProxy.disputeGameFactory())
+                .gameArgs(GameTypes.SUPER_CANNON)
         );
 
         // Check the prestate values.
@@ -1274,9 +1265,8 @@ contract OPContractsManager_UpdatePrestate_Test is OPContractsManager_TestInit {
         // Clear out the PermissionedDisputeGame implementation.
         address owner = chainDeployOutput1.disputeGameFactoryProxy.owner();
         vm.prank(owner);
-        chainDeployOutput1.disputeGameFactoryProxy.setImplementation(
-            GameTypes.PERMISSIONED_CANNON, IDisputeGame(payable(address(0)))
-        );
+        chainDeployOutput1.disputeGameFactoryProxy
+            .setImplementation(GameTypes.PERMISSIONED_CANNON, IDisputeGame(payable(address(0))));
 
         // Create the input for the function call.
         Claim cannonPrestate = Claim.wrap(bytes32(hex"ABBA"));
@@ -1293,12 +1283,12 @@ contract OPContractsManager_UpdatePrestate_Test is OPContractsManager_TestInit {
         vm.etch(address(proxyAdminOwner), vm.getDeployedCode("test/mocks/Callers.sol:DelegateCaller"));
 
         // Trigger the updatePrestate function.
-        DelegateCaller(proxyAdminOwner).dcForward(
-            address(prestateUpdater), abi.encodeCall(IOPContractsManager.updatePrestate, (inputs))
-        );
+        DelegateCaller(proxyAdminOwner)
+            .dcForward(address(prestateUpdater), abi.encodeCall(IOPContractsManager.updatePrestate, (inputs)));
 
-        LibGameArgs.GameArgs memory permissionedGameArgs =
-            LibGameArgs.decode(chainDeployOutput1.disputeGameFactoryProxy.gameArgs(GameTypes.SUPER_PERMISSIONED_CANNON));
+        LibGameArgs.GameArgs memory permissionedGameArgs = LibGameArgs.decode(
+            chainDeployOutput1.disputeGameFactoryProxy.gameArgs(GameTypes.SUPER_PERMISSIONED_CANNON)
+        );
         LibGameArgs.GameArgs memory cannonGameArgs =
             LibGameArgs.decode(chainDeployOutput1.disputeGameFactoryProxy.gameArgs(GameTypes.SUPER_CANNON));
         LibGameArgs.GameArgs memory cannonKonaGameArgs =
@@ -1443,8 +1433,8 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
     function test_upgrade_absolutePrestateOverride_succeeds() public {
         // Get the pdg and fdg before the upgrade
         Claim pdgPrestateBefore = IPermissionedDisputeGame(
-            address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON))
-        ).absolutePrestate();
+                address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON))
+            ).absolutePrestate();
         Claim fdgPrestateBefore =
             IFaultDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.CANNON))).absolutePrestate();
 
@@ -1480,8 +1470,8 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
     function test_upgrade_absolutePrestateNotSet_succeeds() public {
         // Get the pdg and fdg before the upgrade
         Claim pdgPrestateBefore = IPermissionedDisputeGame(
-            address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON))
-        ).absolutePrestate();
+                address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON))
+            ).absolutePrestate();
         Claim fdgPrestateBefore =
             IFaultDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.CANNON))).absolutePrestate();
 
@@ -1514,8 +1504,8 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
     function test_upgrade_cannonPrestateNotSet_succeeds() public {
         // Get the pdg and fdg before the upgrade
         Claim pdgPrestateBefore = IPermissionedDisputeGame(
-            address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON))
-        ).absolutePrestate();
+                address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON))
+            ).absolutePrestate();
         Claim fdgPrestateBefore =
             IFaultDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.CANNON))).absolutePrestate();
 
@@ -1549,8 +1539,8 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
     function test_upgrade_cannonKonaPrestateNotSet_succeeds() public {
         // Get the pdg and fdg before the upgrade
         Claim pdgPrestateBefore = IPermissionedDisputeGame(
-            address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON))
-        ).absolutePrestate();
+                address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON))
+            ).absolutePrestate();
         Claim fdgPrestateBefore =
             IFaultDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.CANNON))).absolutePrestate();
 
@@ -1652,9 +1642,8 @@ contract OPContractsManager_UpgradeSuperchainConfig_Test is OPContractsManager_U
 
         vm.expectEmit(address(superchainConfig));
         emit Upgraded(impls.superchainConfigImpl);
-        DelegateCaller(superchainPAO).dcForward(
-            address(opcm), abi.encodeCall(IOPContractsManager.upgradeSuperchainConfig, (superchainConfig))
-        );
+        DelegateCaller(superchainPAO)
+            .dcForward(address(opcm), abi.encodeCall(IOPContractsManager.upgradeSuperchainConfig, (superchainConfig)));
     }
 
     /// @notice Tests that the upgradeSuperchainConfig function reverts when it is not called via delegatecall.
@@ -1677,9 +1666,8 @@ contract OPContractsManager_UpgradeSuperchainConfig_Test is OPContractsManager_U
         assertNotEq(proxyAdmin.owner(), delegateCaller);
 
         vm.expectRevert("Ownable: caller is not the owner");
-        DelegateCaller(delegateCaller).dcForward(
-            address(opcm), abi.encodeCall(IOPContractsManager.upgradeSuperchainConfig, (superchainConfig))
-        );
+        DelegateCaller(delegateCaller)
+            .dcForward(address(opcm), abi.encodeCall(IOPContractsManager.upgradeSuperchainConfig, (superchainConfig)));
     }
 
     /// @notice Tests that the upgradeSuperchainConfig function reverts when the superchainConfig version is the same or
@@ -1695,9 +1683,8 @@ contract OPContractsManager_UpgradeSuperchainConfig_Test is OPContractsManager_U
 
         // Try to upgrade the SuperchainConfig contract again, should fail.
         vm.expectRevert(IOPContractsManagerUpgrader.OPContractsManagerUpgrader_SuperchainConfigAlreadyUpToDate.selector);
-        DelegateCaller(upgrader).dcForward(
-            address(opcm), abi.encodeCall(IOPContractsManager.upgradeSuperchainConfig, (superchainConfig))
-        );
+        DelegateCaller(upgrader)
+            .dcForward(address(opcm), abi.encodeCall(IOPContractsManager.upgradeSuperchainConfig, (superchainConfig)));
     }
 }
 
@@ -1718,16 +1705,16 @@ contract OPContractsManager_Migrate_Test is OPContractsManager_TestInit {
 
     /// @notice Helper function to create the default migration input.
     function _getDefaultInput() internal view returns (IOPContractsManagerInteropMigrator.MigrateInput memory) {
-        IOPContractsManagerInteropMigrator.GameParameters memory gameParameters = IOPContractsManagerInteropMigrator
-            .GameParameters({
-            proposer: address(1234),
-            challenger: address(5678),
-            maxGameDepth: 73,
-            splitDepth: 30,
-            initBond: 1 ether,
-            clockExtension: Duration.wrap(10800),
-            maxClockDuration: Duration.wrap(302400)
-        });
+        IOPContractsManagerInteropMigrator.GameParameters memory gameParameters =
+            IOPContractsManagerInteropMigrator.GameParameters({
+                proposer: address(1234),
+                challenger: address(5678),
+                maxGameDepth: 73,
+                splitDepth: 30,
+                initBond: 1 ether,
+                clockExtension: Duration.wrap(10800),
+                maxClockDuration: Duration.wrap(302400)
+            });
 
         IOPContractsManager.OpChainConfig[] memory opChainConfigs = new IOPContractsManager.OpChainConfig[](2);
         opChainConfigs[0] = IOPContractsManager.OpChainConfig(
@@ -2289,15 +2276,13 @@ contract OPContractsManager_Deploy_Test is DeployOPChain_TestBase, DisputeGames 
         Claim claim = Claim.wrap(bytes32(uint256(9876)));
         uint256 l2BlockNumber = uint256(123);
         IPermissionedDisputeGame pdg = IPermissionedDisputeGame(
-            payable(
-                createGame(
+            payable(createGame(
                     opcmOutput.disputeGameFactoryProxy,
                     GameTypes.PERMISSIONED_CANNON,
                     opcmInput.roles.proposer,
                     claim,
                     l2BlockNumber
-                )
-            )
+                ))
         );
 
         // Verify immutable fields on the game proxy

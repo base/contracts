@@ -286,43 +286,43 @@ contract RISCV is IBigStepper {
             }
             function stateOffsetPreimageKey() -> out {
                 out := 32 // 0 + 32
-                    //                out := add(stateOffsetMemRoot(), stateSizeMemRoot())
+                //                out := add(stateOffsetMemRoot(), stateSizeMemRoot())
             }
             function stateOffsetPreimageOffset() -> out {
                 out := 64 // 32 + 32
-                    //                out := add(stateOffsetPreimageKey(), stateSizePreimageKey())
+                //                out := add(stateOffsetPreimageKey(), stateSizePreimageKey())
             }
             function stateOffsetPC() -> out {
                 out := 72 // 64 + 8
-                    //                out := add(stateOffsetPreimageOffset(), stateSizePreimageOffset())
+                //                out := add(stateOffsetPreimageOffset(), stateSizePreimageOffset())
             }
             function stateOffsetExitCode() -> out {
                 out := 80 // 72 + 8
-                    //                out := add(stateOffsetPC(), stateSizePC())
+                //                out := add(stateOffsetPC(), stateSizePC())
             }
             function stateOffsetExited() -> out {
                 out := 81 // 80 + 1
-                    //                out := add(stateOffsetExitCode(), stateSizeExitCode())
+                //                out := add(stateOffsetExitCode(), stateSizeExitCode())
             }
             function stateOffsetStep() -> out {
                 out := 82 // 81 + 1
-                    //                out := add(stateOffsetExited(), stateSizeExited())
+                //                out := add(stateOffsetExited(), stateSizeExited())
             }
             function stateOffsetHeap() -> out {
                 out := 90 // 82 + 8
-                    //                out := add(stateOffsetStep(), stateSizeStep())
+                //                out := add(stateOffsetStep(), stateSizeStep())
             }
             function stateOffsetLoadReservation() -> out {
                 out := 98 // 90 + 8
-                    //                out := add(stateOffsetHeap(), stateSizeHeap())
+                //                out := add(stateOffsetHeap(), stateSizeHeap())
             }
             function stateOffsetRegisters() -> out {
                 out := 106 // 98 + 8
-                    //                out := add(stateOffsetLoadReservation(), stateSizeLoadReservation())
+                //                out := add(stateOffsetLoadReservation(), stateSizeLoadReservation())
             }
             function stateSize() -> out {
                 out := 362 // 106 + 256
-                    //                out := add(stateOffsetRegisters(), stateSizeRegisters())
+                //                out := add(stateOffsetRegisters(), stateSizeRegisters())
             }
 
             //
@@ -505,28 +505,26 @@ contract RISCV is IBigStepper {
             }
 
             function parseImmTypeS(instr) -> out {
-                out :=
-                    signExtend64(
-                        or64(shl64(toU64(5), shr64(toU64(25), instr)), and64(shr64(toU64(7), instr), toU64(0x1F))),
-                        toU64(11)
-                    )
+                out := signExtend64(
+                    or64(shl64(toU64(5), shr64(toU64(25), instr)), and64(shr64(toU64(7), instr), toU64(0x1F))),
+                    toU64(11)
+                )
             }
 
             function parseImmTypeB(instr) -> out {
-                out :=
-                    signExtend64(
+                out := signExtend64(
+                    or64(
                         or64(
-                            or64(
-                                shl64(toU64(1), and64(shr64(toU64(8), instr), toU64(0xF))),
-                                shl64(toU64(5), and64(shr64(toU64(25), instr), toU64(0x3F)))
-                            ),
-                            or64(
-                                shl64(toU64(11), and64(shr64(toU64(7), instr), toU64(1))),
-                                shl64(toU64(12), shr64(toU64(31), instr))
-                            )
+                            shl64(toU64(1), and64(shr64(toU64(8), instr), toU64(0xF))),
+                            shl64(toU64(5), and64(shr64(toU64(25), instr), toU64(0x3F)))
                         ),
-                        toU64(12)
-                    )
+                        or64(
+                            shl64(toU64(11), and64(shr64(toU64(7), instr), toU64(1))),
+                            shl64(toU64(12), shr64(toU64(31), instr))
+                        )
+                    ),
+                    toU64(12)
+                )
             }
 
             function parseImmTypeU(instr) -> out {
@@ -534,20 +532,19 @@ contract RISCV is IBigStepper {
             }
 
             function parseImmTypeJ(instr) -> out {
-                out :=
-                    signExtend64(
+                out := signExtend64(
+                    or64(
                         or64(
-                            or64(
-                                and64(shr64(toU64(21), instr), shortToU64(0x3FF)), // 10 bits for index 0:9
-                                shl64(toU64(10), and64(shr64(toU64(20), instr), toU64(1))) // 1 bit for index 10
-                            ),
-                            or64(
-                                shl64(toU64(11), and64(shr64(toU64(12), instr), toU64(0xFF))), // 8 bits for index 11:18
-                                shl64(toU64(19), shr64(toU64(31), instr)) // 1 bit for index 19
-                            )
+                            and64(shr64(toU64(21), instr), shortToU64(0x3FF)), // 10 bits for index 0:9
+                            shl64(toU64(10), and64(shr64(toU64(20), instr), toU64(1))) // 1 bit for index 10
                         ),
-                        toU64(19)
-                    )
+                        or64(
+                            shl64(toU64(11), and64(shr64(toU64(12), instr), toU64(0xFF))), // 8 bits for index 11:18
+                            shl64(toU64(19), shr64(toU64(31), instr)) // 1 bit for index 19
+                        )
+                    ),
+                    toU64(19)
+                )
             }
 
             function parseOpcode(instr) -> out {
@@ -600,7 +597,7 @@ contract RISCV is IBigStepper {
 
                 let path := shr64(toU64(5), addr) // 32 bytes of memory per leaf
                 let node := leaf // starting from the leaf node, work back up by combining with siblings, to reconstruct
-                    // the root
+                // the root
                 for { let i := 0 } lt(i, sub(64, 5)) { i := add(i, 1) } {
                     let sibling := calldataload(offset)
                     offset := add64(offset, toU64(32))
@@ -626,7 +623,7 @@ contract RISCV is IBigStepper {
                 offset := add64(offset, toU64(32))
                 let path := shr64(toU64(5), addr) // 32 bytes of memory per leaf
                 let node := leaf // starting from the leaf node, work back up by combining with siblings, to reconstruct
-                    // the root
+                // the root
                 for { let i := 0 } lt(i, sub(64, 5)) { i := add(i, 1) } {
                     let sibling := calldataload(offset)
                     offset := add64(offset, toU64(32))
@@ -653,7 +650,7 @@ contract RISCV is IBigStepper {
                 if iszero64(eq64(leftAddr, rightAddr)) {
                     // if unaligned, use second proof for the right part
                     if eq(proofIndexR, 0xff) { revertWithCode(0xbad22220) } // unexpected need for right-side proof in
-                        // loadMem
+                    // loadMem
                     // load/verify right part
                     right := b32asBEWord(getMemoryB32(rightAddr, proofIndexR))
                     // left content is aligned to right of 32 bytes
@@ -745,7 +742,7 @@ contract RISCV is IBigStepper {
                 // if aligned: nothing more to do here
                 if eq64(leftAddr, rightAddr) { leave }
                 if eq(proofIndexR, 0xff) { revertWithCode(0xbad22221) } // unexpected need for right-side proof in
-                    // storeMem
+                // storeMem
                 // load the right base (with updated mem root)
                 let right := b32asBEWord(getMemoryB32(rightAddr, proofIndexR))
                 // apply the right patch
@@ -794,7 +791,7 @@ contract RISCV is IBigStepper {
                 let addr := sload(preimageOraclePos()) // calling Oracle.readPreimage(bytes32,uint256)
                 let memPtr := mload(0x40) // get pointer to free memory for preimage interactions
                 mstore(memPtr, shl(224, 0xe03110e1)) // (32-4)*8=224: right-pad the function selector, and then store it
-                    // as prefix
+                // as prefix
                 mstore(add(memPtr, 0x04), key)
                 mstore(add(memPtr, 0x24), offset)
                 let res := call(gas(), addr, 0, memPtr, 0x44, 0x00, 0x40) // output into scratch space
@@ -924,7 +921,7 @@ contract RISCV is IBigStepper {
                             setHeap(add64(prevHeap, length)) // increment heap with length
                         }
                         default {
-                            // allow hinted memory address (leave it in A0 as return argument)
+                        // allow hinted memory address (leave it in A0 as return argument)
                         }
                     }
 
@@ -1114,7 +1111,11 @@ contract RISCV is IBigStepper {
                         // first 8 bytes: soft limit. 1024 file handles max open
                         // second 8 bytes: hard limit
                         storeMemUnaligned(
-                            addr, toU64(16), or(shortToU256(1024), shl(toU256(64), shortToU256(1024))), 1, 2
+                            addr,
+                            toU64(16),
+                            or(shortToU256(1024), shl(toU256(64), shortToU256(1024))),
+                            1,
+                            2
                         )
                         setRegister(toU64(10), toU64(0))
                         setRegister(toU64(11), toU64(0))
@@ -1342,8 +1343,9 @@ contract RISCV is IBigStepper {
                     }
                     case 1 {
                         // 001 = MULH: upper bits of signed x signed
-                        rdValue :=
-                            u256ToU64(shr(toU256(64), mul(signExtend64To256(rs1Value), signExtend64To256(rs2Value))))
+                        rdValue := u256ToU64(
+                            shr(toU256(64), mul(signExtend64To256(rs1Value), signExtend64To256(rs2Value)))
+                        )
                     }
                     case 2 {
                         // 010 = MULHSU: upper bits of signed x unsigned
@@ -1397,7 +1399,7 @@ contract RISCV is IBigStepper {
                     case 1 {
                         // 001 = SLL
                         rdValue := shl64(and64(rs2Value, toU64(0x3F)), rs1Value) // only the low 6 bits are consider in
-                            // RV6VI
+                        // RV6VI
                     }
                     case 2 {
                         // 010 = SLT
@@ -1548,7 +1550,7 @@ contract RISCV is IBigStepper {
                     revertWithCode(0xbad10ad0) // target not aligned with 4 bytes
                 }
                 setPC(newPC) // signed offset in multiples of 2
-                    // bytes (last bit is there, but ignored)
+                // bytes (last bit is there, but ignored)
             }
             case 0x67 {
                 // 110_0111: JALR = Jump and link register

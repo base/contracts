@@ -176,8 +176,7 @@ contract InteropMigration is Script {
         IOPContractsManagerInteropMigrator.MigrateInput memory inputs = IOPContractsManagerInteropMigrator.MigrateInput({
             usePermissionlessGame: _imi.usePermissionlessGame(),
             startingAnchorRoot: Proposal({
-                root: Hash.wrap(_imi.startingAnchorRoot()),
-                l2SequenceNumber: _imi.startingAnchorL2SequenceNumber()
+                root: Hash.wrap(_imi.startingAnchorRoot()), l2SequenceNumber: _imi.startingAnchorL2SequenceNumber()
             }),
             gameParameters: IOPContractsManagerInteropMigrator.GameParameters({
                 proposer: _imi.proposer(),

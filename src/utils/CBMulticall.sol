@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {ICBMulticall, Call, Call3, Call3Value, Result} from "./ICBMulticall.sol";
+import { ICBMulticall, Call, Call3, Call3Value, Result } from "./ICBMulticall.sol";
 
 /// @title CBMulticall
 ///
@@ -46,7 +46,10 @@ contract CBMulticall is ICBMulticall {
     /// @param requireSuccess If true, require all calls to succeed
     /// @param calls An array of Call structs
     /// @return returnData An array of Result structs
-    function tryAggregate(bool requireSuccess, Call[] calldata calls)
+    function tryAggregate(
+        bool requireSuccess,
+        Call[] calldata calls
+    )
         public
         payable
         returns (Result[] memory returnData)
@@ -72,7 +75,10 @@ contract CBMulticall is ICBMulticall {
     /// @return blockNumber The block number where the calls were executed
     /// @return blockHash The hash of the block where the calls were executed
     /// @return returnData An array of Result structs
-    function tryBlockAndAggregate(bool requireSuccess, Call[] calldata calls)
+    function tryBlockAndAggregate(
+        bool requireSuccess,
+        Call[] calldata calls
+    )
         public
         payable
         returns (uint256 blockNumber, bytes32 blockHash, Result[] memory returnData)
@@ -180,7 +186,7 @@ contract CBMulticall is ICBMulticall {
             Result memory result;
             calli = calls[i];
             uint256 val = calli.value;
-            (result.success, result.returnData) = calli.target.call{value: val}(calli.callData);
+            (result.success, result.returnData) = calli.target.call{ value: val }(calli.callData);
             assembly {
                 // Revert if the call fails and failure is not allowed
                 // `allowFailure := calldataload(add(calli, 0x20))` and `success := mload(result)`

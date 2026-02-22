@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {FeeVault} from "src/L2/FeeVault.sol";
+import { FeeVault } from "src/L2/FeeVault.sol";
 import { Types } from "src/libraries/Types.sol";
 
 contract FeeVaultRevert {

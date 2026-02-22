@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {BaseSmartEscrowTest} from "test/smart-escrow/BaseSmartEscrow.t.sol";
+import { BaseSmartEscrowTest } from "test/smart-escrow/BaseSmartEscrow.t.sol";
 
 contract ResumeSmartEscrow is BaseSmartEscrowTest {
     function test_resume_succeeds() public {

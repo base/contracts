@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {BaseFeeVault} from "src/L2/BaseFeeVault.sol";
-import {L1FeeVault} from "src/L2/L1FeeVault.sol";
-import {SequencerFeeVault, FeeVault} from "src/L2/SequencerFeeVault.sol";
-import {Predeploys} from "src/libraries/Predeploys.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { Address } from "@openzeppelin/contracts/utils/Address.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { BaseFeeVault } from "src/L2/BaseFeeVault.sol";
+import { L1FeeVault } from "src/L2/L1FeeVault.sol";
+import { SequencerFeeVault, FeeVault } from "src/L2/SequencerFeeVault.sol";
+import { Predeploys } from "src/libraries/Predeploys.sol";
 
-import {FeeDisburser} from "src/revenue-share/FeeDisburser.sol";
+import { FeeDisburser } from "src/revenue-share/FeeDisburser.sol";
 
-import {FeeVaultRevert} from "test/revenue-share/mocks/FeeVaultRevert.sol";
-import {OptimismWalletRevert} from "test/revenue-share/mocks/OptimismWalletRevert.sol";
-import {CommonTest} from "test/CommonTest.t.sol";
+import { FeeVaultRevert } from "test/revenue-share/mocks/FeeVaultRevert.sol";
+import { OptimismWalletRevert } from "test/revenue-share/mocks/OptimismWalletRevert.sol";
+import { CommonTest } from "test/CommonTest.t.sol";
 import { Types } from "src/libraries/Types.sol";
 
 contract FeeDisburserTest is CommonTest {
@@ -76,10 +76,7 @@ contract FeeDisburserTest is CommonTest {
             Types.WithdrawalNetwork.L2
         );
         _initializeFeeVault(
-            Predeploys.L1_FEE_VAULT,
-            payable(address(feeDisburser)),
-            minimumWithdrawalAmount,
-            Types.WithdrawalNetwork.L2
+            Predeploys.L1_FEE_VAULT, payable(address(feeDisburser)), minimumWithdrawalAmount, Types.WithdrawalNetwork.L2
         );
     }
 
@@ -131,12 +128,7 @@ contract FeeDisburserTest is CommonTest {
     }
 
     function test_disburseFees_fail_feeVaultWithdrawalToAnotherAddress() external {
-        _initializeFeeVault(
-            Predeploys.SEQUENCER_FEE_WALLET,
-            admin,
-            minimumWithdrawalAmount,
-            Types.WithdrawalNetwork.L2
-        );
+        _initializeFeeVault(Predeploys.SEQUENCER_FEE_WALLET, admin, minimumWithdrawalAmount, Types.WithdrawalNetwork.L2);
 
         vm.expectRevert("FeeDisburser: FeeVault must withdraw to FeeDisburser contract");
         feeDisburser.disburseFees();
@@ -263,7 +255,9 @@ contract FeeDisburserTest is CommonTest {
         uint256 sequencerFeeVaultBalance,
         uint256 baseFeeVaultBalance,
         uint256 l1FeeVaultBalance
-    ) external {
+    )
+        external
+    {
         vm.assume(sequencerFeeVaultBalance < 10 ** 36);
         vm.assume(baseFeeVaultBalance < 10 ** 36);
         vm.assume(l1FeeVaultBalance < 10 ** 36);
@@ -306,7 +300,7 @@ contract FeeDisburserTest is CommonTest {
     function test_receive_fail_unauthorizedCaller() external {
         vm.expectRevert("FeeDisburser: Only FeeVaults can send ETH to FeeDisburser");
         vm.prank(alice);
-        (bool success,) = payable(address(feeDisburser)).call{value: NON_ZERO_VALUE}("");
+        (bool success,) = payable(address(feeDisburser)).call{ value: NON_ZERO_VALUE }("");
         assertTrue(success);
     }
 
@@ -351,7 +345,9 @@ contract FeeDisburserTest is CommonTest {
         address _recipient,
         uint256 _minWithdrawalAmount,
         Types.WithdrawalNetwork _withdrawalNetwork
-    ) internal {
+    )
+        internal
+    {
         vm.store(predeploy, INITIALIZABLE_STORAGE, bytes32(0));
         FeeVault(payable(predeploy)).initialize(_recipient, _minWithdrawalAmount, _withdrawalNetwork);
     }

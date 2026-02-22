@@ -88,7 +88,9 @@ contract DeployDisputeGame is Script {
                 DeployUtils.createDeterministic({
                     _name: "PermissionedDisputeGame",
                     _args: DeployUtils.encodeConstructor(
-                        abi.encodeCall(IPermissionedDisputeGame.__constructor__, (args, _input.proposer, _input.challenger))
+                        abi.encodeCall(
+                            IPermissionedDisputeGame.__constructor__, (args, _input.proposer, _input.challenger)
+                        )
                     ),
                     _salt: DeployUtils.DEFAULT_SALT
                 })
@@ -124,7 +126,9 @@ contract DeployDisputeGame is Script {
             impl = IPermissionedDisputeGame(
                 DeployUtils.createDeterministic({
                     _name: "PermissionedDisputeGameV2",
-                    _args: DeployUtils.encodeConstructor(abi.encodeCall(IPermissionedDisputeGameV2.__constructor__, (args))),
+                    _args: DeployUtils.encodeConstructor(
+                        abi.encodeCall(IPermissionedDisputeGameV2.__constructor__, (args))
+                    ),
                     _salt: DeployUtils.DEFAULT_SALT
                 })
             );

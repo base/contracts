@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {Test} from "forge-std/Test.sol";
-import {Vm} from "forge-std/Vm.sol";
-import {Preinstalls} from "src/libraries/Preinstalls.sol";
+import { Test } from "forge-std/Test.sol";
+import { Vm } from "forge-std/Vm.sol";
+import { Preinstalls } from "src/libraries/Preinstalls.sol";
 
-import {MultisigScript} from "script/universal/MultisigScript.sol";
-import {Simulation} from "script/universal/Simulation.sol";
-import {IGnosisSafe, Enum} from "script/universal/IGnosisSafe.sol";
+import { MultisigScript } from "script/universal/MultisigScript.sol";
+import { Simulation } from "script/universal/Simulation.sol";
+import { IGnosisSafe, Enum } from "script/universal/IGnosisSafe.sol";
 
-import {Counter} from "test/universal/Counter.sol";
+import { Counter } from "test/universal/Counter.sol";
 
 contract MultisigScriptDoubleNestedTest is Test, MultisigScript {
     Vm.Wallet internal wallet1 = vm.createWallet("1");
@@ -100,8 +100,8 @@ contract MultisigScriptDoubleNestedTest is Test, MultisigScript {
         safes[0] = signerSafe;
         safes[1] = safe3;
 
-        Call[] memory callsChain = _buildCallsChain({safes: _appendOwnerSafe(safes)});
-        dataToSign = _encodeTransactionData({safe: signerSafe, call: callsChain[0]});
+        Call[] memory callsChain = _buildCallsChain({ safes: _appendOwnerSafe(safes) });
+        dataToSign = _encodeTransactionData({ safe: signerSafe, call: callsChain[0] });
     }
 
     /// @notice Tests that sign() emits the correct data to sign for safe1

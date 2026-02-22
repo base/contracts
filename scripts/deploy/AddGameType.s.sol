@@ -104,10 +104,7 @@ contract AddGameType is Script {
 contract DummyCaller {
     address internal _opcmAddr;
 
-    function addGameType(IOPContractsManager.AddGameInput[] memory _gameConfigs)
-        external
-        returns (bool, bytes memory)
-    {
+    function addGameType(IOPContractsManager.AddGameInput[] memory _gameConfigs) external returns (bool, bytes memory) {
         bytes memory data = abi.encodeCall(DummyCaller.addGameType, _gameConfigs);
         (bool success, bytes memory result) = _opcmAddr.delegatecall(data);
         return (success, result);
