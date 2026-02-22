@@ -36,7 +36,7 @@ contract ChallengeTest is BaseTest {
 
         assertEq(uint8(game1.status()), uint8(GameStatus.CHALLENGER_WINS));
         assertEq(game1.bondRecipient(), ZK_PROVER);
-        (address counteredBy,,,) = game1.provingData();
+        address counteredBy = game1.counteredByGameAddress();
         assertEq(counteredBy, address(game2));
 
         // Retrieve bond after challenge
