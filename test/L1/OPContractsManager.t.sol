@@ -774,7 +774,7 @@ contract OPContractsManager_AddGameType_Test is OPContractsManager_TestInit {
     function test_addGameType_reusedDelayedWETH_succeeds() public {
         IDelayedWETH delayedWETH = IDelayedWETH(
             DeployUtils.create1({
-                _name: "Proxy",
+                _name: "src/universal/Proxy.sol:Proxy",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxy.__constructor__, (address(this))))
             })
         );

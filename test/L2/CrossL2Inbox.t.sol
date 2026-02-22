@@ -168,6 +168,7 @@ contract CrossL2Inbox_ValidateMessage_Test is CrossL2Inbox_TestInit {
         crossL2Inbox.validateMessage(_idOne, _messageHashOne);
 
         // Send the tx2 but without any access list and check that it reverts since the slot should not be warmed
+        vm.noAccessList();
         vm.expectRevert(ICrossL2Inbox.NotInAccessList.selector);
         crossL2Inbox.validateMessage(_idTwo, _messageHashTwo);
     }

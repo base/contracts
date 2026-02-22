@@ -14,7 +14,7 @@ contract SystemConfig_GasLimitBoundaries_Invariant is Test {
     function setUp() external {
         IProxy proxy = IProxy(
             DeployUtils.create1({
-                _name: "Proxy",
+                _name: "src/universal/Proxy.sol:Proxy",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxy.__constructor__, (msg.sender)))
             })
         );

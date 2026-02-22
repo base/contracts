@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
+import { IAccessControl } from "@openzeppelin/contracts-v5/access/IAccessControl.sol";
 
 import { SmartEscrow } from "src/smart-escrow/SmartEscrow.sol";
 
@@ -60,13 +60,6 @@ contract BaseSmartEscrowTest is CommonTest {
     }
 
     function accessControlErrorMessage(address account, bytes32 role) internal pure returns (bytes memory) {
-        return bytes(
-            abi.encodePacked(
-                "AccessControl: account ",
-                Strings.toHexString(account),
-                " is missing role ",
-                Strings.toHexString(uint256(role), 32)
-            )
-        );
+        return abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, account, role);
     }
 }

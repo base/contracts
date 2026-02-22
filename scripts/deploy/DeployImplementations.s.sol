@@ -226,7 +226,7 @@ contract DeployImplementations is Script {
         address checkAddress;
         (blueprints.addressManager, checkAddress) = DeployUtils.createDeterministicBlueprint(vm.getCode("AddressManager"), _salt);
         require(checkAddress == address(0), "OPCM-10");
-        (blueprints.proxy, checkAddress) = DeployUtils.createDeterministicBlueprint(vm.getCode("Proxy"), _salt);
+        (blueprints.proxy, checkAddress) = DeployUtils.createDeterministicBlueprint(vm.getCode("src/universal/Proxy.sol:Proxy"), _salt);
         require(checkAddress == address(0), "OPCM-20");
         (blueprints.proxyAdmin, checkAddress) = DeployUtils.createDeterministicBlueprint(vm.getCode("ProxyAdmin"), _salt);
         require(checkAddress == address(0), "OPCM-30");

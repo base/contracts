@@ -398,8 +398,8 @@ contract L1ERC721Bridge_Uncategorized_Test is L1ERC721Bridge_TestInit {
         vm.expectEmit(true, true, true, true);
         emit ERC721BridgeInitiated(address(localToken), address(remoteToken), alice, alice, tokenId, hex"5678");
 
-        // Set alice to have 7702 code.
-        vm.etch(alice, abi.encodePacked(hex"EF0100", address(0)));
+        // Set alice to have 7702 code (delegation target must be non-zero; address(0) is treated as revocation per EIP-7702).
+        vm.etch(alice, abi.encodePacked(hex"EF0100", address(1)));
 
         // Bridge the token.
         vm.prank(alice);

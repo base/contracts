@@ -136,7 +136,7 @@ contract DeploySuperchain is Script {
         vm.startBroadcast(msg.sender);
         ISuperchainConfig superchainConfigProxy = ISuperchainConfig(
             DeployUtils.create1({
-                _name: "Proxy",
+                _name: "src/universal/Proxy.sol:Proxy",
                 _args: DeployUtils.encodeConstructor(
                     abi.encodeCall(IProxy.__constructor__, (address(superchainProxyAdmin)))
                 )
@@ -164,7 +164,7 @@ contract DeploySuperchain is Script {
         vm.startBroadcast(msg.sender);
         IProtocolVersions protocolVersionsProxy = IProtocolVersions(
             DeployUtils.create1({
-                _name: "Proxy",
+                _name: "src/universal/Proxy.sol:Proxy",
                 _args: DeployUtils.encodeConstructor(
                     abi.encodeCall(IProxy.__constructor__, (address(superchainProxyAdmin)))
                 )

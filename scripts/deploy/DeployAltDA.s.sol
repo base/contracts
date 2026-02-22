@@ -39,7 +39,7 @@ contract DeployAltDA is Script {
         vm.broadcast(msg.sender);
         IDataAvailabilityChallenge proxy = IDataAvailabilityChallenge(
             DeployUtils.create2({
-                _name: "Proxy",
+                _name: "src/universal/Proxy.sol:Proxy",
                 _salt: salt,
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxy.__constructor__, (msg.sender)))
             })

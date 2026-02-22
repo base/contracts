@@ -403,7 +403,7 @@ library ChainAssertions {
         require(keccak256(addressManagerPreamble.initcode) == keccak256(vm.getCode("AddressManager")), "CHECK-OPCM-160");
 
         Blueprint.Preamble memory proxyPreamble = Blueprint.parseBlueprintPreamble(address(blueprints.proxy).code);
-        require(keccak256(proxyPreamble.initcode) == keccak256(vm.getCode("Proxy")), "CHECK-OPCM-170");
+        require(keccak256(proxyPreamble.initcode) == keccak256(vm.getCode("src/universal/Proxy.sol:Proxy")), "CHECK-OPCM-170");
 
         Blueprint.Preamble memory proxyAdminPreamble =
             Blueprint.parseBlueprintPreamble(address(blueprints.proxyAdmin).code);
