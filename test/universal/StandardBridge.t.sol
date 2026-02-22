@@ -117,7 +117,7 @@ contract StandardBridge_IsCorrectTokenPair_Test is StandardBridge_TestInit {
         assertTrue(legacy.l1Token() != address(0x20));
         assertFalse(bridge.isCorrectTokenPair(address(legacy), address(0x20)));
         // A token that doesn't support either modern or legacy interface will revert
-        vm.expectRevert(bytes(""));
+        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
         bridge.isCorrectTokenPair(address(erc20), address(1));
     }
 }

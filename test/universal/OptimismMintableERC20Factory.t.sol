@@ -149,7 +149,7 @@ contract OptimismMintableERC20Factory_CreateStandardL2Token_Test is OptimismMint
         l2OptimismMintableERC20Factory.createStandardL2Token(_remoteToken, _name, _symbol);
 
         // Arrange
-        vm.expectRevert(bytes(""));
+        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
 
         // Act
         vm.prank(_caller);
@@ -174,7 +174,7 @@ contract OptimismMintableERC20Factory_CreateStandardL2Token_Test is OptimismMint
         l2OptimismMintableERC20Factory.createOptimismMintableERC20WithDecimals(_remoteToken, _name, _symbol, _decimals);
 
         // Arrange
-        vm.expectRevert(bytes(""));
+        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
 
         // Act
         vm.prank(_caller);

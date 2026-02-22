@@ -82,7 +82,7 @@ contract OptimismMintableERC721Factory_CreateOptimismMintableERC721_Test is Opti
         vm.prank(alice);
         l2OptimismMintableERC721Factory.createOptimismMintableERC721(remote, "L2Token", "L2T");
 
-        vm.expectRevert(bytes(""));
+        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
 
         vm.prank(alice);
         l2OptimismMintableERC721Factory.createOptimismMintableERC721(remote, "L2Token", "L2T");

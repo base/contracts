@@ -60,7 +60,7 @@ contract Proxy_UpgradeTo_Test is Proxy_TestInit {
     function test_upgradeTo_notAdmin_succeeds() external {
         // The implementation does not have a `upgradeTo` method, calling `upgradeTo` not as the
         // owner should revert.
-        vm.expectRevert(bytes(""));
+        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
         proxy.upgradeTo(address(64));
 
         // Call `upgradeTo` as the owner, it should succeed and emit the `Upgraded` event.
@@ -153,7 +153,7 @@ contract Proxy_UpgradeToAndCall_Test is Proxy_TestInit {
         assertEq(impl, postImpl);
 
         // The attempt to `upgradeToAndCall` should revert when it is not called by the owner.
-        vm.expectRevert(bytes(""));
+        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
         proxy.upgradeToAndCall(address(simpleStorage), abi.encodeCall(simpleStorage.set, (1, 1)));
     }
 
@@ -198,7 +198,7 @@ contract Proxy_Admin_Test is Proxy_TestInit {
     function test_admin_notAdmin_succeeds() external {
         // Calling `changeAdmin` not as the owner should revert as the implementation does not have
         // a `changeAdmin` method.
-        vm.expectRevert(bytes(""));
+        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
         proxy.changeAdmin(address(1));
 
         // Call `changeAdmin` as the owner, it should succeed and emit the `AdminChanged` event.
@@ -209,7 +209,7 @@ contract Proxy_Admin_Test is Proxy_TestInit {
 
         // Calling `admin` not as the owner should revert as the implementation does not have a
         // `admin` method.
-        vm.expectRevert(bytes(""));
+        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
         proxy.admin();
 
         // Calling `admin` as the owner should work.
