@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 /// @title Recovery
 ///
@@ -32,7 +32,7 @@ contract Recovery is UUPSUpgradeable {
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address) internal view override onlyOwner {}
+    function _authorizeUpgrade(address) internal view override onlyOwner { }
 
     /// @notice Withdraw ETH from the contract.
     ///
@@ -42,7 +42,7 @@ contract Recovery is UUPSUpgradeable {
     /// @param amounts The amounts of ETH to send to each address.
     function withdrawETH(address[] calldata targets, uint256[] calldata amounts) public onlyOwner {
         for (uint256 i = 0; i < targets.length; i++) {
-            (bool success,) = targets[i].call{value: amounts[i]}("");
+            (bool success,) = targets[i].call{ value: amounts[i] }("");
             if (!success) continue;
         }
     }

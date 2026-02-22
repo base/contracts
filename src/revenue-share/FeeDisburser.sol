@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {L2StandardBridge} from "lib/optimism/packages/contracts-bedrock/src/L2/L2StandardBridge.sol";
-import {Predeploys} from "lib/optimism/packages/contracts-bedrock/src/libraries/Predeploys.sol";
-import {SafeCall} from "lib/optimism/packages/contracts-bedrock/src/libraries/SafeCall.sol";
-import {FeeVault} from "lib/optimism/packages/contracts-bedrock/src/universal/FeeVault.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { IL2StandardBridge } from "interfaces/L2/IL2StandardBridge.sol";
+import { Predeploys } from "src/libraries/Predeploys.sol";
+import { SafeCall } from "src/libraries/SafeCall.sol";
+import { FeeVault } from "src/L2/FeeVault.sol";
+import { Types } from "src/libraries/Types.sol";
 
 /// @title FeeDisburser
 ///
@@ -110,7 +111,7 @@ contract FeeDisburser {
         } else if (msg.sender != Predeploys.L1_FEE_VAULT) {
             revert("FeeDisburser: Only FeeVaults can send ETH to FeeDisburser");
         }
-        emit FeesReceived({sender: msg.sender, amount: msg.value});
+        emit FeesReceived({ sender: msg.sender, amount: msg.value });
     }
 
     /// @notice Withdraws funds from FeeVaults, sends Optimism their revenue share, and withdraws remaining funds to L1.
@@ -127,10 +128,10 @@ contract FeeDisburser {
         );
 
         // Sequencer and base FeeVaults will withdraw fees to the FeeDisburser contract mutating netFeeRevenue
-        _feeVaultWithdrawal({feeVault: payable(Predeploys.SEQUENCER_FEE_WALLET)});
-        _feeVaultWithdrawal({feeVault: payable(Predeploys.BASE_FEE_VAULT)});
+        _feeVaultWithdrawal({ feeVault: payable(Predeploys.SEQUENCER_FEE_WALLET) });
+        _feeVaultWithdrawal({ feeVault: payable(Predeploys.BASE_FEE_VAULT) });
 
-        _feeVaultWithdrawal({feeVault: payable(Predeploys.L1_FEE_VAULT)});
+        _feeVaultWithdrawal({ feeVault: payable(Predeploys.L1_FEE_VAULT) });
 
         // Gross revenue is the sum of all fees
         uint256 feeBalance = address(this).balance;
@@ -150,16 +151,16 @@ contract FeeDisburser {
         uint256 optimismGrossRevenueShare = feeBalance * OPTIMISM_GROSS_REVENUE_SHARE_BASIS_POINTS / BASIS_POINT_SCALE;
 
         // Optimism's revenue share is the maximum of net and gross revenue
-        uint256 optimismRevenueShare = Math.max({a: optimismNetRevenueShare, b: optimismGrossRevenueShare});
+        uint256 optimismRevenueShare = Math.max({ a: optimismNetRevenueShare, b: optimismGrossRevenueShare });
 
         // Send Optimism their revenue share on L2
         require(
-            SafeCall.send({_target: OPTIMISM_WALLET, _gas: gasleft(), _value: optimismRevenueShare}),
+            SafeCall.send({ _target: OPTIMISM_WALLET, _gas: gasleft(), _value: optimismRevenueShare }),
             "FeeDisburser: Failed to send funds to Optimism"
         );
 
         // Send remaining funds to L1 wallet on L1
-        L2StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE)).bridgeETHTo{value: address(this).balance}({
+        IL2StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE)).bridgeETHTo{ value: address(this).balance }({
             _to: L1_WALLET, _minGasLimit: WITHDRAWAL_MIN_GAS, _extraData: bytes("")
         });
         emit FeesDisbursed({
@@ -179,7 +180,7 @@ contract FeeDisburser {
     /// @param feeVault The address of the FeeVault to withdraw from.
     function _feeVaultWithdrawal(address payable feeVault) internal {
         require(
-            FeeVault(feeVault).WITHDRAWAL_NETWORK() == FeeVault.WithdrawalNetwork.L2,
+            FeeVault(feeVault).WITHDRAWAL_NETWORK() == Types.WithdrawalNetwork.L2,
             "FeeDisburser: FeeVault must withdraw to L2"
         );
         require(

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {Proxy} from "lib/optimism/packages/contracts-bedrock/src/universal/Proxy.sol";
+import { Proxy } from "src/universal/Proxy.sol";
 
-import {BalanceTracker} from "src/revenue-share/BalanceTracker.sol";
+import { BalanceTracker } from "src/revenue-share/BalanceTracker.sol";
 
-import {CommonTest} from "test/CommonTest.t.sol";
-import {ReenterProcessFees} from "test/revenue-share/mocks/ReenterProcessFees.sol";
+import { CommonTest } from "test/CommonTest.t.sol";
+import { ReenterProcessFees } from "test/revenue-share/mocks/ReenterProcessFees.sol";
 
 contract BalanceTrackerTest is CommonTest {
     event ProcessedFunds(
@@ -250,7 +250,7 @@ contract BalanceTrackerTest is CommonTest {
         vm.expectEmit(true, true, true, true, address(balanceTracker));
         emit ReceivedFunds(l1StandardBridge, NON_ZERO_VALUE);
 
-        (bool success,) = payable(address(balanceTracker)).call{value: NON_ZERO_VALUE}("");
+        (bool success,) = payable(address(balanceTracker)).call{ value: NON_ZERO_VALUE }("");
         assertTrue(success);
 
         assertEq(address(balanceTracker).balance, NON_ZERO_VALUE);

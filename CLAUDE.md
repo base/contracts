@@ -4,67 +4,100 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This repository contains Solidity smart contracts and deployment scripts for Base, an Ethereum L2 using Optimism's bedrock architecture. The codebase includes revenue sharing contracts, smart escrow functionality, fee vault fixes, multisig deployment utilities, and challenger contracts.
+Base contracts repository — an Optimism Bedrock-based L2 blockchain. Contains Solidity smart contracts for Base's L1 and L2 infrastructure, built on top of Optimism's contracts-bedrock (op-contracts/v6.0.0-rc.2). Uses Foundry (Forge) as the build/test framework.
 
-## Environment Setup
+## Build & Development Commands
 
-Before working with this codebase:
-1. Ensure you have an `.env` file with `OP_COMMIT` variable set (required for dependency management)
-2. Run `make deps` to install all dependencies including Optimism contracts at the specified commit
+All commands use `just` (justfile) unless noted. The Makefile handles initial setup only.
 
-## Common Commands
+### Setup
+```bash
+make install-foundry    # Install Foundry toolchain
+make deps               # Install all Solidity dependencies (forge install + manual clones)
+just build-go-ffi       # Build the Go FFI tool (required before running tests)
+```
 
-### Development Commands
-- `make deps` - Install all dependencies (foundry, OpenZeppelin, Optimism contracts)
-- `make test` - Run all tests with verbose output and FFI enabled
-- `forge build` - Build all contracts
-- `make bindings` - Generate Go bindings for BalanceTracker and FeeDisburser contracts
+### Building
+```bash
+just build              # Production build (runs lint-fix first, optimizer_runs=999999)
+just build-dev          # Fast dev build (FOUNDRY_PROFILE=lite, no optimization)
+just build-source       # Build src/ only (skip tests and scripts)
+```
 
-### Setup Commands
-- `make install-foundry` - Install Foundry toolkit (if not already installed)
-- `make clean-lib` - Clean lib directory
+### Testing
+```bash
+just test               # Run all tests (builds go-ffi first)
+just test-dev           # Fast dev tests (lite profile, 8 fuzz runs)
+just test -- --match-test "test_myFunction"        # Run a single test by name
+just test -- --match-contract "MyContract"          # Run tests in a specific contract
+just test -- --match-path "test/L1/*"               # Run tests matching a path
+just test-rerun         # Re-run only failed tests with verbose output
+just test-upgrade       # Fork tests against mainnet/sepolia (requires ETH_RPC_URL)
+just coverage           # Coverage report
+```
 
-## Architecture Overview
+### Linting & Formatting
+```bash
+just lint               # Format + check (forge fmt)
+just lint-check         # Check only (no auto-fix)
+forge fmt               # Direct format command
+```
+Line length: 120 chars. Multiline function headers: all params on separate lines.
 
-### Core Contract Categories
+### Pre-PR Workflow
+```bash
+just pre-pr             # Full workflow: build-dev, lint, build-source, all checks
+just pre-pr --clean     # Same but cleans build artifacts first
+just check              # Run all validation checks without building
+```
 
-1. **Revenue Share System** (`src/revenue-share/`)
-   - `BalanceTracker.sol` - Manages funding of system addresses and profit distribution
-   - `FeeDisburser.sol` - Handles fee disbursement logic
+### Snapshots & Semver
+```bash
+just snapshots          # Regenerate ABI/storage snapshots and semver-lock
+just snapshots-check    # Verify snapshots are up to date
+```
 
-2. **Smart Escrow** (`src/smart-escrow/`)
-   - `SmartEscrow.sol` - Vesting contract for OP token payments with termination capabilities
+## Architecture
 
-3. **Fee Vault Fixes** (`src/fee-vault-fixes/`)
-   - `FeeVault.sol` - Enhanced fee vault implementation
+### Contract Structure (src/)
+- **L1/**: Ethereum mainnet contracts — `OPContractsManager.sol` (central upgrade manager), `OptimismPortal2.sol` (proof finalization), `SystemConfig.sol`, `SuperchainConfig.sol`
+- **L2/**: L2 contracts — `L1Block.sol`, `L2StandardBridge.sol`, `CrossL2Inbox.sol`, `SuperchainERC20.sol`
+- **dispute/**: Fault proof game contracts with v1, v2, and zk variants
+- **cannon/**: Cannon VM contracts (MIPS-based fault proof execution)
+- **universal/**: Cross-chain utilities (bridges, messengers)
+- **libraries/**: Shared libraries — `Constants.sol`, `Predeploys.sol` (canonical L2 addresses), `Preinstalls.sol`
+- **periphery/**: Non-core contracts (drippie, faucet, monitoring)
+- **safe/**: Safe multisig extensions
+- **governance/**, **recovery/**, **revenue-share/**, **smart-escrow/**: Domain-specific contracts
 
-4. **Challenger System** (`src/`)
-   - `Challenger1of2.sol` - Deprecated 1-of-2 challenger contract (pre-fault proofs)
+### Interfaces (interfaces/)
+Separate directory for contract interfaces, mirroring the src/ structure. Go checks (`scripts/checks/interfaces`) validate that interfaces match their implementations.
 
-5. **Multisig Utilities** (`script/universal/`)
-   - Complete multisig deployment and management system with nested and double-nested capabilities
-   - Includes signature handling, simulation, and deployment scripts
+### Test Structure (test/)
+- Mirrors `src/` directory layout
+- `CommonTest.t.sol`: Base test class with standard accounts (alice, bob, admin, deployer)
+- `test/setup/Setup.sol`: Full system deployment setup using `Deploy.s.sol`
+- `test/setup/FeatureFlags.sol`: Development feature gating for tests
+- `test/mocks/`: 20+ mock contracts
+- `test/invariants/`: Property-based invariant tests
+- `test/kontrol/`: K framework formal verification proofs
+- FFI enabled: tests can call external programs via `scripts/go-ffi/`
 
-### Test Structure
-- Tests mirror the `src/` directory structure
-- Uses Foundry's testing framework with FFI enabled
-- Common test utilities in `test/CommonTest.t.sol`
-- Mock contracts available in `test/*/mocks/` directories
+### Deployment (scripts/)
+- `scripts/deploy/Deploy.s.sol`: Main deployment script
+- Input/Output pattern (`BaseDeployIO.sol`): Modular deployment composition
+- `deploy-config/`: JSON configs per network (mainnet.json, sepolia.json, hardhat.json)
+- `scripts/L2Genesis.s.sol`: L2 genesis state generation
 
-### Dependencies
-- Built on Foundry with Solidity 0.8.15
-- Uses OpenZeppelin contracts v4.9.3 for core functionality
-- Integrates with Optimism bedrock contracts (version specified by OP_COMMIT)
-- Includes Solmate and Solady for additional utilities
+## Key Patterns
 
-### Contract Deployment
-- L1 and L2 deployment scripts in `script/deploy/`
-- Test deployment scripts for both layers
-- Universal deployment utilities for cross-chain operations
+- **Proxy pattern**: EIP-1967 transparent proxies for upgradeability
+- **Compilation restrictions**: Dispute game contracts and OPContractsManager use 5000 optimizer runs (not 999999) due to size constraints. The `lite` profile mirrors these restrictions with 0 runs.
+- **Foundry profiles**: `default` (production), `lite` (dev), `ci` (128 fuzz runs), `ciheavy` (20000 fuzz runs)
+- **Semver tracking**: Contracts use semantic versioning tracked in `snapshots/semver-lock.json`
+- **Storage spacers**: Validated by `scripts/checks/spacers` to prevent storage layout conflicts in upgradeable contracts
+- **Solidity version**: 0.8.15 for main contracts, some use ^0.8.0
 
-## Important Notes
+## CI
 
-- This repository primarily extends Optimism's bedrock contracts rather than replacing them
-- The OP_COMMIT environment variable controls which version of Optimism contracts to use
-- Contracts use 999999 optimizer runs for maximum gas efficiency
-- All contracts target Solidity 0.8.15 for consistency
+GitHub Actions runs on PR: `forge fmt --check` → `make deps` → `forge build --sizes` → `forge test -vvv` with `FOUNDRY_PROFILE=ci`.

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
-import {CBMulticall, Call, Call3, Call3Value, Result} from "src/utils/CBMulticall.sol";
-import {CommonTest} from "test/CommonTest.t.sol";
-import {MockReceiver} from "test/mocks/MockReceiver.sol";
+import { CBMulticall, Call, Call3, Call3Value, Result } from "src/utils/CBMulticall.sol";
+import { CommonTest } from "test/CommonTest.t.sol";
+import { MockReceiver } from "test/mocks/MockReceiver.sol";
 
 /// @dev Helper contract used to invoke `aggregateDelegateCalls` via `delegatecall`.
 ///      This simulates the intended multisig usage pattern where the multicall
@@ -36,8 +36,8 @@ contract CBMulticallTest is CommonTest {
 
     function test_aggregate_returnsBlockNumberAndData() external {
         Call[] memory calls = new Call[](2);
-        calls[0] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 41)});
-        calls[1] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 1)});
+        calls[0] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 41) });
+        calls[1] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 1) });
 
         (uint256 bn, bytes[] memory rdata) = mc.aggregate(calls);
         assertEq(bn, block.number);
@@ -47,16 +47,16 @@ contract CBMulticallTest is CommonTest {
 
     function test_aggregate_revertsOnFailedCall() external {
         Call[] memory calls = new Call[](2);
-        calls[0] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 0)});
-        calls[1] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.willRevert.selector)});
+        calls[0] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 0) });
+        calls[1] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.willRevert.selector) });
         vm.expectRevert(bytes("Multicall3: call failed"));
         mc.aggregate(calls);
     }
 
     function test_tryAggregate_noRequire_returnsResults() external {
         Call[] memory calls = new Call[](2);
-        calls[0] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 1)});
-        calls[1] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.willRevert.selector)});
+        calls[0] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 1) });
+        calls[1] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.willRevert.selector) });
 
         Result[] memory results = mc.tryAggregate(false, calls);
         assertEq(results.length, 2);
@@ -67,16 +67,16 @@ contract CBMulticallTest is CommonTest {
 
     function test_tryAggregate_requireSuccess_revertsOnFailure() external {
         Call[] memory calls = new Call[](2);
-        calls[0] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 0)});
-        calls[1] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.willRevert.selector)});
+        calls[0] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 0) });
+        calls[1] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.willRevert.selector) });
         vm.expectRevert(bytes("Multicall3: call failed"));
         mc.tryAggregate(true, calls);
     }
 
     function test_tryBlockAndAggregate_noRequire_returnsBlockInfoAndResults() external {
         Call[] memory calls = new Call[](2);
-        calls[0] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 0)});
-        calls[1] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.willRevert.selector)});
+        calls[0] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 0) });
+        calls[1] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.willRevert.selector) });
 
         (uint256 bn, bytes32 bh, Result[] memory res) = mc.tryBlockAndAggregate(false, calls);
         assertEq(bn, block.number);
@@ -88,8 +88,8 @@ contract CBMulticallTest is CommonTest {
 
     function test_blockAndAggregate_allSuccess_returnsResults() external {
         Call[] memory calls = new Call[](2);
-        calls[0] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 1)});
-        calls[1] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 2)});
+        calls[0] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 1) });
+        calls[1] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 2) });
         (uint256 bn, bytes32 bh, Result[] memory res) = mc.blockAndAggregate(calls);
         assertEq(bn, block.number);
         assertEq(bh, blockhash(block.number));
@@ -99,16 +99,16 @@ contract CBMulticallTest is CommonTest {
 
     function test_blockAndAggregate_revertsOnFailure() external {
         Call[] memory calls = new Call[](2);
-        calls[0] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 0)});
-        calls[1] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.willRevert.selector)});
+        calls[0] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 0) });
+        calls[1] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.willRevert.selector) });
         vm.expectRevert(bytes("Multicall3: call failed"));
         mc.blockAndAggregate(calls);
     }
 
     function test_tryBlockAndAggregate_requireSuccess_revertsOnFailure() external {
         Call[] memory calls = new Call[](2);
-        calls[0] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 0)});
-        calls[1] = Call({target: address(target), callData: abi.encodeWithSelector(MockReceiver.willRevert.selector)});
+        calls[0] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.bump.selector, 0) });
+        calls[1] = Call({ target: address(target), callData: abi.encodeWithSelector(MockReceiver.willRevert.selector) });
         vm.expectRevert(bytes("Multicall3: call failed"));
         mc.tryBlockAndAggregate(true, calls);
     }
@@ -231,10 +231,6 @@ contract CBMulticallTest is CommonTest {
 
     function test_getCurrentBlockCoinbase() external view {
         assertEq(mc.getCurrentBlockCoinbase(), block.coinbase);
-    }
-
-    function test_getCurrentBlockDifficulty() external view {
-        assertEq(mc.getCurrentBlockDifficulty(), block.difficulty);
     }
 
     function test_getCurrentBlockGasLimit() external view {

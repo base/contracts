@@ -28,25 +28,29 @@ jobs:
         with:
           version: stable
 
-      - name: Show Forge version
-        run: |
-          forge --version
+      - name: Install Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: scripts/go-ffi/go.mod
+          cache-dependency-path: scripts/go-ffi/go.sum
 
-      - name: Run Forge fmt
-        run: |
-          forge fmt --check
-        id: fmt
+      - name: Install just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+
+      - name: Show Forge version
+        run: forge --version
 
       - name: Install dependencies
-        run: |
-          make deps
+        run: make deps
+
+      - name: Run Forge fmt check
+        run: just lint-check
+        id: fmt
 
       - name: Run Forge build
-        run: |
-          forge build --sizes
+        run: just forge-build
         id: build
 
       - name: Run Forge tests
-        run: |
-          forge test -vvv
+        run: just test
         id: test

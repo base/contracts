@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import { IAccessControl } from "@openzeppelin/contracts-v5/access/IAccessControl.sol";
 
-import {SmartEscrow} from "src/smart-escrow/SmartEscrow.sol";
+import { SmartEscrow } from "src/smart-escrow/SmartEscrow.sol";
 
-import {CommonTest} from "test/CommonTest.t.sol";
-import {MockERC20} from "test/MockERC20.t.sol";
+import { CommonTest } from "test/CommonTest.t.sol";
+import { MockERC20 } from "test/MockERC20.t.sol";
 
 contract BaseSmartEscrowTest is CommonTest {
     event Transfer(address indexed from, address indexed to, uint256 value);
@@ -60,13 +60,6 @@ contract BaseSmartEscrowTest is CommonTest {
     }
 
     function accessControlErrorMessage(address account, bytes32 role) internal pure returns (bytes memory) {
-        return bytes(
-            abi.encodePacked(
-                "AccessControl: account ",
-                Strings.toHexString(account),
-                " is missing role ",
-                Strings.toHexString(uint256(role), 32)
-            )
-        );
+        return abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, account, role);
     }
 }

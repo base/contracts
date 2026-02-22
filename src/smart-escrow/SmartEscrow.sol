@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
-import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {
+    AccessControlDefaultAdminRules
+} from "@openzeppelin/contracts-v5/access/extensions/AccessControlDefaultAdminRules.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title SmartEscrow contract
 ///
@@ -176,22 +178,26 @@ contract SmartEscrow is AccessControlDefaultAdminRules {
         uint256 vestingPeriodSeconds_,
         uint256 initialTokens_,
         uint256 vestingEventTokens_
-    ) AccessControlDefaultAdminRules(5 days, escrowOwner) {
+    )
+        AccessControlDefaultAdminRules(5 days, escrowOwner)
+    {
         if (
             benefactor_ == address(0) || beneficiary_ == address(0) || beneficiaryOwner == address(0)
                 || benefactorOwner == address(0)
         ) {
             revert AddressIsZeroAddress();
         }
-        if (start_ >= end_) revert StartTimeAfterEndTime({startTimestamp: start_, endTimestamp: end_});
-        if (cliffStart_ < start_) revert CliffStartTimeInvalid({cliffStartTimestamp: cliffStart_, startTime: start_});
+        if (start_ >= end_) revert StartTimeAfterEndTime({ startTimestamp: start_, endTimestamp: end_ });
+        if (cliffStart_ < start_) {
+            revert CliffStartTimeInvalid({ cliffStartTimestamp: cliffStart_, startTime: start_ });
+        }
         if (cliffStart_ >= end_) {
-            revert CliffStartTimeAfterEndTime({cliffStartTimestamp: cliffStart_, endTimestamp: end_});
+            revert CliffStartTimeAfterEndTime({ cliffStartTimestamp: cliffStart_, endTimestamp: end_ });
         }
         if (vestingPeriodSeconds_ == 0) revert VestingPeriodIsZeroSeconds();
         if (vestingEventTokens_ == 0) revert VestingEventTokensIsZero();
         if ((end_ - start_) < vestingPeriodSeconds_) {
-            revert VestingPeriodExceedsContractDuration({vestingPeriodSeconds: vestingPeriodSeconds_});
+            revert VestingPeriodExceedsContractDuration({ vestingPeriodSeconds: vestingPeriodSeconds_ });
         }
         if ((end_ - start_) % vestingPeriodSeconds_ != 0) {
             revert UnevenVestingPeriod({
@@ -208,10 +214,10 @@ contract SmartEscrow is AccessControlDefaultAdminRules {
         initialTokens = initialTokens_;
         vestingEventTokens = vestingEventTokens_;
 
-        _grantRole({role: BENEFACTOR_OWNER_ROLE, account: benefactorOwner});
-        _grantRole({role: TERMINATOR_ROLE, account: benefactorOwner});
-        _grantRole({role: BENEFICIARY_OWNER_ROLE, account: beneficiaryOwner});
-        _grantRole({role: TERMINATOR_ROLE, account: beneficiaryOwner});
+        _grantRole({ role: BENEFACTOR_OWNER_ROLE, account: benefactorOwner });
+        _grantRole({ role: TERMINATOR_ROLE, account: benefactorOwner });
+        _grantRole({ role: BENEFICIARY_OWNER_ROLE, account: beneficiaryOwner });
+        _grantRole({ role: TERMINATOR_ROLE, account: beneficiaryOwner });
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -247,7 +253,7 @@ contract SmartEscrow is AccessControlDefaultAdminRules {
         address oldBenefactor = benefactor;
         if (oldBenefactor != newBenefactor) {
             benefactor = newBenefactor;
-            emit BenefactorUpdated({oldBenefactor: oldBenefactor, newBenefactor: newBenefactor});
+            emit BenefactorUpdated({ oldBenefactor: oldBenefactor, newBenefactor: newBenefactor });
         }
     }
 
@@ -262,17 +268,17 @@ contract SmartEscrow is AccessControlDefaultAdminRules {
         address oldBeneficiary = beneficiary;
         if (oldBeneficiary != newBeneficiary) {
             beneficiary = newBeneficiary;
-            emit BeneficiaryUpdated({oldBeneficiary: oldBeneficiary, newBeneficiary: newBeneficiary});
+            emit BeneficiaryUpdated({ oldBeneficiary: oldBeneficiary, newBeneficiary: newBeneficiary });
         }
     }
 
     /// @notice Allow withdrawal of remaining tokens to benefactor address if contract is terminated.
     function withdrawUnvestedTokens() external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (!contractTerminated) revert ContractIsNotTerminated();
-        uint256 amount = OP_TOKEN.balanceOf({account: address(this)});
+        uint256 amount = OP_TOKEN.balanceOf({ account: address(this) });
         if (amount > 0) {
-            OP_TOKEN.transfer({to: benefactor, amount: amount});
-            emit TokensWithdrawn({benefactor: benefactor, amount: amount});
+            OP_TOKEN.transfer({ to: benefactor, amount: amount });
+            emit TokensWithdrawn({ benefactor: benefactor, amount: amount });
         }
     }
 
@@ -286,21 +292,21 @@ contract SmartEscrow is AccessControlDefaultAdminRules {
         uint256 amount = releasable();
         if (amount > 0) {
             released += amount;
-            OP_TOKEN.transfer({to: beneficiary, amount: amount});
-            emit TokensReleased({beneficiary: beneficiary, amount: amount});
+            OP_TOKEN.transfer({ to: beneficiary, amount: amount });
+            emit TokensReleased({ beneficiary: beneficiary, amount: amount });
         }
     }
 
     /// @notice Getter for the amount of releasable OP.
     function releasable() public view returns (uint256) {
-        return vestedAmount({timestamp: block.timestamp}) - released;
+        return vestedAmount({ timestamp: block.timestamp }) - released;
     }
 
     /// @notice Calculates the amount of OP that has already vested.
     ///
     /// @param timestamp The timestamp to at which to get the vested amount
     function vestedAmount(uint256 timestamp) public view returns (uint256) {
-        return _vestingSchedule({timestamp: timestamp});
+        return _vestingSchedule({ timestamp: timestamp });
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -314,7 +320,7 @@ contract SmartEscrow is AccessControlDefaultAdminRules {
         if (timestamp < cliffStart) {
             return 0;
         } else if (timestamp > end) {
-            return OP_TOKEN.balanceOf({account: address(this)}) + released;
+            return OP_TOKEN.balanceOf({ account: address(this) }) + released;
         } else {
             return initialTokens + ((timestamp - start) / vestingPeriod) * vestingEventTokens;
         }

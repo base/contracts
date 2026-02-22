@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
-import {Test} from "forge-std/Test.sol";
-import {Vm} from "forge-std/Vm.sol";
-import {Preinstalls} from "lib/optimism/packages/contracts-bedrock/src/libraries/Preinstalls.sol";
+import { Test } from "forge-std/Test.sol";
+import { Vm } from "forge-std/Vm.sol";
+import { Preinstalls } from "src/libraries/Preinstalls.sol";
 
-import {MultisigScript} from "script/universal/MultisigScript.sol";
-import {Simulation} from "script/universal/Simulation.sol";
-import {IGnosisSafe, Enum} from "script/universal/IGnosisSafe.sol";
+import { MultisigScript } from "script/universal/MultisigScript.sol";
+import { Simulation } from "script/universal/Simulation.sol";
+import { IGnosisSafe, Enum } from "script/universal/IGnosisSafe.sol";
 
-import {Counter} from "test/universal/Counter.sol";
-import {LibString} from "lib/solady/src/utils/LibString.sol";
+import { Counter } from "test/universal/Counter.sol";
+import { LibString } from "lib/solady/src/utils/LibString.sol";
 
-import {CBMulticall} from "src/utils/CBMulticall.sol";
+import { CBMulticall } from "src/utils/CBMulticall.sol";
 
 contract MultisigScriptTest is Test, MultisigScript {
     Vm.Wallet internal wallet1 = vm.createWallet("1");
@@ -142,7 +142,7 @@ contract MultisigScriptTest is Test, MultisigScript {
     ///
     /// @return The encoded transaction data that signers need to sign
     function _expectedTxDataForCurrentBuildCalls() internal view returns (bytes memory) {
-        return _encodeTransactionData(_ownerSafe(), _buildAggregatedScriptCall({scriptCalls: _buildCalls()}));
+        return _encodeTransactionData(_ownerSafe(), _buildAggregatedScriptCall({ scriptCalls: _buildCalls() }));
     }
 
     /// @notice Tests that sign() emits the correct data to sign

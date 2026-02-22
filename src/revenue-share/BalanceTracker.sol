@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import {SafeCall} from "lib/optimism/packages/contracts-bedrock/src/libraries/SafeCall.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import { SafeCall } from "src/libraries/SafeCall.sol";
 
 /// @title BalanceTracker
 ///
@@ -81,14 +83,17 @@ contract BalanceTracker is ReentrancyGuardUpgradeable {
     /// @notice Fallback function to receive funds from L2 fee withdrawals and additional top up funds if L2 fees are
     ///         insufficient to fund L1 system addresses.
     receive() external payable {
-        emit ReceivedFunds({sender: msg.sender, amount: msg.value});
+        emit ReceivedFunds({ sender: msg.sender, amount: msg.value });
     }
 
     /// @notice Initializes the BalanceTracker contract.
     ///
     /// @param systemAddresses_ The system addresses being funded.
     /// @param targetBalances_  The target balances for system addresses.
-    function initialize(address payable[] memory systemAddresses_, uint256[] memory targetBalances_)
+    function initialize(
+        address payable[] memory systemAddresses_,
+        uint256[] memory targetBalances_
+    )
         external
         reinitializer(2)
     {
@@ -122,7 +127,7 @@ contract BalanceTracker is ReentrancyGuardUpgradeable {
         require(systemAddressesLength > 0, "BalanceTracker: systemAddresses cannot have a length of zero");
         // Refills balances of systems addresses up to their target balances
         for (uint256 i; i < systemAddressesLength;) {
-            _refillBalanceIfNeeded({systemAddress: systemAddresses[i], targetBalance: targetBalances[i]});
+            _refillBalanceIfNeeded({ systemAddress: systemAddresses[i], targetBalance: targetBalances[i] });
             unchecked {
                 i++;
             }
@@ -130,8 +135,8 @@ contract BalanceTracker is ReentrancyGuardUpgradeable {
 
         // Send remaining profits to profit wallet
         uint256 valueToSend = address(this).balance;
-        bool success = SafeCall.send({_target: PROFIT_WALLET, _gas: gasleft(), _value: valueToSend});
-        emit SentProfit({profitWallet: PROFIT_WALLET, success: success, balanceSent: valueToSend});
+        bool success = SafeCall.send({ _target: PROFIT_WALLET, _gas: gasleft(), _value: valueToSend });
+        emit SentProfit({ profitWallet: PROFIT_WALLET, success: success, balanceSent: valueToSend });
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -145,7 +150,7 @@ contract BalanceTracker is ReentrancyGuardUpgradeable {
     function _refillBalanceIfNeeded(address systemAddress, uint256 targetBalance) internal {
         uint256 systemAddressBalance = systemAddress.balance;
         if (systemAddressBalance >= targetBalance) {
-            emit ProcessedFunds({systemAddress: systemAddress, success: false, balanceNeeded: 0, balanceSent: 0});
+            emit ProcessedFunds({ systemAddress: systemAddress, success: false, balanceNeeded: 0, balanceSent: 0 });
             return;
         }
 
@@ -153,7 +158,7 @@ contract BalanceTracker is ReentrancyGuardUpgradeable {
         uint256 balanceTrackerBalance = address(this).balance;
         uint256 valueToSend = valueNeeded > balanceTrackerBalance ? balanceTrackerBalance : valueNeeded;
 
-        bool success = SafeCall.send({_target: systemAddress, _gas: gasleft(), _value: valueToSend});
+        bool success = SafeCall.send({ _target: systemAddress, _gas: gasleft(), _value: valueToSend });
         emit ProcessedFunds({
             systemAddress: systemAddress, success: success, balanceNeeded: valueNeeded, balanceSent: valueToSend
         });

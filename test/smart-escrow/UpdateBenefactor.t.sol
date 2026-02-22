@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
-import {BaseSmartEscrowTest} from "test/smart-escrow/BaseSmartEscrow.t.sol";
+import { BaseSmartEscrowTest } from "test/smart-escrow/BaseSmartEscrow.t.sol";
 
 contract UpdateBenefactorSmartEscrow is BaseSmartEscrowTest {
     function test_updateBenefactor_succeeds() public {

@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
-import {SmartEscrow} from "src/smart-escrow/SmartEscrow.sol";
+import {
+    IAccessControlDefaultAdminRules
+} from "@openzeppelin/contracts-v5/access/extensions/IAccessControlDefaultAdminRules.sol";
 
-import {BaseSmartEscrowTest} from "test/smart-escrow/BaseSmartEscrow.t.sol";
+import { SmartEscrow } from "src/smart-escrow/SmartEscrow.sol";
+
+import { BaseSmartEscrowTest } from "test/smart-escrow/BaseSmartEscrow.t.sol";
 
 contract ConstructorSmartEscrow is BaseSmartEscrowTest {
     function test_constructor_zeroAddressBenefactor_fails() public {
@@ -79,7 +83,11 @@ contract ConstructorSmartEscrow is BaseSmartEscrowTest {
     }
 
     function test_constructor_zeroAddressEscrowOwner_fails() public {
-        vm.expectRevert("AccessControl: 0 default admin");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControlDefaultAdminRules.AccessControlInvalidDefaultAdmin.selector, address(0)
+            )
+        );
         new SmartEscrow(
             benefactor,
             beneficiary,
