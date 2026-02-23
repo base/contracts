@@ -32,3 +32,12 @@ For contract deployment artifacts, see [base-org/contract-deployments](https://g
 - If you don't have foundry installed, run `make install-foundry`.
 - `make deps`
 - Test contracts: `make test`
+## Contributing note
+
+This repository is actively used for Base smart contract development.
+If you are contributing for the first time:
+- Please fork the repository
+- Create a feature branch
+- Open a Pull Request against `main`
+
+Thank you for your contribution.
