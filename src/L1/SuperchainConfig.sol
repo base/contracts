@@ -85,7 +85,10 @@ contract SuperchainConfig is ProxyAdminOwnedBase, ISemver {
         _assertOnlyGuardianOrIncidentResponder();
 
         // Cannot pause if the identifier is already paused to prevent re-pausing without either
-        // unpausing, extending, or resetting the pause timestamp.
+        // unpausing, extending, or resetting the pause timestamp. Note that this check intentionally
+        // prevents re-pausing even after a pause has expired (when paused() returns false but the
+        // timestamp is still non-zero). This is a Stage 1 Decentralization requirement: the guardian
+        // must explicitly unpause before pausing again, ensuring deliberate action is taken.
         if (pauseTimestamps[_identifier] != 0) {
             revert SuperchainConfig_AlreadyPaused(_identifier);
         }
