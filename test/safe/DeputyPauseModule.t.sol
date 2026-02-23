@@ -8,9 +8,13 @@ import "test/safe-tools/SafeTestTools.sol";
 // Libraries
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
+// Contracts
+import { SuperchainConfig } from "src/L1/SuperchainConfig.sol";
+
 // Interfaces
 import { IDeputyPauseModule } from "interfaces/safe/IDeputyPauseModule.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
+import { IProxy } from "interfaces/universal/IProxy.sol";
 
 /// @title DeputyPauseModule_TestInit
 /// @notice Reusable test initialization for `DeputyPauseModule` tests.
@@ -48,12 +52,10 @@ abstract contract DeputyPauseModule_TestInit is CommonTest, SafeTestTools {
         // Create a Guardian Safe with 10 owners.
         guardianSafeInstance = _setupSafe(keys2, 10);
 
-        // Set the Guardian Safe as the guardian of the SuperchainConfig.
-        vm.store(
-            address(superchainConfig),
-            bytes32(0),
-            bytes32(uint256(uint160(address(guardianSafeInstance.safe)))) << (2 * 8)
-        );
+        // Deploy a new SuperchainConfig impl with the Guardian Safe as guardian and upgrade the proxy.
+        SuperchainConfig newImpl = new SuperchainConfig(address(guardianSafeInstance.safe), address(0));
+        vm.prank(address(superchainProxyAdmin));
+        IProxy(payable(address(superchainConfig))).upgradeTo(address(newImpl));
 
         // Make sure that the Guardian Safe is the guardian of the SuperchainConfig.
         assertEq(superchainConfig.guardian(), address(guardianSafeInstance.safe));

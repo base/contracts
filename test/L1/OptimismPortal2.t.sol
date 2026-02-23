@@ -2628,10 +2628,11 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
             _data: _data
         });
 
-        // 7702 delegation using the 7702 prefix
+        // 7702 delegation using the 7702 prefix.
+        // vm.deal must be called before vm.etch so the etched code is preserved.
+        vm.deal(depositor, _mint);
         vm.etch(depositor, abi.encodePacked(hex"EF0100", _7702Target));
 
-        vm.deal(depositor, _mint);
         vm.prank(depositor, address(0x0420));
         optimismPortal2.depositTransaction{ value: _mint }({
             _to: _to, _value: _value, _gasLimit: _gasLimit, _isCreation: _isCreation, _data: _data
