@@ -42,7 +42,7 @@ contract SuperchainConfig is ProxyAdminOwnedBase, ISemver {
     mapping(address => uint256) public pauseTimestamps;
 
     /// @notice Emitted when the pause is triggered.
-    /// @param identifier A string helping to identify provenance of the pause transaction.
+    /// @param identifier An address helping to identify provenance of the pause transaction.
     event Paused(address identifier);
 
     /// @notice Emitted when the pause is lifted.
