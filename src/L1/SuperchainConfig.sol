@@ -8,7 +8,6 @@ import { ProxyAdminOwnedBase } from "src/L1/ProxyAdminOwnedBase.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 
 /// @custom:proxied true
-/// @custom:audit none This contracts is not yet audited.
 /// @title SuperchainConfig
 /// @notice The SuperchainConfig contract is used to manage configuration of global superchain values.
 /// @dev WARNING: When upgrading this contract, any active pause states will be lost as the pause state
