@@ -102,7 +102,7 @@ contract FeeDisburser is ISemver {
     function disburseFees() external virtual {
         if (block.timestamp < lastDisbursementTime + FEE_DISBURSEMENT_INTERVAL) revert IntervalNotReached();
 
-        // Sequencer and base FeeVaults will withdraw fees to the FeeDisburser contract mutating netFeeRevenue
+        // Sequencer, base, and L1 FeeVaults will withdraw fees to the FeeDisburser contract.
         _feeVaultWithdrawal(payable(Predeploys.SEQUENCER_FEE_WALLET));
         _feeVaultWithdrawal(payable(Predeploys.BASE_FEE_VAULT));
         _feeVaultWithdrawal(payable(Predeploys.L1_FEE_VAULT));
