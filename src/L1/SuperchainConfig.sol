@@ -48,6 +48,10 @@ contract SuperchainConfig is ProxyAdminOwnedBase, ISemver {
     /// @notice Emitted when the pause is lifted.
     event Unpaused(address identifier);
 
+    /// @notice Emitted when a pause is extended.
+    /// @param identifier An address helping to identify provenance of the pause transaction.
+    event PauseExtended(address identifier);
+
     /// @notice Semantic version.
     /// @custom:semver 2.5.0
     string public constant version = "2.5.0";
@@ -122,7 +126,7 @@ contract SuperchainConfig is ProxyAdminOwnedBase, ISemver {
 
         // Reset the pause timestamp.
         pauseTimestamps[_identifier] = block.timestamp;
-        emit Paused(_identifier);
+        emit PauseExtended(_identifier);
     }
 
     /// @notice Checks if the system can be paused for a specific identifier.

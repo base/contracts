@@ -278,6 +278,19 @@
         "type": "address"
       }
     ],
+    "name": "PauseExtended",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "identifier",
+        "type": "address"
+      }
+    ],
     "name": "Unpaused",
     "type": "event"
   },

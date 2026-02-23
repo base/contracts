@@ -192,6 +192,8 @@ contract SuperchainConfig_Extend_Test is SuperchainConfig_TestInit {
 
         vm.warp(block.timestamp + 1);
 
+        vm.expectEmit(address(superchainConfig));
+        emit PauseExtended(_identifier);
         superchainConfig.extend(_identifier);
         assertTrue(superchainConfig.pauseTimestamps(_identifier) > firstPauseTimestamp);
         assertTrue(superchainConfig.paused(_identifier));
