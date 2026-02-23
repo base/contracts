@@ -107,6 +107,7 @@ contract FeeDisburser is ISemver {
         _feeVaultWithdrawal(payable(Predeploys.SEQUENCER_FEE_WALLET));
         _feeVaultWithdrawal(payable(Predeploys.BASE_FEE_VAULT));
         _feeVaultWithdrawal(payable(Predeploys.L1_FEE_VAULT));
+        // Note: OPERATOR_FEE_VAULT is intentionally omitted because Base does not currently use it.
 
         // Gross revenue is the sum of all fees
         uint256 feeBalance = address(this).balance;
