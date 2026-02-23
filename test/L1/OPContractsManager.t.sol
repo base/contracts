@@ -176,7 +176,6 @@ contract OPContractsManager_Upgrade_Harness is CommonTest, DisputeGames {
             permissionlessWethProxy: delayedWeth,
             permissionedCannonWethProxy: delayedWETHPermissionedGameProxy
         });
-
     }
 
     /// @notice Helper function that runs an OPCM upgrade, asserts that the upgrade was successful,
