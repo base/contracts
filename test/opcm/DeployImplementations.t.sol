@@ -42,15 +42,6 @@ contract DeployImplementations_Test is Test, FeatureFlags {
         vm.etch(address(superchainConfigProxy), hex"01");
         vm.etch(address(protocolVersionsProxy), hex"01");
 
-        vm.mockCall(
-            address(superchainConfigProxy), abi.encodeCall(ISuperchainConfig.guardian, ()), abi.encode(address(0xdead))
-        );
-        vm.mockCall(
-            address(superchainConfigProxy),
-            abi.encodeCall(ISuperchainConfig.incidentResponder, ()),
-            abi.encode(address(0))
-        );
-
         deployImplementations = new DeployImplementations();
     }
 
@@ -227,15 +218,6 @@ contract DeployImplementations_Test is Test, FeatureFlags {
         vm.prank(address(superchainProxyAdmin));
         IProxy(payable(address(superchainConfigProxy))).upgradeTo(address(superchainConfigImpl));
 
-        vm.mockCall(
-            address(superchainConfigProxy), abi.encodeCall(ISuperchainConfig.guardian, ()), abi.encode(address(0xdead))
-        );
-        vm.mockCall(
-            address(superchainConfigProxy),
-            abi.encodeCall(ISuperchainConfig.incidentResponder, ()),
-            abi.encode(address(0))
-        );
-
         _faultGameV2MaxGameDepth = bound(_faultGameV2MaxGameDepth, 4, 125);
         _faultGameV2SplitDepth =
             bound(_faultGameV2SplitDepth, 2, _faultGameV2MaxGameDepth > 3 ? _faultGameV2MaxGameDepth - 2 : 2);
@@ -258,7 +240,9 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             protocolVersionsProxy,
             superchainProxyAdmin,
             l1ProxyAdminOwner,
-            challenger
+            challenger,
+            address(0xdead), // guardian
+            address(0) // incidentResponder
         );
 
         DeployImplementations.Output memory output = deployImplementations.run(input);
@@ -544,7 +528,9 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             protocolVersionsProxy,
             superchainProxyAdmin,
             l1ProxyAdminOwner,
-            challenger
+            challenger,
+            address(0xdead), // guardian
+            address(0) // incidentResponder
         );
     }
 }

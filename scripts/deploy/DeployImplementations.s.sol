@@ -64,6 +64,8 @@ contract DeployImplementations is Script {
         IProxyAdmin superchainProxyAdmin;
         address l1ProxyAdminOwner;
         address challenger;
+        address guardian;
+        address incidentResponder;
     }
 
     struct Output {
@@ -250,10 +252,7 @@ contract DeployImplementations is Script {
             DeployUtils.createDeterministic({
                 _name: "SuperchainConfig",
                 _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        ISuperchainConfig.__constructor__,
-                        (_input.superchainConfigProxy.guardian(), _input.superchainConfigProxy.incidentResponder())
-                    )
+                    abi.encodeCall(ISuperchainConfig.__constructor__, (_input.guardian, _input.incidentResponder))
                 ),
                 _salt: _salt
             })
