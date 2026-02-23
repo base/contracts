@@ -48,8 +48,9 @@ contract FeeDisburser is ISemver {
     /// @notice Emitted when fees are disbursed.
     ///
     /// @param disbursementTime The time of the disbursement.
+    /// @param deprecated This parameter is deprecated and will always be 0.
     /// @param totalFeesDisbursed The total amount of fees disbursed.
-    event FeesDisbursed(uint256 disbursementTime, uint256 totalFeesDisbursed);
+    event FeesDisbursed(uint256 disbursementTime, uint256 deprecated, uint256 totalFeesDisbursed);
 
     /// @notice Emitted when fees are received from FeeVaults.
     ///
@@ -125,7 +126,7 @@ contract FeeDisburser is ISemver {
             L1_WALLET, WITHDRAWAL_MIN_GAS, bytes("")
         );
 
-        emit FeesDisbursed(lastDisbursementTime, feeBalance);
+        emit FeesDisbursed(lastDisbursementTime, 0, feeBalance);
     }
 
     /// @notice Receives ETH fees withdrawn from L2 FeeVaults.
