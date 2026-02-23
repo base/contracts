@@ -86,8 +86,8 @@ contract FeeDisburser {
     /// @param l1Wallet                The L1 address which receives the remainder of the revenue.
     /// @param feeDisbursementInterval The minimum amount of time in seconds that must pass between fee disbursals.
     constructor(address l1Wallet, uint256 feeDisbursementInterval) {
-        require(l1Wallet != address(0), ZeroAddress());
-        require(feeDisbursementInterval >= 24 hours, IntervalTooLow());
+        if (l1Wallet == address(0)) revert ZeroAddress();
+        if (feeDisbursementInterval < 24 hours) revert IntervalTooLow();
 
         L1_WALLET = l1Wallet;
         FEE_DISBURSEMENT_INTERVAL = feeDisbursementInterval;
@@ -99,7 +99,7 @@ contract FeeDisburser {
 
     /// @notice Withdraws funds from FeeVaults and bridges to L1.
     function disburseFees() external virtual {
-        require(block.timestamp >= lastDisbursementTime + FEE_DISBURSEMENT_INTERVAL, IntervalNotReached());
+        if (block.timestamp < lastDisbursementTime + FEE_DISBURSEMENT_INTERVAL) revert IntervalNotReached();
 
         // Sequencer and base FeeVaults will withdraw fees to the FeeDisburser contract mutating netFeeRevenue
         _feeVaultWithdrawal(payable(Predeploys.SEQUENCER_FEE_WALLET));
@@ -141,8 +141,8 @@ contract FeeDisburser {
     ///
     /// @param feeVault The address of the FeeVault to withdraw from.
     function _feeVaultWithdrawal(address payable feeVault) private {
-        require(IFeeVault(feeVault).WITHDRAWAL_NETWORK() == Types.WithdrawalNetwork.L2, FeeVaultMustWithdrawToL2());
-        require(IFeeVault(feeVault).RECIPIENT() == address(this), FeeVaultMustWithdrawToFeeDisburser());
+        if (IFeeVault(feeVault).WITHDRAWAL_NETWORK() != Types.WithdrawalNetwork.L2) revert FeeVaultMustWithdrawToL2();
+        if (IFeeVault(feeVault).RECIPIENT() != address(this)) revert FeeVaultMustWithdrawToFeeDisburser();
 
         if (feeVault.balance >= IFeeVault(feeVault).MIN_WITHDRAWAL_AMOUNT()) {
             IFeeVault(feeVault).withdraw();
