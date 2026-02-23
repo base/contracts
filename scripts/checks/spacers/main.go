@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethereum-optimism/optimism/op-chain-ops/solc"
-	"github.com/ethereum-optimism/optimism/packages/contracts-bedrock/scripts/checks/common"
+	"github.com/base/contracts/scripts/checks/common"
 )
 
 func parseVariableLength(variableType string, types map[string]solc.StorageLayoutType) (int, error) {

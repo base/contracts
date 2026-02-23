@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/ethereum-optimism/optimism/packages/contracts-bedrock/scripts/checks/common"
+	"github.com/base/contracts/scripts/checks/common"
 )
 
 var importPattern = regexp.MustCompile(`import\s*{([^}]+)}`)
