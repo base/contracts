@@ -30,3 +30,9 @@ program, view our [security program policies][7].
 [5]: https://stack.optimism.io/docs/releases/bedrock/
 [6]: https://hackerone.com/coinbase
 [7]: https://hackerone.com/coinbase?view_policy=true
+## Responsible Disclosure
+
+If you discover a potential security vulnerability, please do not open a public issue.
+Instead, follow the security policy outlined above or contact the maintainers privately.
+
+We appreciate responsible disclosure and timely reporting.
