@@ -74,6 +74,7 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
                 superchainProxyAdminOwner: superchainProxyAdminOwner,
                 protocolVersionsOwner: protocolVersionsOwner,
                 guardian: guardian,
+                incidentResponder: address(0),
                 paused: paused,
                 requiredProtocolVersion: requiredProtocolVersion,
                 recommendedProtocolVersion: recommendedProtocolVersion

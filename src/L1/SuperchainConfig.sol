@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+// Contracts
+import { ProxyAdminOwnedBase } from "src/L1/ProxyAdminOwnedBase.sol";
+
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
 
@@ -11,7 +14,7 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 /// @dev WARNING: When upgrading this contract, any active pause states will be lost as the pause state
 ///      is stored in storage variables that are not preserved during upgrades. Therefore, this contract
 ///      should not be upgraded while the system is paused.
-contract SuperchainConfig is ISemver {
+contract SuperchainConfig is ProxyAdminOwnedBase, ISemver {
     /// @notice Thrown when a caller is not the guardian but tries to call a guardian-only function
     error SuperchainConfig_OnlyGuardian();
 
@@ -56,6 +59,18 @@ contract SuperchainConfig is ISemver {
     constructor(address _guardian, address _incidentResponder) {
         GUARDIAN = _guardian;
         INCIDENT_RESPONDER = _incidentResponder;
+    }
+
+    /// @notice Getter for the guardian address.
+    /// @return The guardian address.
+    function guardian() external view returns (address) {
+        return GUARDIAN;
+    }
+
+    /// @notice Getter for the incident responder address.
+    /// @return The incident responder address.
+    function incidentResponder() external view returns (address) {
+        return INCIDENT_RESPONDER;
     }
 
     /// @notice Returns the duration after which a pause expires.

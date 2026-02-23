@@ -56,22 +56,6 @@ contract Initializer_Test is CommonTest {
         // The 'name' field should be the name of the contract as it saved in the deployment
         // script.
 
-        // SuperchainConfigImpl
-        contracts.push(
-            InitializeableContract({
-                name: "SuperchainConfigImpl",
-                target: EIP1967Helper.getImplementation(address(superchainConfig)),
-                initCalldata: abi.encodeCall(superchainConfig.initialize, (address(0)))
-            })
-        );
-        // SuperchainConfigProxy
-        contracts.push(
-            InitializeableContract({
-                name: "SuperchainConfigProxy",
-                target: address(superchainConfig),
-                initCalldata: abi.encodeCall(superchainConfig.initialize, (address(0)))
-            })
-        );
         // L1CrossDomainMessengerImpl
         contracts.push(
             InitializeableContract({

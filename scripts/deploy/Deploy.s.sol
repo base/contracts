@@ -225,6 +225,7 @@ contract Deploy is Deployer {
         DeploySuperchain.Output memory dso = ds.run(
             DeploySuperchain.Input({
                 guardian: cfg.superchainConfigGuardian(),
+                incidentResponder: address(0),
                 // TODO: when DeployAuthSystem is done, finalSystemOwner should be replaced with the Foundation Upgrades
                 // Safe
                 protocolVersionsOwner: cfg.finalSystemOwner(),

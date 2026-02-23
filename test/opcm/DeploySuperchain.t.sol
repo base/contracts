@@ -48,6 +48,7 @@ contract DeploySuperchain_Test is Test {
 
         DeploySuperchain.Input memory dsi = DeploySuperchain.Input(
             _guardian,
+            address(0),
             _protocolVersionsOwner,
             _superchainProxyAdminOwner,
             _paused,
@@ -124,6 +125,7 @@ contract DeploySuperchain_Test is Test {
     function defaultInput() internal view returns (DeploySuperchain.Input memory input_) {
         input_ = DeploySuperchain.Input(
             defaultGuardian,
+            address(0),
             defaultProtocolVersionsOwner,
             defaultProxyAdminOwner,
             defaultPaused,
