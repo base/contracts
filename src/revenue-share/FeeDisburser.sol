@@ -34,11 +34,9 @@ contract FeeDisburser is ISemver {
     /// @notice The timestamp of the last disbursal.
     uint256 public lastDisbursementTime;
 
-    /// @notice Tracks aggregate net fee revenue which is the sum of sequencer and base fees.
-    ///
-    /// @dev Explicitly tracking Net Revenue is required to separate L1FeeVault initiated
-    ///      withdrawals from Net Revenue calculations.
-    /// @dev This variable is deprecated.
+    /// @custom:legacy
+    /// @notice Previously tracked the aggregate net fee revenue (sum of sequencer and base fees).
+    ///         This variable is deprecated and its value should not be relied upon.
     uint256 public netFeeRevenue;
 
     ////////////////////////////////////////////////////////////////
