@@ -353,15 +353,8 @@ library ChainAssertions {
         );
         require(address(superchainConfig) != address(0), "CHECK-SC-10");
 
-        if (_isProxy) {
-            require(superchainConfig.guardian() == _cfg.superchainConfigGuardian(), "CHECK-SC-20");
-        } else {
-            require(
-                superchainConfig.guardian() == address(0)
-                    || superchainConfig.guardian() == _cfg.superchainConfigGuardian(),
-                "CHECK-SC-40"
-            );
-        }
+        require(_cfg.superchainConfigGuardian() != address(0), "CHECK-SC-20");
+        require(superchainConfig.guardian() == _cfg.superchainConfigGuardian(), "CHECK-SC-30");
     }
 
     /// @notice Asserts that the OPContractsManager is setup correctly
