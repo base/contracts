@@ -6,6 +6,7 @@ import { IFeeVault, Types } from "interfaces/L2/IFeeVault.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 
+/// @custom:proxied true
 /// @title FeeDisburser
 /// @notice Withdraws funds from system FeeVault contracts and bridges to L1.
 contract FeeDisburser is ISemver {
