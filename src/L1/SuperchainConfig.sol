@@ -8,7 +8,6 @@ import { ProxyAdminOwnedBase } from "src/L1/ProxyAdminOwnedBase.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 
 /// @custom:proxied true
-/// @custom:audit none This contracts is not yet audited.
 /// @title SuperchainConfig
 /// @notice The SuperchainConfig contract is used to manage configuration of global superchain values.
 /// @dev WARNING: When upgrading this contract, any active pause states will be lost as the pause state
@@ -43,7 +42,7 @@ contract SuperchainConfig is ProxyAdminOwnedBase, ISemver {
     mapping(address => uint256) public pauseTimestamps;
 
     /// @notice Emitted when the pause is triggered.
-    /// @param identifier A string helping to identify provenance of the pause transaction.
+    /// @param identifier An address helping to identify provenance of the pause transaction.
     event Paused(address identifier);
 
     /// @notice Emitted when the pause is lifted.
@@ -86,7 +85,10 @@ contract SuperchainConfig is ProxyAdminOwnedBase, ISemver {
         _assertOnlyGuardianOrIncidentResponder();
 
         // Cannot pause if the identifier is already paused to prevent re-pausing without either
-        // unpausing, extending, or resetting the pause timestamp.
+        // unpausing, extending, or resetting the pause timestamp. Note that this check intentionally
+        // prevents re-pausing even after a pause has expired (when paused() returns false but the
+        // timestamp is still non-zero). This is a Stage 1 Decentralization requirement: the guardian
+        // must explicitly unpause before pausing again, ensuring deliberate action is taken.
         if (pauseTimestamps[_identifier] != 0) {
             revert SuperchainConfig_AlreadyPaused(_identifier);
         }

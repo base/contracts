@@ -3,11 +3,13 @@ pragma solidity 0.8.25;
 
 import { IL2StandardBridge } from "interfaces/L2/IL2StandardBridge.sol";
 import { IFeeVault, Types } from "interfaces/L2/IFeeVault.sol";
+import { ISemver } from "interfaces/universal/ISemver.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 
+/// @custom:proxied true
 /// @title FeeDisburser
 /// @notice Withdraws funds from system FeeVault contracts and bridges to L1.
-contract FeeDisburser {
+contract FeeDisburser is ISemver {
     ////////////////////////////////////////////////////////////////
     ///                     Constants
     ////////////////////////////////////////////////////////////////
@@ -101,7 +103,7 @@ contract FeeDisburser {
     function disburseFees() external virtual {
         if (block.timestamp < lastDisbursementTime + FEE_DISBURSEMENT_INTERVAL) revert IntervalNotReached();
 
-        // Sequencer and base FeeVaults will withdraw fees to the FeeDisburser contract mutating netFeeRevenue
+        // Sequencer, base, and L1 FeeVaults will withdraw fees to the FeeDisburser contract.
         _feeVaultWithdrawal(payable(Predeploys.SEQUENCER_FEE_WALLET));
         _feeVaultWithdrawal(payable(Predeploys.BASE_FEE_VAULT));
         _feeVaultWithdrawal(payable(Predeploys.L1_FEE_VAULT));
@@ -128,6 +130,11 @@ contract FeeDisburser {
     /// @notice Receives ETH fees withdrawn from L2 FeeVaults.
     receive() external payable virtual {
         emit FeesReceived(msg.sender, msg.value);
+    }
+
+    /// @custom:semver 1.0.0
+    function version() external pure virtual returns (string memory) {
+        return "1.0.0";
     }
 
     ////////////////////////////////////////////////////////////////
