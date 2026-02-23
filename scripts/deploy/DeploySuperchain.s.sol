@@ -19,6 +19,7 @@ contract DeploySuperchain is Script {
     struct Input {
         // Role inputs.
         address guardian;
+        address incidentResponder;
         address protocolVersionsOwner;
         address superchainProxyAdminOwner;
         // Other inputs.
@@ -36,6 +37,7 @@ contract DeploySuperchain is Script {
     struct InternalInput {
         // Role inputs.
         address guardian;
+        address incidentResponder;
         address protocolVersionsOwner;
         address superchainProxyAdminOwner;
         // Other inputs.
@@ -74,7 +76,7 @@ contract DeploySuperchain is Script {
 
         // Deploy and initialize the superchain contracts.
         deploySuperchainImplementationContracts(internalInput, output_);
-        deployAndInitializeSuperchainConfig(internalInput, output_);
+        deploySuperchainConfigProxy(internalInput, output_);
         deployAndInitializeProtocolVersions(internalInput, output_);
 
         // Transfer ownership of the ProxyAdmin from the deployer to the specified owner.
@@ -103,12 +105,14 @@ contract DeploySuperchain is Script {
         _output.superchainProxyAdmin = superchainProxyAdmin;
     }
 
-    function deploySuperchainImplementationContracts(InternalInput memory, Output memory _output) private {
+    function deploySuperchainImplementationContracts(InternalInput memory _input, Output memory _output) private {
         // Deploy implementation contracts.
         ISuperchainConfig superchainConfigImpl = ISuperchainConfig(
             DeployUtils.createDeterministic({
                 _name: "SuperchainConfig",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(ISuperchainConfig.__constructor__, ())),
+                _args: DeployUtils.encodeConstructor(
+                    abi.encodeCall(ISuperchainConfig.__constructor__, (_input.guardian, _input.incidentResponder))
+                ),
                 _salt: _salt
             })
         );
@@ -127,9 +131,7 @@ contract DeploySuperchain is Script {
         _output.protocolVersionsImpl = protocolVersionsImpl;
     }
 
-    function deployAndInitializeSuperchainConfig(InternalInput memory _input, Output memory _output) private {
-        address guardian = _input.guardian;
-
+    function deploySuperchainConfigProxy(InternalInput memory, Output memory _output) private {
         IProxyAdmin superchainProxyAdmin = _output.superchainProxyAdmin;
         ISuperchainConfig superchainConfigImpl = _output.superchainConfigImpl;
 
@@ -142,11 +144,7 @@ contract DeploySuperchain is Script {
                 )
             })
         );
-        superchainProxyAdmin.upgradeAndCall(
-            payable(address(superchainConfigProxy)),
-            address(superchainConfigImpl),
-            abi.encodeCall(ISuperchainConfig.initialize, (guardian))
-        );
+        superchainProxyAdmin.upgrade(payable(address(superchainConfigProxy)), address(superchainConfigImpl));
         vm.stopBroadcast();
 
         vm.label(address(superchainConfigProxy), "SuperchainConfigProxy");
@@ -244,9 +242,6 @@ contract DeploySuperchain is Script {
     function assertValidSuperchainConfig(InternalInput memory _input, Output memory _output) internal {
         // Proxy checks.
         ISuperchainConfig superchainConfig = _output.superchainConfigProxy;
-        DeployUtils.assertInitialized({
-            _contractAddress: address(superchainConfig), _isProxy: true, _slot: 0, _offset: 0
-        });
         require(superchainConfig.guardian() == _input.guardian, "SUPCON-10");
 
         vm.startPrank(address(0));
@@ -261,7 +256,7 @@ contract DeploySuperchain is Script {
 
         // Implementation checks
         superchainConfig = _output.superchainConfigImpl;
-        require(superchainConfig.guardian() == address(0), "SUPCON-50");
+        require(superchainConfig.guardian() == _input.guardian, "SUPCON-50");
     }
 
     function assertValidProtocolVersions(InternalInput memory _input, Output memory _output) internal {
@@ -292,6 +287,7 @@ contract DeploySuperchain is Script {
     function toInternalInput(Input memory _input) internal pure returns (InternalInput memory input_) {
         input_ = InternalInput(
             _input.guardian,
+            _input.incidentResponder,
             _input.protocolVersionsOwner,
             _input.superchainProxyAdminOwner,
             _input.paused,

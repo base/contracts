@@ -74,6 +74,7 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
                 superchainProxyAdminOwner: superchainProxyAdminOwner,
                 protocolVersionsOwner: protocolVersionsOwner,
                 guardian: guardian,
+                incidentResponder: address(0),
                 paused: paused,
                 requiredProtocolVersion: requiredProtocolVersion,
                 recommendedProtocolVersion: recommendedProtocolVersion
@@ -98,7 +99,9 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
                 superchainProxyAdmin: dso.superchainProxyAdmin,
                 l1ProxyAdminOwner: dso.superchainProxyAdmin.owner(),
                 challenger: challenger,
-                devFeatureBitmap: devFeatureBitmap
+                devFeatureBitmap: devFeatureBitmap,
+                guardian: guardian,
+                incidentResponder: address(0)
             })
         );
         opcm = dio.opcm;

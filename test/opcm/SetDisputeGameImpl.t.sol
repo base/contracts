@@ -80,15 +80,13 @@ contract SetDisputeGameImpl_Test is Test {
         script = new SetDisputeGameImpl();
         input = new SetDisputeGameImplInput();
         DisputeGameFactory dgfImpl = new DisputeGameFactory();
-        SuperchainConfig supConfigImpl = new SuperchainConfig();
+        SuperchainConfig supConfigImpl = new SuperchainConfig(address(this), address(0));
         AnchorStateRegistry anchorStateRegistryImpl = new AnchorStateRegistry(0);
         SystemConfig systemConfigImpl = new SystemConfig();
 
         Proxy supConfigProxy = new Proxy(address(1));
         vm.prank(address(1));
-        supConfigProxy.upgradeToAndCall(
-            address(supConfigImpl), abi.encodeCall(supConfigImpl.initialize, (address(this)))
-        );
+        supConfigProxy.upgradeTo(address(supConfigImpl));
 
         Proxy systemConfigProxy = new Proxy(address(1));
         vm.prank(address(1));

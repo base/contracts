@@ -279,13 +279,16 @@ contract DeployOwnership is Deploy {
                 _salt: _implSalt(),
                 _name: "SuperchainConfig",
                 _nick: "SuperchainConfigImpl",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(ISuperchainConfig.__constructor__, ()))
+                _args: DeployUtils.encodeConstructor(
+                    abi.encodeCall(
+                        ISuperchainConfig.__constructor__,
+                        (cfg.superchainConfigGuardian(), cfg.superchainConfigIncidentResponder())
+                    )
+                )
             })
         );
 
-        require(superchainConfig.guardian() == address(0), "SuperchainConfig: guardian must be address(0)");
-        bytes32 initialized = vm.load(address(superchainConfig), bytes32(0));
-        require(initialized != 0, "SuperchainConfig: must be initialized");
+        require(superchainConfig.guardian() == cfg.superchainConfigGuardian(), "SuperchainConfig: guardian mismatch");
     }
 
     /// @notice Configure the Security Council Safe with the LivenessModule and LivenessGuard.

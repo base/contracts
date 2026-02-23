@@ -1,42 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { IL2StandardBridge } from "interfaces/L2/IL2StandardBridge.sol";
+import { IFeeVault, Types } from "interfaces/L2/IFeeVault.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
-import { SafeCall } from "src/libraries/SafeCall.sol";
-import { FeeVault } from "src/L2/FeeVault.sol";
-import { Types } from "src/libraries/Types.sol";
 
 /// @title FeeDisburser
-///
-/// @notice Withdraws funds from system FeeVault contracts, shares revenue with Optimism, and bridges the rest of funds
-///         to L1.
+/// @notice Withdraws funds from system FeeVault contracts and bridges to L1.
 contract FeeDisburser {
-    //////////////////////////////////////////////////////////////////////////////////////
-    ///                                   Constants                                    ///
-    //////////////////////////////////////////////////////////////////////////////////////
-
-    /// @notice The basis point scale which revenue share splits are denominated in.
-    uint32 public constant BASIS_POINT_SCALE = 10_000;
+    ////////////////////////////////////////////////////////////////
+    ///                     Constants
+    ////////////////////////////////////////////////////////////////
 
     /// @notice The minimum gas limit for the FeeDisburser withdrawal transaction to L1.
     uint32 public constant WITHDRAWAL_MIN_GAS = 35_000;
 
-    /// @notice The net revenue percentage denominated in basis points that is used in Optimism revenue share
-    ///         calculation.
-    uint256 public constant OPTIMISM_NET_REVENUE_SHARE_BASIS_POINTS = 1_500;
-
-    /// @notice The gross revenue percentage denominated in basis points that is used in Optimism revenue share
-    ///         calculation.
-    uint256 public constant OPTIMISM_GROSS_REVENUE_SHARE_BASIS_POINTS = 250;
-
-    //////////////////////////////////////////////////////////////////////////////////////
-    ///                                   Immutables                                   ///
-    //////////////////////////////////////////////////////////////////////////////////////
-
-    /// @notice The address of the Optimism wallet that will receive Optimism's revenue share.
-    address payable public immutable OPTIMISM_WALLET;
+    ////////////////////////////////////////////////////////////////
+    ///                     Immutables
+    ////////////////////////////////////////////////////////////////
 
     /// @notice The address of the L1 wallet that will receive the OP chain runner's share of fees.
     address public immutable L1_WALLET;
@@ -44,29 +25,29 @@ contract FeeDisburser {
     /// @notice The minimum amount of time in seconds that must pass between fee disbursals.
     uint256 public immutable FEE_DISBURSEMENT_INTERVAL;
 
-    //////////////////////////////////////////////////////////////////////////////////////
-    ///                                    Storage                                     ///
-    //////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////
+    ///                     Storage
+    ////////////////////////////////////////////////////////////////
 
     /// @notice The timestamp of the last disbursal.
     uint256 public lastDisbursementTime;
 
     /// @notice Tracks aggregate net fee revenue which is the sum of sequencer and base fees.
     ///
-    /// @dev Explicitly tracking Net Revenue is required to separate L1FeeVault initiated withdrawals from Net Revenue
-    ///      calculations.
+    /// @dev Explicitly tracking Net Revenue is required to separate L1FeeVault initiated
+    ///      withdrawals from Net Revenue calculations.
+    /// @dev This variable is deprecated.
     uint256 public netFeeRevenue;
 
-    //////////////////////////////////////////////////////////////////////////////////////
-    ///                                     Events                                     ///
-    //////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////
+    ///                       Events
+    ////////////////////////////////////////////////////////////////
 
     /// @notice Emitted when fees are disbursed.
     ///
-    /// @param disbursementTime   The time of the disbursement.
-    /// @param paidToOptimism     The amount of fees disbursed to Optimism.
+    /// @param disbursementTime The time of the disbursement.
     /// @param totalFeesDisbursed The total amount of fees disbursed.
-    event FeesDisbursed(uint256 disbursementTime, uint256 paidToOptimism, uint256 totalFeesDisbursed);
+    event FeesDisbursed(uint256 disbursementTime, uint256 totalFeesDisbursed);
 
     /// @notice Emitted when fees are received from FeeVaults.
     ///
@@ -77,61 +58,53 @@ contract FeeDisburser {
     /// @notice Emitted when no fees are collected from FeeVaults at time of disbursement.
     event NoFeesCollected();
 
-    //////////////////////////////////////////////////////////////////////////////////////
-    ///                                  Constructor                                   ///
-    //////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////
+    ///                        Errors
+    ////////////////////////////////////////////////////////////////
+
+    /// @notice Thrown when the L1 wallet address is the zero address.
+    error ZeroAddress();
+
+    /// @notice Thrown when the fee disbursement interval is less than 24 hours.
+    error IntervalTooLow();
+
+    /// @notice Thrown when disburseFees is called before the disbursement interval has passed.
+    error IntervalNotReached();
+
+    /// @notice Thrown when a FeeVault's withdrawal network is not set to L2.
+    error FeeVaultMustWithdrawToL2();
+
+    /// @notice Thrown when a FeeVault's recipient is not set to the FeeDisburser contract.
+    error FeeVaultMustWithdrawToFeeDisburser();
+
+    ////////////////////////////////////////////////////////////////
+    ///                     Constructor
+    ////////////////////////////////////////////////////////////////
 
     /// @notice Constructor for the FeeDisburser contract which validates and sets immutable variables.
     ///
-    /// @param optimismWallet          The address which receives Optimism's revenue share.
     /// @param l1Wallet                The L1 address which receives the remainder of the revenue.
     /// @param feeDisbursementInterval The minimum amount of time in seconds that must pass between fee disbursals.
-    constructor(address payable optimismWallet, address l1Wallet, uint256 feeDisbursementInterval) {
-        require(optimismWallet != address(0), "FeeDisburser: OptimismWallet cannot be address(0)");
-        require(l1Wallet != address(0), "FeeDisburser: L1Wallet cannot be address(0)");
-        require(
-            feeDisbursementInterval >= 24 hours, "FeeDisburser: FeeDisbursementInterval cannot be less than 24 hours"
-        );
+    constructor(address l1Wallet, uint256 feeDisbursementInterval) {
+        if (l1Wallet == address(0)) revert ZeroAddress();
+        if (feeDisbursementInterval < 24 hours) revert IntervalTooLow();
 
-        OPTIMISM_WALLET = optimismWallet;
         L1_WALLET = l1Wallet;
         FEE_DISBURSEMENT_INTERVAL = feeDisbursementInterval;
     }
 
-    //////////////////////////////////////////////////////////////////////////////////////
-    ///                               External Functions                               ///
-    //////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////
+    ///                     External Functions
+    ////////////////////////////////////////////////////////////////
 
-    /// @dev Receives ETH fees withdrawn from L2 FeeVaults.
-    /// @dev Will revert if ETH is not sent from L2 FeeVaults.
-    receive() external payable virtual {
-        if (msg.sender == Predeploys.SEQUENCER_FEE_WALLET || msg.sender == Predeploys.BASE_FEE_VAULT) {
-            // Adds value received to net fee revenue if the sender is the sequencer or base FeeVault
-            netFeeRevenue += msg.value;
-        } else if (msg.sender != Predeploys.L1_FEE_VAULT) {
-            revert("FeeDisburser: Only FeeVaults can send ETH to FeeDisburser");
-        }
-        emit FeesReceived({ sender: msg.sender, amount: msg.value });
-    }
-
-    /// @notice Withdraws funds from FeeVaults, sends Optimism their revenue share, and withdraws remaining funds to L1.
-    ///
-    /// @dev Implements revenue share business logic as follows:
-    ///          Net Revenue             = sequencer FeeVault fee revenue + base FeeVault fee revenue
-    ///          Gross Revenue           = Net Revenue + l1 FeeVault fee revenue
-    ///          Optimism Revenue Share  = Maximum of 15% of Net Revenue and 2.5% of Gross Revenue
-    ///          L1 Wallet Revenue Share = Gross Revenue - Optimism Revenue Share
+    /// @notice Withdraws funds from FeeVaults and bridges to L1.
     function disburseFees() external virtual {
-        require(
-            block.timestamp >= lastDisbursementTime + FEE_DISBURSEMENT_INTERVAL,
-            "FeeDisburser: Disbursement interval not reached"
-        );
+        if (block.timestamp < lastDisbursementTime + FEE_DISBURSEMENT_INTERVAL) revert IntervalNotReached();
 
         // Sequencer and base FeeVaults will withdraw fees to the FeeDisburser contract mutating netFeeRevenue
-        _feeVaultWithdrawal({ feeVault: payable(Predeploys.SEQUENCER_FEE_WALLET) });
-        _feeVaultWithdrawal({ feeVault: payable(Predeploys.BASE_FEE_VAULT) });
-
-        _feeVaultWithdrawal({ feeVault: payable(Predeploys.L1_FEE_VAULT) });
+        _feeVaultWithdrawal(payable(Predeploys.SEQUENCER_FEE_WALLET));
+        _feeVaultWithdrawal(payable(Predeploys.BASE_FEE_VAULT));
+        _feeVaultWithdrawal(payable(Predeploys.L1_FEE_VAULT));
 
         // Gross revenue is the sum of all fees
         uint256 feeBalance = address(this).balance;
@@ -144,33 +117,22 @@ contract FeeDisburser {
 
         lastDisbursementTime = block.timestamp;
 
-        // Net revenue is the sum of sequencer fees and base fees
-        uint256 optimismNetRevenueShare = netFeeRevenue * OPTIMISM_NET_REVENUE_SHARE_BASIS_POINTS / BASIS_POINT_SCALE;
-        netFeeRevenue = 0;
-
-        uint256 optimismGrossRevenueShare = feeBalance * OPTIMISM_GROSS_REVENUE_SHARE_BASIS_POINTS / BASIS_POINT_SCALE;
-
-        // Optimism's revenue share is the maximum of net and gross revenue
-        uint256 optimismRevenueShare = Math.max({ a: optimismNetRevenueShare, b: optimismGrossRevenueShare });
-
-        // Send Optimism their revenue share on L2
-        require(
-            SafeCall.send({ _target: OPTIMISM_WALLET, _gas: gasleft(), _value: optimismRevenueShare }),
-            "FeeDisburser: Failed to send funds to Optimism"
+        // Send remaining funds to L1 wallet on L1
+        IL2StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE)).bridgeETHTo{ value: address(this).balance }(
+            L1_WALLET, WITHDRAWAL_MIN_GAS, bytes("")
         );
 
-        // Send remaining funds to L1 wallet on L1
-        IL2StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE)).bridgeETHTo{ value: address(this).balance }({
-            _to: L1_WALLET, _minGasLimit: WITHDRAWAL_MIN_GAS, _extraData: bytes("")
-        });
-        emit FeesDisbursed({
-            disbursementTime: lastDisbursementTime, paidToOptimism: optimismRevenueShare, totalFeesDisbursed: feeBalance
-        });
+        emit FeesDisbursed(lastDisbursementTime, feeBalance);
     }
 
-    //////////////////////////////////////////////////////////////////////////////////////
-    ///                               Internal Functions                               ///
-    //////////////////////////////////////////////////////////////////////////////////////
+    /// @notice Receives ETH fees withdrawn from L2 FeeVaults.
+    receive() external payable virtual {
+        emit FeesReceived(msg.sender, msg.value);
+    }
+
+    ////////////////////////////////////////////////////////////////
+    ///                     Private Functions
+    ////////////////////////////////////////////////////////////////
 
     /// @notice Withdraws fees from a FeeVault.
     ///
@@ -178,17 +140,12 @@ contract FeeDisburser {
     ///      withdrawal amount.
     ///
     /// @param feeVault The address of the FeeVault to withdraw from.
-    function _feeVaultWithdrawal(address payable feeVault) internal {
-        require(
-            FeeVault(feeVault).WITHDRAWAL_NETWORK() == Types.WithdrawalNetwork.L2,
-            "FeeDisburser: FeeVault must withdraw to L2"
-        );
-        require(
-            FeeVault(feeVault).RECIPIENT() == address(this),
-            "FeeDisburser: FeeVault must withdraw to FeeDisburser contract"
-        );
-        if (feeVault.balance >= FeeVault(feeVault).MIN_WITHDRAWAL_AMOUNT()) {
-            FeeVault(feeVault).withdraw();
+    function _feeVaultWithdrawal(address payable feeVault) private {
+        if (IFeeVault(feeVault).WITHDRAWAL_NETWORK() != Types.WithdrawalNetwork.L2) revert FeeVaultMustWithdrawToL2();
+        if (IFeeVault(feeVault).RECIPIENT() != address(this)) revert FeeVaultMustWithdrawToFeeDisburser();
+
+        if (feeVault.balance >= IFeeVault(feeVault).MIN_WITHDRAWAL_AMOUNT()) {
+            IFeeVault(feeVault).withdraw();
         }
     }
 }

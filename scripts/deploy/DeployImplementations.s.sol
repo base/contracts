@@ -64,6 +64,8 @@ contract DeployImplementations is Script {
         IProxyAdmin superchainProxyAdmin;
         address l1ProxyAdminOwner;
         address challenger;
+        address guardian;
+        address incidentResponder;
     }
 
     struct Output {
@@ -109,7 +111,7 @@ contract DeployImplementations is Script {
         assertValidInput(_input);
 
         // Deploy the implementations.
-        deploySuperchainConfigImpl(output_);
+        deploySuperchainConfigImpl(_input, output_);
         deployProtocolVersionsImpl(output_);
         deploySystemConfigImpl(output_);
         deployL1CrossDomainMessengerImpl(output_);
@@ -245,11 +247,13 @@ contract DeployImplementations is Script {
 
     // --- Core Contracts ---
 
-    function deploySuperchainConfigImpl(Output memory _output) private {
+    function deploySuperchainConfigImpl(Input memory _input, Output memory _output) private {
         ISuperchainConfig impl = ISuperchainConfig(
             DeployUtils.createDeterministic({
                 _name: "SuperchainConfig",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(ISuperchainConfig.__constructor__, ())),
+                _args: DeployUtils.encodeConstructor(
+                    abi.encodeCall(ISuperchainConfig.__constructor__, (_input.guardian, _input.incidentResponder))
+                ),
                 _salt: _salt
             })
         );

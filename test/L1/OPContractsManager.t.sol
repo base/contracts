@@ -176,18 +176,6 @@ contract OPContractsManager_Upgrade_Harness is CommonTest, DisputeGames {
             permissionlessWethProxy: delayedWeth,
             permissionedCannonWethProxy: delayedWETHPermissionedGameProxy
         });
-
-        // Since this superchainConfig is already at the expected reinitializer version...
-        // We do this to pass the reinitializer check when trying to upgrade the superchainConfig contract.
-
-        // Get the value of the 0th storage slot of the superchainConfig contract.
-        bytes32 slot0 = vm.load(address(superchainConfig), bytes32(0));
-        // Remove the value of initialized slot.
-        slot0 = slot0 & bytes32(~uint256(0xff));
-        // Store 1 there.
-        slot0 = bytes32(uint256(slot0) + 1);
-        // Store the new value.
-        vm.store(address(superchainConfig), bytes32(0), slot0);
     }
 
     /// @notice Helper function that runs an OPCM upgrade, asserts that the upgrade was successful,

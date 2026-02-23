@@ -2,9 +2,7 @@
 pragma solidity 0.8.15;
 
 // Contracts
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { ProxyAdminOwnedBase } from "src/L1/ProxyAdminOwnedBase.sol";
-import { ReinitializableBase } from "src/universal/ReinitializableBase.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
@@ -16,9 +14,12 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 /// @dev WARNING: When upgrading this contract, any active pause states will be lost as the pause state
 ///      is stored in storage variables that are not preserved during upgrades. Therefore, this contract
 ///      should not be upgraded while the system is paused.
-contract SuperchainConfig is ProxyAdminOwnedBase, Initializable, ReinitializableBase, ISemver {
+contract SuperchainConfig is ProxyAdminOwnedBase, ISemver {
     /// @notice Thrown when a caller is not the guardian but tries to call a guardian-only function
     error SuperchainConfig_OnlyGuardian();
+
+    /// @notice Thrown when a caller is not the guardian or incident responder but tries to pause
+    error SuperchainConfig_OnlyGuardianOrIncidentResponder();
 
     /// @notice Thrown when attempting to pause an identifier that is already paused
     error SuperchainConfig_AlreadyPaused(address identifier);
@@ -26,19 +27,17 @@ contract SuperchainConfig is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @notice Thrown when attempting to extend a pause that is not already paused.
     error SuperchainConfig_NotAlreadyPaused(address identifier);
 
-    /// @notice Enum representing different types of updates.
-    /// @custom:value GUARDIAN            Represents an update to the guardian.
-    enum UpdateType {
-        GUARDIAN
-    }
-
     /// @notice The duration after which a pause expires. This value is set to exactly 3 months in
     ///         seconds. Any duration longer than this value is incompatible with Stage 1.
     uint256 internal constant PAUSE_EXPIRY = 7_884_000;
 
     /// @notice The address of the guardian, which can pause withdrawals from the System.
-    ///         It can only be modified by an upgrade.
-    address public guardian;
+    ///         This is an immutable variable set at construction time.
+    address public immutable GUARDIAN;
+
+    /// @notice The address of the incident responder, which can pause the system.
+    ///         This is an immutable variable set at construction time.
+    address public immutable INCIDENT_RESPONDER;
 
     /// @notice Mapping of pause identifiers to their pause timestamps
     mapping(address => uint256) public pauseTimestamps;
@@ -50,28 +49,28 @@ contract SuperchainConfig is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @notice Emitted when the pause is lifted.
     event Unpaused(address identifier);
 
-    /// @notice Emitted when configuration is updated.
-    /// @param updateType Type of update.
-    /// @param data       Encoded update data.
-    event ConfigUpdate(UpdateType indexed updateType, bytes data);
-
     /// @notice Semantic version.
-    /// @custom:semver 2.4.0
-    string public constant version = "2.4.0";
+    /// @custom:semver 2.5.0
+    string public constant version = "2.5.0";
 
     /// @notice Constructs the SuperchainConfig contract.
-    constructor() ReinitializableBase(2) {
-        _disableInitializers();
+    /// @param _guardian The address of the guardian, which can pause and unpause the system.
+    /// @param _incidentResponder The address of the incident responder, which can pause the system.
+    constructor(address _guardian, address _incidentResponder) {
+        GUARDIAN = _guardian;
+        INCIDENT_RESPONDER = _incidentResponder;
     }
 
-    /// @notice Initializer.
-    /// @param _guardian    Address of the guardian, can pause the OptimismPortal.
-    function initialize(address _guardian) external reinitializer(initVersion()) {
-        // Initialization transactions must come from the ProxyAdmin or its owner.
-        _assertOnlyProxyAdminOrProxyAdminOwner();
+    /// @notice Getter for the guardian address.
+    /// @return The guardian address.
+    function guardian() external view returns (address) {
+        return GUARDIAN;
+    }
 
-        // Now perform initialization logic.
-        _setGuardian(_guardian);
+    /// @notice Getter for the incident responder address.
+    /// @return The incident responder address.
+    function incidentResponder() external view returns (address) {
+        return INCIDENT_RESPONDER;
     }
 
     /// @notice Returns the duration after which a pause expires.
@@ -83,8 +82,8 @@ contract SuperchainConfig is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @notice Pauses the system for a specific superchain cluster identifier.
     /// @param _identifier The address identifier for the pause.
     function pause(address _identifier) external {
-        // Only the Guardian can pause the system.
-        _assertOnlyGuardian();
+        // Only the Guardian or Incident Responder can pause the system.
+        _assertOnlyGuardianOrIncidentResponder();
 
         // Cannot pause if the identifier is already paused to prevent re-pausing without either
         // unpausing, extending, or resetting the pause timestamp.
@@ -158,18 +157,17 @@ contract SuperchainConfig is ProxyAdminOwnedBase, Initializable, Reinitializable
         return timestamp + PAUSE_EXPIRY;
     }
 
-    /// @notice Sets the guardian address. This is only callable during initialization, so an upgrade
-    ///         will be required to change the guardian.
-    /// @param _guardian The new guardian address.
-    function _setGuardian(address _guardian) internal {
-        guardian = _guardian;
-        emit ConfigUpdate(UpdateType.GUARDIAN, abi.encode(_guardian));
-    }
-
     /// @notice Asserts that the caller is the guardian.
     function _assertOnlyGuardian() internal view {
-        if (msg.sender != guardian) {
+        if (msg.sender != GUARDIAN) {
             revert SuperchainConfig_OnlyGuardian();
+        }
+    }
+
+    /// @notice Asserts that the caller is the guardian or incident responder.
+    function _assertOnlyGuardianOrIncidentResponder() internal view {
+        if (msg.sender != GUARDIAN && msg.sender != INCIDENT_RESPONDER) {
+            revert SuperchainConfig_OnlyGuardianOrIncidentResponder();
         }
     }
 }

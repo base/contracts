@@ -22,6 +22,7 @@ contract DeployConfig is Script {
 
     address public finalSystemOwner;
     address public superchainConfigGuardian;
+    address public superchainConfigIncidentResponder;
     uint256 public l1ChainID;
     uint256 public l2ChainID;
     uint256 public l2GenesisDeltaTimeOffset;
@@ -112,6 +113,7 @@ contract DeployConfig is Script {
 
         finalSystemOwner = stdJson.readAddress(_json, "$.finalSystemOwner");
         superchainConfigGuardian = stdJson.readAddress(_json, "$.superchainConfigGuardian");
+        superchainConfigIncidentResponder = _readOr(_json, "$.superchainConfigIncidentResponder", address(0));
         l1ChainID = stdJson.readUint(_json, "$.l1ChainID");
         l2ChainID = stdJson.readUint(_json, "$.l2ChainID");
 

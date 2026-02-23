@@ -4,14 +4,8 @@ pragma solidity 0.8.15;
 // Testing
 import { CommonTest } from "test/setup/CommonTest.sol";
 
-// Libraries
-import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
-import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
-
 // Interfaces
-import { IProxy } from "interfaces/universal/IProxy.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
 /// @title SuperchainConfig_TestInit
 /// @notice Initialization contract for SuperchainConfig tests.
@@ -22,74 +16,13 @@ abstract contract SuperchainConfig_TestInit is CommonTest {
     }
 }
 
-/// @title SuperchainConfig_Initialize_Test
-/// @notice Test contract for SuperchainConfig `initialize` function.
-contract SuperchainConfig_Initialize_Test is SuperchainConfig_TestInit {
-    /// @notice Tests that initialization sets the correct values. These are defined in
-    ///         CommonTest.sol.
-    function test_initialize_unpaused_succeeds() external view {
+/// @title SuperchainConfig_Constructor_Test
+/// @notice Test contract for SuperchainConfig constructor values.
+contract SuperchainConfig_Constructor_Test is SuperchainConfig_TestInit {
+    /// @notice Tests that constructor sets the correct values.
+    function test_constructor_unpaused_succeeds() external view {
         assertFalse(superchainConfig.paused(address(this)));
         assertEq(superchainConfig.guardian(), deploy.cfg().superchainConfigGuardian());
-    }
-
-    /// @notice Tests that it can be initialized as paused.
-    function test_initialize_paused_succeeds() external {
-        IProxy newProxy = IProxy(
-            DeployUtils.create1({
-                _name: "src/universal/Proxy.sol:Proxy",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxy.__constructor__, (alice)))
-            })
-        );
-        ISuperchainConfig newImpl = ISuperchainConfig(
-            DeployUtils.create1({
-                _name: "SuperchainConfig",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(ISuperchainConfig.__constructor__, ()))
-            })
-        );
-
-        vm.startPrank(alice);
-        newProxy.upgradeToAndCall(
-            address(newImpl), abi.encodeCall(ISuperchainConfig.initialize, (deploy.cfg().superchainConfigGuardian()))
-        );
-
-        assertFalse(ISuperchainConfig(address(newProxy)).paused(address(this)));
-        assertEq(ISuperchainConfig(address(newProxy)).guardian(), deploy.cfg().superchainConfigGuardian());
-    }
-
-    /// @notice Tests that the initializer value is correct. Trivial test for normal
-    ///         initialization but confirms that the initValue is not incremented incorrectly if
-    ///         an upgrade function is not present.
-    function test_initialize_correctInitializerValue_succeeds() public {
-        // Get the slot for _initialized.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("SuperchainConfig", "_initialized");
-
-        // Get the initializer value.
-        bytes32 slotVal = vm.load(address(superchainConfig), bytes32(slot.slot));
-        uint8 val = uint8(uint256(slotVal) & 0xFF);
-
-        // Assert that the initializer value matches the expected value.
-        assertEq(val, superchainConfig.initVersion());
-    }
-
-    /// @notice Tests that the `initialize` function reverts if called by a non-proxy admin or
-    ///         owner.
-    /// @param _sender The address of the sender to test.
-    function testFuzz_initialize_notProxyAdminOrProxyAdminOwner_reverts(address _sender) public {
-        // Prank as not the superchain ProxyAdmin or ProxyAdmin owner.
-        vm.assume(_sender != address(superchainProxyAdmin) && _sender != superchainProxyAdminOwner);
-
-        // Get the slot for _initialized.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("SuperchainConfig", "_initialized");
-
-        // Set the initialized slot to 0.
-        vm.store(address(superchainConfig), bytes32(slot.slot), bytes32(0));
-
-        // Expect the revert with `ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner` selector.
-        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
-
-        // Call the `initialize` function with the sender
-        vm.prank(_sender);
-        superchainConfig.initialize(address(0xdeadbeef));
     }
 }
 
@@ -189,12 +122,12 @@ contract SuperchainConfig_Pause_Test is SuperchainConfig_TestInit {
         assertTrue(superchainConfig.paused(_identifier));
     }
 
-    /// @notice Tests that `pause` reverts when called by a non-guardian.
-    /// @param _caller The non-guardian caller to test.
-    function testFuzz_pause_notGuardian_reverts(address _caller) external {
-        vm.assume(_caller != superchainConfig.guardian());
+    /// @notice Tests that `pause` reverts when called by a non-guardian and non-incident-responder.
+    /// @param _caller The unauthorized caller to test.
+    function testFuzz_pause_notGuardianOrIncidentResponder_reverts(address _caller) external {
+        vm.assume(_caller != superchainConfig.guardian() && _caller != superchainConfig.incidentResponder());
 
-        vm.expectRevert(ISuperchainConfig.SuperchainConfig_OnlyGuardian.selector);
+        vm.expectRevert(ISuperchainConfig.SuperchainConfig_OnlyGuardianOrIncidentResponder.selector);
         vm.prank(_caller);
         superchainConfig.pause(address(this));
 

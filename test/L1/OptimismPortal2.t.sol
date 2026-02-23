@@ -2595,6 +2595,7 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
         external
     {
         assumeNotForgeAddress(_7702Target);
+        vm.assume(_7702Target != address(0));
 
         // Prevent overflow on an upgrade context
         _mint = bound(_mint, 0, type(uint256).max - address(ethLockbox).balance);

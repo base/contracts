@@ -4,22 +4,16 @@ pragma solidity ^0.8.0;
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
 interface ISuperchainConfig is IProxyAdminOwnedBase {
-    enum UpdateType {
-        GUARDIAN
-    }
-
-    event ConfigUpdate(UpdateType indexed updateType, bytes data);
-    event Initialized(uint8 version);
     event Paused(address identifier);
     event Unpaused(address identifier);
 
     error SuperchainConfig_OnlyGuardian();
+    error SuperchainConfig_OnlyGuardianOrIncidentResponder();
     error SuperchainConfig_AlreadyPaused(address identifier);
     error SuperchainConfig_NotAlreadyPaused(address identifier);
-    error ReinitializableBase_ZeroInitVersion();
 
     function guardian() external view returns (address);
-    function initialize(address _guardian) external;
+    function incidentResponder() external view returns (address);
     function pause(address _identifier) external;
     function unpause(address _identifier) external;
     function pausable(address _identifier) external view returns (bool);
@@ -30,7 +24,6 @@ interface ISuperchainConfig is IProxyAdminOwnedBase {
     function version() external view returns (string memory);
     function pauseTimestamps(address) external view returns (uint256);
     function pauseExpiry() external view returns (uint256);
-    function initVersion() external view returns (uint8);
 
-    function __constructor__() external;
+    function __constructor__(address _guardian, address _incidentResponder) external;
 }
