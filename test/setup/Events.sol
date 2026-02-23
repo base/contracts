@@ -107,6 +107,8 @@ abstract contract Events {
 
     event Unpaused(address identifier);
 
+    event PauseExtended(address identifier);
+
     event BalanceChanged(address account, uint256 balance);
 
     event ETHMigrated(address indexed lockbox, uint256 ethBalance);

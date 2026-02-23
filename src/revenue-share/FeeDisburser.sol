@@ -34,11 +34,9 @@ contract FeeDisburser is ISemver {
     /// @notice The timestamp of the last disbursal.
     uint256 public lastDisbursementTime;
 
-    /// @notice Tracks aggregate net fee revenue which is the sum of sequencer and base fees.
-    ///
-    /// @dev Explicitly tracking Net Revenue is required to separate L1FeeVault initiated
-    ///      withdrawals from Net Revenue calculations.
-    /// @dev This variable is deprecated.
+    /// @custom:legacy
+    /// @notice Previously tracked the aggregate net fee revenue (sum of sequencer and base fees).
+    ///         This variable is deprecated and its value should not be relied upon.
     uint256 public netFeeRevenue;
 
     ////////////////////////////////////////////////////////////////
@@ -48,8 +46,9 @@ contract FeeDisburser is ISemver {
     /// @notice Emitted when fees are disbursed.
     ///
     /// @param disbursementTime The time of the disbursement.
+    /// @param deprecated This parameter is deprecated and will always be 0.
     /// @param totalFeesDisbursed The total amount of fees disbursed.
-    event FeesDisbursed(uint256 disbursementTime, uint256 totalFeesDisbursed);
+    event FeesDisbursed(uint256 disbursementTime, uint256 deprecated, uint256 totalFeesDisbursed);
 
     /// @notice Emitted when fees are received from FeeVaults.
     ///
@@ -107,6 +106,7 @@ contract FeeDisburser is ISemver {
         _feeVaultWithdrawal(payable(Predeploys.SEQUENCER_FEE_WALLET));
         _feeVaultWithdrawal(payable(Predeploys.BASE_FEE_VAULT));
         _feeVaultWithdrawal(payable(Predeploys.L1_FEE_VAULT));
+        // Note: OPERATOR_FEE_VAULT is intentionally omitted because Base does not currently use it.
 
         // Gross revenue is the sum of all fees
         uint256 feeBalance = address(this).balance;
@@ -124,7 +124,7 @@ contract FeeDisburser is ISemver {
             L1_WALLET, WITHDRAWAL_MIN_GAS, bytes("")
         );
 
-        emit FeesDisbursed(lastDisbursementTime, feeBalance);
+        emit FeesDisbursed(lastDisbursementTime, 0, feeBalance);
     }
 
     /// @notice Receives ETH fees withdrawn from L2 FeeVaults.

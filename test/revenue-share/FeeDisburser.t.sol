@@ -12,7 +12,7 @@ import { Predeploys } from "src/libraries/Predeploys.sol";
 /// @notice Comprehensive unit and fuzz tests for the FeeDisburser contract
 contract FeeDisburserTest is Test {
     // Events (must match FeeDisburser.sol)
-    event FeesDisbursed(uint256 disbursementTime, uint256 totalFeesDisbursed);
+    event FeesDisbursed(uint256 disbursementTime, uint256 deprecated, uint256 totalFeesDisbursed);
     event FeesReceived(address indexed sender, uint256 amount);
     event NoFeesCollected();
 
@@ -155,7 +155,7 @@ contract FeeDisburserTest is Test {
         _mockBridge();
 
         vm.expectEmit(true, true, true, true, address(feeDisburser));
-        emit FeesDisbursed(block.timestamp, feeAmount);
+        emit FeesDisbursed(block.timestamp, 0, feeAmount);
 
         feeDisburser.disburseFees();
 
@@ -177,7 +177,7 @@ contract FeeDisburserTest is Test {
         _mockBridge();
 
         vm.expectEmit(true, true, true, true, address(feeDisburser));
-        emit FeesDisbursed(block.timestamp, feeAmount);
+        emit FeesDisbursed(block.timestamp, 0, feeAmount);
 
         feeDisburser.disburseFees();
 
@@ -197,7 +197,7 @@ contract FeeDisburserTest is Test {
         _mockBridge();
 
         vm.expectEmit(true, true, true, true, address(feeDisburser));
-        emit FeesDisbursed(block.timestamp, feeAmount);
+        emit FeesDisbursed(block.timestamp, 0, feeAmount);
 
         feeDisburser.disburseFees();
 
@@ -232,7 +232,7 @@ contract FeeDisburserTest is Test {
         _mockBridge();
 
         vm.expectEmit(true, true, true, true, address(feeDisburser));
-        emit FeesDisbursed(block.timestamp, totalFees);
+        emit FeesDisbursed(block.timestamp, 0, totalFees);
 
         feeDisburser.disburseFees();
 
@@ -271,7 +271,7 @@ contract FeeDisburserTest is Test {
         _mockBridge();
 
         vm.expectEmit(true, true, true, true, address(feeDisburser));
-        emit FeesDisbursed(block.timestamp, sequencerFees);
+        emit FeesDisbursed(block.timestamp, 0, sequencerFees);
 
         feeDisburser.disburseFees();
     }
@@ -564,7 +564,7 @@ contract FeeDisburserTest is Test {
             emit NoFeesCollected();
         } else {
             vm.expectEmit(true, true, true, true, address(feeDisburser));
-            emit FeesDisbursed(block.timestamp, expectedTotal);
+            emit FeesDisbursed(block.timestamp, 0, expectedTotal);
         }
 
         feeDisburser.disburseFees();
@@ -690,7 +690,7 @@ contract FeeDisburserTest is Test {
 
         // Execute disbursement
         vm.expectEmit(true, true, true, true, address(feeDisburser));
-        emit FeesDisbursed(block.timestamp, totalFees);
+        emit FeesDisbursed(block.timestamp, 0, totalFees);
 
         feeDisburser.disburseFees();
 
@@ -738,7 +738,7 @@ contract FeeDisburserTest is Test {
         _mockBridge();
 
         vm.expectEmit(true, true, true, true, address(feeDisburser));
-        emit FeesDisbursed(block.timestamp, DEFAULT_MIN_WITHDRAWAL);
+        emit FeesDisbursed(block.timestamp, 0, DEFAULT_MIN_WITHDRAWAL);
 
         feeDisburser.disburseFees();
     }
@@ -778,7 +778,7 @@ contract FeeDisburserTest is Test {
         _mockBridge();
 
         vm.expectEmit(true, true, true, true, address(feeDisburser));
-        emit FeesDisbursed(block.timestamp, totalFees);
+        emit FeesDisbursed(block.timestamp, 0, totalFees);
 
         feeDisburser.disburseFees();
     }

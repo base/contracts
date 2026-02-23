@@ -6,6 +6,7 @@ import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 interface ISuperchainConfig is IProxyAdminOwnedBase {
     event Paused(address identifier);
     event Unpaused(address identifier);
+    event PauseExtended(address identifier);
 
     error SuperchainConfig_OnlyGuardian();
     error SuperchainConfig_OnlyGuardianOrIncidentResponder();
