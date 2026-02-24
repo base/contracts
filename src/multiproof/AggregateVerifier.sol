@@ -362,10 +362,17 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
         // Verify the proof.
         ProofType proofType = ProofType(uint8(proof[0]));
+        
+        bytes32 l1OriginHash = bytes32(proof[1:33]);
+        uint256 l1OriginNumber = uint256(bytes32(proof[33:65]));
+        // Verify claimed L1 origin hash matches actual blockhash
+        _verifyL1Origin(l1OriginHash, l1OriginNumber);
+
         _verifyProof(
-            proof[1:],
+            proof[65:],
             proofType,
             gameCreator(),
+            l1OriginHash,
             startingOutputRoot.root.raw(),
             startingOutputRoot.l2SequenceNumber,
             rootClaim().raw(),
@@ -399,6 +406,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             proofBytes[1:],
             proofType,
             msg.sender,
+            l1Head().raw(),
             startingOutputRoot.root.raw(),
             startingOutputRoot.l2SequenceNumber,
             rootClaim().raw(),
@@ -509,6 +517,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             proofBytes[1:],
             proofType,
             msg.sender,
+            l1Head().raw(),
             startingRoot,
             startingL2SequenceNumber,
             intermediateRootToProve,
@@ -720,25 +729,20 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         bytes calldata proofBytes,
         ProofType proofType,
         address prover,
+        bytes32 l1OriginHash,
         bytes32 startingRoot,
         uint256 startingL2SequenceNumber,
         bytes32 endingRoot,
         uint256 endingL2SequenceNumber,
         bytes memory intermediateRoots
     ) internal view {
-        if (proofBytes.length < 65) revert InvalidProof();
-
-        bytes32 l1OriginHash = bytes32(proofBytes[:32]);
-        uint256 l1OriginNumber = uint256(bytes32(proofBytes[32:64]));
-        // Verify claimed L1 origin hash matches actual blockhash
-        _verifyL1Origin(l1OriginHash, l1OriginNumber);
+        if (proofBytes.length < 1) revert InvalidProof();
 
         if (proofType == ProofType.TEE) {
             _verifyTeeProof(
                 proofBytes,
                 prover,
                 l1OriginHash,
-                l1OriginNumber,
                 startingRoot,
                 startingL2SequenceNumber,
                 endingRoot,
@@ -750,7 +754,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
                 proofBytes,
                 prover,
                 l1OriginHash,
-                l1OriginNumber,
                 startingRoot,
                 startingL2SequenceNumber,
                 endingRoot,
@@ -768,7 +771,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         bytes calldata proofBytes,
         address prover,
         bytes32 l1OriginHash,
-        uint256 l1OriginNumber,
         bytes32 startingRoot,
         uint256 startingL2SequenceNumber,
         bytes32 endingRoot,
@@ -779,7 +781,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             abi.encodePacked(
                 prover,
                 l1OriginHash,
-                l1OriginNumber,
                 startingRoot,
                 startingL2SequenceNumber,
                 endingRoot,
@@ -801,7 +802,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         bytes calldata proofBytes,
         address prover,
         bytes32 l1OriginHash,
-        uint256 l1OriginNumber,
         bytes32 startingRoot,
         uint256 startingL2SequenceNumber,
         bytes32 endingRoot,
@@ -812,7 +812,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             abi.encodePacked(
                 prover,
                 l1OriginHash,
-                l1OriginNumber,
                 startingRoot,
                 startingL2SequenceNumber,
                 endingRoot,
