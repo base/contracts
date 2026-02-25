@@ -362,7 +362,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
         // Verify the proof.
         ProofType proofType = ProofType(uint8(proof[0]));
-        
+
         bytes32 l1OriginHash = bytes32(proof[1:33]);
         uint256 l1OriginNumber = uint256(bytes32(proof[33:65]));
         // Verify claimed L1 origin hash matches actual blockhash
@@ -561,9 +561,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         }
 
         bondClaimed = true;
-        // This can fail if this game was challenged and the countered by game is 
-        // blacklisted/retired after it resolved to DEFENDER_WINS. 
-        // The centralized functions in DELAYED_WETH will handle this as it's a already 
+        // This can fail if this game was challenged and the countered by game is
+        // blacklisted/retired after it resolved to DEFENDER_WINS.
+        // The centralized functions in DELAYED_WETH will handle this as it's a already
         // a very centralized action to blacklist/retire a valid challenging game.
         DELAYED_WETH.withdraw(bondRecipient, bondAmount);
 
@@ -705,13 +705,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     function _updateExpectedResolution() internal {
         bool hasTee = proofTypeToProver[ProofType.TEE] != address(0);
         bool hasZk = proofTypeToProver[ProofType.ZK] != address(0);
-        
+
         if (!hasTee && !hasZk) revert NoProofProvided();
-        
+
         uint64 delay = (hasTee && hasZk) ? FAST_FINALIZATION_DELAY : SLOW_FINALIZATION_DELAY;
         uint64 newResolution = uint64(block.timestamp) + delay;
-        expectedResolution =
-            Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, expectedResolution.raw())));
+        expectedResolution = Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, expectedResolution.raw())));
     }
 
     function _updateProvingData(ProofType proofType, address prover) internal {

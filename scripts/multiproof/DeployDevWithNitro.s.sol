@@ -240,11 +240,7 @@ contract DeployDevWithNitro is Script {
         address factoryImpl = address(new DisputeGameFactory());
         MinimalProxyAdmin proxyAdmin = new MinimalProxyAdmin(cfg.owner);
 
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            factoryImpl,
-            address(proxyAdmin),
-            ""
-        );
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(factoryImpl, address(proxyAdmin), "");
 
         vm.store(address(proxy), PROXY_OWNER_ADDRESS, bytes32(uint256(uint160(address(proxyAdmin)))));
         DisputeGameFactory(address(proxy)).initialize(cfg.owner);
