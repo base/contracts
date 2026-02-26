@@ -362,10 +362,17 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
         // Verify the proof.
         ProofType proofType = ProofType(uint8(proof[0]));
+
+        bytes32 l1OriginHash = bytes32(proof[1:33]);
+        uint256 l1OriginNumber = uint256(bytes32(proof[33:65]));
+        // Verify claimed L1 origin hash matches actual blockhash
+        _verifyL1Origin(l1OriginHash, l1OriginNumber);
+
         _verifyProof(
-            proof[1:],
+            proof[65:],
             proofType,
             gameCreator(),
+            l1OriginHash,
             startingOutputRoot.root.raw(),
             startingOutputRoot.l2SequenceNumber,
             rootClaim().raw(),
@@ -399,6 +406,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             proofBytes[1:],
             proofType,
             msg.sender,
+            l1Head().raw(),
             startingOutputRoot.root.raw(),
             startingOutputRoot.l2SequenceNumber,
             rootClaim().raw(),
@@ -509,6 +517,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             proofBytes[1:],
             proofType,
             msg.sender,
+            l1Head().raw(),
             startingRoot,
             startingL2SequenceNumber,
             intermediateRootToProve,
@@ -552,9 +561,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         }
 
         bondClaimed = true;
-        // This can fail if this game was challenged and the countered by game is 
-        // blacklisted/retired after it resolved to DEFENDER_WINS. 
-        // The centralized functions in DELAYED_WETH will handle this as it's a already 
+        // This can fail if this game was challenged and the countered by game is
+        // blacklisted/retired after it resolved to DEFENDER_WINS.
+        // The centralized functions in DELAYED_WETH will handle this as it's a already
         // a very centralized action to blacklist/retire a valid challenging game.
         DELAYED_WETH.withdraw(bondRecipient, bondAmount);
 
@@ -696,13 +705,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     function _updateExpectedResolution() internal {
         bool hasTee = proofTypeToProver[ProofType.TEE] != address(0);
         bool hasZk = proofTypeToProver[ProofType.ZK] != address(0);
-        
+
         if (!hasTee && !hasZk) revert NoProofProvided();
-        
+
         uint64 delay = (hasTee && hasZk) ? FAST_FINALIZATION_DELAY : SLOW_FINALIZATION_DELAY;
         uint64 newResolution = uint64(block.timestamp) + delay;
-        expectedResolution =
-            Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, expectedResolution.raw())));
+        expectedResolution = Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, expectedResolution.raw())));
     }
 
     function _updateProvingData(ProofType proofType, address prover) internal {
@@ -720,25 +728,20 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         bytes calldata proofBytes,
         ProofType proofType,
         address prover,
+        bytes32 l1OriginHash,
         bytes32 startingRoot,
         uint256 startingL2SequenceNumber,
         bytes32 endingRoot,
         uint256 endingL2SequenceNumber,
         bytes memory intermediateRoots
     ) internal view {
-        if (proofBytes.length < 65) revert InvalidProof();
-
-        bytes32 l1OriginHash = bytes32(proofBytes[:32]);
-        uint256 l1OriginNumber = uint256(bytes32(proofBytes[32:64]));
-        // Verify claimed L1 origin hash matches actual blockhash
-        _verifyL1Origin(l1OriginHash, l1OriginNumber);
+        if (proofBytes.length < 1) revert InvalidProof();
 
         if (proofType == ProofType.TEE) {
             _verifyTeeProof(
                 proofBytes,
                 prover,
                 l1OriginHash,
-                l1OriginNumber,
                 startingRoot,
                 startingL2SequenceNumber,
                 endingRoot,
@@ -750,7 +753,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
                 proofBytes,
                 prover,
                 l1OriginHash,
-                l1OriginNumber,
                 startingRoot,
                 startingL2SequenceNumber,
                 endingRoot,
@@ -763,12 +765,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     }
 
     /// @notice Verifies a TEE proof for the current game.
-    /// @param proofBytes The proof: prover(20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65).
+    /// @param proofBytes The proof: prover(20) + signature (65).
     function _verifyTeeProof(
         bytes calldata proofBytes,
         address prover,
         bytes32 l1OriginHash,
-        uint256 l1OriginNumber,
         bytes32 startingRoot,
         uint256 startingL2SequenceNumber,
         bytes32 endingRoot,
@@ -779,7 +780,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             abi.encodePacked(
                 prover,
                 l1OriginHash,
-                l1OriginNumber,
                 startingRoot,
                 startingL2SequenceNumber,
                 endingRoot,
@@ -796,12 +796,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     }
 
     /// @notice Verifies a ZK proof for the current game.
-    /// @param proofBytes The proof: l1OriginHash (32) + l1OriginNumber (32) + zkProof (variable).
+    /// @param proofBytes The proof: zkProof (variable).
     function _verifyZkProof(
         bytes calldata proofBytes,
         address prover,
         bytes32 l1OriginHash,
-        uint256 l1OriginNumber,
         bytes32 startingRoot,
         uint256 startingL2SequenceNumber,
         bytes32 endingRoot,
@@ -812,7 +811,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
             abi.encodePacked(
                 prover,
                 l1OriginHash,
-                l1OriginNumber,
                 startingRoot,
                 startingL2SequenceNumber,
                 endingRoot,
