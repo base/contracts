@@ -765,7 +765,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     }
 
     /// @notice Verifies a TEE proof for the current game.
-    /// @param proofBytes The proof: prover(20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65).
+    /// @param proofBytes The proof: prover(20) + signature (65).
     function _verifyTeeProof(
         bytes calldata proofBytes,
         address prover,
@@ -796,7 +796,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     }
 
     /// @notice Verifies a ZK proof for the current game.
-    /// @param proofBytes The proof: l1OriginHash (32) + l1OriginNumber (32) + zkProof (variable).
+    /// @param proofBytes The proof: zkProof (variable).
     function _verifyZkProof(
         bytes calldata proofBytes,
         address prover,
