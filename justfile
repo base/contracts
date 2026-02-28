@@ -79,6 +79,15 @@ test *ARGS: build-go-ffi
 test-dev *ARGS: build-go-ffi
   FOUNDRY_PROFILE=lite forge test {{ARGS}}
 
+# Runs multiproof contract tests.
+test-multiproof *ARGS: build-go-ffi
+  @set -e; \
+  echo "Applying patch..."; \
+  git apply multiproof_tests/optimism.patch; \
+  trap 'echo "Reverting patch..."; git apply -R multiproof_tests/optimism.patch' EXIT; \
+  echo "Running tests..."; \
+  FOUNDRY_PROFILE=multiproof forge test {{ARGS}}
+
 # Default block number for the forked upgrade path.
 
 export sepoliaBlockNumber := "9366100"

@@ -231,6 +231,10 @@
     "initCodeHash": "0x3a82e248129d19764bb975bb79b48a982f077f33bb508480bf8d2ec1c0c9810d",
     "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
   },
+  "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
+    "initCodeHash": "0x2d681a39e518379b6d2c013735ae25a9bcf6e939d597bde9e6126375b86fd294",
+    "sourceCodeHash": "0x7d0711f990d7ae8fdc27bf2da12f6fad21aaeca87f30d53e3e0b772f8d8c0f9f"
+  },
   "src/revenue-share/FeeDisburser.sol:FeeDisburser": {
     "initCodeHash": "0x1278027e3756e2989e80c0a7b513e221a5fe0d3dbd9ded108375a29b2c1f3d57",
     "sourceCodeHash": "0xac49a0ecf22b8a7bb3ebef830a2d27b19050f9b08941186e8563d5113cf0ce9c"

@@ -60,5 +60,5 @@ jobs:
           git diff --exit-code snapshots/semver-lock.json
 
       - name: Run Forge tests
-        run: just test
+        run: just test && just test-multiproof
         id: test
