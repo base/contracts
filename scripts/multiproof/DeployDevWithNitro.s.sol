@@ -121,17 +121,17 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {Script} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {console2 as console} from "forge-std/console2.sol";
-import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
-import {IDelayedWETH} from "optimism/interfaces/dispute/IDelayedWETH.sol";
-import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
-import {DisputeGameFactory} from "optimism/src/dispute/DisputeGameFactory.sol";
-import {GameType, Hash} from "optimism/src/dispute/lib/Types.sol";
+import {IAnchorStateRegistry} from "interfaces/dispute/IAnchorStateRegistry.sol";
+import {IDelayedWETH} from "interfaces/dispute/IDelayedWETH.sol";
+import {IDisputeGame} from "interfaces/dispute/IDisputeGame.sol";
+import {DisputeGameFactory} from "src/dispute/DisputeGameFactory.sol";
+import {GameType, Hash} from "src/dispute/lib/Types.sol";
 
-import {AggregateVerifier} from "../src/AggregateVerifier.sol";
-import {IVerifier} from "../src/interfaces/IVerifier.sol";
-import {MockVerifier} from "../src/mocks/MockVerifier.sol";
-import {SystemConfigGlobal} from "../src/tee/SystemConfigGlobal.sol";
-import {TEEVerifier} from "../src/tee/TEEVerifier.sol";
+import {AggregateVerifier} from "src/multiproof/AggregateVerifier.sol";
+import {IVerifier} from "interfaces/multiproof/IVerifier.sol";
+import {MockVerifier} from "src/multiproof/mocks/MockVerifier.sol";
+import {SystemConfigGlobal} from "src/multiproof/tee/SystemConfigGlobal.sol";
+import {TEEVerifier} from "src/multiproof/tee/TEEVerifier.sol";
 
 import {MinimalProxyAdmin} from "./mocks/MinimalProxyAdmin.sol";
 import {MockAnchorStateRegistry} from "./mocks/MockAnchorStateRegistry.sol";
