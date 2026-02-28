@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-import {IVerifier} from "interfaces/multiproof/IVerifier.sol";
+import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 
-import {SystemConfigGlobal} from "./SystemConfigGlobal.sol";
+import { SystemConfigGlobal } from "./SystemConfigGlobal.sol";
 
 /// @title TEEVerifier
 /// @notice Stateless TEE proof verifier that validates signatures against registered signers.
@@ -43,8 +43,8 @@ contract TEEVerifier is IVerifier {
     }
 
     /// @notice Verifies a TEE proof for a state transition.
-    /// @param proofBytes The proof: proposer (20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65) = 149 bytes.
-    /// @param imageId The claimed TEE image hash (PCR0). Must match the signer's registered PCR0.
+    /// @param proofBytes The proof: proposer (20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65) = 149
+    /// bytes. @param imageId The claimed TEE image hash (PCR0). Must match the signer's registered PCR0.
     /// @param journal The keccak256 hash of the proof's public inputs.
     /// @return valid Whether the proof is valid.
     function verify(bytes calldata proofBytes, bytes32 imageId, bytes32 journal) external view override returns (bool) {

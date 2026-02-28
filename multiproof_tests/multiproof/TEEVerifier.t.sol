@@ -62,7 +62,7 @@ contract TEEVerifierTest is Test {
         verifier = new TEEVerifier(SystemConfigGlobal(address(systemConfigGlobal)));
     }
 
-    function testVerifyValidSignature() public {
+    function testVerifyValidSignature() public view {
         // Create a journal hash
         bytes32 journal = keccak256("test-journal");
 

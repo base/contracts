@@ -116,26 +116,26 @@ pragma solidity 0.8.15;
  * ══════════════════════════════════════════════════════════════════════════════════
  */
 
-import {CertManager} from "@nitro-validator/CertManager.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {Script} from "forge-std/Script.sol";
-import {stdJson} from "forge-std/StdJson.sol";
-import {console2 as console} from "forge-std/console2.sol";
-import {IAnchorStateRegistry} from "interfaces/dispute/IAnchorStateRegistry.sol";
-import {IDelayedWETH} from "interfaces/dispute/IDelayedWETH.sol";
-import {IDisputeGame} from "interfaces/dispute/IDisputeGame.sol";
-import {DisputeGameFactory} from "src/dispute/DisputeGameFactory.sol";
-import {GameType, Hash} from "src/dispute/lib/Types.sol";
+import { CertManager } from "@nitro-validator/CertManager.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { Script } from "forge-std/Script.sol";
+import { stdJson } from "forge-std/StdJson.sol";
+import { console2 as console } from "forge-std/console2.sol";
+import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
+import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
+import { DisputeGameFactory } from "src/dispute/DisputeGameFactory.sol";
+import { GameType, Hash } from "src/dispute/lib/Types.sol";
 
-import {AggregateVerifier} from "src/multiproof/AggregateVerifier.sol";
-import {IVerifier} from "interfaces/multiproof/IVerifier.sol";
-import {MockVerifier} from "src/multiproof/mocks/MockVerifier.sol";
-import {SystemConfigGlobal} from "src/multiproof/tee/SystemConfigGlobal.sol";
-import {TEEVerifier} from "src/multiproof/tee/TEEVerifier.sol";
+import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
+import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
+import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
+import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
+import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
 
-import {MinimalProxyAdmin} from "./mocks/MinimalProxyAdmin.sol";
-import {MockAnchorStateRegistry} from "./mocks/MockAnchorStateRegistry.sol";
-import {MockDelayedWETH} from "./mocks/MockDelayedWETH.sol";
+import { MinimalProxyAdmin } from "./mocks/MinimalProxyAdmin.sol";
+import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";
+import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 
 /// @title DeployDevWithNitro
 /// @notice Development deployment WITH AWS Nitro attestation validation.

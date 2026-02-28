@@ -12,18 +12,18 @@ import {
     GamePaused,
     NoCreditToClaim
 } from "src/dispute/lib/Errors.sol";
-import {IDelayedWETH} from "interfaces/dispute/IDelayedWETH.sol";
-import {IDisputeGame} from "interfaces/dispute/IDisputeGame.sol";
-import {IDisputeGameFactory} from "interfaces/dispute/IDisputeGameFactory.sol";
-import {IAnchorStateRegistry} from "interfaces/dispute/IAnchorStateRegistry.sol";
-import {Claim, GameStatus, GameType, Hash, Proposal, Timestamp} from "src/dispute/lib/Types.sol";
+import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
+import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
+import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { Claim, GameStatus, GameType, Hash, Proposal, Timestamp } from "src/dispute/lib/Types.sol";
 
 // Solady
-import {Clone} from "@solady/utils/Clone.sol";
-import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
-import {ReentrancyGuard} from "@solady/utils/ReentrancyGuard.sol";
+import { Clone } from "@solady/utils/Clone.sol";
+import { FixedPointMathLib } from "@solady/utils/FixedPointMathLib.sol";
+import { ReentrancyGuard } from "@solady/utils/ReentrancyGuard.sol";
 
-import {IVerifier} from "interfaces/multiproof/IVerifier.sol";
+import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 
 contract AggregateVerifier is Clone, ReentrancyGuard {
     ////////////////////////////////////////////////////////////////
@@ -386,7 +386,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
 
         // Deposit the bond.
         bondAmount = msg.value;
-        DELAYED_WETH.deposit{value: msg.value}();
+        DELAYED_WETH.deposit{ value: msg.value }();
     }
 
     /// @notice Verifies a proof for the current game.
@@ -493,7 +493,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     /// @param intermediateRootIndex Index of the intermediate root to challenge.
     /// @param intermediateRootToProve The intermediate root that the proof claims to be correct.
     /// @dev The first byte of the proof is the proof type.
-    function nullify(bytes calldata proofBytes, uint256 intermediateRootIndex, bytes32 intermediateRootToProve)
+    function nullify(
+        bytes calldata proofBytes,
+        uint256 intermediateRootIndex,
+        bytes32 intermediateRootToProve
+    )
         external
     {
         if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
@@ -568,7 +572,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         DELAYED_WETH.withdraw(bondRecipient, bondAmount);
 
         // Transfer the credit to the bond recipient.
-        (bool success,) = bondRecipient.call{value: bondAmount}(hex"");
+        (bool success,) = bondRecipient.call{ value: bondAmount }(hex"");
         if (!success) revert BondTransferFailed();
 
         // Emit the credit claimed event.
@@ -597,7 +601,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         // Try to update the anchor game first. Won't always succeed because delays can lead
         // to situations in which this game might not be eligible to be a new anchor game.
         // eip150-safe
-        try ANCHOR_STATE_REGISTRY.setAnchorState(IDisputeGame(address(this))) {} catch {}
+        try ANCHOR_STATE_REGISTRY.setAnchorState(IDisputeGame(address(this))) { } catch { }
     }
 
     /// @notice The starting block number of the game.
@@ -691,7 +695,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         return Hash.wrap(_getArgBytes32(0x34));
     }
 
-    /// @notice The L2 sequence number for which this game is proposing an output root (in this case - the block number).
+    /// @notice The L2 sequence number for which this game is proposing an output root (in this case - the block
+    /// number).
     function l2SequenceNumber() public pure returns (uint256) {
         return _getArgUint256(0x54);
     }
@@ -734,7 +739,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         bytes32 endingRoot,
         uint256 endingL2SequenceNumber,
         bytes memory intermediateRoots
-    ) internal view {
+    )
+        internal
+        view
+    {
         if (proofBytes.length < 1) revert InvalidProof();
 
         if (proofType == ProofType.TEE) {
@@ -775,7 +783,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         bytes32 endingRoot,
         uint256 endingL2SequenceNumber,
         bytes memory intermediateRoots
-    ) internal view {
+    )
+        internal
+        view
+    {
         bytes32 journal = keccak256(
             abi.encodePacked(
                 prover,
@@ -806,7 +817,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         bytes32 endingRoot,
         uint256 endingL2SequenceNumber,
         bytes memory intermediateRoots
-    ) internal view {
+    )
+        internal
+        view
+    {
         bytes32 journal = keccak256(
             abi.encodePacked(
                 prover,

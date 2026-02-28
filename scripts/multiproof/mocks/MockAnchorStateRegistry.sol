@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {IDisputeGame} from "interfaces/dispute/IDisputeGame.sol";
-import {GameType, Hash} from "src/dispute/lib/Types.sol";
+import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
+import { GameType, Hash } from "src/dispute/lib/Types.sol";
 
 /// @title MockAnchorStateRegistry
 /// @notice Minimal mock for testing - stores anchor state and factory reference.
@@ -23,7 +23,12 @@ contract MockAnchorStateRegistry {
     /// @param newAnchorRoot The initial anchor root.
     /// @param newAnchorL2BlockNumber The initial anchor L2 block number.
     /// @param gameType The respected game type.
-    function initialize(address newFactory, Hash newAnchorRoot, uint256 newAnchorL2BlockNumber, GameType gameType)
+    function initialize(
+        address newFactory,
+        Hash newAnchorRoot,
+        uint256 newAnchorL2BlockNumber,
+        GameType gameType
+    )
         external
     {
         factory = newFactory;

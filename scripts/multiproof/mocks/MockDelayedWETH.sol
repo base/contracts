@@ -6,10 +6,10 @@ pragma solidity 0.8.15;
 /// @dev For testing purposes only. The real DelayedWETH handles bond deposits and withdrawals.
 contract MockDelayedWETH {
     /// @notice Accepts ETH deposits (no-op for testing).
-    function deposit() external payable {}
+    function deposit() external payable { }
 
     /// @notice Mock unlock - no-op for testing.
-    function unlock(address, uint256) external {}
+    function unlock(address, uint256) external { }
 
     /// @notice Mock withdraw - transfers ETH back.
     /// @param recipient The address to send ETH to.
@@ -19,5 +19,5 @@ contract MockDelayedWETH {
     }
 
     /// @notice Allows contract to receive ETH.
-    receive() external payable {}
+    receive() external payable { }
 }

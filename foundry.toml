@@ -176,3 +176,12 @@ src = 'test/kontrol/proofs'
 out = 'kout-proofs'
 test = 'test/kontrol/proofs'
 script = 'test/kontrol/proofs'
+
+################################################################
+#                         PROFILE: Multiproof                  #
+################################################################
+
+[profile.multiproof]
+src = 'multiproof_tests'
+out = 'multiproof-out'
+test = 'multiproof_tests'

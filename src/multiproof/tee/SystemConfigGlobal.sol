@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {LibCborElement, CborElement, CborDecode} from "@nitro-validator/CborDecode.sol";
-import {ICertManager} from "@nitro-validator/ICertManager.sol";
-import {LibBytes} from "@nitro-validator/LibBytes.sol";
-import {NitroValidator} from "@nitro-validator/NitroValidator.sol";
-import {OwnableManagedUpgradeable} from "@op-enclave/OwnableManagedUpgradeable.sol";
+import { LibCborElement, CborElement, CborDecode } from "@nitro-validator/CborDecode.sol";
+import { ICertManager } from "@nitro-validator/ICertManager.sol";
+import { LibBytes } from "@nitro-validator/LibBytes.sol";
+import { NitroValidator } from "@nitro-validator/NitroValidator.sol";
+import { OwnableManagedUpgradeable } from "@op-enclave/OwnableManagedUpgradeable.sol";
 
 /// @title SystemConfigGlobal
 /// @notice Manages TEE signer registration via AWS Nitro attestation.
@@ -61,7 +61,7 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, NitroValidator {
     constructor(ICertManager certManager) NitroValidator(certManager) {
         // Always disable the implementation contract by setting dead addresses.
         // Proxies will call initialize() to set the real owner/manager.
-        initialize({initialOwner: address(0xdEaD), initialManager: address(0xdEaD)});
+        initialize({ initialOwner: address(0xdEaD), initialManager: address(0xdEaD) });
     }
 
     /// @notice Sets the proposer address.

@@ -1,0 +1,57 @@
+diff --git a/interfaces/dispute/IInitializable.sol b/interfaces/dispute/IInitializable.sol
+index a3bb74b8..bc998e1f 100644
+--- a/interfaces/dispute/IInitializable.sol
++++ b/interfaces/dispute/IInitializable.sol
+@@ -2,5 +2,5 @@
+ pragma solidity ^0.8.0;
+ 
+ interface IInitializable {
+-    function initialize() external payable;
++    function initialize(bytes calldata initData) external payable;
+ }
+diff --git a/src/dispute/DisputeGameFactory.sol b/src/dispute/DisputeGameFactory.sol
+index 6129c830..851e898f 100644
+--- a/src/dispute/DisputeGameFactory.sol
++++ b/src/dispute/DisputeGameFactory.sol
+@@ -143,11 +143,13 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
+     /// @param _gameType The type of the DisputeGame - used to decide the proxy implementation.
+     /// @param _rootClaim The root claim of the DisputeGame.
+     /// @param _extraData Any extra data that should be provided to the created dispute game.
++    /// @param _initData The initialization data for the DisputeGame.
+     /// @return proxy_ The address of the created DisputeGame proxy.
+     function create(
+         GameType _gameType,
+         Claim _rootClaim,
+-        bytes calldata _extraData
++        bytes calldata _extraData,
++        bytes calldata _initData
+     )
+         external
+         payable
+@@ -165,7 +167,9 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
+         // Get the hash of the parent block.
+         bytes32 parentHash = blockhash(block.number - 1);
+ 
+-        if (gameArgs[_gameType].length == 0) {
++        // Cache gameArgs to avoid stack-too-deep errors
++        bytes memory implArgs = gameArgs[_gameType];
++        if (implArgs.length == 0) {
+             // Clone the implementation contract and initialize it with the given parameters.
+             //
+             // CWIA Calldata Layout:
+@@ -193,13 +197,10 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
+             // │ [88 + n, 88 + n + m) │ Implementation args (opaque)        │
+             // └──────────────────────┴─────────────────────────────────────┘
+             proxy_ = IDisputeGame(
+-                address(impl)
+-                    .clone(
+-                        abi.encodePacked(msg.sender, _rootClaim, parentHash, _gameType, _extraData, gameArgs[_gameType])
+-                    )
++                address(impl).clone(abi.encodePacked(msg.sender, _rootClaim, parentHash, _gameType, _extraData, implArgs))
+             );
+         }
+-        proxy_.initialize{ value: msg.value }();
++        proxy_.initialize{ value: msg.value }(_initData);
+ 
+         // Compute the unique identifier for the dispute game.
+         Hash uuid = getGameUUID(_gameType, _rootClaim, _extraData);
