@@ -4,25 +4,25 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 
 // Optimism
-import {AnchorStateRegistry} from "optimism/src/dispute/AnchorStateRegistry.sol";
-import {DelayedWETH} from "optimism/src/dispute/DelayedWETH.sol";
-import {DisputeGameFactory} from "optimism/src/dispute/DisputeGameFactory.sol";
-import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
-import {IDelayedWETH} from "optimism/interfaces/dispute/IDelayedWETH.sol";
-import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
-import {IDisputeGameFactory} from "optimism/interfaces/dispute/IDisputeGameFactory.sol";
-import {ISystemConfig} from "optimism/interfaces/L1/ISystemConfig.sol";
-import {Claim, GameStatus, GameType, Hash, Proposal, Timestamp} from "optimism/src/dispute/lib/Types.sol";
+import {AnchorStateRegistry} from "src/dispute/AnchorStateRegistry.sol";
+import {DelayedWETH} from "src/dispute/DelayedWETH.sol";
+import {DisputeGameFactory} from "src/dispute/DisputeGameFactory.sol";
+import {IAnchorStateRegistry} from "interfaces/dispute/IAnchorStateRegistry.sol";
+import {IDelayedWETH} from "interfaces/dispute/IDelayedWETH.sol";
+import {IDisputeGame} from "interfaces/dispute/IDisputeGame.sol";
+import {IDisputeGameFactory} from "interfaces/dispute/IDisputeGameFactory.sol";
+import {ISystemConfig} from "interfaces/L1/ISystemConfig.sol";
+import {Claim, GameStatus, GameType, Hash, Proposal, Timestamp} from "src/dispute/lib/Types.sol";
 
 // OpenZeppelin
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {AggregateVerifier} from "src/AggregateVerifier.sol";
-import {IVerifier} from "src/interfaces/IVerifier.sol";
+import {AggregateVerifier} from "src/multiproof/AggregateVerifier.sol";
+import {IVerifier} from "interfaces/multiproof/IVerifier.sol";
 
-import {MockSystemConfig} from "src/mocks/MockSystemConfig.sol";
-import {MockVerifier} from "src/mocks/MockVerifier.sol";
+import {MockSystemConfig} from "src/multiproof/mocks/MockSystemConfig.sol";
+import {MockVerifier} from "src/multiproof/mocks/MockVerifier.sol";
 
 contract BaseTest is Test {
     // Constants

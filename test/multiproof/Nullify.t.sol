@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import {GameNotInProgress} from "optimism/src/dispute/lib/Errors.sol";
-import {Claim, GameStatus} from "optimism/src/dispute/lib/Types.sol";
+import {GameNotInProgress} from "src/dispute/lib/Errors.sol";
+import {Claim, GameStatus} from "src/dispute/lib/Types.sol";
 
-import {AggregateVerifier} from "src/AggregateVerifier.sol";
+import {AggregateVerifier} from "src/multiproof/AggregateVerifier.sol";
 
-import {BaseTest} from "test/BaseTest.t.sol";
+import {BaseTest} from "./BaseTest.t.sol";
 
 contract NullifyTest is BaseTest {
     function testNullifyWithTEEProof() public {

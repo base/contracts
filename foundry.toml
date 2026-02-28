@@ -43,6 +43,7 @@ remappings = [
   '@openzeppelin/contracts-v5/=lib/openzeppelin-contracts-v5/contracts',
   '@rari-capital/solmate/=lib/solmate',
   '@lib-keccak/=lib/lib-keccak/contracts/lib',
+  'solady/=lib/solady/src/',
   '@solady/=lib/solady/src',
   '@solady-v0.0.245/=lib/solady-v0.0.245/src',
   'forge-std/=lib/forge-std/src',
@@ -50,7 +51,8 @@ remappings = [
   'safe-contracts/=lib/safe-contracts/contracts',
   'kontrol-cheatcodes/=lib/kontrol-cheatcodes/src',
   'interfaces/=interfaces',
-  'optimism/=lib/optimism/packages/contracts-bedrock/',
+  '@nitro-validator/=lib/nitro-validator/src/',
+  '@op-enclave/=lib/op-enclave/contracts/src/'
 ]
 
 fs_permissions = [

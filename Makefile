@@ -9,7 +9,7 @@ install-foundry:
 	~/.foundry/bin/foundryup
 
 .PHONY: deps
-deps: clean-lib checkout-op-commit
+deps: clean-lib
 	forge install --no-git \
 		github.com/foundry-rs/forge-std@6853b9ec7df5dc0c213b05ae67785ad4f4baa0ea \
 		github.com/runtimeverification/kontrol-cheatcodes@2c48ae1ab44228c199dca29414c0b4b18a3434e6 \

@@ -11,19 +11,19 @@ import {
     GameNotResolved,
     GamePaused,
     NoCreditToClaim
-} from "optimism/src/dispute/lib/Errors.sol";
-import {IDelayedWETH} from "optimism/interfaces/dispute/IDelayedWETH.sol";
-import {IDisputeGame} from "optimism/interfaces/dispute/IDisputeGame.sol";
-import {IDisputeGameFactory} from "optimism/interfaces/dispute/IDisputeGameFactory.sol";
-import {IAnchorStateRegistry} from "optimism/interfaces/dispute/IAnchorStateRegistry.sol";
-import {Claim, GameStatus, GameType, Hash, Proposal, Timestamp} from "optimism/src/dispute/lib/Types.sol";
+} from "src/dispute/lib/Errors.sol";
+import {IDelayedWETH} from "interfaces/dispute/IDelayedWETH.sol";
+import {IDisputeGame} from "interfaces/dispute/IDisputeGame.sol";
+import {IDisputeGameFactory} from "interfaces/dispute/IDisputeGameFactory.sol";
+import {IAnchorStateRegistry} from "interfaces/dispute/IAnchorStateRegistry.sol";
+import {Claim, GameStatus, GameType, Hash, Proposal, Timestamp} from "src/dispute/lib/Types.sol";
 
 // Solady
-import {Clone} from "solady/utils/Clone.sol";
-import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
-import {ReentrancyGuard} from "solady/utils/ReentrancyGuard.sol";
+import {Clone} from "@solady/utils/Clone.sol";
+import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
+import {ReentrancyGuard} from "@solady/utils/ReentrancyGuard.sol";
 
-import {IVerifier} from "./interfaces/IVerifier.sol";
+import {IVerifier} from "interfaces/multiproof/IVerifier.sol";
 
 contract AggregateVerifier is Clone, ReentrancyGuard {
     ////////////////////////////////////////////////////////////////

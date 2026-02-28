@@ -8,11 +8,11 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 import {ICertManager} from "@nitro-validator/ICertManager.sol";
 
-import {DevSystemConfigGlobal} from "src/tee/DevSystemConfigGlobal.sol";
-import {SystemConfigGlobal} from "src/tee/SystemConfigGlobal.sol";
-import {TEEVerifier} from "src/tee/TEEVerifier.sol";
+import {DevSystemConfigGlobal} from "src/multiproof/tee/DevSystemConfigGlobal.sol";
+import {SystemConfigGlobal} from "src/multiproof/tee/SystemConfigGlobal.sol";
+import {TEEVerifier} from "src/multiproof/tee/TEEVerifier.sol";
 
-import {MockCertManager} from "src/mocks/MockCertManager.sol";
+import {MockCertManager} from "src/multiproof/mocks/MockCertManager.sol";
 
 contract TEEVerifierTest is Test {
     TEEVerifier public verifier;

@@ -8,10 +8,10 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 import {ICertManager} from "@nitro-validator/ICertManager.sol";
 
-import {DevSystemConfigGlobal} from "src/tee/DevSystemConfigGlobal.sol";
-import {SystemConfigGlobal} from "src/tee/SystemConfigGlobal.sol";
+import {DevSystemConfigGlobal} from "src/multiproof/tee/DevSystemConfigGlobal.sol";
+import {SystemConfigGlobal} from "src/multiproof/tee/SystemConfigGlobal.sol";
 
-import {MockCertManager} from "src/mocks/MockCertManager.sol";
+import {MockCertManager} from "src/multiproof/mocks/MockCertManager.sol";
 
 /// @notice Tests for SystemConfigGlobal and DevSystemConfigGlobal contracts.
 /// @dev IMPORTANT: This test file uses DevSystemConfigGlobal as the implementation because
