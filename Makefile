@@ -34,16 +34,6 @@ deps: clean-lib
 test:
 	forge test --ffi -vvv
 
-.PHONY: test-multiproof
-test-multiproof:
-	@set -e; \
-	echo "Applying patch..."; \
-	git apply multiproof_tests/optimism.patch; \
-	trap 'echo "Reverting patch..."; git apply -R multiproof_tests/optimism.patch' EXIT; \
-	echo "Running tests..."; \
-	FOUNDRY_PROFILE=multiproof forge test --ffi -vvv
-
-
 .PHONY: clean-lib
 clean-lib:
 	rm -rf lib

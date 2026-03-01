@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import { ICertManager } from "@nitro-validator/ICertManager.sol";
 
-import { SystemConfigGlobal } from "./SystemConfigGlobal.sol";
+import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
 
 /// @title DevSystemConfigGlobal
 /// @notice Development version of SystemConfigGlobal with bypassed attestation for testing.
