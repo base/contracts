@@ -7,7 +7,6 @@ kout-proofs
 test/kontrol/logs
 out
 lib
-multiproof-out
 
 # Metrics
 coverage.out
