@@ -452,7 +452,7 @@ contract SuperFaultDisputeGame_Initialize_Test is SuperFaultDisputeGame_TestInit
     /// @notice Tests that the game cannot be initialized twice.
     function test_initialize_onlyOnce_succeeds() public {
         vm.expectRevert(AlreadyInitialized.selector);
-        gameProxy.initialize();
+        gameProxy.initialize(bytes(""));
     }
 
     /// @notice Tests that initialization reverts when oracle challenge period is too large.
