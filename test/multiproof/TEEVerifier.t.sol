@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
-import {ICertManager} from "@nitro-validator/ICertManager.sol";
+import {ICertManager} from "lib/nitro-validator/src/ICertManager.sol";
 
 import {DevSystemConfigGlobal} from "src/multiproof/mocks/MockDevSystemConfigGlobal.sol";
 import {SystemConfigGlobal} from "src/multiproof/tee/SystemConfigGlobal.sol";

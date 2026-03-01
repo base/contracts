@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { LibCborElement, CborElement, CborDecode } from "@nitro-validator/CborDecode.sol";
-import { ICertManager } from "@nitro-validator/ICertManager.sol";
-import { LibBytes } from "@nitro-validator/LibBytes.sol";
-import { NitroValidator } from "@nitro-validator/NitroValidator.sol";
-import { OwnableManagedUpgradeable } from "@op-enclave/OwnableManagedUpgradeable.sol";
+import { LibCborElement, CborElement, CborDecode } from "lib/nitro-validator/src/CborDecode.sol";
+import { ICertManager } from "lib/nitro-validator/src/ICertManager.sol";
+import { LibBytes } from "lib/nitro-validator/src/LibBytes.sol";
+import { NitroValidator } from "lib/nitro-validator/src//NitroValidator.sol";
+import { OwnableManagedUpgradeable } from "lib/op-enclave/contracts/src/OwnableManagedUpgradeable.sol";
 
 /// @title SystemConfigGlobal
 /// @notice Manages TEE signer registration via AWS Nitro attestation.

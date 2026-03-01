@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { ICertManager } from "@nitro-validator/ICertManager.sol";
+import { ICertManager } from "lib/nitro-validator/src/ICertManager.sol";
 
 /// @title MockCertManager
 /// @notice Mock CertManager for testing SystemConfigGlobal.
