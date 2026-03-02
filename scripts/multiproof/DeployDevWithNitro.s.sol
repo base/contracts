@@ -91,13 +91,16 @@ import {
 } from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { Script } from "forge-std/Script.sol";
-import { stdJson } from "forge-std/StdJson.sol";
 import { console2 as console } from "forge-std/console2.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
 import { DisputeGameFactory } from "src/dispute/DisputeGameFactory.sol";
 import { GameType, Hash } from "src/dispute/lib/Types.sol";
+
+import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
+import { Config } from "scripts/libraries/Config.sol";
+import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
@@ -113,8 +116,6 @@ import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 /// @notice Development deployment WITH AWS Nitro attestation validation.
 /// @dev Uses real SystemConfigGlobal which requires registerSigner() with valid attestation.
 contract DeployDevWithNitro is Script {
-    using stdJson for string;
-
     /// @notice Constant from Optimism's Constants.sol - the storage slot for proxy admin.
     bytes32 internal constant PROXY_OWNER_ADDRESS = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
@@ -122,18 +123,8 @@ contract DeployDevWithNitro is Script {
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 10;
     uint256 public constant INIT_BOND = 0.001 ether;
 
-    /// @notice Config struct to reduce stack variables.
-    struct DeployConfig {
-        address owner;
-        bytes32 teeImageHash;
-        address teeProposer;
-        address nitroEnclaveVerifier;
-        GameType gameType;
-        uint256 gameTypeRaw;
-        bytes32 genesisOutputRoot;
-        uint256 genesisBlockNumber;
-        bytes32 configHash;
-    }
+    DeployConfig public constant cfg =
+        DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
 
     // Deployed addresses
     address public systemConfigGlobalProxy;
@@ -143,60 +134,44 @@ contract DeployDevWithNitro is Script {
     address public mockDelayedWETH;
     address public aggregateVerifier;
 
-    function run() public {
-        DeployConfig memory cfg = loadConfig();
+    function setUp() public {
+        DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
+        cfg.read(Config.deployConfigPath());
+    }
 
+    function run() public {
         console.log("=== Deploying Dev Infrastructure (WITH NITRO) ===");
         console.log("Chain ID:", block.chainid);
-        console.log("Owner:", cfg.owner);
-        console.log("TEE Proposer:", cfg.teeProposer);
-        console.log("Game Type:", cfg.gameTypeRaw);
+        console.log("Owner:", cfg.finalSystemOwner());
+        console.log("TEE Proposer:", cfg.teeProposer());
+        console.log("Game Type:", cfg.multiproofGameType());
         console.log("");
         console.log("NOTE: Using REAL SystemConfigGlobal - ZK attestation proof REQUIRED.");
-        console.log("NitroEnclaveVerifier:", cfg.nitroEnclaveVerifier);
+        console.log("NitroEnclaveVerifier:", cfg.nitroEnclaveVerifier());
 
         vm.startBroadcast();
 
-        _deployTEEContracts(cfg.owner, cfg.nitroEnclaveVerifier);
-        _registerProposer(cfg.teeProposer);
-        _deployInfrastructure(cfg);
-        _deployAggregateVerifier(cfg);
+        _deployTEEContracts(cfg.finalSystemOwner(), cfg.nitroEnclaveVerifier());
+        _registerProposer(cfg.teeProposer());
+        _deployInfrastructure();
+        _deployAggregateVerifier();
 
         vm.stopBroadcast();
 
-        _printSummary(cfg);
+        _printSummary();
         _writeOutput();
     }
 
-    function loadConfig() public view returns (DeployConfig memory cfg) {
-        string memory configPath = vm.envOr("DEPLOY_CONFIG_PATH", string("deploy-config/sepolia-with-nitro.json"));
-        string memory config = vm.readFile(configPath);
-
-        cfg.owner = config.readAddress(".finalSystemOwner");
-        cfg.teeImageHash = config.readBytes32(".teeImageHash");
-        cfg.teeProposer = config.readAddressOr(".teeProposer", cfg.owner);
-        cfg.nitroEnclaveVerifier = config.readAddress(".nitroEnclaveVerifier");
-        cfg.gameTypeRaw = config.readUintOr(".gameType", 621);
-        cfg.gameType = GameType.wrap(uint32(cfg.gameTypeRaw));
-        cfg.genesisOutputRoot = config.readBytes32Or(".genesisOutputRoot", bytes32(uint256(1)));
-        cfg.genesisBlockNumber = config.readUintOr(".genesisBlockNumber", 0);
-        cfg.configHash = config.readBytes32Or(".configHash", bytes32(0));
-    }
-
-    function _deployTEEContracts(address owner, address nitroEnclaveVerifier) internal {
-        // 1. SystemConfigGlobal (REAL version) - requires ZK attestation proof for signer registration
-        address scgImpl = address(new SystemConfigGlobal(INitroEnclaveVerifier(nitroEnclaveVerifier)));
-        console.log("NitroEnclaveVerifier (external):", nitroEnclaveVerifier);
+    function _deployTEEContracts(address owner, address _nitroEnclaveVerifier) internal {
+        address scgImpl = address(new SystemConfigGlobal(INitroEnclaveVerifier(_nitroEnclaveVerifier)));
+        console.log("NitroEnclaveVerifier (external):", _nitroEnclaveVerifier);
         systemConfigGlobalProxy = address(
             new TransparentUpgradeableProxy(
-                scgImpl,
-                address(0xdead), // Non-upgradeable for testing
-                abi.encodeCall(SystemConfigGlobal.initialize, (owner, owner))
+                scgImpl, address(0xdead), abi.encodeCall(SystemConfigGlobal.initialize, (owner, owner))
             )
         );
         console.log("SystemConfigGlobal:", systemConfigGlobalProxy);
 
-        // 2. TEEVerifier
         teeVerifier = address(new TEEVerifier(SystemConfigGlobal(systemConfigGlobalProxy)));
         console.log("TEEVerifier:", teeVerifier);
     }
@@ -206,65 +181,65 @@ contract DeployDevWithNitro is Script {
         console.log("Registered TEE proposer:", teeProposer);
     }
 
-    function _deployInfrastructure(DeployConfig memory cfg) internal {
-        // 4. REAL DisputeGameFactory (behind proxy)
+    function _deployInfrastructure() internal {
         address factoryImpl = address(new DisputeGameFactory());
-        MinimalProxyAdmin proxyAdmin = new MinimalProxyAdmin(cfg.owner);
+        MinimalProxyAdmin proxyAdmin = new MinimalProxyAdmin(cfg.finalSystemOwner());
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(factoryImpl, address(proxyAdmin), "");
 
         vm.store(address(proxy), PROXY_OWNER_ADDRESS, bytes32(uint256(uint160(address(proxyAdmin)))));
-        DisputeGameFactory(address(proxy)).initialize(cfg.owner);
+        DisputeGameFactory(address(proxy)).initialize(cfg.finalSystemOwner());
 
         disputeGameFactory = address(proxy);
         console.log("DisputeGameFactory:", disputeGameFactory);
 
-        // 5. Mock AnchorStateRegistry
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
         mockAnchorRegistry = address(asr);
-        asr.initialize(disputeGameFactory, Hash.wrap(cfg.genesisOutputRoot), cfg.genesisBlockNumber, cfg.gameType);
+        asr.initialize(
+            disputeGameFactory,
+            Hash.wrap(cfg.multiproofGenesisOutputRoot()),
+            cfg.multiproofGenesisBlockNumber(),
+            GameType.wrap(uint32(cfg.multiproofGameType()))
+        );
         console.log("AnchorStateRegistry (mock):", mockAnchorRegistry);
     }
 
-    function _deployAggregateVerifier(DeployConfig memory cfg) internal {
-        // 6. Mock ZK Verifier
+    function _deployAggregateVerifier() internal {
         address zkVerifier = address(new MockVerifier());
         console.log("MockVerifier (ZK):", zkVerifier);
 
-        // 6.5. Mock DelayedWETH for bond handling
         mockDelayedWETH = address(new MockDelayedWETH());
         console.log("MockDelayedWETH:", mockDelayedWETH);
 
-        // 7. AggregateVerifier
         aggregateVerifier = address(
             new AggregateVerifier(
-                cfg.gameType,
+                GameType.wrap(uint32(cfg.multiproofGameType())),
                 IAnchorStateRegistry(mockAnchorRegistry),
                 IDelayedWETH(payable(mockDelayedWETH)),
                 IVerifier(teeVerifier),
                 IVerifier(zkVerifier),
-                cfg.teeImageHash,
-                bytes32(0), // zkImageHash (unused)
-                cfg.configHash,
-                8453, // l2ChainId (Base mainnet)
+                cfg.teeImageHash(),
+                bytes32(0),
+                cfg.multiproofConfigHash(),
+                8453,
                 BLOCK_INTERVAL,
                 INTERMEDIATE_BLOCK_INTERVAL
             )
         );
         console.log("AggregateVerifier:", aggregateVerifier);
 
-        // 8. Register AggregateVerifier with the factory
-        DisputeGameFactory(disputeGameFactory).setImplementation(cfg.gameType, IDisputeGame(aggregateVerifier));
-        DisputeGameFactory(disputeGameFactory).setInitBond(cfg.gameType, INIT_BOND);
+        DisputeGameFactory(disputeGameFactory)
+            .setImplementation(GameType.wrap(uint32(cfg.multiproofGameType())), IDisputeGame(aggregateVerifier));
+        DisputeGameFactory(disputeGameFactory).setInitBond(GameType.wrap(uint32(cfg.multiproofGameType())), INIT_BOND);
         console.log("Registered AggregateVerifier with factory");
     }
 
-    function _printSummary(DeployConfig memory cfg) internal view {
+    function _printSummary() internal view {
         console.log("\n========================================");
         console.log("   DEV DEPLOYMENT COMPLETE (WITH NITRO)");
         console.log("========================================");
         console.log("\nTEE Contracts:");
-        console.log("  NitroEnclaveVerifier (external):", cfg.nitroEnclaveVerifier);
+        console.log("  NitroEnclaveVerifier (external):", cfg.nitroEnclaveVerifier());
         console.log("  SystemConfigGlobal:", systemConfigGlobalProxy);
         console.log("  TEEVerifier:", teeVerifier);
         console.log("\nInfrastructure:");
@@ -273,9 +248,9 @@ contract DeployDevWithNitro is Script {
         console.log("  DelayedWETH (mock):", mockDelayedWETH);
         console.log("\nGame:");
         console.log("  AggregateVerifier:", aggregateVerifier);
-        console.log("  Game Type:", cfg.gameTypeRaw);
-        console.log("  TEE Image Hash:", vm.toString(cfg.teeImageHash));
-        console.log("  Config Hash:", vm.toString(cfg.configHash));
+        console.log("  Game Type:", cfg.multiproofGameType());
+        console.log("  TEE Image Hash:", vm.toString(cfg.teeImageHash()));
+        console.log("  Config Hash:", vm.toString(cfg.multiproofConfigHash()));
         console.log("========================================");
         console.log("\n>>> NEXT STEPS (ZK ATTESTATION PROOF REQUIRED) <<<");
         console.log("\n1. Register the PCR0 (raw 48-byte enclave image hash):");

@@ -1,5 +1,5 @@
 {
-  "finalSystemOwner": "0xfd1D2e729aE8eEe2E146c033bf4400fE75284301",
+  "finalSystemOwner": "0x6e427c3212C0b63BE0C382F97715D49b011bFF33",
   "superchainConfigGuardian": "0xfd1D2e729aE8eEe2E146c033bf4400fE75284301",
   "l1StartingBlockTag": "0x48f520cf4ddaf34c8336e6e490632ea3cf1e5e93b0b2bc6e917557e31845371b",
   "l1ChainID": 11155111,
@@ -64,5 +64,12 @@
   "gasPayingTokenName": "",
   "gasPayingTokenSymbol": "",
   "nativeAssetLiquidityAmount": null,
-  "liquidityControllerOwner": "0xfd1D2e729aE8eEe2E146c033bf4400fE75284301"
+  "liquidityControllerOwner": "0xfd1D2e729aE8eEe2E146c033bf4400fE75284301",
+  "teeImageHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+  "multiproofConfigHash": "0x12e9c45f19f9817c6d4385fad29e7a70c355502cf0883e76a9a7e478a85d1360",
+  "multiproofGameType": 621,
+  "teeProposer": "0xb28E6890Cffa969dA9851c1BF1Ac34B76EbFEe98",
+  "nitroEnclaveVerifier": "0x0000000000000000000000000000000000000000",
+  "multiproofGenesisOutputRoot": "0xbc273d5876d1858ecd5aaf4ce4eaf16c73f0187ca4271b774ed5da7d2254ba79",
+  "multiproofGenesisBlockNumber": 37223829
 }

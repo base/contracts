@@ -97,6 +97,10 @@ contract DeployConfig is Script {
     bytes32 public teeImageHash;
     bytes32 public multiproofConfigHash;
     uint256 public multiproofGameType;
+    address public teeProposer;
+    address public nitroEnclaveVerifier;
+    bytes32 public multiproofGenesisOutputRoot;
+    uint256 public multiproofGenesisBlockNumber;
 
     bool public useInterop;
     bool public useUpgradedFork;
@@ -200,6 +204,10 @@ contract DeployConfig is Script {
         teeImageHash = bytes32(_readOr(_json, "$.teeImageHash", 0));
         multiproofConfigHash = bytes32(_readOr(_json, "$.multiproofConfigHash", 0));
         multiproofGameType = _readOr(_json, "$.multiproofGameType", 621);
+        teeProposer = _readOr(_json, "$.teeProposer", finalSystemOwner);
+        nitroEnclaveVerifier = _readOr(_json, "$.nitroEnclaveVerifier", address(0));
+        multiproofGenesisOutputRoot = bytes32(_readOr(_json, "$.multiproofGenesisOutputRoot", uint256(1)));
+        multiproofGenesisBlockNumber = _readOr(_json, "$.multiproofGenesisBlockNumber", 0);
     }
 
     function fork() public view returns (Fork fork_) {
