@@ -191,6 +191,10 @@
     "initCodeHash": "0xa464c608edf80a5f4277b081be1c302605b05036befb744bbe1dcb42b151ea96",
     "sourceCodeHash": "0xf2df70bdcdfd489b31077e33dba55174ac4a1bf742fd93e69510528ee2ea5a57"
   },
+  "src/dispute/DisputeGameFactory.sol:DisputeGameFactory:dispute": {
+    "initCodeHash": "0x5377f55b80de4f18ea270cf73bfdfbf5bae9f5d9065445aaacecbf3256a3f700",
+    "sourceCodeHash": "0xf2df70bdcdfd489b31077e33dba55174ac4a1bf742fd93e69510528ee2ea5a57"
+  },
   "src/dispute/FaultDisputeGame.sol:FaultDisputeGame": {
     "initCodeHash": "0xe7d3c982532946d196d7efadb9e2576c76b8f9e0d1f885ac36977d6f3fb72a65",
     "sourceCodeHash": "0x9c8bca8da051d33272da326d422e980239135def0662fb3476c702b72ac5f77b"
@@ -232,6 +236,10 @@
     "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
+    "initCodeHash": "0x2d681a39e518379b6d2c013735ae25a9bcf6e939d597bde9e6126375b86fd294",
+    "sourceCodeHash": "0xf1ec5f9b79fa641ab6ad4c6a2ff6e8fb313df953f773a7c8923e911fa465ffb3"
+  },
+  "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal:dispute": {
     "initCodeHash": "0x73537cace710afd0dc4ea7c2e25687a29cee13843617f518a3edeb8e79cf324c",
     "sourceCodeHash": "0xf1ec5f9b79fa641ab6ad4c6a2ff6e8fb313df953f773a7c8923e911fa465ffb3"
   },

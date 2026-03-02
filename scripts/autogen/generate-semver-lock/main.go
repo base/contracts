@@ -81,6 +81,9 @@ func processFile(file string) (*SemverLockResult, []error) {
 		sourceFilePath = path
 		contractName = name
 		contractKey = sourceFilePath + ":" + name
+		if strings.HasSuffix(file, ".dispute.json") {
+			contractKey += ":dispute"
+		}
 		break
 	}
 
