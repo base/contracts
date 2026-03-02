@@ -116,7 +116,7 @@ pragma solidity 0.8.15;
  * ══════════════════════════════════════════════════════════════════════════════════
  */
 
-import { CertManager } from "@nitro-validator/CertManager.sol";
+import { CertManager } from "lib/nitro-validator/src/CertManager.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { Script } from "forge-std/Script.sol";
 import { stdJson } from "forge-std/StdJson.sol";
@@ -172,7 +172,7 @@ contract DeployDevWithNitro is Script {
     address public aggregateVerifier;
 
     function run() public {
-        DeployConfig memory cfg = _loadConfig();
+        DeployConfig memory cfg = loadConfig();
 
         console.log("=== Deploying Dev Infrastructure (WITH NITRO) ===");
         console.log("Chain ID:", block.chainid);
@@ -195,7 +195,7 @@ contract DeployDevWithNitro is Script {
         _writeOutput();
     }
 
-    function _loadConfig() internal view returns (DeployConfig memory cfg) {
+    function loadConfig() public view returns (DeployConfig memory cfg) {
         string memory configPath = vm.envOr("DEPLOY_CONFIG_PATH", string("deploy-config/sepolia-with-nitro.json"));
         string memory config = vm.readFile(configPath);
 

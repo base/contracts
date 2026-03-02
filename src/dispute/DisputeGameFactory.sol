@@ -197,7 +197,8 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
             // │ [88 + n, 88 + n + m) │ Implementation args (opaque)        │
             // └──────────────────────┴─────────────────────────────────────┘
             proxy_ = IDisputeGame(
-                address(impl).clone(abi.encodePacked(msg.sender, _rootClaim, parentHash, _gameType, _extraData, implArgs))
+                address(impl)
+                    .clone(abi.encodePacked(msg.sender, _rootClaim, parentHash, _gameType, _extraData, implArgs))
             );
         }
         proxy_.initialize{ value: msg.value }(_initData);

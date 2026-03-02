@@ -1,28 +1,28 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test} from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
 // Optimism
-import {AnchorStateRegistry} from "src/dispute/AnchorStateRegistry.sol";
-import {DelayedWETH} from "src/dispute/DelayedWETH.sol";
-import {DisputeGameFactory} from "src/dispute/DisputeGameFactory.sol";
-import {IAnchorStateRegistry} from "interfaces/dispute/IAnchorStateRegistry.sol";
-import {IDelayedWETH} from "interfaces/dispute/IDelayedWETH.sol";
-import {IDisputeGame} from "interfaces/dispute/IDisputeGame.sol";
-import {IDisputeGameFactory} from "interfaces/dispute/IDisputeGameFactory.sol";
-import {ISystemConfig} from "interfaces/L1/ISystemConfig.sol";
-import {Claim, GameStatus, GameType, Hash, Proposal, Timestamp} from "src/dispute/lib/Types.sol";
+import { AnchorStateRegistry } from "src/dispute/AnchorStateRegistry.sol";
+import { DelayedWETH } from "src/dispute/DelayedWETH.sol";
+import { DisputeGameFactory } from "src/dispute/DisputeGameFactory.sol";
+import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
+import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
+import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
+import { Claim, GameStatus, GameType, Hash, Proposal, Timestamp } from "src/dispute/lib/Types.sol";
 
 // OpenZeppelin
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {AggregateVerifier} from "src/multiproof/AggregateVerifier.sol";
-import {IVerifier} from "interfaces/multiproof/IVerifier.sol";
+import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
+import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 
-import {MockSystemConfig} from "src/multiproof/mocks/MockSystemConfig.sol";
-import {MockVerifier} from "src/multiproof/mocks/MockVerifier.sol";
+import { MockSystemConfig } from "src/multiproof/mocks/MockSystemConfig.sol";
+import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
 
 contract BaseTest is Test {
     // Constants
@@ -148,7 +148,10 @@ contract BaseTest is Test {
         uint256 l2BlockNumber,
         uint32 parentIndex,
         bytes memory proof
-    ) internal returns (AggregateVerifier game) {
+    )
+        internal
+        returns (AggregateVerifier game)
+    {
         bytes memory intermediateRoots =
             abi.encodePacked(_generateIntermediateRootsExceptLast(l2BlockNumber), rootClaim.raw());
         bytes memory extraData = abi.encodePacked(uint256(l2BlockNumber), uint32(parentIndex), intermediateRoots);
@@ -156,7 +159,7 @@ contract BaseTest is Test {
         vm.deal(creator, INIT_BOND);
         vm.prank(creator);
         return AggregateVerifier(
-            address(factory.create{value: INIT_BOND}(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, proof))
+            address(factory.create{ value: INIT_BOND }(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, proof))
         );
     }
 
@@ -171,7 +174,10 @@ contract BaseTest is Test {
     /// @param salt A salt to make proofs unique.
     /// @param proofType The type of proof to generate.
     /// @return proof The formatted proof bytes.
-    function _generateProof(bytes memory salt, AggregateVerifier.ProofType proofType)
+    function _generateProof(
+        bytes memory salt,
+        AggregateVerifier.ProofType proofType
+    )
         internal
         view
         returns (bytes memory)

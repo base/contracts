@@ -67,6 +67,7 @@ import { INativeAssetLiquidity } from "interfaces/L2/INativeAssetLiquidity.sol";
 import { IFeeSplitter } from "interfaces/L2/IFeeSplitter.sol";
 import { IL1Withdrawer } from "interfaces/L2/IL1Withdrawer.sol";
 import { ISuperchainRevSharesCalculator } from "interfaces/L2/ISuperchainRevSharesCalculator.sol";
+import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 
 /// @title Setup
 /// @dev This contact is responsible for setting up the contracts in state. It currently
@@ -156,6 +157,7 @@ abstract contract Setup is FeatureFlags {
     IFeeSplitter feeSplitter = IFeeSplitter(payable(Predeploys.FEE_SPLITTER));
     IL1Withdrawer l1Withdrawer;
     ISuperchainRevSharesCalculator superchainRevSharesCalculator;
+    IVerifier aggregateVerifier;
 
     /// @notice Indicates whether a test is running against a forked production network.
     function isForkTest() public view returns (bool) {
@@ -294,6 +296,7 @@ abstract contract Setup is FeatureFlags {
         superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
         superchainProxyAdminOwner = superchainProxyAdmin.owner();
         mips = IBigStepper(artifacts.mustGetAddress("MipsSingleton"));
+        aggregateVerifier = IVerifier(artifacts.mustGetAddress("AggregrateVerifier"));
 
         if (deploy.cfg().useAltDA()) {
             dataAvailabilityChallenge =

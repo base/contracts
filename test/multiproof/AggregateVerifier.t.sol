@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import {BadExtraData} from "src/dispute/lib/Errors.sol";
-import {IAnchorStateRegistry} from "interfaces/dispute/IAnchorStateRegistry.sol";
-import {IDelayedWETH} from "interfaces/dispute/IDelayedWETH.sol";
-import {IDisputeGame} from "interfaces/dispute/IDisputeGame.sol";
-import {IDisputeGameFactory} from "interfaces/dispute/IDisputeGameFactory.sol";
-import {Claim, GameStatus, Hash, Timestamp} from "src/dispute/lib/Types.sol";
+import { BadExtraData } from "src/dispute/lib/Errors.sol";
+import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
+import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
+import { Claim, GameStatus, Hash, Timestamp } from "src/dispute/lib/Types.sol";
 
-import {AggregateVerifier} from "src/multiproof/AggregateVerifier.sol";
-import {IVerifier} from "interfaces/multiproof/IVerifier.sol";
+import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
+import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 
-import {BaseTest} from "./BaseTest.t.sol";
+import { BaseTest } from "./BaseTest.t.sol";
 
 contract AggregateVerifierTest is BaseTest {
     function testInitializeWithTEEProof() public {
@@ -74,7 +74,7 @@ contract AggregateVerifierTest is BaseTest {
 
         vm.prank(TEE_PROVER);
         vm.expectRevert(BadExtraData.selector);
-        factory.create{value: INIT_BOND}(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, initData);
+        factory.create{ value: INIT_BOND }(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, initData);
     }
 
     function testUpdatingAnchorStateRegistryWithTEEProof() public {

@@ -39,10 +39,17 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IOPContractsManagerStandardValidator } from "interfaces/L1/IOPContractsManagerStandardValidator.sol";
+import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
 import { DevFeatures } from "src/libraries/DevFeatures.sol";
+import { CertManager } from "lib/nitro-validator/src/CertManager.sol";
+import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
+import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
+import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
+import { DeployDevWithNitro } from "../multiproof/DeployDevWithNitro.s.sol";
+import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
 
 contract DeployImplementations is Script {
     struct Input {
@@ -95,6 +102,7 @@ contract DeployImplementations is Script {
         IPermissionedDisputeGameV2 permissionedDisputeGameV2Impl;
         ISuperFaultDisputeGame superFaultDisputeGameImpl;
         ISuperPermissionedDisputeGame superPermissionedDisputeGameImpl;
+        IVerifier aggregateVerifierImpl;
     }
 
     bytes32 internal _salt = DeployUtils.DEFAULT_SALT;
@@ -128,6 +136,7 @@ contract DeployImplementations is Script {
         deployAnchorStateRegistryImpl(_input, output_);
         deployFaultDisputeGameV2Impl(_input, output_);
         deployPermissionedDisputeGameV2Impl(_input, output_);
+        deployAggregateVerifierImpl(_input, output_);
         if (DevFeatures.isDevFeatureEnabled(_input.devFeatureBitmap, DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
             deploySuperFaultDisputeGameImpl(_input, output_);
             deploySuperPermissionedDisputeGameImpl(_input, output_);
@@ -693,6 +702,37 @@ contract DeployImplementations is Script {
         );
         vm.label(address(impl), "OPContractsManagerStandardValidatorImpl");
         _output.opcmStandardValidator = impl;
+    }
+
+    function deployAggregateVerifierImpl(Input memory, Output memory _output) private {
+        DeployDevWithNitro nitro = new DeployDevWithNitro();
+        DeployDevWithNitro.DeployConfig memory cfg = nitro.loadConfig();
+
+        address zkVerifier = address(new MockVerifier());
+
+        address certManager = address(new CertManager());
+        SystemConfigGlobal scgImpl = new SystemConfigGlobal(CertManager(certManager));
+        address teeVerifierImpl = address(new TEEVerifier(scgImpl));
+
+        IVerifier aggregateVerifierImpl = IVerifier(
+            address(
+                new AggregateVerifier(
+                    cfg.gameType,
+                    _output.anchorStateRegistryImpl,
+                    _output.delayedWETHImpl,
+                    IVerifier(teeVerifierImpl),
+                    IVerifier(zkVerifier),
+                    cfg.teeImageHash,
+                    bytes32(0),
+                    cfg.configHash,
+                    8453,
+                    100,
+                    10
+                )
+            )
+        );
+        vm.label(address(aggregateVerifierImpl), "AggregateVerifierImpl");
+        _output.aggregateVerifierImpl = aggregateVerifierImpl;
     }
 
     function assertValidInput(Input memory _input) private pure {

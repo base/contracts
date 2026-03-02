@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import {ClaimAlreadyResolved} from "src/dispute/lib/Errors.sol";
-import {IAnchorStateRegistry} from "interfaces/dispute/IAnchorStateRegistry.sol";
-import {IDisputeGame} from "interfaces/dispute/IDisputeGame.sol";
-import {Claim, GameStatus, Hash} from "src/dispute/lib/Types.sol";
+import { ClaimAlreadyResolved } from "src/dispute/lib/Errors.sol";
+import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
+import { Claim, GameStatus, Hash } from "src/dispute/lib/Types.sol";
 
-import {AggregateVerifier} from "src/multiproof/AggregateVerifier.sol";
+import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
 
-import {BaseTest} from "./BaseTest.t.sol";
+import { BaseTest } from "./BaseTest.t.sol";
 
 contract ChallengeTest is BaseTest {
     function testChallengeTEEProofWithZKProof() public {

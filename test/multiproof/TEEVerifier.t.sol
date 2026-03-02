@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import {Test} from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
-import {ICertManager} from "lib/nitro-validator/src/ICertManager.sol";
+import { ICertManager } from "lib/nitro-validator/src/ICertManager.sol";
 
-import {DevSystemConfigGlobal} from "src/multiproof/mocks/MockDevSystemConfigGlobal.sol";
-import {SystemConfigGlobal} from "src/multiproof/tee/SystemConfigGlobal.sol";
-import {TEEVerifier} from "src/multiproof/tee/TEEVerifier.sol";
+import { DevSystemConfigGlobal } from "src/multiproof/mocks/MockDevSystemConfigGlobal.sol";
+import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
+import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
 
-import {MockCertManager} from "src/multiproof/mocks/MockCertManager.sol";
+import { MockCertManager } from "src/multiproof/mocks/MockCertManager.sol";
 
 contract TEEVerifierTest is Test {
     TEEVerifier public verifier;

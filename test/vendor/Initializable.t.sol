@@ -359,6 +359,17 @@ contract Initializer_Test is CommonTest {
                 )
             })
         );
+
+        // AggregateVerifier
+        contracts.push(
+            InitializeableContract({
+                name: "AggregateVerifier",
+                target: address(aggregateVerifier),
+                initCalldata: abi.encodeCall(
+                    ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0))
+                )
+            })
+        );
     }
 
     /// @notice Tests that:
@@ -394,11 +405,6 @@ contract Initializer_Test is CommonTest {
         excludes[j++] = "src/L1/FeesDepositor.sol";
         // Contract is not deployed as part of the standard deployment script.
         excludes[j++] = "src/revenue-share/BalanceTracker.sol";
-
-        // Exclude Multiproof contracts as they are not part of standard deployment script.
-        excludes[j++] = "src/multiproof/AggregateVerifier.sol";
-        excludes[j++] = "src/multiproof/tee/SystemConfigGlobal.sol";
-        excludes[j++] = "src/multiproof/tee/DevSystemConfigGlobal.sol";
 
         // Get all contract names in the src directory, minus the excluded contracts.
         string[] memory contractNames = ForgeArtifacts.getContractNames("src/*", excludes);
