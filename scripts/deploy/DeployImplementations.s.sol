@@ -44,8 +44,9 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
 import { DevFeatures } from "src/libraries/DevFeatures.sol";
-import { INitroEnclaveVerifier } from
-    "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
+import {
+    INitroEnclaveVerifier
+} from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
 import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
 import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
