@@ -286,7 +286,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
     /// @param proof The proof.
     /// @dev This function may only be called once.
     /// @dev First byte of the proof is the proof type.
-    function initialize(bytes calldata proof) external payable virtual {
+    function initializeWithInitData(bytes calldata proof) external payable virtual {
         // The game must not have already been initialized.
         if (initialized) revert AlreadyInitialized();
 

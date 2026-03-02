@@ -363,7 +363,7 @@ contract Initializer_Test is CommonTest {
         // AggregateVerifier
         contracts.push(
             InitializeableContract({
-                name: "AggregateVerifier",
+                name: "AggregateVerifierImpl",
                 target: address(aggregateVerifier),
                 initCalldata: abi.encodeCall(
                     ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0))
