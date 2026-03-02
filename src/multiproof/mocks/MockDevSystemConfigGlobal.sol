@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { ICertManager } from "lib/nitro-validator/src/ICertManager.sol";
+import { INitroEnclaveVerifier } from
+    "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
 
 import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
 
@@ -10,7 +11,7 @@ import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
 /// @dev This contract adds addDevSigner() which bypasses AWS Nitro attestation verification.
 ///      DO NOT deploy this contract to production networks.
 contract DevSystemConfigGlobal is SystemConfigGlobal {
-    constructor(ICertManager certManager) SystemConfigGlobal(certManager) { }
+    constructor(INitroEnclaveVerifier nitroVerifier) SystemConfigGlobal(nitroVerifier) { }
 
     /// @notice Registers a signer for testing (bypasses attestation verification).
     /// @dev Only callable by owner. For development/testing use only.

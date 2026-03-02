@@ -301,6 +301,7 @@ contract Deploy is Deployer {
         artifacts.save("PreimageOracle", address(dio.preimageOracleSingleton));
         artifacts.save("PermissionedDisputeGame", address(dio.permissionedDisputeGameV2Impl));
         artifacts.save("AggregateVerifier", address(dio.aggregateVerifierImpl));
+        artifacts.save("SystemConfigGlobal", address(dio.systemConfigGlobalImpl));
 
         // Get a contract set from the implementation addresses which were just deployed.
         Types.ContractSet memory impls = ChainAssertions.dioToContractSet(dio);

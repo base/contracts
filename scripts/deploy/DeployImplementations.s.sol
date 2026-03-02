@@ -44,7 +44,8 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
 import { DevFeatures } from "src/libraries/DevFeatures.sol";
-import { CertManager } from "lib/nitro-validator/src/CertManager.sol";
+import { INitroEnclaveVerifier } from
+    "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
 import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
 import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
@@ -103,6 +104,7 @@ contract DeployImplementations is Script {
         ISuperFaultDisputeGame superFaultDisputeGameImpl;
         ISuperPermissionedDisputeGame superPermissionedDisputeGameImpl;
         IVerifier aggregateVerifierImpl;
+        SystemConfigGlobal systemConfigGlobalImpl;
     }
 
     bytes32 internal _salt = DeployUtils.DEFAULT_SALT;
@@ -710,8 +712,10 @@ contract DeployImplementations is Script {
 
         address zkVerifier = address(new MockVerifier());
 
-        address certManager = address(new CertManager());
-        SystemConfigGlobal scgImpl = new SystemConfigGlobal(CertManager(certManager));
+        // NitroEnclaveVerifier is not needed for this deployment (uses dev mode).
+        SystemConfigGlobal scgImpl = new SystemConfigGlobal(INitroEnclaveVerifier(address(0)));
+        vm.label(address(scgImpl), "SystemConfigGlobalImpl");
+        _output.systemConfigGlobalImpl = scgImpl;
         address teeVerifierImpl = address(new TEEVerifier(scgImpl));
 
         IVerifier aggregateVerifierImpl = IVerifier(

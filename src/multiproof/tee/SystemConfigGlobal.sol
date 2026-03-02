@@ -1,22 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { LibCborElement, CborElement, CborDecode } from "lib/nitro-validator/src/CborDecode.sol";
-import { ICertManager } from "lib/nitro-validator/src/ICertManager.sol";
-import { LibBytes } from "lib/nitro-validator/src/LibBytes.sol";
-import { NitroValidator } from "lib/nitro-validator/src//NitroValidator.sol";
+import {
+    INitroEnclaveVerifier,
+    ZkCoProcessorType,
+    VerifierJournal,
+    VerificationResult,
+    Pcr,
+    Bytes48
+} from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
 import { OwnableManagedUpgradeable } from "lib/op-enclave/contracts/src/OwnableManagedUpgradeable.sol";
+import { ISemver } from "interfaces/universal/ISemver.sol";
 
 /// @title SystemConfigGlobal
-/// @notice Manages TEE signer registration via AWS Nitro attestation.
-/// @dev Signers are registered by providing a valid AWS Nitro attestation document.
+/// @notice Manages TEE signer registration via ZK-verified AWS Nitro attestation.
+/// @dev Signers are registered by providing a ZK proof of a valid AWS Nitro attestation document,
+///      verified through an external NitroEnclaveVerifier contract (Risc0).
 ///      Each signer is associated with the PCR0 (enclave image hash) from their attestation,
 ///      which allows TEEVerifier to validate that a signer was registered with a specific image.
-contract SystemConfigGlobal is OwnableManagedUpgradeable, NitroValidator {
-    using LibBytes for bytes;
-    using CborDecode for bytes;
-    using LibCborElement for CborElement;
-
+contract SystemConfigGlobal is OwnableManagedUpgradeable, ISemver {
     /// @notice Maximum age of an attestation document (60 minutes), in seconds.
     uint256 public constant MAX_AGE = 60 minutes;
 
@@ -25,13 +27,15 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, NitroValidator {
     ///      but block.timestamp is in seconds.
     uint256 private constant MS_PER_SECOND = 1000;
 
+    /// @notice The external NitroEnclaveVerifier contract used for ZK attestation verification.
+    INitroEnclaveVerifier public immutable NITRO_VERIFIER;
+
     /// @notice Mapping of valid PCR0s (enclave image hashes) attested from AWS Nitro.
     /// @dev Only attestations with a PCR0 in this mapping can register signers.
     mapping(bytes32 => bool) public validPCR0s;
 
     /// @notice Mapping of signer address to the PCR0 they were registered with.
     /// @dev A non-zero value indicates the signer is valid and was registered with that PCR0.
-    ///      This replaces the old validSigners(address => bool) mapping to enable imageId validation.
     mapping(address => bytes32) public signerPCR0;
 
     /// @notice Mapping of whether an address is a valid proposer.
@@ -58,9 +62,17 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, NitroValidator {
     /// @notice Thrown when the attestation document is too old.
     error AttestationTooOld();
 
-    constructor(ICertManager certManager) NitroValidator(certManager) {
-        // Always disable the implementation contract by setting dead addresses.
-        // Proxies will call initialize() to set the real owner/manager.
+    /// @notice Thrown when the ZK attestation verification fails.
+    error AttestationVerificationFailed();
+
+    /// @notice Thrown when PCR0 (index 0) is not found in the attestation's PCR list.
+    error PCR0NotFound();
+
+    /// @notice Thrown when the attestation's public key is too short to derive a signer address.
+    error InvalidPublicKey();
+
+    constructor(INitroEnclaveVerifier nitroVerifier) {
+        NITRO_VERIFIER = nitroVerifier;
         initialize({ initialOwner: address(0xdEaD), initialManager: address(0xdEaD) });
     }
 
@@ -88,27 +100,33 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, NitroValidator {
         emit PCR0Deregistered(pcr0Hash);
     }
 
-    /// @notice Registers a signer using an AWS Nitro attestation document.
-    /// @dev The attestation must:
-    ///      1. Be signed by a valid AWS Nitro certificate chain
-    ///      2. Contain a PCR0 that has been pre-registered via registerPCR0
-    ///      3. Be less than MAX_AGE old
-    /// @param attestationTbs The TBS (to-be-signed) portion of the attestation document.
-    /// @param signature The signature over the attestation.
-    function registerSigner(bytes calldata attestationTbs, bytes calldata signature) external onlyOwnerOrManager {
-        Ptrs memory ptrs = validateAttestation(attestationTbs, signature);
-        bytes32 pcr0Hash = attestationTbs.keccak(ptrs.pcrs[0]);
-        if (!validPCR0s[pcr0Hash]) revert InvalidPCR0();
-        // Convert attestation timestamp from milliseconds to seconds before comparing
-        if (ptrs.timestamp / MS_PER_SECOND + MAX_AGE <= block.timestamp) revert AttestationTooOld();
+    /// @notice Registers a signer using a ZK proof of an AWS Nitro attestation document.
+    /// @dev The ZK proof must verify a valid attestation that:
+    ///      1. Has a valid AWS Nitro certificate chain (verified offchain via ZK)
+    ///      2. Contains a PCR0 that has been pre-registered via registerPCR0
+    ///      3. Is less than MAX_AGE old
+    /// @param output The ABI-encoded VerifierJournal from the ZK proof.
+    /// @param proofBytes The Risc0 ZK proof bytes.
+    function registerSigner(bytes calldata output, bytes calldata proofBytes) external onlyOwnerOrManager {
+        VerifierJournal memory journal = NITRO_VERIFIER.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
 
-        // The publicKey is encoded in the form specified in section 4.3.6 of ANSI X9.62,
-        // which is a 0x04 byte followed by the x and y coordinates of the public key.
-        // We ignore the first byte when hashing.
-        bytes32 publicKeyHash = attestationTbs.keccak(ptrs.publicKey.start() + 1, ptrs.publicKey.length() - 1);
+        if (journal.result != VerificationResult.Success) revert AttestationVerificationFailed();
+
+        if (journal.timestamp / MS_PER_SECOND + MAX_AGE <= block.timestamp) revert AttestationTooOld();
+
+        bytes32 pcr0Hash = _extractPCR0Hash(journal.pcrs);
+        if (!validPCR0s[pcr0Hash]) revert InvalidPCR0();
+
+        // The publicKey is encoded in ANSI X9.62 format: 0x04 || x || y (65 bytes).
+        // We skip the first byte (0x04 prefix) when hashing to derive the address.
+        bytes memory pubKey = journal.publicKey;
+        if (pubKey.length < 2) revert InvalidPublicKey();
+        bytes32 publicKeyHash;
+        assembly {
+            publicKeyHash := keccak256(add(pubKey, 0x21), sub(mload(pubKey), 1))
+        }
         address enclaveAddress = address(uint160(uint256(publicKeyHash)));
 
-        // Store the PCR0 hash for this signer (enables imageId validation)
         signerPCR0[enclaveAddress] = pcr0Hash;
         emit SignerRegistered(enclaveAddress, pcr0Hash);
     }
@@ -137,8 +155,15 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, NitroValidator {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.1.0
+    /// @custom:semver 0.2.0
     function version() public pure virtual returns (string memory) {
-        return "0.1.0";
+        return "0.2.0";
+    }
+
+    /// @dev Extracts PCR0 from the first entry in the PCR array and returns its keccak256 hash.
+    function _extractPCR0Hash(Pcr[] memory pcrs) internal pure returns (bytes32) {
+        if (pcrs.length == 0 || pcrs[0].index != 0) revert PCR0NotFound();
+        Bytes48 memory value = pcrs[0].value;
+        return keccak256(abi.encodePacked(value.first, value.second));
     }
 }

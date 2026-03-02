@@ -6,24 +6,22 @@ import { Test } from "forge-std/Test.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
-import { ICertManager } from "lib/nitro-validator/src/ICertManager.sol";
+import { INitroEnclaveVerifier } from
+    "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
 
 import { DevSystemConfigGlobal } from "src/multiproof/mocks/MockDevSystemConfigGlobal.sol";
 import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
 
-import { MockCertManager } from "src/multiproof/mocks/MockCertManager.sol";
-
 /// @notice Tests for SystemConfigGlobal and DevSystemConfigGlobal contracts.
 /// @dev IMPORTANT: This test file uses DevSystemConfigGlobal as the implementation because
-/// registering signers on the production SystemConfigGlobal requires valid AWS Nitro attestation
-/// documents, which cannot be generated in a test environment. DevSystemConfigGlobal extends
+/// registering signers on the production SystemConfigGlobal requires a ZK proof of a valid
+/// AWS Nitro attestation, which cannot be generated in a test environment. DevSystemConfigGlobal extends
 /// SystemConfigGlobal with an `addDevSigner` function that bypasses attestation verification,
 /// allowing us to test all signer-related functionality. All tests for base SystemConfigGlobal
 /// functionality (PCR0 management, ownership, proposer, etc.) are equally valid since
 /// DevSystemConfigGlobal inherits from SystemConfigGlobal without modifying those functions.
 contract SystemConfigGlobalTest is Test {
     DevSystemConfigGlobal public systemConfigGlobal;
-    MockCertManager public certManager;
     ProxyAdmin public proxyAdmin;
 
     address public owner;
@@ -48,11 +46,9 @@ contract SystemConfigGlobalTest is Test {
 
         pcr0Hash = keccak256(TEST_PCR0);
 
-        // Deploy mock cert manager
-        certManager = new MockCertManager();
-
         // Deploy implementation (using DevSystemConfigGlobal for test flexibility)
-        DevSystemConfigGlobal impl = new DevSystemConfigGlobal(ICertManager(address(certManager)));
+        // NitroEnclaveVerifier is not needed since tests use addDevSigner(), so pass address(0).
+        DevSystemConfigGlobal impl = new DevSystemConfigGlobal(INitroEnclaveVerifier(address(0)));
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));
@@ -70,7 +66,7 @@ contract SystemConfigGlobalTest is Test {
     function testInitialization() public view {
         assertEq(systemConfigGlobal.owner(), owner);
         assertEq(systemConfigGlobal.manager(), manager);
-        assertEq(systemConfigGlobal.version(), "0.1.0");
+        assertEq(systemConfigGlobal.version(), "0.2.0");
     }
 
     // ============ PCR0 Registration Tests ============

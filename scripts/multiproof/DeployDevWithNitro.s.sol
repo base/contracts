@@ -10,8 +10,9 @@ pragma solidity 0.8.15;
  * ══════════════════════════════════════════════════════════════════════════════════
  *
  * This script deploys infrastructure using the REAL SystemConfigGlobal, which
- * REQUIRES valid AWS Nitro attestation for signer registration. You cannot use
- * addDevSigner() - you must go through the full registerSigner() flow.
+ * REQUIRES a ZK proof of a valid AWS Nitro attestation for signer registration.
+ * You cannot use addDevSigner() - you must go through the full registerSigner() flow.
+ * A pre-deployed NitroEnclaveVerifier contract address must be provided in the config.
  *
  * USE THIS SCRIPT WHEN:
  * - Testing the full Nitro attestation flow end-to-end
@@ -43,48 +44,17 @@ pragma solidity 0.8.15;
  * Note: The teeImageHash in deploy-config is keccak256(PCR0_RAW), not the raw bytes.
  *
  * ─────────────────────────────────────────────────────────────────────────────────
- * STEP 2: Get fresh attestation from the enclave
+ * STEP 2: Generate ZK proof of the attestation and register the signer
  * ─────────────────────────────────────────────────────────────────────────────────
  *
- * Query the Nitro enclave for a signed attestation document. This contains:
- * - The enclave's public key (from which the signer address is derived)
- * - PCR0 (image hash)
- * - Timestamp
- * - AWS certificate chain signature
- *
- *   curl -s -X POST $ENCLAVE_URL \
- *     -H "Content-Type: application/json" \
- *     -d '{"jsonrpc":"2.0","method":"enclave_signerAttestation","id":1}' \
- *     | jq -r '.result'
- *
- * IMPORTANT: The attestation is only valid for 60 minutes! You must complete
- * Step 3 within that window.
- *
- * ─────────────────────────────────────────────────────────────────────────────────
- * STEP 3: Register the signer using the attestation - OWNER OR MANAGER
- * ─────────────────────────────────────────────────────────────────────────────────
- *
- * Option A: Use the register-signer tool from base/op-enclave
- *
- *   go install github.com/base/op-enclave/tools/register-signer@latest
- *
- *   register-signer \
- *     -attestation $ATTESTATION_HEX \
- *     -deployment deployments/<chainid>-dev-with-nitro.json \
- *     -rpc $RPC_URL \
- *     -private-key $OWNER_OR_MANAGER_KEY
- *
- * Option B: Call the contract directly (requires parsing attestation into TBS + sig)
- *
- *   # The attestation is a COSE Sign1 structure. You need to split it into:
- *   # - attestationTbs: The "to-be-signed" payload
- *   # - signature: The ECDSA signature over the payload
- *   #
- *   # See: https://github.com/base/op-enclave/tree/main/tools/register-signer
+ * Generate a Risc0 ZK proof of the Nitro attestation offchain, then call:
  *
  *   cast send $SYSTEM_CONFIG_GLOBAL \
- *     "registerSigner(bytes,bytes)" $ATTESTATION_TBS $SIGNATURE \
+ *     "registerSigner(bytes,bytes)" $ZK_OUTPUT $ZK_PROOF_BYTES \
  *     --private-key $OWNER_OR_MANAGER_KEY --rpc-url $RPC_URL
+ *
+ * IMPORTANT: The attestation is only valid for 60 minutes! Generate the proof
+ * and submit the transaction within that window.
  *
  * ─────────────────────────────────────────────────────────────────────────────────
  * VERIFICATION
@@ -107,7 +77,7 @@ pragma solidity 0.8.15;
  * | SystemConfigGlobal         | DevSystemConfigGlobal | SystemConfigGlobal    |
  * | Signer registration        | addDevSigner()        | registerSigner()      |
  * | Requires Nitro enclave     | No                    | Yes                   |
- * | Validates AWS cert chain   | No                    | Yes                   |
+ * | Validates attestation (ZK) | No                    | Yes                   |
  * | PCR0 pre-registration      | No                    | Yes                   |
  * | Attestation freshness      | N/A                   | < 60 minutes          |
  *
@@ -116,7 +86,8 @@ pragma solidity 0.8.15;
  * ══════════════════════════════════════════════════════════════════════════════════
  */
 
-import { CertManager } from "lib/nitro-validator/src/CertManager.sol";
+import { INitroEnclaveVerifier } from
+    "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { Script } from "forge-std/Script.sol";
 import { stdJson } from "forge-std/StdJson.sol";
@@ -155,6 +126,7 @@ contract DeployDevWithNitro is Script {
         address owner;
         bytes32 teeImageHash;
         address teeProposer;
+        address nitroEnclaveVerifier;
         GameType gameType;
         uint256 gameTypeRaw;
         bytes32 genesisOutputRoot;
@@ -163,7 +135,6 @@ contract DeployDevWithNitro is Script {
     }
 
     // Deployed addresses
-    address public certManager;
     address public systemConfigGlobalProxy;
     address public teeVerifier;
     address public disputeGameFactory;
@@ -180,11 +151,12 @@ contract DeployDevWithNitro is Script {
         console.log("TEE Proposer:", cfg.teeProposer);
         console.log("Game Type:", cfg.gameTypeRaw);
         console.log("");
-        console.log("NOTE: Using REAL SystemConfigGlobal - attestation REQUIRED.");
+        console.log("NOTE: Using REAL SystemConfigGlobal - ZK attestation proof REQUIRED.");
+        console.log("NitroEnclaveVerifier:", cfg.nitroEnclaveVerifier);
 
         vm.startBroadcast();
 
-        _deployTEEContracts(cfg.owner);
+        _deployTEEContracts(cfg.owner, cfg.nitroEnclaveVerifier);
         _registerProposer(cfg.teeProposer);
         _deployInfrastructure(cfg);
         _deployAggregateVerifier(cfg);
@@ -202,6 +174,7 @@ contract DeployDevWithNitro is Script {
         cfg.owner = config.readAddress(".finalSystemOwner");
         cfg.teeImageHash = config.readBytes32(".teeImageHash");
         cfg.teeProposer = config.readAddressOr(".teeProposer", cfg.owner);
+        cfg.nitroEnclaveVerifier = config.readAddress(".nitroEnclaveVerifier");
         cfg.gameTypeRaw = config.readUintOr(".gameType", 621);
         cfg.gameType = GameType.wrap(uint32(cfg.gameTypeRaw));
         cfg.genesisOutputRoot = config.readBytes32Or(".genesisOutputRoot", bytes32(uint256(1)));
@@ -209,13 +182,10 @@ contract DeployDevWithNitro is Script {
         cfg.configHash = config.readBytes32Or(".configHash", bytes32(0));
     }
 
-    function _deployTEEContracts(address owner) internal {
-        // 1. CertManager - validates AWS Nitro certificate chains
-        certManager = address(new CertManager());
-        console.log("CertManager:", certManager);
-
-        // 2. SystemConfigGlobal (REAL version) - requires attestation for signer registration
-        address scgImpl = address(new SystemConfigGlobal(CertManager(certManager)));
+    function _deployTEEContracts(address owner, address nitroEnclaveVerifier) internal {
+        // 1. SystemConfigGlobal (REAL version) - requires ZK attestation proof for signer registration
+        address scgImpl = address(new SystemConfigGlobal(INitroEnclaveVerifier(nitroEnclaveVerifier)));
+        console.log("NitroEnclaveVerifier (external):", nitroEnclaveVerifier);
         systemConfigGlobalProxy = address(
             new TransparentUpgradeableProxy(
                 scgImpl,
@@ -225,7 +195,7 @@ contract DeployDevWithNitro is Script {
         );
         console.log("SystemConfigGlobal:", systemConfigGlobalProxy);
 
-        // 3. TEEVerifier
+        // 2. TEEVerifier
         teeVerifier = address(new TEEVerifier(SystemConfigGlobal(systemConfigGlobalProxy)));
         console.log("TEEVerifier:", teeVerifier);
     }
@@ -293,7 +263,7 @@ contract DeployDevWithNitro is Script {
         console.log("   DEV DEPLOYMENT COMPLETE (WITH NITRO)");
         console.log("========================================");
         console.log("\nTEE Contracts:");
-        console.log("  CertManager:", certManager);
+        console.log("  NitroEnclaveVerifier (external):", cfg.nitroEnclaveVerifier);
         console.log("  SystemConfigGlobal:", systemConfigGlobalProxy);
         console.log("  TEEVerifier:", teeVerifier);
         console.log("\nInfrastructure:");
@@ -306,17 +276,16 @@ contract DeployDevWithNitro is Script {
         console.log("  TEE Image Hash:", vm.toString(cfg.teeImageHash));
         console.log("  Config Hash:", vm.toString(cfg.configHash));
         console.log("========================================");
-        console.log("\n>>> NEXT STEPS (ATTESTATION REQUIRED) <<<");
+        console.log("\n>>> NEXT STEPS (ZK ATTESTATION PROOF REQUIRED) <<<");
         console.log("\n1. Register the PCR0 (raw 48-byte enclave image hash):");
         console.log("   cast send", systemConfigGlobalProxy);
         console.log('     "registerPCR0(bytes)" <PCR0_RAW_BYTES>');
         console.log("     --private-key <OWNER_KEY> --rpc-url <RPC>");
-        console.log("\n2. Get attestation from enclave (valid for 60 min):");
-        console.log('   curl -X POST <ENCLAVE_URL> -H "Content-Type: application/json"');
-        console.log("     -d '{\"jsonrpc\":\"2.0\",\"method\":\"enclave_signerAttestation\",\"id\":1}'");
-        console.log("\n3. Register signer with attestation:");
-        console.log("   go install github.com/base/op-enclave/tools/register-signer@latest");
-        console.log("   register-signer -attestation <HEX> -rpc <RPC> -private-key <KEY>");
+        console.log("\n2. Generate a Risc0 ZK proof of the Nitro attestation offchain.");
+        console.log("\n3. Register signer with ZK proof:");
+        console.log("   cast send", systemConfigGlobalProxy);
+        console.log('     "registerSigner(bytes,bytes)" <ZK_OUTPUT> <ZK_PROOF_BYTES>');
+        console.log("     --private-key <OWNER_OR_MANAGER_KEY> --rpc-url <RPC>");
         console.log("\nSee the comments at the top of this file for full details.");
         console.log("========================================\n");
     }
@@ -324,9 +293,7 @@ contract DeployDevWithNitro is Script {
     function _writeOutput() internal {
         string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-dev-with-nitro.json");
         string memory output = string.concat(
-            '{"CertManager":"',
-            vm.toString(certManager),
-            '","SystemConfigGlobal":"',
+            '{"SystemConfigGlobal":"',
             vm.toString(systemConfigGlobalProxy),
             '","TEEVerifier":"',
             vm.toString(teeVerifier),

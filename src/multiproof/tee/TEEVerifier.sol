@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
+import { ISemver } from "interfaces/universal/ISemver.sol";
 
 import { SystemConfigGlobal } from "./SystemConfigGlobal.sol";
 
@@ -16,7 +17,7 @@ import { SystemConfigGlobal } from "./SystemConfigGlobal.sol";
 ///      by checking against blockhash() or the EIP-2935 history contract.
 ///      The contract is intentionally stateless - all state related to output proposals is
 ///      managed by the calling contract (e.g., AggregateVerifier).
-contract TEEVerifier is IVerifier {
+contract TEEVerifier is IVerifier, ISemver {
     /// @notice The SystemConfigGlobal contract that manages valid TEE signers.
     /// @dev Signers are registered via AWS Nitro attestation in SystemConfigGlobal.
     SystemConfigGlobal public immutable SYSTEM_CONFIG_GLOBAL;
@@ -80,5 +81,11 @@ contract TEEVerifier is IVerifier {
         }
 
         return true;
+    }
+
+    /// @notice Semantic version.
+    /// @custom:semver 0.1.0
+    function version() public pure virtual returns (string memory) {
+        return "0.1.0";
     }
 }

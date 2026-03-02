@@ -6,18 +6,16 @@ import { Test } from "forge-std/Test.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
-import { ICertManager } from "lib/nitro-validator/src/ICertManager.sol";
+import { INitroEnclaveVerifier } from
+    "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
 
 import { DevSystemConfigGlobal } from "src/multiproof/mocks/MockDevSystemConfigGlobal.sol";
 import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
 
-import { MockCertManager } from "src/multiproof/mocks/MockCertManager.sol";
-
 contract TEEVerifierTest is Test {
     TEEVerifier public verifier;
     DevSystemConfigGlobal public systemConfigGlobal;
-    MockCertManager public certManager;
     ProxyAdmin public proxyAdmin;
 
     // Test signer - we'll derive address from private key
@@ -36,11 +34,8 @@ contract TEEVerifierTest is Test {
         // Derive signer address from private key
         signerAddress = vm.addr(SIGNER_PRIVATE_KEY);
 
-        // Deploy mock cert manager
-        certManager = new MockCertManager();
-
-        // Deploy implementation
-        DevSystemConfigGlobal impl = new DevSystemConfigGlobal(ICertManager(address(certManager)));
+        // Deploy implementation (NitroEnclaveVerifier not needed for dev signer tests)
+        DevSystemConfigGlobal impl = new DevSystemConfigGlobal(INitroEnclaveVerifier(address(0)));
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));

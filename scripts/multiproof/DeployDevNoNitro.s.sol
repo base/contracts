@@ -43,7 +43,7 @@ pragma solidity 0.8.15;
  * | SystemConfigGlobal         | DevSystemConfigGlobal | SystemConfigGlobal    |
  * | Signer registration        | addDevSigner()        | registerSigner()      |
  * | Requires Nitro enclave     | No                    | Yes                   |
- * | Validates AWS cert chain   | No                    | Yes                   |
+ * | Validates attestation (ZK) | No                    | Yes                   |
  * | PCR0 pre-registration      | No                    | Yes                   |
  * | Attestation freshness      | N/A                   | < 60 minutes          |
  *
@@ -52,7 +52,8 @@ pragma solidity 0.8.15;
  * ══════════════════════════════════════════════════════════════════════════════════
  */
 
-import { CertManager } from "lib/nitro-validator/src/CertManager.sol";
+import { INitroEnclaveVerifier } from
+    "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { Script } from "forge-std/Script.sol";
 import { stdJson } from "forge-std/StdJson.sol";
@@ -100,7 +101,6 @@ contract DeployDevNoNitro is Script {
     }
 
     // Deployed addresses
-    address public certManager;
     address public systemConfigGlobalProxy;
     address public teeVerifier;
     address public disputeGameFactory;
@@ -147,12 +147,9 @@ contract DeployDevNoNitro is Script {
     }
 
     function _deployTEEContracts(address owner) internal {
-        // 1. CertManager (not used in dev mode, but deployed for interface compatibility)
-        certManager = address(new CertManager());
-        console.log("CertManager:", certManager);
-
-        // 2. DevSystemConfigGlobal - allows addDevSigner() to bypass attestation
-        address scgImpl = address(new DevSystemConfigGlobal(CertManager(certManager)));
+        // 1. DevSystemConfigGlobal - allows addDevSigner() to bypass attestation
+        //    NitroEnclaveVerifier is not needed in dev mode, so we pass address(0).
+        address scgImpl = address(new DevSystemConfigGlobal(INitroEnclaveVerifier(address(0))));
         systemConfigGlobalProxy = address(
             new TransparentUpgradeableProxy(
                 scgImpl,
@@ -162,7 +159,7 @@ contract DeployDevNoNitro is Script {
         );
         console.log("DevSystemConfigGlobal:", systemConfigGlobalProxy);
 
-        // 3. TEEVerifier
+        // 2. TEEVerifier
         teeVerifier = address(new TEEVerifier(SystemConfigGlobal(systemConfigGlobalProxy)));
         console.log("TEEVerifier:", teeVerifier);
     }
@@ -230,7 +227,6 @@ contract DeployDevNoNitro is Script {
         console.log("    DEV DEPLOYMENT COMPLETE (NO NITRO)");
         console.log("========================================");
         console.log("\nTEE Contracts:");
-        console.log("  CertManager:", certManager);
         console.log("  DevSystemConfigGlobal:", systemConfigGlobalProxy);
         console.log("  TEEVerifier:", teeVerifier);
         console.log("\nInfrastructure:");
@@ -254,9 +250,7 @@ contract DeployDevNoNitro is Script {
     function _writeOutput() internal {
         string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-dev-no-nitro.json");
         string memory output = string.concat(
-            '{"CertManager":"',
-            vm.toString(certManager),
-            '","SystemConfigGlobal":"',
+            '{"SystemConfigGlobal":"',
             vm.toString(systemConfigGlobalProxy),
             '","TEEVerifier":"',
             vm.toString(teeVerifier),

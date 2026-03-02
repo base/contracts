@@ -68,6 +68,7 @@ import { IFeeSplitter } from "interfaces/L2/IFeeSplitter.sol";
 import { IL1Withdrawer } from "interfaces/L2/IL1Withdrawer.sol";
 import { ISuperchainRevSharesCalculator } from "interfaces/L2/ISuperchainRevSharesCalculator.sol";
 import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
+import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
 
 /// @title Setup
 /// @dev This contact is responsible for setting up the contracts in state. It currently
@@ -158,6 +159,7 @@ abstract contract Setup is FeatureFlags {
     IL1Withdrawer l1Withdrawer;
     ISuperchainRevSharesCalculator superchainRevSharesCalculator;
     IVerifier aggregateVerifier;
+    SystemConfigGlobal systemConfigGlobal;
 
     /// @notice Indicates whether a test is running against a forked production network.
     function isForkTest() public view returns (bool) {
@@ -297,6 +299,7 @@ abstract contract Setup is FeatureFlags {
         superchainProxyAdminOwner = superchainProxyAdmin.owner();
         mips = IBigStepper(artifacts.mustGetAddress("MipsSingleton"));
         aggregateVerifier = IVerifier(artifacts.mustGetAddress("AggregateVerifier"));
+        systemConfigGlobal = SystemConfigGlobal(artifacts.mustGetAddress("SystemConfigGlobal"));
 
         if (deploy.cfg().useAltDA()) {
             dataAvailabilityChallenge =

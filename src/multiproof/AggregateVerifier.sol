@@ -24,8 +24,9 @@ import { FixedPointMathLib } from "@solady/utils/FixedPointMathLib.sol";
 import { ReentrancyGuard } from "@solady/utils/ReentrancyGuard.sol";
 
 import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
+import { ISemver } from "interfaces/universal/ISemver.sol";
 
-contract AggregateVerifier is Clone, ReentrancyGuard {
+contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     ////////////////////////////////////////////////////////////////
     //                         Enums                              //
     ////////////////////////////////////////////////////////////////
@@ -913,5 +914,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard {
         if (actualHash != l1OriginHash) {
             revert L1OriginHashMismatch(l1OriginHash, actualHash);
         }
+    }
+
+    /// @notice Semantic version.
+    /// @custom:semver 0.1.0
+    function version() public pure virtual returns (string memory) {
+        return "0.1.0";
     }
 }
