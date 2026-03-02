@@ -774,7 +774,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Verifies a TEE proof for the current game.
-    /// @param proofBytes The proof: prover(20) + signature (65).
+    /// @param proofBytes The proof: signature(65).
     function _verifyTeeProof(
         bytes calldata proofBytes,
         address prover,

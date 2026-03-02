@@ -72,5 +72,8 @@
   "gasPayingTokenName": "",
   "gasPayingTokenSymbol": "",
   "nativeAssetLiquidityAmount": null,
-  "liquidityControllerOwner": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"
+  "liquidityControllerOwner": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
+  "teeImageHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+  "multiproofConfigHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "multiproofGameType": 621
 }

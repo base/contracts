@@ -49,8 +49,8 @@ import { INitroEnclaveVerifier } from
 import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
 import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
-import { DeployDevWithNitro } from "../multiproof/DeployDevWithNitro.s.sol";
 import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
+import { GameType } from "src/dispute/lib/Types.sol";
 
 contract DeployImplementations is Script {
     struct Input {
@@ -66,6 +66,10 @@ contract DeployImplementations is Script {
         uint256 faultGameV2SplitDepth;
         uint256 faultGameV2ClockExtension;
         uint256 faultGameV2MaxClockDuration;
+        // Multiproof parameters
+        bytes32 teeImageHash;
+        bytes32 multiproofConfigHash;
+        uint256 multiproofGameType;
         // Outputs from DeploySuperchain.s.sol.
         ISuperchainConfig superchainConfigProxy;
         IProtocolVersions protocolVersionsProxy;
@@ -706,13 +710,9 @@ contract DeployImplementations is Script {
         _output.opcmStandardValidator = impl;
     }
 
-    function deployAggregateVerifierImpl(Input memory, Output memory _output) private {
-        DeployDevWithNitro nitro = new DeployDevWithNitro();
-        DeployDevWithNitro.DeployConfig memory cfg = nitro.loadConfig();
-
+    function deployAggregateVerifierImpl(Input memory _input, Output memory _output) private {
         address zkVerifier = address(new MockVerifier());
 
-        // NitroEnclaveVerifier is not needed for this deployment (uses dev mode).
         SystemConfigGlobal scgImpl = new SystemConfigGlobal(INitroEnclaveVerifier(address(0)));
         vm.label(address(scgImpl), "SystemConfigGlobalImpl");
         _output.systemConfigGlobalImpl = scgImpl;
@@ -721,14 +721,14 @@ contract DeployImplementations is Script {
         IVerifier aggregateVerifierImpl = IVerifier(
             address(
                 new AggregateVerifier(
-                    cfg.gameType,
+                    GameType.wrap(uint32(_input.multiproofGameType)),
                     _output.anchorStateRegistryImpl,
                     _output.delayedWETHImpl,
                     IVerifier(teeVerifierImpl),
                     IVerifier(zkVerifier),
-                    cfg.teeImageHash,
+                    _input.teeImageHash,
                     bytes32(0),
-                    cfg.configHash,
+                    _input.multiproofConfigHash,
                     8453,
                     100,
                     10

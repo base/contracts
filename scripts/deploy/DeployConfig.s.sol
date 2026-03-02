@@ -93,6 +93,11 @@ contract DeployConfig is Script {
     uint256 public faultGameV2ClockExtension;
     uint256 public faultGameV2MaxClockDuration;
 
+    // Multiproof Configuration
+    bytes32 public teeImageHash;
+    bytes32 public multiproofConfigHash;
+    uint256 public multiproofGameType;
+
     bool public useInterop;
     bool public useUpgradedFork;
     bytes32 public devFeatureBitmap;
@@ -192,6 +197,9 @@ contract DeployConfig is Script {
         faultGameV2SplitDepth = _readOr(_json, "$.faultGameV2SplitDepth", 30);
         faultGameV2ClockExtension = _readOr(_json, "$.faultGameV2ClockExtension", 10800);
         faultGameV2MaxClockDuration = _readOr(_json, "$.faultGameV2MaxClockDuration", 302400);
+        teeImageHash = bytes32(_readOr(_json, "$.teeImageHash", 0));
+        multiproofConfigHash = bytes32(_readOr(_json, "$.multiproofConfigHash", 0));
+        multiproofGameType = _readOr(_json, "$.multiproofGameType", 621);
     }
 
     function fork() public view returns (Fork fork_) {
