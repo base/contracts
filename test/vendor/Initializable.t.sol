@@ -339,38 +339,33 @@ contract Initializer_Test is CommonTest {
             })
         );
 
-        // ETHLockboxImpl
-        contracts.push(
-            InitializeableContract({
-                name: "ETHLockboxImpl",
-                target: EIP1967Helper.getImplementation(address(ethLockbox)),
-                initCalldata: abi.encodeCall(
-                    ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0))
-                )
-            })
-        );
+        // ETHLockbox is only deployed when interop is enabled
+        if (address(ethLockbox) != address(0)) {
+            // ETHLockboxImpl
+            contracts.push(
+                InitializeableContract({
+                    name: "ETHLockboxImpl",
+                    target: EIP1967Helper.getImplementation(address(ethLockbox)),
+                    initCalldata: abi.encodeCall(
+                        ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0))
+                    )
+                })
+            );
 
-        // ETHLockboxProxy
-        contracts.push(
-            InitializeableContract({
-                name: "ETHLockboxProxy",
-                target: address(ethLockbox),
-                initCalldata: abi.encodeCall(
-                    ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0))
-                )
-            })
-        );
+            // ETHLockboxProxy
+            contracts.push(
+                InitializeableContract({
+                    name: "ETHLockboxProxy",
+                    target: address(ethLockbox),
+                    initCalldata: abi.encodeCall(
+                        ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0))
+                    )
+                })
+            );
+        }
 
-        // AggregateVerifier
-        contracts.push(
-            InitializeableContract({
-                name: "AggregateVerifierImpl",
-                target: address(aggregateVerifier),
-                initCalldata: abi.encodeCall(
-                    ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0))
-                )
-            })
-        );
+        // AggregateVerifier uses a custom `bool initialized` instead of OpenZeppelin's `_initialized`
+        // uint8, so it cannot be tested by this framework. It is excluded below.
 
         // SystemConfigGlobalImpl
         contracts.push(
@@ -389,7 +384,7 @@ contract Initializer_Test is CommonTest {
     function test_cannotReinitialize_succeeds() public {
         // Collect exclusions.
         uint256 j;
-        string[] memory excludes = new string[](18);
+        string[] memory excludes = new string[](20);
         // Contract is currently not being deployed as part of the standard deployment script.
         excludes[j++] = "src/L2/OptimismSuperchainERC20.sol";
         // Periphery contracts don't get deployed as part of the standard deployment script.
@@ -417,6 +412,12 @@ contract Initializer_Test is CommonTest {
         excludes[j++] = "src/revenue-share/BalanceTracker.sol";
         // Multiproof mocks are not deployed as part of the standard deployment script.
         excludes[j++] = "src/multiproof/mocks/*";
+        // AggregateVerifier uses a custom `bool initialized` instead of OpenZeppelin's `_initialized` uint8.
+        excludes[j++] = "src/multiproof/AggregateVerifier.sol";
+        // ETHLockbox is only deployed when interop is enabled.
+        if (address(ethLockbox) == address(0)) {
+            excludes[j++] = "src/L1/ETHLockbox.sol";
+        }
 
         // Get all contract names in the src directory, minus the excluded contracts.
         string[] memory contractNames = ForgeArtifacts.getContractNames("src/*", excludes);
