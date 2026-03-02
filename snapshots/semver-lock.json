@@ -232,7 +232,7 @@
     "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
-    "initCodeHash": "0x2d681a39e518379b6d2c013735ae25a9bcf6e939d597bde9e6126375b86fd294",
+    "initCodeHash": "0x73537cace710afd0dc4ea7c2e25687a29cee13843617f518a3edeb8e79cf324c",
     "sourceCodeHash": "0xf1ec5f9b79fa641ab6ad4c6a2ff6e8fb313df953f773a7c8923e911fa465ffb3"
   },
   "src/revenue-share/FeeDisburser.sol:FeeDisburser": {
