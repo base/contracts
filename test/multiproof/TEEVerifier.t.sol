@@ -4,7 +4,7 @@ pragma solidity 0.8.15;
 import { Test } from "forge-std/Test.sol";
 
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
 import { ICertManager } from "lib/nitro-validator/src/ICertManager.sol";
 
@@ -43,7 +43,7 @@ contract TEEVerifierTest is Test {
         DevSystemConfigGlobal impl = new DevSystemConfigGlobal(ICertManager(address(certManager)));
 
         // Deploy proxy admin
-        proxyAdmin = new ProxyAdmin();
+        proxyAdmin = new ProxyAdmin(address(this));
 
         // Deploy proxy
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(

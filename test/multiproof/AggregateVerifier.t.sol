@@ -74,7 +74,7 @@ contract AggregateVerifierTest is BaseTest {
 
         vm.prank(TEE_PROVER);
         vm.expectRevert(BadExtraData.selector);
-        factory.create{ value: INIT_BOND }(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, initData);
+        factory.createWithInitData{ value: INIT_BOND }(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, initData);
     }
 
     function testUpdatingAnchorStateRegistryWithTEEProof() public {

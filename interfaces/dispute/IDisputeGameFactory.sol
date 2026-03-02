@@ -34,6 +34,15 @@ interface IDisputeGameFactory is IProxyAdminOwnedBase, IReinitializableBase {
         external
         payable
         returns (IDisputeGame proxy_);
+    function createWithInitData(
+        GameType _gameType,
+        Claim _rootClaim,
+        bytes memory _extraData,
+        bytes memory initData
+    )
+        external
+        payable
+        returns (IDisputeGame proxy_);
     function findLatestGames(
         GameType _gameType,
         uint256 _start,

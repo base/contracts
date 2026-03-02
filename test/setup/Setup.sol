@@ -296,7 +296,7 @@ abstract contract Setup is FeatureFlags {
         superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
         superchainProxyAdminOwner = superchainProxyAdmin.owner();
         mips = IBigStepper(artifacts.mustGetAddress("MipsSingleton"));
-        aggregateVerifier = IVerifier(artifacts.mustGetAddress("AggregrateVerifier"));
+        aggregateVerifier = IVerifier(artifacts.mustGetAddress("AggregateVerifier"));
 
         if (deploy.cfg().useAltDA()) {
             dataAvailabilityChallenge =

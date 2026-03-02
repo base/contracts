@@ -15,7 +15,7 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { Claim, GameStatus, GameType, Hash, Proposal, Timestamp } from "src/dispute/lib/Types.sol";
 
 // OpenZeppelin
-import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
@@ -82,7 +82,7 @@ contract BaseTest is Test {
         DisputeGameFactory _factory = new DisputeGameFactory();
 
         // Deploy proxy admin
-        proxyAdmin = new ProxyAdmin();
+        proxyAdmin = new ProxyAdmin(address(this));
 
         // Deploy proxy for anchor state registry
         TransparentUpgradeableProxy anchorStateRegistryProxy =
@@ -159,7 +159,7 @@ contract BaseTest is Test {
         vm.deal(creator, INIT_BOND);
         vm.prank(creator);
         return AggregateVerifier(
-            address(factory.create{ value: INIT_BOND }(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, proof))
+            address(factory.createWithInitData{ value: INIT_BOND }(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, proof))
         );
     }
 

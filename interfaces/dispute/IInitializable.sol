@@ -2,5 +2,6 @@
 pragma solidity ^0.8.0;
 
 interface IInitializable {
-    function initialize(bytes calldata initData) external payable;
+    function initialize() external payable;
+    function initializeWithInitData(bytes calldata initData) external payable;
 }

@@ -217,7 +217,7 @@ contract OPSuccinctFaultDisputeGame is Clone, ISemver, IDisputeGame {
 
     /// @notice Initializes the contract.
     /// @dev This function may only be called once.
-    function initialize(bytes calldata) external payable virtual {
+    function initialize() external payable virtual {
         // SAFETY: Any revert in this function will bubble up to the DisputeGameFactory and
         // prevent the game from being created.
         //
@@ -320,6 +320,8 @@ contract OPSuccinctFaultDisputeGame is Clone, ISemver, IDisputeGame {
         wasRespectedGameTypeWhenCreated =
             GameType.unwrap(ANCHOR_STATE_REGISTRY.respectedGameType()) == GameType.unwrap(GAME_TYPE);
     }
+
+    function initializeWithInitData(bytes calldata) external payable {}
 
     /// @notice The L2 block number for which this game is proposing an output root.
     function l2SequenceNumber() public pure returns (uint256 l2SequenceNumber_) {
