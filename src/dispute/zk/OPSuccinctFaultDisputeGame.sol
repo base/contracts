@@ -321,7 +321,7 @@ contract OPSuccinctFaultDisputeGame is Clone, ISemver, IDisputeGame {
             GameType.unwrap(ANCHOR_STATE_REGISTRY.respectedGameType()) == GameType.unwrap(GAME_TYPE);
     }
 
-    function initializeWithInitData(bytes calldata) external payable {}
+    function initializeWithInitData(bytes calldata) external payable { }
 
     /// @notice The L2 block number for which this game is proposing an output root.
     function l2SequenceNumber() public pure returns (uint256 l2SequenceNumber_) {

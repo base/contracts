@@ -159,7 +159,11 @@ contract BaseTest is Test {
         vm.deal(creator, INIT_BOND);
         vm.prank(creator);
         return AggregateVerifier(
-            address(factory.createWithInitData{ value: INIT_BOND }(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, proof))
+            address(
+                factory.createWithInitData{ value: INIT_BOND }(
+                    AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, proof
+                )
+            )
         );
     }
 

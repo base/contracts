@@ -143,7 +143,11 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
         GameType _gameType,
         Claim _rootClaim,
         bytes calldata _extraData
-    ) external payable returns (IDisputeGame proxy_) {
+    )
+        external
+        payable
+        returns (IDisputeGame proxy_)
+    {
         proxy_ = _createGameImpl(_gameType, _rootClaim, _extraData);
         proxy_.initialize{ value: msg.value }();
         _finalizeGameCreation(_gameType, _rootClaim, _extraData, proxy_);
@@ -154,7 +158,11 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
         Claim _rootClaim,
         bytes calldata _extraData,
         bytes calldata _initData
-    ) external payable returns (IDisputeGame proxy_) {
+    )
+        external
+        payable
+        returns (IDisputeGame proxy_)
+    {
         proxy_ = _createGameImpl(_gameType, _rootClaim, _extraData);
         proxy_.initializeWithInitData{ value: msg.value }(_initData);
         _finalizeGameCreation(_gameType, _rootClaim, _extraData, proxy_);
@@ -171,7 +179,7 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
         bytes calldata _extraData,
         IDisputeGame proxy_
     )
-       internal
+        internal
     {
         // Compute the unique identifier for the dispute game.
         Hash uuid = getGameUUID(_gameType, _rootClaim, _extraData);
@@ -191,7 +199,11 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
     function _createGameImpl(
         GameType _gameType,
         Claim _rootClaim,
-        bytes calldata _extraData) internal returns (IDisputeGame proxy_) {
+        bytes calldata _extraData
+    )
+        internal
+        returns (IDisputeGame proxy_)
+    {
         // Grab the implementation contract for the given `GameType`.
         IDisputeGame impl = gameImpls[_gameType];
 
