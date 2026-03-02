@@ -66,7 +66,7 @@ import { GameType, Hash } from "src/dispute/lib/Types.sol";
 import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
-import { DevSystemConfigGlobal } from "src/multiproof/tee/DevSystemConfigGlobal.sol";
+import { DevSystemConfigGlobal } from "src/multiproof/mocks/MockDevSystemConfigGlobal.sol";
 import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
 
