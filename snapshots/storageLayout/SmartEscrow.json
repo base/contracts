@@ -1,0 +1,79 @@
+[
+  {
+    "bytes": "32",
+    "label": "_roles",
+    "offset": 0,
+    "slot": "0",
+    "type": "mapping(bytes32 => struct AccessControl.RoleData)"
+  },
+  {
+    "bytes": "20",
+    "label": "_pendingDefaultAdmin",
+    "offset": 0,
+    "slot": "1",
+    "type": "address"
+  },
+  {
+    "bytes": "6",
+    "label": "_pendingDefaultAdminSchedule",
+    "offset": 20,
+    "slot": "1",
+    "type": "uint48"
+  },
+  {
+    "bytes": "6",
+    "label": "_currentDelay",
+    "offset": 26,
+    "slot": "1",
+    "type": "uint48"
+  },
+  {
+    "bytes": "20",
+    "label": "_currentDefaultAdmin",
+    "offset": 0,
+    "slot": "2",
+    "type": "address"
+  },
+  {
+    "bytes": "6",
+    "label": "_pendingDelay",
+    "offset": 20,
+    "slot": "2",
+    "type": "uint48"
+  },
+  {
+    "bytes": "6",
+    "label": "_pendingDelaySchedule",
+    "offset": 26,
+    "slot": "2",
+    "type": "uint48"
+  },
+  {
+    "bytes": "20",
+    "label": "benefactor",
+    "offset": 0,
+    "slot": "3",
+    "type": "address"
+  },
+  {
+    "bytes": "20",
+    "label": "beneficiary",
+    "offset": 0,
+    "slot": "4",
+    "type": "address"
+  },
+  {
+    "bytes": "32",
+    "label": "released",
+    "offset": 0,
+    "slot": "5",
+    "type": "uint256"
+  },
+  {
+    "bytes": "1",
+    "label": "contractTerminated",
+    "offset": 0,
+    "slot": "6",
+    "type": "bool"
+  }
+]

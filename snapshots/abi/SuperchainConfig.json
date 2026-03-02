@@ -1,8 +1,45 @@
 [
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_guardian",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_incidentResponder",
+        "type": "address"
+      }
+    ],
     "stateMutability": "nonpayable",
     "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "GUARDIAN",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "INCIDENT_RESPONDER",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [
@@ -51,28 +88,15 @@
   },
   {
     "inputs": [],
-    "name": "initVersion",
+    "name": "incidentResponder",
     "outputs": [
       {
-        "internalType": "uint8",
-        "name": "",
-        "type": "uint8"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "address",
-        "name": "_guardian",
+        "name": "",
         "type": "address"
       }
     ],
-    "name": "initialize",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -227,32 +251,13 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": true,
-        "internalType": "enum SuperchainConfig.UpdateType",
-        "name": "updateType",
-        "type": "uint8"
-      },
-      {
         "indexed": false,
-        "internalType": "bytes",
-        "name": "data",
-        "type": "bytes"
+        "internalType": "address",
+        "name": "identifier",
+        "type": "address"
       }
     ],
-    "name": "ConfigUpdate",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint8",
-        "name": "version",
-        "type": "uint8"
-      }
-    ],
-    "name": "Initialized",
+    "name": "PauseExtended",
     "type": "event"
   },
   {
@@ -266,19 +271,6 @@
       }
     ],
     "name": "Paused",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "identifier",
-        "type": "address"
-      }
-    ],
-    "name": "PauseExtended",
     "type": "event"
   },
   {
@@ -325,11 +317,6 @@
     "type": "error"
   },
   {
-    "inputs": [],
-    "name": "ReinitializableBase_ZeroInitVersion",
-    "type": "error"
-  },
-  {
     "inputs": [
       {
         "internalType": "address",
@@ -354,6 +341,11 @@
   {
     "inputs": [],
     "name": "SuperchainConfig_OnlyGuardian",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "SuperchainConfig_OnlyGuardianOrIncidentResponder",
     "type": "error"
   }
 ]
