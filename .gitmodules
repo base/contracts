@@ -1,3 +1,0 @@
-[submodule "lib/aws-nitro-enclave-attestation"]
-	path = lib/aws-nitro-enclave-attestation
-	url = https://github.com/automata-network/aws-nitro-enclave-attestation
