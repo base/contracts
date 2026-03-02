@@ -75,6 +75,10 @@ clean:
 test *ARGS: build-go-ffi
   forge test {{ARGS}}
 
+# Runs multiproof contract tests.
+test-multiproof *ARGS: build-go-ffi
+  forge test --match-path "test/multiproof/*" {{ARGS}}
+
 # Runs standard contract tests (developer mode).
 test-dev *ARGS: build-go-ffi
   FOUNDRY_PROFILE=lite forge test {{ARGS}}
