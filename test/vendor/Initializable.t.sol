@@ -365,9 +365,7 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "SystemConfigGlobalImpl",
                 target: address(systemConfigGlobal),
-                initCalldata: abi.encodeCall(
-                    systemConfigGlobal.initialize, (address(0), address(0))
-                )
+                initCalldata: abi.encodeCall(systemConfigGlobal.initialize, (address(0), address(0)))
             })
         );
     }
