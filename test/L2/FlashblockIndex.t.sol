@@ -5,6 +5,8 @@ import { Test } from "forge-std/Test.sol";
 import { FlashblockIndex } from "src/L2/FlashblockIndex.sol";
 
 contract FlashblockIndexTest is Test {
+    event FlashblockIndexUpdated(uint8 indexed flashblockIndex, uint48 indexed blockNumber);
+
     FlashblockIndex flashblockIndex;
     address builder;
 
@@ -16,6 +18,17 @@ contract FlashblockIndexTest is Test {
     /// @notice Tests that the constructor correctly sets the BUILDER immutable.
     function test_constructor_setsBuilder() external view {
         assertEq(flashblockIndex.BUILDER(), builder);
+    }
+
+    /// @notice Tests that initialize() reverts on the implementation contract since initializers are disabled.
+    function test_initialize_reverts_whenCalledOnImplementation() external {
+        vm.expectRevert("Initializable: contract is already initialized");
+        flashblockIndex.initialize();
+    }
+
+    /// @notice Tests that version() returns "1.0.0".
+    function test_version_returnsCorrectValue() external view {
+        assertEq(flashblockIndex.version(), "1.0.0");
     }
 
     /// @notice Tests that get() returns (0, 0) when no index has ever been written.
@@ -69,6 +82,15 @@ contract FlashblockIndexTest is Test {
         (uint8 actualIndex, uint48 actualBlock) = flashblockIndex.get();
         assertEq(actualIndex, index);
         assertEq(actualBlock, blockNumber);
+    }
+
+    /// @notice Tests that the fallback emits FlashblockIndexUpdated with the correct parameters.
+    function test_fallback_emitsFlashblockIndexUpdated(uint8 index, uint48 blockNumber) external {
+        vm.roll(blockNumber);
+        vm.expectEmit(address(flashblockIndex));
+        emit FlashblockIndexUpdated(index, blockNumber);
+        (bool success,) = _callFallback({ caller: builder, index: index });
+        assertTrue(success);
     }
 
     /// @notice Tests that a second fallback call overwrites the previous value at a different block.
@@ -135,6 +157,8 @@ contract FlashblockIndexTest is Test {
         assertEq(actualIndex, index);
         assertEq(actualBlock, 0);
     }
+
+    // --- Helper ---
 
     /// @notice Helper function to call the fallback with the given caller and index.
     /// @param caller The address of the caller.
