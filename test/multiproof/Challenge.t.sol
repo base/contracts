@@ -38,6 +38,8 @@ contract ChallengeTest is BaseTest {
         assertEq(game1.bondRecipient(), ZK_PROVER);
         address counteredBy = game1.counteredByGameAddress();
         assertEq(counteredBy, address(game2));
+        assertEq(game1.proofCount(), -1);
+        assertEq(game1.expectedResolution().raw(), type(uint64).max);
 
         // Retrieve bond after challenge
         vm.warp(block.timestamp + 7 days);
@@ -188,6 +190,45 @@ contract ChallengeTest is BaseTest {
         // challenge game
         uint256 gameIndex = factory.gameCount() - 1;
         vm.expectRevert(AggregateVerifier.InvalidGame.selector);
+        game.challenge(gameIndex);
+    }
+
+    function testChallengeFailsAfterTEENullification() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+
+        Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee1")));
+        bytes memory teeProof1 = _generateProof("tee-proof-1", AggregateVerifier.ProofType.TEE);
+
+        AggregateVerifier game =
+            _createAggregateVerifierGame(TEE_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, teeProof1);
+
+        Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
+        bytes memory teeProof2 = _generateProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
+
+        game.nullify(teeProof2, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
+
+        // challenge game
+        uint256 gameIndex = factory.gameCount() - 1;
+        vm.expectRevert(AggregateVerifier.NotEnoughProofs.selector);
+        game.challenge(gameIndex);
+    }
+
+    function testChallengeFailsAfterZKNullification() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk1")));
+        bytes memory zkProof1 = _generateProof("zk-proof-1", AggregateVerifier.ProofType.ZK);
+
+        AggregateVerifier game =
+            _createAggregateVerifierGame(ZK_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, zkProof1);
+
+        Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk2")));
+        bytes memory zkProof2 = _generateProof("zk-proof-2", AggregateVerifier.ProofType.ZK);
+
+        game.nullify(zkProof2, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
+
+        // challenge game
+        uint256 gameIndex = factory.gameCount() - 1;
+        vm.expectRevert(ClaimAlreadyResolved.selector);
         game.challenge(gameIndex);
     }
 }

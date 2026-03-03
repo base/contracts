@@ -733,7 +733,8 @@ contract DeployImplementations is Script {
                     _input.multiproofConfigHash,
                     8453,
                     100,
-                    10
+                    10,
+                    1
                 )
             )
         );

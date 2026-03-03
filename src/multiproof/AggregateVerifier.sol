@@ -101,6 +101,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The game type ID.
     GameType internal immutable GAME_TYPE;
 
+    /// @notice The minimum number of proofs required to resolve the game.
+    uint256 public immutable PROOF_THRESHOLD;
+
     ////////////////////////////////////////////////////////////////
     //                         State Vars                         //
     ////////////////////////////////////////////////////////////////
@@ -143,6 +146,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The timestamp of the game's expected resolution.
     Timestamp public expectedResolution;
+
+    /// @notice The number of proofs provided.
+    /// @dev Can be negative if a ZK proof is nullified.
+    int256 public proofCount;
 
     ////////////////////////////////////////////////////////////////
     //                         Events                             //
@@ -239,6 +246,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice Thrown when the L1 origin hash doesn't match the actual blockhash.
     error L1OriginHashMismatch(bytes32 claimed, bytes32 actual);
 
+    /// @notice Thrown when trying to nullify with a TEE proof when a ZK proof has already been provided.
+    error CanOnlyNullifyWithZKProof();
+
+    /// @notice Thrown when there are not enough proofs to resolve the game.
+    error NotEnoughProofs();
+
+    /// @notice Thrown when the proof threshold is not positive.
+    error InvalidProofThreshold();
+
     /// @param gameType_ The game type.
     /// @param anchorStateRegistry_ The anchor state registry.
     /// @param delayedWETH The delayed WETH contract.
@@ -249,6 +265,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param configHash The hash of the rollup configuration.
     /// @param l2ChainId The chain ID of the L2 network.
     /// @param blockInterval The block interval.
+    /// @param intermediateBlockInterval The intermediate block interval.
+    /// @param proofThreshold The minimum number of proofs required to resolve the game.
     constructor(
         GameType gameType_,
         IAnchorStateRegistry anchorStateRegistry_,
@@ -260,11 +278,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 configHash,
         uint256 l2ChainId,
         uint256 blockInterval,
-        uint256 intermediateBlockInterval
+        uint256 intermediateBlockInterval,
+        uint256 proofThreshold
     ) {
+        // Block interval and intermediate block interval must be positive and divisible.
         if (blockInterval == 0 || intermediateBlockInterval == 0 || blockInterval % intermediateBlockInterval != 0) {
             revert InvalidBlockInterval(blockInterval, intermediateBlockInterval);
         }
+
+        // Proof threshold must be between 1 and 2.
+        if (proofThreshold < 1 || proofThreshold > 2) revert InvalidProofThreshold();
 
         // Set up initial game state.
         GAME_TYPE = gameType_;
@@ -279,6 +302,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         L2_CHAIN_ID = l2ChainId;
         BLOCK_INTERVAL = blockInterval;
         INTERMEDIATE_BLOCK_INTERVAL = intermediateBlockInterval;
+        PROOF_THRESHOLD = proofThreshold;
 
         INITIALIZE_CALLDATA_SIZE = 0x7E + 0x20 * intermediateOutputRootsCount();
     }
@@ -437,6 +461,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             status = GameStatus.DEFENDER_WINS;
         }
 
+        // casting to 'int256' is safe because 1 <= PROOF_THRESHOLD <= 2
+        // forge-lint: disable-next-line(unsafe-typecast)
+        if (proofCount < int256(PROOF_THRESHOLD)) revert NotEnoughProofs();
+
         // Bond is refunded as no challenge was made or parent is invalid.
         bondRecipient = gameCreator();
         // Mark the game as resolved.
@@ -465,6 +493,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         if (proofTypeToProver[ProofType.TEE] == address(0)) revert MissingProof(ProofType.TEE);
         if (proofTypeToProver[ProofType.ZK] != address(0)) revert AlreadyProven(ProofType.ZK);
 
+        // Prevents challenging after TEE nullification.
+        if (proofCount != 1) revert NotEnoughProofs();
+
         (,, IDisputeGame game) = DISPUTE_GAME_FACTORY.gameAtIndex(gameIndex);
 
         // The game must be a valid game used to challenge.
@@ -480,6 +511,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         // Set the game as challenged.
         status = GameStatus.CHALLENGER_WINS;
+
+        // Set the proof count to -1.
+        proofCount = -1;
+
+        // Update the expected resolution.
+        _updateExpectedResolution();
 
         // Set the bond recipient.
         // Bond cannot be claimed until the game used to challenge resolves as DEFENDER_WINS.
@@ -509,6 +546,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         if (proposedIntermediateRoot == intermediateRootToProve) revert IntermediateRootSameAsProposed();
 
         ProofType proofType = ProofType(uint8(proofBytes[0]));
+
+        // If TEE and ZK proofs are provided, can only nullify with ZK proof.
+        if (proofType == ProofType.TEE) {
+            if (proofTypeToProver[ProofType.ZK] != address(0)) revert CanOnlyNullifyWithZKProof();
+        }
+
         if (proofTypeToProver[proofType] == address(0)) revert MissingProof(proofType);
 
         bytes32 startingRoot = intermediateRootIndex == 0
@@ -530,9 +573,24 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             abi.encodePacked(intermediateRootToProve)
         );
 
-        // Set the game as challenged so that child games can't resolve.
-        status = GameStatus.CHALLENGER_WINS;
-        // Refund the bond. This can override a challenge.
+        if (proofType == ProofType.ZK) {
+            // Since a ZK proof vetoes a TEE proof, we make the proof count negative for ZK nullifications.
+            // This ensures that the game cannot resolve if a TEE proof is provided later.
+            proofCount = -1;
+
+            // Set the game as challenged so that child games can't resolve.
+            status = GameStatus.CHALLENGER_WINS;
+        } else if (proofType == ProofType.TEE) {
+            // The status is not updated here to still allow a ZK proof to be provided later.
+            proofCount -= 1;
+        }
+
+        // If there are no proofs, the expected resolution will be set to type(uint64).max.
+        // It's not possible to go from FAST_FINALIZATION_DELAY to SLOW_FINALIZATION_DELAY
+        // as we can only do a ZK nullification in this case, causing proofCount to be negative.
+        _updateExpectedResolution();
+
+        // Refund the bond as either a ZK proof was nullified or a ZK proof has to be provided later.
         bondRecipient = gameCreator();
 
         emit Nullified(msg.sender, intermediateRootIndex, intermediateRootToProve);
@@ -709,12 +767,18 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice Updates the expected resolution timestamp.
     function _updateExpectedResolution() internal {
-        bool hasTee = proofTypeToProver[ProofType.TEE] != address(0);
-        bool hasZk = proofTypeToProver[ProofType.ZK] != address(0);
+        uint64 delay;
 
-        if (!hasTee && !hasZk) revert NoProofProvided();
+        if (proofCount >= 2) {
+            delay = FAST_FINALIZATION_DELAY;
+        } else if (proofCount > 0) {
+            delay = SLOW_FINALIZATION_DELAY;
+        } else {
+            // If there are no proofs, don't allow the game to resolve.
+            expectedResolution = Timestamp.wrap(type(uint64).max);
+            return;
+        }
 
-        uint64 delay = (hasTee && hasZk) ? FAST_FINALIZATION_DELAY : SLOW_FINALIZATION_DELAY;
         uint64 newResolution = uint64(block.timestamp) + delay;
         expectedResolution = Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, expectedResolution.raw())));
     }
@@ -726,6 +790,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         if (proofType == ProofType.ZK) {
             bondRecipient = gameCreator();
         }
+
+        proofCount += 1;
 
         _updateExpectedResolution();
     }

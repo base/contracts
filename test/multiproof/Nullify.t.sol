@@ -23,8 +23,10 @@ contract NullifyTest is BaseTest {
 
         game.nullify(teeProof2, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
 
-        assertEq(uint8(game.status()), uint8(GameStatus.CHALLENGER_WINS));
+        assertEq(uint8(game.status()), uint8(GameStatus.IN_PROGRESS));
         assertEq(game.bondRecipient(), TEE_PROVER);
+        assertEq(game.proofCount(), 0);
+        assertEq(game.expectedResolution().raw(), type(uint64).max);
 
         uint256 balanceBefore = game.gameCreator().balance;
         game.claimCredit();
@@ -50,6 +52,8 @@ contract NullifyTest is BaseTest {
 
         assertEq(uint8(game1.status()), uint8(GameStatus.CHALLENGER_WINS));
         assertEq(game1.bondRecipient(), ZK_PROVER);
+        assertEq(game1.proofCount(), -1);
+        assertEq(game1.expectedResolution().raw(), type(uint64).max);
 
         uint256 balanceBefore = game1.gameCreator().balance;
         game1.claimCredit();
@@ -59,7 +63,7 @@ contract NullifyTest is BaseTest {
         assertEq(delayedWETH.balanceOf(address(game1)), 0);
     }
 
-    function testTEENullifyFailsIfNoTEEProof() public {
+    function testTEENullifyFailsIfThereIsZKProof() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
 
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk1")));
@@ -71,9 +75,7 @@ contract NullifyTest is BaseTest {
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
         bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE)
-        );
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.CanOnlyNullifyWithZKProof.selector));
         game1.nullify(teeProof, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
     }
 
