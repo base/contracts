@@ -47,6 +47,10 @@
     "initCodeHash": "0x9b1f3555b499709485d51d5d9665002c0eb1e5eb893be1fb978a30749e894858",
     "sourceCodeHash": "0x572b5da38443fa5fc1c1873a733adee1894c6eba94f0e7867f2e81c5eb616a39"
   },
+  "src/L1/SuperchainConfig.sol:SuperchainConfig:dispute": {
+    "initCodeHash": "0x9b1f3555b499709485d51d5d9665002c0eb1e5eb893be1fb978a30749e894858",
+    "sourceCodeHash": "0x572b5da38443fa5fc1c1873a733adee1894c6eba94f0e7867f2e81c5eb616a39"
+  },
   "src/L1/SystemConfig.sol:SystemConfig": {
     "initCodeHash": "0x3e8e52d96398a6de91d8922769cc5d0bc7acb2a692689ceb70f1de816e8d6b14",
     "sourceCodeHash": "0x1a24ffe154eddbe0088a4b0848e662bf5eb482fe031ba528f74c51804f6e0395"
@@ -235,11 +239,23 @@
     "initCodeHash": "0xda3fa6778bd2bf6f0926920ee94fc4cd40b5f3a1dafe3861a398dd8a7368c758",
     "sourceCodeHash": "0x17cfef34861039fa1b1f7e84a5e59438fe053622aa1eca7e6dbcd2b5a7d3ad33"
   },
+  "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
+    "initCodeHash": "0x98393b796c9074b6b2913d346ad3ef68d7f74d7755f14cbaf09650284d7e2427",
+    "sourceCodeHash": "0x17cfef34861039fa1b1f7e84a5e59438fe053622aa1eca7e6dbcd2b5a7d3ad33"
+  },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
     "initCodeHash": "0x14dacf35829eec2a16c4744b1a2d788cfe90558acb85d08b0256e524a9f1f882",
     "sourceCodeHash": "0xef8529ec551b107b376d74d3a74ef9268a191651b3b950c33405f39369c908f0"
   },
+  "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal:dispute": {
+    "initCodeHash": "0xbbfc9ae5ad49b407a80774f8ccc4e346d22b8b1f3430beb2ca8f382305b2a780",
+    "sourceCodeHash": "0xef8529ec551b107b376d74d3a74ef9268a191651b3b950c33405f39369c908f0"
+  },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
+    "initCodeHash": "0x78317d9088a26523d938ce0d88ed0134abc60292c0cdb3f8a6a9530638fd9e9a",
+    "sourceCodeHash": "0x73055cec7dd6698fba87b975ca89614759d8b506f4c8f19f21a461da46392b1c"
+  },
+  "src/multiproof/tee/TEEVerifier.sol:TEEVerifier:dispute": {
     "initCodeHash": "0x78317d9088a26523d938ce0d88ed0134abc60292c0cdb3f8a6a9530638fd9e9a",
     "sourceCodeHash": "0x73055cec7dd6698fba87b975ca89614759d8b506f4c8f19f21a461da46392b1c"
   },
