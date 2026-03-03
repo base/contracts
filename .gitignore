@@ -1,6 +1,8 @@
 # Artifacts and Cache
 artifacts
+!crates/bindings/artifacts/
 forge-artifacts
+target
 cache
 broadcast
 kout-proofs
