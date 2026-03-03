@@ -240,12 +240,12 @@
     "sourceCodeHash": "0x17cfef34861039fa1b1f7e84a5e59438fe053622aa1eca7e6dbcd2b5a7d3ad33"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
-    "initCodeHash": "0x13f0b99fc8bdfa396c7671974d452e8e13fab87f30cb5cbf520680c4ed72a7e4",
-    "sourceCodeHash": "0x13e1e75b3c8141159f7c00d258c37d9d37e89921fa5e1fdadcbb886bf9d9ca5e"
+    "initCodeHash": "0x14dacf35829eec2a16c4744b1a2d788cfe90558acb85d08b0256e524a9f1f882",
+    "sourceCodeHash": "0xef8529ec551b107b376d74d3a74ef9268a191651b3b950c33405f39369c908f0"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal:dispute": {
     "initCodeHash": "0xa40fa93611b6f6f6950aa20c5c2b1423d079cb695b47d382172e6ebc4d24aeaa",
-    "sourceCodeHash": "0x13e1e75b3c8141159f7c00d258c37d9d37e89921fa5e1fdadcbb886bf9d9ca5e"
+    "sourceCodeHash": "0xef8529ec551b107b376d74d3a74ef9268a191651b3b950c33405f39369c908f0"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0x78317d9088a26523d938ce0d88ed0134abc60292c0cdb3f8a6a9530638fd9e9a",

@@ -140,6 +140,8 @@ contract DeployDevWithNitro is Script {
     }
 
     function run() public {
+        GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
+
         console.log("=== Deploying Dev Infrastructure (WITH NITRO) ===");
         console.log("Chain ID:", block.chainid);
         console.log("Owner:", cfg.finalSystemOwner());
@@ -153,8 +155,8 @@ contract DeployDevWithNitro is Script {
 
         _deployTEEContracts(cfg.finalSystemOwner(), cfg.nitroEnclaveVerifier());
         _registerProposer(cfg.teeProposer());
-        _deployInfrastructure();
-        _deployAggregateVerifier();
+        _deployInfrastructure(gameType);
+        _deployAggregateVerifier(gameType);
 
         vm.stopBroadcast();
 
@@ -181,7 +183,7 @@ contract DeployDevWithNitro is Script {
         console.log("Registered TEE proposer:", teeProposer);
     }
 
-    function _deployInfrastructure() internal {
+    function _deployInfrastructure(GameType gameType) internal {
         address factoryImpl = address(new DisputeGameFactory());
         MinimalProxyAdmin proxyAdmin = new MinimalProxyAdmin(cfg.finalSystemOwner());
 
@@ -199,12 +201,12 @@ contract DeployDevWithNitro is Script {
             disputeGameFactory,
             Hash.wrap(cfg.multiproofGenesisOutputRoot()),
             cfg.multiproofGenesisBlockNumber(),
-            GameType.wrap(uint32(cfg.multiproofGameType()))
+            gameType
         );
         console.log("AnchorStateRegistry (mock):", mockAnchorRegistry);
     }
 
-    function _deployAggregateVerifier() internal {
+    function _deployAggregateVerifier(GameType gameType) internal {
         address zkVerifier = address(new MockVerifier());
         console.log("MockVerifier (ZK):", zkVerifier);
 
@@ -213,7 +215,7 @@ contract DeployDevWithNitro is Script {
 
         aggregateVerifier = address(
             new AggregateVerifier(
-                GameType.wrap(uint32(cfg.multiproofGameType())),
+                gameType,
                 IAnchorStateRegistry(mockAnchorRegistry),
                 IDelayedWETH(payable(mockDelayedWETH)),
                 IVerifier(teeVerifier),
@@ -228,9 +230,8 @@ contract DeployDevWithNitro is Script {
         );
         console.log("AggregateVerifier:", aggregateVerifier);
 
-        DisputeGameFactory(disputeGameFactory)
-            .setImplementation(GameType.wrap(uint32(cfg.multiproofGameType())), IDisputeGame(aggregateVerifier));
-        DisputeGameFactory(disputeGameFactory).setInitBond(GameType.wrap(uint32(cfg.multiproofGameType())), INIT_BOND);
+        DisputeGameFactory(disputeGameFactory).setImplementation(gameType, IDisputeGame(aggregateVerifier));
+        DisputeGameFactory(disputeGameFactory).setInitBond(gameType, INIT_BOND);
         console.log("Registered AggregateVerifier with factory");
     }
 

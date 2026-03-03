@@ -239,6 +239,7 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             bytes32(uint256(1)), // teeImageHash
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
+            address(0), // nitroEnclaveVerifier
             superchainConfigProxy,
             protocolVersionsProxy,
             superchainProxyAdmin,
@@ -530,6 +531,7 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             bytes32(uint256(1)), // teeImageHash
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
+            address(0), // nitroEnclaveVerifier
             superchainConfigProxy,
             protocolVersionsProxy,
             superchainProxyAdmin,

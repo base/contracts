@@ -97,6 +97,7 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
                 teeImageHash: bytes32(uint256(1)),
                 multiproofConfigHash: bytes32(0),
                 multiproofGameType: 621,
+                nitroEnclaveVerifier: address(0),
                 superchainConfigProxy: dso.superchainConfigProxy,
                 protocolVersionsProxy: dso.protocolVersionsProxy,
                 superchainProxyAdmin: dso.superchainProxyAdmin,

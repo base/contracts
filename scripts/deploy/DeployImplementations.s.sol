@@ -71,6 +71,7 @@ contract DeployImplementations is Script {
         bytes32 teeImageHash;
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
+        address nitroEnclaveVerifier;
         // Outputs from DeploySuperchain.s.sol.
         ISuperchainConfig superchainConfigProxy;
         IProtocolVersions protocolVersionsProxy;
@@ -714,7 +715,7 @@ contract DeployImplementations is Script {
     function deployAggregateVerifierImpl(Input memory _input, Output memory _output) private {
         address zkVerifier = address(new MockVerifier());
 
-        SystemConfigGlobal scgImpl = new SystemConfigGlobal(INitroEnclaveVerifier(address(0)));
+        SystemConfigGlobal scgImpl = new SystemConfigGlobal(INitroEnclaveVerifier(_input.nitroEnclaveVerifier));
         vm.label(address(scgImpl), "SystemConfigGlobalImpl");
         _output.systemConfigGlobalImpl = scgImpl;
         address teeVerifierImpl = address(new TEEVerifier(scgImpl));

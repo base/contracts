@@ -286,6 +286,7 @@ contract Deploy is Deployer {
                 teeImageHash: cfg.teeImageHash(),
                 multiproofConfigHash: cfg.multiproofConfigHash(),
                 multiproofGameType: cfg.multiproofGameType(),
+                nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
                 protocolVersionsProxy: IProtocolVersions(artifacts.mustGetAddress("ProtocolVersionsProxy")),
                 superchainConfigProxy: superchainConfigProxy,
                 superchainProxyAdmin: superchainProxyAdmin,

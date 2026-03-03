@@ -120,7 +120,7 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, ISemver {
         // The publicKey is encoded in ANSI X9.62 format: 0x04 || x || y (65 bytes).
         // We skip the first byte (0x04 prefix) when hashing to derive the address.
         bytes memory pubKey = journal.publicKey;
-        if (pubKey.length < 2) revert InvalidPublicKey();
+        if (pubKey.length != 65) revert InvalidPublicKey();
         bytes32 publicKeyHash;
         assembly {
             publicKeyHash := keccak256(add(pubKey, 0x21), sub(mload(pubKey), 1))
@@ -160,10 +160,14 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, ISemver {
         return "0.2.0";
     }
 
-    /// @dev Extracts PCR0 from the first entry in the PCR array and returns its keccak256 hash.
+    /// @dev Finds PCR0 (index 0) in the PCR array and returns its keccak256 hash.
     function _extractPCR0Hash(Pcr[] memory pcrs) internal pure returns (bytes32) {
-        if (pcrs.length == 0 || pcrs[0].index != 0) revert PCR0NotFound();
-        Bytes48 memory value = pcrs[0].value;
-        return keccak256(abi.encodePacked(value.first, value.second));
+        for (uint256 i = 0; i < pcrs.length; i++) {
+            if (pcrs[i].index == 0) {
+                Bytes48 memory value = pcrs[i].value;
+                return keccak256(abi.encodePacked(value.first, value.second));
+            }
+        }
+        revert PCR0NotFound();
     }
 }
