@@ -152,10 +152,10 @@ library ForgeArtifacts {
 
     /// @notice Pulls the `_initialized` storage slot information from the Forge artifacts for a given contract.
     function getInitializedSlot(string memory _contractName) internal returns (StorageSlot memory slot_) {
-        // FaultDisputeGame and PermissionedDisputeGame use a different name for the initialized storage slot.
+        // FaultDisputeGame, PermissionedDisputeGame, and AggregateVerifier use a different name for the initialized storage slot.
         string memory slotName = "_initialized";
         string memory slotType = "t_uint8";
-        if (LibString.eq(_contractName, "FaultDisputeGame") || LibString.eq(_contractName, "PermissionedDisputeGame")) {
+        if (LibString.eq(_contractName, "FaultDisputeGame") || LibString.eq(_contractName, "PermissionedDisputeGame") || LibString.eq(_contractName, "AggregateVerifier")) {
             slotName = "initialized";
             slotType = "t_bool";
         }

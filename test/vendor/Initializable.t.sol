@@ -365,6 +365,15 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "AggregateVerifierImpl",
                 target: address(aggregateVerifier),
+                initCalldata: abi.encodeWithSignature("initializeWithInitData(bytes)", hex"")
+            })
+        );
+
+        // SystemConfigGlobal (Multiproof)
+        contracts.push(
+            InitializeableContract({
+                name: "SystemConfigGlobalImpl",
+                target: address(systemConfigGlobal),
                 initCalldata: abi.encodeCall(
                     ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0))
                 )
@@ -405,6 +414,8 @@ contract Initializer_Test is CommonTest {
         excludes[j++] = "src/L1/FeesDepositor.sol";
         // Contract is not deployed as part of the standard deployment script.
         excludes[j++] = "src/revenue-share/BalanceTracker.sol";
+        // Mock contracts are not deployed as part of the standard deployment script.
+        excludes[j++] = "src/multiproof/mocks/*";
 
         // Get all contract names in the src directory, minus the excluded contracts.
         string[] memory contractNames = ForgeArtifacts.getContractNames("src/*", excludes);

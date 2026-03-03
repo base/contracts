@@ -103,6 +103,7 @@ contract DeployImplementations is Script {
         ISuperFaultDisputeGame superFaultDisputeGameImpl;
         ISuperPermissionedDisputeGame superPermissionedDisputeGameImpl;
         IVerifier aggregateVerifierImpl;
+        SystemConfigGlobal systemConfigGlobalImpl;
     }
 
     bytes32 internal _salt = DeployUtils.DEFAULT_SALT;
@@ -136,6 +137,7 @@ contract DeployImplementations is Script {
         deployAnchorStateRegistryImpl(_input, output_);
         deployFaultDisputeGameV2Impl(_input, output_);
         deployPermissionedDisputeGameV2Impl(_input, output_);
+        deploySystemConfigGlobalImpl(_input, output_);
         deployAggregateVerifierImpl(_input, output_);
         if (DevFeatures.isDevFeatureEnabled(_input.devFeatureBitmap, DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
             deploySuperFaultDisputeGameImpl(_input, output_);
@@ -477,7 +479,7 @@ contract DeployImplementations is Script {
     function deployDisputeGameFactoryImpl(Output memory _output) private {
         IDisputeGameFactory impl = IDisputeGameFactory(
             DeployUtils.createDeterministic({
-                _name: "DisputeGameFactory",
+                _name: "src/dispute/DisputeGameFactory.sol:DisputeGameFactory",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IDisputeGameFactory.__constructor__, ())),
                 _salt: _salt
             })
@@ -704,15 +706,20 @@ contract DeployImplementations is Script {
         _output.opcmStandardValidator = impl;
     }
 
+    function deploySystemConfigGlobalImpl(Input memory, Output memory _output) private {
+        address certManager = address(new CertManager());
+        SystemConfigGlobal scgImpl = new SystemConfigGlobal(CertManager(certManager));
+
+        vm.label(address(scgImpl), "SystemConfigGlobalImpl");
+        _output.systemConfigGlobalImpl = scgImpl;
+    }
+
     function deployAggregateVerifierImpl(Input memory, Output memory _output) private {
         DeployDevWithNitro nitro = new DeployDevWithNitro();
         DeployDevWithNitro.DeployConfig memory cfg = nitro.loadConfig();
 
         address zkVerifier = address(new MockVerifier());
-
-        address certManager = address(new CertManager());
-        SystemConfigGlobal scgImpl = new SystemConfigGlobal(CertManager(certManager));
-        address teeVerifierImpl = address(new TEEVerifier(scgImpl));
+        address teeVerifierImpl = address(new TEEVerifier(_output.systemConfigGlobalImpl));
 
         IVerifier aggregateVerifierImpl = IVerifier(
             address(
