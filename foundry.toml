@@ -36,6 +36,7 @@ compilation_restrictions = [
   { paths = "src/dispute/AnchorStateRegistry.sol", optimizer_runs = 5000 },
   { paths = "src/dispute/DelayedWETH.sol", optimizer_runs = 5000 },
   { paths = "src/universal/ProxyAdmin.sol", optimizer_runs = 5000 },
+  { paths = "src/universal/Proxy.sol", optimizer_runs = 5000 },
 ]
 
 extra_output = ['devdoc', 'userdoc', 'metadata', 'storageLayout']
@@ -175,6 +176,7 @@ compilation_restrictions = [
   { paths = "src/dispute/AnchorStateRegistry.sol", optimizer_runs = 0 },
   { paths = "src/dispute/DelayedWETH.sol", optimizer_runs = 0 },
   { paths = "src/universal/ProxyAdmin.sol", optimizer_runs = 0 },
+  { paths = "src/universal/Proxy.sol", optimizer_runs = 0 },
 ]
 
 ################################################################

@@ -360,22 +360,13 @@ contract Initializer_Test is CommonTest {
             })
         );
 
-        // AggregateVerifier
-        contracts.push(
-            InitializeableContract({
-                name: "AggregateVerifierImpl",
-                target: address(aggregateVerifier),
-                initCalldata: abi.encodeWithSignature("initializeWithInitData(bytes)", hex"")
-            })
-        );
-
         // SystemConfigGlobal (Multiproof)
         contracts.push(
             InitializeableContract({
                 name: "SystemConfigGlobalImpl",
                 target: address(systemConfigGlobal),
                 initCalldata: abi.encodeCall(
-                    ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0))
+                    systemConfigGlobal.initialize, (address(0), address(0))
                 )
             })
         );
@@ -405,6 +396,7 @@ contract Initializer_Test is CommonTest {
         excludes[j++] = "src/dispute/PermissionedDisputeGame.sol";
         excludes[j++] = "src/dispute/SuperPermissionedDisputeGame.sol";
         excludes[j++] = "src/dispute/zk/OPSuccinctFaultDisputeGame.sol";
+        excludes[j++] = "src/mutliproof/AggregateVerifier.sol";
         // TODO: Eventually remove this exclusion. Same reason as above dispute contracts.
         excludes[j++] = "src/L1/OPContractsManager.sol";
         // TODO: Eventually remove this exclusion. Same reason as above dispute contracts.
