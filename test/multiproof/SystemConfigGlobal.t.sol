@@ -67,7 +67,7 @@ contract SystemConfigGlobalTest is Test {
     function testInitialization() public view {
         assertEq(systemConfigGlobal.owner(), owner);
         assertEq(systemConfigGlobal.manager(), manager);
-        assertEq(systemConfigGlobal.version(), "0.2.0");
+        assertEq(systemConfigGlobal.version(), "0.1.0");
     }
 
     // ============ PCR0 Registration Tests ============
