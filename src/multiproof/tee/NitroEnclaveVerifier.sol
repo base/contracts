@@ -1,8 +1,8 @@
 //SPDX-License-Identifier: Apache2.0
 pragma solidity ^0.8.0;
 
-import {Ownable} from "@solady/auth/Ownable.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import { Ownable } from "@solady/auth/Ownable.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {
     INitroEnclaveVerifier,
     ZkCoProcessorType,
@@ -11,13 +11,17 @@ import {
     BatchVerifierJournal,
     VerificationResult
 } from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
-import {IRiscZeroVerifier} from "lib/aws-nitro-enclave-attestation/contracts/lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
-import {ISP1Verifier} from "lib/aws-nitro-enclave-attestation/contracts/lib/sp1-contracts/contracts/src/ISP1Verifier.sol";
+import {
+    IRiscZeroVerifier
+} from "lib/aws-nitro-enclave-attestation/contracts/lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
+import {
+    ISP1Verifier
+} from "lib/aws-nitro-enclave-attestation/contracts/lib/sp1-contracts/contracts/src/ISP1Verifier.sol";
 
 /**
  * @title NitroEnclaveVerifier
  * @dev Implementation contract for AWS Nitro Enclave attestation verification using zero-knowledge proofs
- * @dev Custom version of Automata's NitroEnclaveVerifier contract at 
+ * @dev Custom version of Automata's NitroEnclaveVerifier contract at
  * https://github.com/automata-network/aws-nitro-enclave-attestation/tree/26c90565cb009e6539643a0956f9502a12ade672
  *
  * Differences:
@@ -149,7 +153,10 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * @param _aggregatorId Aggregator program ID to check
      * @return True if the ID is supported
      */
-    function isAggregatorIdSupported(ZkCoProcessorType _zkCoProcessor, bytes32 _aggregatorId)
+    function isAggregatorIdSupported(
+        ZkCoProcessorType _zkCoProcessor,
+        bytes32 _aggregatorId
+    )
         external
         view
         returns (bool)
@@ -259,7 +266,10 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         ZkCoProcessorType _zkCoProcessor,
         ZkCoProcessorConfig memory _config,
         bytes32 _verifierProofId
-    ) external onlyOwner {
+    )
+        external
+        onlyOwner
+    {
         zkConfig[_zkCoProcessor] = _config;
 
         // Auto-add program IDs to the version sets and store verifierProofId mapping
@@ -298,7 +308,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * @param _newVerifierId New verifier program ID to set as latest
      * @param _newVerifierProofId New verifier proof ID (stored in mapping, used in batch verification)
      */
-    function updateVerifierId(ZkCoProcessorType _zkCoProcessor, bytes32 _newVerifierId, bytes32 _newVerifierProofId)
+    function updateVerifierId(
+        ZkCoProcessorType _zkCoProcessor,
+        bytes32 _newVerifierId,
+        bytes32 _newVerifierProofId
+    )
         external
         onlyOwner
     {
@@ -420,7 +434,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * - Platform Configuration Registers (PCRs) for integrity measurement
      * - Module ID and timestamp information
      */
-    function verify(bytes calldata output, ZkCoProcessorType zkCoprocessor, bytes calldata proofBytes)
+    function verify(
+        bytes calldata output,
+        ZkCoProcessorType zkCoprocessor,
+        bytes calldata proofBytes
+    )
         external
         returns (VerifierJournal memory journal)
     {
@@ -448,7 +466,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * Batch verification is recommended when processing multiple attestations
      * as it significantly reduces gas costs compared to individual verifications.
      */
-    function batchVerify(bytes calldata output, ZkCoProcessorType zkCoprocessor, bytes calldata proofBytes)
+    function batchVerify(
+        bytes calldata output,
+        ZkCoProcessorType zkCoprocessor,
+        bytes calldata proofBytes
+    )
         external
         returns (VerifierJournal[] memory results)
     {
@@ -476,7 +498,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         ZkCoProcessorType,
         bytes32,
         bytes calldata
-    ) external pure returns (VerifierJournal memory) {
+    )
+        external
+        pure
+        returns (VerifierJournal memory)
+    {
         revert("Not implemented");
     }
 
@@ -487,7 +513,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         bytes32,
         bytes32,
         bytes calldata
-    ) external pure returns (VerifierJournal[] memory) {
+    )
+        external
+        pure
+        returns (VerifierJournal[] memory)
+    {
         revert("Not implemented");
     }
 
@@ -568,7 +598,10 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         bytes32 programId,
         bytes calldata output,
         bytes calldata proofBytes
-    ) internal view {
+    )
+        internal
+        view
+    {
         // Resolve the verifier address (route-specific or default)
         address verifier = _resolveZkVerifier(zkCoprocessor, proofBytes);
 
@@ -587,7 +620,10 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * @param proofBytes Proof data (selector extracted from first 4 bytes)
      * @return Resolved verifier address
      */
-    function _resolveZkVerifier(ZkCoProcessorType zkCoprocessor, bytes calldata proofBytes)
+    function _resolveZkVerifier(
+        ZkCoProcessorType zkCoprocessor,
+        bytes calldata proofBytes
+    )
         internal
         view
         returns (address)
