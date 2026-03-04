@@ -248,20 +248,20 @@
     "sourceCodeHash": "0x17cfef34861039fa1b1f7e84a5e59438fe053622aa1eca7e6dbcd2b5a7d3ad33"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
-    "initCodeHash": "0x14dacf35829eec2a16c4744b1a2d788cfe90558acb85d08b0256e524a9f1f882",
-    "sourceCodeHash": "0xef8529ec551b107b376d74d3a74ef9268a191651b3b950c33405f39369c908f0"
+    "initCodeHash": "0x76da4f2a736d7a39a01720e5d900a85fcaa60ba0430fcacbb8ab367f55ba5411",
+    "sourceCodeHash": "0xba78bc35f234479e9844b595f109da6029d46c062d246af6dc410542c84c61a3"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal:dispute": {
-    "initCodeHash": "0xbbfc9ae5ad49b407a80774f8ccc4e346d22b8b1f3430beb2ca8f382305b2a780",
-    "sourceCodeHash": "0xef8529ec551b107b376d74d3a74ef9268a191651b3b950c33405f39369c908f0"
+    "initCodeHash": "0xfae3a71157f3c64a7bda037ec116bf6e7265099397d9bcad22c01cc1f029ed7d",
+    "sourceCodeHash": "0xba78bc35f234479e9844b595f109da6029d46c062d246af6dc410542c84c61a3"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0x78317d9088a26523d938ce0d88ed0134abc60292c0cdb3f8a6a9530638fd9e9a",
-    "sourceCodeHash": "0x73055cec7dd6698fba87b975ca89614759d8b506f4c8f19f21a461da46392b1c"
+    "sourceCodeHash": "0x08e6d340b025c5a6c5997ef6fb69e6c14444f9e473b2c5337d6c10b6c89c0b4f"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier:dispute": {
     "initCodeHash": "0x78317d9088a26523d938ce0d88ed0134abc60292c0cdb3f8a6a9530638fd9e9a",
-    "sourceCodeHash": "0x73055cec7dd6698fba87b975ca89614759d8b506f4c8f19f21a461da46392b1c"
+    "sourceCodeHash": "0x08e6d340b025c5a6c5997ef6fb69e6c14444f9e473b2c5337d6c10b6c89c0b4f"
   },
   "src/revenue-share/FeeDisburser.sol:FeeDisburser": {
     "initCodeHash": "0x1278027e3756e2989e80c0a7b513e221a5fe0d3dbd9ded108375a29b2c1f3d57",
