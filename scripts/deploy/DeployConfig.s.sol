@@ -101,6 +101,8 @@ contract DeployConfig is Script {
     address public nitroEnclaveVerifier;
     bytes32 public multiproofGenesisOutputRoot;
     uint256 public multiproofGenesisBlockNumber;
+    uint256 public multiproofBlockInterval;
+    uint256 public multiproofIntermediateBlockInterval;
 
     bool public useInterop;
     bool public useUpgradedFork;
@@ -205,9 +207,11 @@ contract DeployConfig is Script {
         multiproofConfigHash = bytes32(_readOr(_json, "$.multiproofConfigHash", 0));
         multiproofGameType = _readOr(_json, "$.multiproofGameType", 621);
         teeProposer = _readOr(_json, "$.teeProposer", finalSystemOwner);
-        nitroEnclaveVerifier = _readOr(_json, "$.nitroEnclaveVerifier", address(0));
+        nitroEnclaveVerifier = stdJson.readAddress(_json, "$.nitroEnclaveVerifier");
         multiproofGenesisOutputRoot = bytes32(_readOr(_json, "$.multiproofGenesisOutputRoot", uint256(1)));
         multiproofGenesisBlockNumber = _readOr(_json, "$.multiproofGenesisBlockNumber", 0);
+        multiproofBlockInterval = _readOr(_json, "$.multiproofBlockInterval", 100);
+        multiproofIntermediateBlockInterval = _readOr(_json, "$.multiproofIntermediateBlockInterval", 10);
     }
 
     function fork() public view returns (Fork fork_) {

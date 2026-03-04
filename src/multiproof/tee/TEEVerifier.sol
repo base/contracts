@@ -13,10 +13,8 @@ import { SystemConfigGlobal } from "./SystemConfigGlobal.sol";
 /// @dev This contract is designed to be used as the TEE_VERIFIER in the AggregateVerifier.
 ///      It verifies that proofs are signed by enclave addresses registered in SystemConfigGlobal
 ///      via AWS Nitro attestation, and that the signer's PCR0 matches the claimed imageId.
-///      Additionally, it verifies that the L1 origin block referenced in the proof actually exists
-///      by checking against blockhash() or the EIP-2935 history contract.
-///      The contract is intentionally stateless - all state related to output proposals is
-///      managed by the calling contract (e.g., AggregateVerifier).
+///      The contract is intentionally stateless - all state related to output proposals and
+///      L1 origin verification is managed by the calling contract (e.g., AggregateVerifier).
 contract TEEVerifier is IVerifier, ISemver {
     /// @notice The SystemConfigGlobal contract that manages valid TEE signers.
     /// @dev Signers are registered via AWS Nitro attestation in SystemConfigGlobal.

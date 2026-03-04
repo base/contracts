@@ -71,5 +71,7 @@
   "teeProposer": "0xb28E6890Cffa969dA9851c1BF1Ac34B76EbFEe98",
   "nitroEnclaveVerifier": "0x0000000000000000000000000000000000000000",
   "multiproofGenesisOutputRoot": "0xbc273d5876d1858ecd5aaf4ce4eaf16c73f0187ca4271b774ed5da7d2254ba79",
-  "multiproofGenesisBlockNumber": 37223829
+  "multiproofGenesisBlockNumber": 37223829,
+  "multiproofBlockInterval": 100,
+  "multiproofIntermediateBlockInterval": 10
 }

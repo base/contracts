@@ -72,6 +72,9 @@ contract DeployImplementations is Script {
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
         address nitroEnclaveVerifier;
+        uint256 l2ChainID;
+        uint256 multiproofBlockInterval;
+        uint256 multiproofIntermediateBlockInterval;
         // Outputs from DeploySuperchain.s.sol.
         ISuperchainConfig superchainConfigProxy;
         IProtocolVersions protocolVersionsProxy;
@@ -731,9 +734,9 @@ contract DeployImplementations is Script {
                     _input.teeImageHash,
                     bytes32(0),
                     _input.multiproofConfigHash,
-                    8453,
-                    100,
-                    10
+                    _input.l2ChainID,
+                    _input.multiproofBlockInterval,
+                    _input.multiproofIntermediateBlockInterval
                 )
             )
         );
