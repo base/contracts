@@ -249,9 +249,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice Thrown when the L1 origin hash doesn't match the actual blockhash.
     error L1OriginHashMismatch(bytes32 claimed, bytes32 actual);
 
-    /// @notice Thrown when trying to nullify with a TEE proof when a ZK proof has already been provided.
-    error CanOnlyNullifyWithZKProof();
-
     /// @notice Thrown when there are not enough proofs to resolve the game.
     error NotEnoughProofs();
 
@@ -550,11 +547,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         ProofType proofType = ProofType(uint8(proofBytes[0]));
 
-        // If TEE and ZK proofs are provided, can only nullify with ZK proof.
-        if (proofType == ProofType.TEE) {
-            if (proofTypeToProver[ProofType.ZK] != address(0)) revert CanOnlyNullifyWithZKProof();
-        }
-
         if (proofTypeToProver[proofType] == address(0)) revert MissingProof(proofType);
 
         bytes32 startingRoot = intermediateRootIndex == 0
@@ -586,6 +578,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         } else if (proofType == ProofType.TEE) {
             // The status is not updated here to still allow a ZK proof to be provided later.
             proofCount -= 1;
+
+            // Increase the expected resolution by the SLOW_FINALIZATION_DELAY.
+            // This gives us enough time to nullify a ZK proof if it was already provided.
+            // Otherwise the below _updateExpectedResolution() makes the expected resolution
+            // the maximum timestamp.
+            expectedResolution = Timestamp.wrap(uint64(block.timestamp + SLOW_FINALIZATION_DELAY));
         }
 
         // If there are no proofs, the expected resolution will be set to type(uint64).max.
