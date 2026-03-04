@@ -240,6 +240,9 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
             address(0), // nitroEnclaveVerifier
+            8453, // l2ChainID
+            100, // multiproofBlockInterval
+            10, // multiproofIntermediateBlockInterval
             superchainConfigProxy,
             protocolVersionsProxy,
             superchainProxyAdmin,
@@ -532,6 +535,9 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
             address(0), // nitroEnclaveVerifier
+            8453, // l2ChainID
+            100, // multiproofBlockInterval
+            10, // multiproofIntermediateBlockInterval
             superchainConfigProxy,
             protocolVersionsProxy,
             superchainProxyAdmin,
