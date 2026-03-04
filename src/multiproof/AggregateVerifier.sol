@@ -57,6 +57,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The maximum number of blocks that EIP-2935 can look back (~8192).
     uint256 public constant EIP2935_WINDOW = 8191;
 
+    /// @notice For when the game no longer accepts proofs and prevents resolution.
+    int8 internal constant NEGATIVE_PROOF_COUNT = type(int8).min;
+
     ////////////////////////////////////////////////////////////////
     //                         Immutables                         //
     ////////////////////////////////////////////////////////////////
@@ -149,7 +152,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The number of proofs provided.
     /// @dev Can be negative if a ZK proof is nullified.
-    int256 public proofCount;
+    int8 public proofCount;
 
     ////////////////////////////////////////////////////////////////
     //                         Events                             //
@@ -287,7 +290,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         }
 
         // Proof threshold must be between 1 and 2.
-        if (proofThreshold < 1 || proofThreshold > 2) revert InvalidProofThreshold();
+        if (proofThreshold != 1 && proofThreshold != 2) revert InvalidProofThreshold();
 
         // Set up initial game state.
         GAME_TYPE = gameType_;
@@ -512,8 +515,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // Set the game as challenged.
         status = GameStatus.CHALLENGER_WINS;
 
-        // Set the proof count to -1.
-        proofCount = -1;
+        // Prevent resolution if any proof was somehow able to be provided later.
+        proofCount = NEGATIVE_PROOF_COUNT;
 
         // Update the expected resolution.
         _updateExpectedResolution();
@@ -575,8 +578,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         if (proofType == ProofType.ZK) {
             // Since a ZK proof vetoes a TEE proof, we make the proof count negative for ZK nullifications.
-            // This ensures that the game cannot resolve if a TEE proof is provided later.
-            proofCount = -1;
+            // This ensures that the game cannot resolve if a TEE proof can somehow be provided later.
+            proofCount = NEGATIVE_PROOF_COUNT;
 
             // Set the game as challenged so that child games can't resolve.
             status = GameStatus.CHALLENGER_WINS;
@@ -771,7 +774,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         if (proofCount >= 2) {
             delay = FAST_FINALIZATION_DELAY;
-        } else if (proofCount > 0) {
+        } else if (proofCount >= 1) {
             delay = SLOW_FINALIZATION_DELAY;
         } else {
             // If there are no proofs, don't allow the game to resolve.

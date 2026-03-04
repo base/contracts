@@ -52,7 +52,7 @@ contract NullifyTest is BaseTest {
 
         assertEq(uint8(game1.status()), uint8(GameStatus.CHALLENGER_WINS));
         assertEq(game1.bondRecipient(), ZK_PROVER);
-        assertEq(game1.proofCount(), -1);
+        assertEq(game1.proofCount(), -128);
         assertEq(game1.expectedResolution().raw(), type(uint64).max);
 
         uint256 balanceBefore = game1.gameCreator().balance;

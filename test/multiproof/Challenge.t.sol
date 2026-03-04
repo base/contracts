@@ -38,7 +38,7 @@ contract ChallengeTest is BaseTest {
         assertEq(game1.bondRecipient(), ZK_PROVER);
         address counteredBy = game1.counteredByGameAddress();
         assertEq(counteredBy, address(game2));
-        assertEq(game1.proofCount(), -1);
+        assertEq(game1.proofCount(), -128);
         assertEq(game1.expectedResolution().raw(), type(uint64).max);
 
         // Retrieve bond after challenge
