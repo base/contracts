@@ -724,7 +724,21 @@ contract DeployImplementations is Script {
         _output.systemConfigGlobalImpl = scgImpl;
         address teeVerifierImpl = address(new TEEVerifier(scgImpl));
 
-        IVerifier aggregateVerifierImpl = IVerifier(
+        _deployAggregateVerifier(_input, _output, teeVerifierImpl, zkVerifier);
+    }
+
+    /// @dev Extracted to avoid "stack too deep" in the legacy (non-IR) codegen pipeline.
+    ///      With 5+ live locals in the outer function, the 12-arg AggregateVerifier constructor
+    ///      would push _input beyond DUP16. A fresh call frame here keeps _input within DUP15.
+    function _deployAggregateVerifier(
+        Input memory _input,
+        Output memory _output,
+        address teeVerifierImpl,
+        address zkVerifier
+    )
+        private
+    {
+        IVerifier impl = IVerifier(
             address(
                 new AggregateVerifier(
                     GameType.wrap(uint32(_input.multiproofGameType)),
@@ -742,8 +756,8 @@ contract DeployImplementations is Script {
                 )
             )
         );
-        vm.label(address(aggregateVerifierImpl), "AggregateVerifierImpl");
-        _output.aggregateVerifierImpl = aggregateVerifierImpl;
+        vm.label(address(impl), "AggregateVerifierImpl");
+        _output.aggregateVerifierImpl = impl;
     }
 
     function assertValidInput(Input memory _input) private pure {
