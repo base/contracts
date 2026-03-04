@@ -1,6 +1,6 @@
 # Artifacts and Cache
 artifacts
-!crates/bindings/artifacts/
+!bindings/rust/artifacts/
 forge-artifacts
 target
 cache
