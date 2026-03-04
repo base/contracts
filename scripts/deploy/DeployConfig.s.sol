@@ -103,6 +103,7 @@ contract DeployConfig is Script {
     uint256 public multiproofGenesisBlockNumber;
     uint256 public multiproofBlockInterval;
     uint256 public multiproofIntermediateBlockInterval;
+    uint256 public multiproofProofThreshold;
 
     bool public useInterop;
     bool public useUpgradedFork;

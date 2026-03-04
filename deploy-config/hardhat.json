@@ -81,5 +81,6 @@
   "multiproofGenesisOutputRoot": "0x0000000000000000000000000000000000000000000000000000000000000001",
   "multiproofGenesisBlockNumber": 0,
   "multiproofBlockInterval": 100,
-  "multiproofIntermediateBlockInterval": 10
+  "multiproofIntermediateBlockInterval": 10,
+  "multiproofProofThreshold": 1
 }

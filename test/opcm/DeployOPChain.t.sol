@@ -101,6 +101,7 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
                 l2ChainID: 8453,
                 multiproofBlockInterval: 100,
                 multiproofIntermediateBlockInterval: 10,
+                multiproofProofThreshold: 1,
                 superchainConfigProxy: dso.superchainConfigProxy,
                 protocolVersionsProxy: dso.protocolVersionsProxy,
                 superchainProxyAdmin: dso.superchainProxyAdmin,
