@@ -222,6 +222,72 @@ snapshots-no-build: snapshots-abi-storage-no-build semver-lock-no-build
 snapshots: build-source snapshots-no-build
 
 
+
+########################################################
+#                       BINDINGS                       #
+########################################################
+
+# Adds a new Rust binding for a Solidity contract.
+# Usage: just bindings-add src/L2/FlashblockIndex.sol
+bindings-add SOL_PATH: build-source
+  #!/bin/bash
+  set -euo pipefail
+
+  sol_path="{{SOL_PATH}}"
+
+  # Extract contract name (e.g. FlashblockIndex from src/L2/FlashblockIndex.sol)
+  contract=$(basename "$sol_path" .sol)
+
+  # Extract module (e.g. l2 from src/L2/FlashblockIndex.sol)
+  module=$(echo "$sol_path" | sed 's|^src/||' | xargs dirname | tr '[:upper:]' '[:lower:]')
+
+  # Convert ContractName to snake_case (e.g. FlashblockIndex -> flashblock_index)
+  snake=$(echo "$contract" | sed 's/\([A-Z]\)/_\L\1/g' | sed 's/^_//')
+
+  rust_dir="bindings/rust/src/${module}"
+  rust_file="${rust_dir}/${snake}.rs"
+  mod_file="${rust_dir}/mod.rs"
+  artifact="bindings/rust/artifacts/${contract}.json"
+
+  # 1. Strip artifact
+  jq '{abi, bytecode: {object: .bytecode.object}, deployedBytecode: {object: .deployedBytecode.object}}' \
+    "forge-artifacts/${contract}.sol/${contract}.json" > "$artifact"
+
+  # 2. Create module directory if needed
+  mkdir -p "$rust_dir"
+
+  # 3. Create .rs file
+  cat > "$rust_file" << EOF
+  use alloy_sol_types::sol;
+
+  sol!(
+      #[sol(rpc, abi)]
+      ${contract},
+      concat!(
+          env!("CARGO_MANIFEST_DIR"),
+          "/artifacts/${contract}.json"
+      )
+  );
+  EOF
+
+  # 4. Add to mod.rs (skip if already present)
+  if ! grep -q "mod ${snake};" "$mod_file" 2>/dev/null; then
+    echo "" >> "$mod_file"
+    echo "mod ${snake};" >> "$mod_file"
+    echo "pub use ${snake}::${contract};" >> "$mod_file"
+  fi
+
+  # 5. Add module to lib.rs (skip if already present)
+  if ! grep -q "pub mod ${module};" "bindings/rust/src/lib.rs" 2>/dev/null; then
+    echo "pub mod ${module};" >> "bindings/rust/src/lib.rs"
+  fi
+
+  # 6. Format generated code
+  cd bindings/rust && cargo fmt
+
+  echo "Added binding: ${contract} -> ${rust_file}"
+
+
 ########################################################
 #                        CHECKS                        #
 ########################################################
@@ -231,6 +297,17 @@ snapshots-check-no-build: snapshots-no-build
 
 # Checks if the snapshots are up to date.
 snapshots-check: build snapshots-check-no-build
+
+# Checks that committed Rust binding artifacts match forge-artifacts.
+bindings-artifacts-check-no-build:
+  #!/bin/bash
+  set -euo pipefail
+  for src in bindings/rust/artifacts/*.json; do
+    name=$(basename "$src" .json)
+    jq '{abi, bytecode: {object: .bytecode.object}, deployedBytecode: {object: .deployedBytecode.object}}' \
+      "forge-artifacts/${name}.sol/${name}.json" > "$src"
+  done
+  git diff --exit-code bindings/rust/artifacts/
 
 # Checks interface correctness without building.
 interfaces-check-no-build:
@@ -338,7 +415,8 @@ check:
   validate-spacers-no-build \
   reinitializer-check-no-build \
   interfaces-check-no-build \
-  lint-forge-tests-check-no-build
+  lint-forge-tests-check-no-build \
+  bindings-artifacts-check-no-build
 
 ########################################################
 #                      DEV TOOLS                       #
