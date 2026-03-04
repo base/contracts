@@ -73,5 +73,6 @@
   "multiproofGenesisOutputRoot": "0xbc273d5876d1858ecd5aaf4ce4eaf16c73f0187ca4271b774ed5da7d2254ba79",
   "multiproofGenesisBlockNumber": 37223829,
   "multiproofBlockInterval": 100,
-  "multiproofIntermediateBlockInterval": 10
+  "multiproofIntermediateBlockInterval": 10,
+  "multiproofProofThreshold": 1
 }
