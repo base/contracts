@@ -37,6 +37,7 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(game.bondRecipient(), address(0));
         assertEq(anchorStateRegistry.isGameProper(IDisputeGame(address(game))), true);
         assertEq(delayedWETH.balanceOf(address(game)), INIT_BOND);
+        assertEq(game.proofCount(), 1);
     }
 
     function testInitializeWithZKProof() public {
@@ -62,6 +63,7 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(game.bondRecipient(), ZK_PROVER);
         assertEq(anchorStateRegistry.isGameProper(IDisputeGame(address(game))), true);
         assertEq(delayedWETH.balanceOf(address(game)), INIT_BOND);
+        assertEq(game.proofCount(), 1);
     }
 
     function testInitializeFailsIfInvalidCallDataSize() public {
@@ -149,6 +151,7 @@ contract AggregateVerifierTest is BaseTest {
             _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, teeProof);
 
         _provideProof(game, ZK_PROVER, zkProof);
+        assertEq(game.proofCount(), 2);
 
         // Unlock bond
         uint256 balanceBefore = game.gameCreator().balance;
@@ -326,7 +329,8 @@ contract AggregateVerifierTest is BaseTest {
             CONFIG_HASH,
             L2_CHAIN_ID,
             0,
-            INTERMEDIATE_BLOCK_INTERVAL
+            INTERMEDIATE_BLOCK_INTERVAL,
+            PROOF_THRESHOLD
         );
 
         // Case 2: INTERMEDIATE_BLOCK_INTERVAL is 0
@@ -342,7 +346,8 @@ contract AggregateVerifierTest is BaseTest {
             CONFIG_HASH,
             L2_CHAIN_ID,
             BLOCK_INTERVAL,
-            0
+            0,
+            PROOF_THRESHOLD
         );
 
         // Case 3: BLOCK_INTERVAL is not divisible by INTERMEDIATE_BLOCK_INTERVAL
@@ -358,7 +363,44 @@ contract AggregateVerifierTest is BaseTest {
             CONFIG_HASH,
             L2_CHAIN_ID,
             3,
-            2
+            2,
+            PROOF_THRESHOLD
+        );
+    }
+
+    function testDeployWithInvalidProofThreshold() public {
+        // Case 1: PROOF_THRESHOLD is 0
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidProofThreshold.selector));
+        new AggregateVerifier(
+            AGGREGATE_VERIFIER_GAME_TYPE,
+            IAnchorStateRegistry(address(anchorStateRegistry)),
+            IDelayedWETH(payable(address(delayedWETH))),
+            IVerifier(address(teeVerifier)),
+            IVerifier(address(zkVerifier)),
+            TEE_IMAGE_HASH,
+            ZK_IMAGE_HASH,
+            CONFIG_HASH,
+            L2_CHAIN_ID,
+            BLOCK_INTERVAL,
+            INTERMEDIATE_BLOCK_INTERVAL,
+            0
+        );
+
+        // Case 2: PROOF_THRESHOLD is > 2
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidProofThreshold.selector));
+        new AggregateVerifier(
+            AGGREGATE_VERIFIER_GAME_TYPE,
+            IAnchorStateRegistry(address(anchorStateRegistry)),
+            IDelayedWETH(payable(address(delayedWETH))),
+            IVerifier(address(teeVerifier)),
+            IVerifier(address(zkVerifier)),
+            TEE_IMAGE_HASH,
+            ZK_IMAGE_HASH,
+            CONFIG_HASH,
+            L2_CHAIN_ID,
+            BLOCK_INTERVAL,
+            INTERMEDIATE_BLOCK_INTERVAL,
+            3
         );
     }
 }

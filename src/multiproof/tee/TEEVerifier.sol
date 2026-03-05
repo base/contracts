@@ -4,6 +4,7 @@ pragma solidity 0.8.15;
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
+import { ISemver } from "interfaces/universal/ISemver.sol";
 
 import { SystemConfigGlobal } from "./SystemConfigGlobal.sol";
 
@@ -12,11 +13,9 @@ import { SystemConfigGlobal } from "./SystemConfigGlobal.sol";
 /// @dev This contract is designed to be used as the TEE_VERIFIER in the AggregateVerifier.
 ///      It verifies that proofs are signed by enclave addresses registered in SystemConfigGlobal
 ///      via AWS Nitro attestation, and that the signer's PCR0 matches the claimed imageId.
-///      Additionally, it verifies that the L1 origin block referenced in the proof actually exists
-///      by checking against blockhash() or the EIP-2935 history contract.
-///      The contract is intentionally stateless - all state related to output proposals is
-///      managed by the calling contract (e.g., AggregateVerifier).
-contract TEEVerifier is IVerifier {
+///      The contract is intentionally stateless - all state related to output proposals and
+///      L1 origin verification is managed by the calling contract (e.g., AggregateVerifier).
+contract TEEVerifier is IVerifier, ISemver {
     /// @notice The SystemConfigGlobal contract that manages valid TEE signers.
     /// @dev Signers are registered via AWS Nitro attestation in SystemConfigGlobal.
     SystemConfigGlobal public immutable SYSTEM_CONFIG_GLOBAL;
@@ -43,15 +42,15 @@ contract TEEVerifier is IVerifier {
     }
 
     /// @notice Verifies a TEE proof for a state transition.
-    /// @param proofBytes The proof: proposer (20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65) = 149
-    /// bytes. @param imageId The claimed TEE image hash (PCR0). Must match the signer's registered PCR0.
+    /// @param proofBytes The proof: proposer(20) + signature(65) = 85 bytes.
+    /// @param imageId The claimed TEE image hash (PCR0). Must match the signer's registered PCR0.
     /// @param journal The keccak256 hash of the proof's public inputs.
     /// @return valid Whether the proof is valid.
     function verify(bytes calldata proofBytes, bytes32 imageId, bytes32 journal) external view override returns (bool) {
-        if (proofBytes.length < 149) revert InvalidProofFormat();
+        if (proofBytes.length < 85) revert InvalidProofFormat();
 
         address proposer = address(bytes20(proofBytes[0:20]));
-        bytes calldata signature = proofBytes[84:149];
+        bytes calldata signature = proofBytes[20:85];
 
         // Recover the signer from the signature
         // The signature should be over the journal hash directly (not eth-signed-message prefixed)
@@ -80,5 +79,11 @@ contract TEEVerifier is IVerifier {
         }
 
         return true;
+    }
+
+    /// @notice Semantic version.
+    /// @custom:semver 0.1.0
+    function version() public pure virtual returns (string memory) {
+        return "0.1.0";
     }
 }

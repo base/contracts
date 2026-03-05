@@ -6,18 +6,17 @@ import { Test } from "forge-std/Test.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
-import { ICertManager } from "lib/nitro-validator/src/ICertManager.sol";
+import {
+    INitroEnclaveVerifier
+} from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
 
 import { DevSystemConfigGlobal } from "src/multiproof/mocks/MockDevSystemConfigGlobal.sol";
 import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
 
-import { MockCertManager } from "src/multiproof/mocks/MockCertManager.sol";
-
 contract TEEVerifierTest is Test {
     TEEVerifier public verifier;
     DevSystemConfigGlobal public systemConfigGlobal;
-    MockCertManager public certManager;
     ProxyAdmin public proxyAdmin;
 
     // Test signer - we'll derive address from private key
@@ -36,11 +35,8 @@ contract TEEVerifierTest is Test {
         // Derive signer address from private key
         signerAddress = vm.addr(SIGNER_PRIVATE_KEY);
 
-        // Deploy mock cert manager
-        certManager = new MockCertManager();
-
-        // Deploy implementation
-        DevSystemConfigGlobal impl = new DevSystemConfigGlobal(ICertManager(address(certManager)));
+        // Deploy implementation (NitroEnclaveVerifier not needed for dev signer tests)
+        DevSystemConfigGlobal impl = new DevSystemConfigGlobal(INitroEnclaveVerifier(address(0)));
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));
@@ -66,16 +62,12 @@ contract TEEVerifierTest is Test {
         // Create a journal hash
         bytes32 journal = keccak256("test-journal");
 
-        // Get current block info for L1 origin
-        uint256 l1OriginNumber = block.number - 1;
-        bytes32 l1OriginHash = blockhash(l1OriginNumber);
-
         // Sign the journal with the signer's private key
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        // Construct proof: proposer (20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65)
-        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, signature);
+        // Construct proof: proposer(20) + signature(65) = 85 bytes
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, signature);
 
         // Verify should return true
         bool result = verifier.verify(proofBytes, IMAGE_ID, journal);
@@ -85,14 +77,11 @@ contract TEEVerifierTest is Test {
     function testVerifyFailsWithInvalidSignature() public {
         bytes32 journal = keccak256("test-journal");
 
-        uint256 l1OriginNumber = block.number - 1;
-        bytes32 l1OriginHash = blockhash(l1OriginNumber);
-
         // Create an invalid signature (all zeros except v)
         bytes memory invalidSignature = new bytes(65);
         invalidSignature[64] = bytes1(uint8(27)); // Set v to 27
 
-        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, invalidSignature);
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, invalidSignature);
 
         vm.expectRevert(TEEVerifier.InvalidSignature.selector);
         verifier.verify(proofBytes, IMAGE_ID, journal);
@@ -102,16 +91,12 @@ contract TEEVerifierTest is Test {
         // Create a journal hash
         bytes32 journal = keccak256("test-journal");
 
-        // Get current block info for L1 origin
-        uint256 l1OriginNumber = block.number - 1;
-        bytes32 l1OriginHash = blockhash(l1OriginNumber);
-
         // Sign the journal with the signer's private key
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        // Construct proof: proposer (20) + l1OriginHash (32) + l1OriginNumber (32) + signature (65)
-        bytes memory proofBytes = abi.encodePacked(address(0), l1OriginHash, l1OriginNumber, signature);
+        // Construct proof: proposer(20) + signature(65) = 85 bytes
+        bytes memory proofBytes = abi.encodePacked(address(0), signature);
 
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.InvalidProposer.selector, address(0)));
         verifier.verify(proofBytes, IMAGE_ID, journal);
@@ -124,13 +109,10 @@ contract TEEVerifierTest is Test {
 
         bytes32 journal = keccak256("test-journal");
 
-        uint256 l1OriginNumber = block.number - 1;
-        bytes32 l1OriginHash = blockhash(l1OriginNumber);
-
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(unregisteredKey, journal);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, signature);
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, signature);
 
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.InvalidSigner.selector, unregisteredSigner));
         verifier.verify(proofBytes, IMAGE_ID, journal);
@@ -139,13 +121,10 @@ contract TEEVerifierTest is Test {
     function testVerifyFailsWithImageIdMismatch() public {
         bytes32 journal = keccak256("test-journal");
 
-        uint256 l1OriginNumber = block.number - 1;
-        bytes32 l1OriginHash = blockhash(l1OriginNumber);
-
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        bytes memory proofBytes = abi.encodePacked(PROPOSER, l1OriginHash, l1OriginNumber, signature);
+        bytes memory proofBytes = abi.encodePacked(PROPOSER, signature);
 
         // Use a different imageId that doesn't match the registered PCR0
         bytes32 wrongImageId = keccak256("wrong-image-id");
@@ -157,8 +136,8 @@ contract TEEVerifierTest is Test {
     function testVerifyFailsWithInvalidProofFormat() public {
         bytes32 journal = keccak256("test-journal");
 
-        // Proof too short (less than 129 bytes)
-        bytes memory shortProof = new bytes(100);
+        // Proof too short (less than 85 bytes)
+        bytes memory shortProof = new bytes(50);
 
         vm.expectRevert(TEEVerifier.InvalidProofFormat.selector);
         verifier.verify(shortProof, IMAGE_ID, journal);

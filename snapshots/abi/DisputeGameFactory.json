@@ -41,6 +41,40 @@
         "type": "uint32"
       },
       {
+        "internalType": "Claim",
+        "name": "_rootClaim",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes",
+        "name": "_extraData",
+        "type": "bytes"
+      },
+      {
+        "internalType": "bytes",
+        "name": "_initData",
+        "type": "bytes"
+      }
+    ],
+    "name": "createWithInitData",
+    "outputs": [
+      {
+        "internalType": "contract IDisputeGame",
+        "name": "proxy_",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "GameType",
+        "name": "_gameType",
+        "type": "uint32"
+      },
+      {
         "internalType": "uint256",
         "name": "_start",
         "type": "uint256"

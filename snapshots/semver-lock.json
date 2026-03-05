@@ -3,10 +3,6 @@
     "initCodeHash": "0xacbae98cc7c0f7ecbf36dc44bbf7cb0a011e6e6b781e28b9dbf947e31482b30d",
     "sourceCodeHash": "0xdddaf874cd201558e34f0ed78db38a58d798188f974646b0cad8ce9910f99037"
   },
-  "src/L1/DataAvailabilityChallenge.sol:DataAvailabilityChallenge:dispute": {
-    "initCodeHash": "0xacbae98cc7c0f7ecbf36dc44bbf7cb0a011e6e6b781e28b9dbf947e31482b30d",
-    "sourceCodeHash": "0xdddaf874cd201558e34f0ed78db38a58d798188f974646b0cad8ce9910f99037"
-  },
   "src/L1/ETHLockbox.sol:ETHLockbox": {
     "initCodeHash": "0x65db3aa3c2e3221065752f66016fa02b66688a01cc5c3066533b27fe620619c8",
     "sourceCodeHash": "0x6c9d3e2dee44c234d59ab93b6564536dfd807f1c4a02a82d5393bc53cb15b8b7"
@@ -131,15 +127,7 @@
     "initCodeHash": "0xe492fe75e3c0a8a80ede7b50271263c42a2c7616a101861e892dba76f9771e34",
     "sourceCodeHash": "0xef9cf289b4bf63808b6822fc2c588fe516abbbfb90479553e7d54d43de344e50"
   },
-  "src/L2/LiquidityController.sol:LiquidityController:dispute": {
-    "initCodeHash": "0xb41fb5ed5d60d9c0fcdc21e222567a48632544b99ef0a298735a56d15e06f327",
-    "sourceCodeHash": "0xef9cf289b4bf63808b6822fc2c588fe516abbbfb90479553e7d54d43de344e50"
-  },
   "src/L2/NativeAssetLiquidity.sol:NativeAssetLiquidity": {
-    "initCodeHash": "0x04b176e5d484e54173a5644c833117c5fd9f055dce8678be9ec4cf07c0f01f00",
-    "sourceCodeHash": "0x79289174e875ead5a6290df9af1951d6c0ff0dc6809601e1c7a80110ceb8e945"
-  },
-  "src/L2/NativeAssetLiquidity.sol:NativeAssetLiquidity:dispute": {
     "initCodeHash": "0x04b176e5d484e54173a5644c833117c5fd9f055dce8678be9ec4cf07c0f01f00",
     "sourceCodeHash": "0x79289174e875ead5a6290df9af1951d6c0ff0dc6809601e1c7a80110ceb8e945"
   },
@@ -251,13 +239,29 @@
     "initCodeHash": "0x3a82e248129d19764bb975bb79b48a982f077f33bb508480bf8d2ec1c0c9810d",
     "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
   },
+  "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
+    "initCodeHash": "0x6e30a9816642f1ea2887f16223868fcd04ac80c3a42a4583dfc611d8331f8674",
+    "sourceCodeHash": "0xb9786dc79b4b494d81905235f7bda044c5b1a98ad82416829f5f6948be1175cc"
+  },
+  "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
+    "initCodeHash": "0xc59c62a455533735aa9337d2db88b255713bd4dde20d3345265ec2fafe62af70",
+    "sourceCodeHash": "0xb9786dc79b4b494d81905235f7bda044c5b1a98ad82416829f5f6948be1175cc"
+  },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
-    "initCodeHash": "0x2d681a39e518379b6d2c013735ae25a9bcf6e939d597bde9e6126375b86fd294",
-    "sourceCodeHash": "0xf1ec5f9b79fa641ab6ad4c6a2ff6e8fb313df953f773a7c8923e911fa465ffb3"
+    "initCodeHash": "0x76da4f2a736d7a39a01720e5d900a85fcaa60ba0430fcacbb8ab367f55ba5411",
+    "sourceCodeHash": "0xa6261402efe0105e2a4f9369818bafb4e65515e51850b44d47504151e1c39d01"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal:dispute": {
-    "initCodeHash": "0x73537cace710afd0dc4ea7c2e25687a29cee13843617f518a3edeb8e79cf324c",
-    "sourceCodeHash": "0xf1ec5f9b79fa641ab6ad4c6a2ff6e8fb313df953f773a7c8923e911fa465ffb3"
+    "initCodeHash": "0xfae3a71157f3c64a7bda037ec116bf6e7265099397d9bcad22c01cc1f029ed7d",
+    "sourceCodeHash": "0xa6261402efe0105e2a4f9369818bafb4e65515e51850b44d47504151e1c39d01"
+  },
+  "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
+    "initCodeHash": "0x78317d9088a26523d938ce0d88ed0134abc60292c0cdb3f8a6a9530638fd9e9a",
+    "sourceCodeHash": "0x08e6d340b025c5a6c5997ef6fb69e6c14444f9e473b2c5337d6c10b6c89c0b4f"
+  },
+  "src/multiproof/tee/TEEVerifier.sol:TEEVerifier:dispute": {
+    "initCodeHash": "0x78317d9088a26523d938ce0d88ed0134abc60292c0cdb3f8a6a9530638fd9e9a",
+    "sourceCodeHash": "0x08e6d340b025c5a6c5997ef6fb69e6c14444f9e473b2c5337d6c10b6c89c0b4f"
   },
   "src/revenue-share/FeeDisburser.sol:FeeDisburser": {
     "initCodeHash": "0x1278027e3756e2989e80c0a7b513e221a5fe0d3dbd9ded108375a29b2c1f3d57",
@@ -277,10 +281,6 @@
   },
   "src/safe/SaferSafes.sol:SaferSafes": {
     "initCodeHash": "0x0ad1f0f33517132b06a225b51e6eac48904d4ad691e0045eb70244d811d0d99d",
-    "sourceCodeHash": "0xd6683fe9be4019d34249ada5a4de3e597f1bd9cd473a89f6eff8f749a0b0e978"
-  },
-  "src/safe/SaferSafes.sol:SaferSafes:dispute": {
-    "initCodeHash": "0x6a58b3e2c2567d6f5f936d335e6ae0750fddc367d322a555e685376fad49d7ef",
     "sourceCodeHash": "0xd6683fe9be4019d34249ada5a4de3e597f1bd9cd473a89f6eff8f749a0b0e978"
   },
   "src/universal/OptimismMintableERC20.sol:OptimismMintableERC20": {

@@ -93,6 +93,18 @@ contract DeployConfig is Script {
     uint256 public faultGameV2ClockExtension;
     uint256 public faultGameV2MaxClockDuration;
 
+    // Multiproof Configuration
+    bytes32 public teeImageHash;
+    bytes32 public multiproofConfigHash;
+    uint256 public multiproofGameType;
+    address public teeProposer;
+    address public nitroEnclaveVerifier;
+    bytes32 public multiproofGenesisOutputRoot;
+    uint256 public multiproofGenesisBlockNumber;
+    uint256 public multiproofBlockInterval;
+    uint256 public multiproofIntermediateBlockInterval;
+    uint256 public multiproofProofThreshold;
+
     bool public useInterop;
     bool public useUpgradedFork;
     bytes32 public devFeatureBitmap;
@@ -192,6 +204,16 @@ contract DeployConfig is Script {
         faultGameV2SplitDepth = _readOr(_json, "$.faultGameV2SplitDepth", 30);
         faultGameV2ClockExtension = _readOr(_json, "$.faultGameV2ClockExtension", 10800);
         faultGameV2MaxClockDuration = _readOr(_json, "$.faultGameV2MaxClockDuration", 302400);
+        teeImageHash = bytes32(_readOr(_json, "$.teeImageHash", 0));
+        multiproofConfigHash = bytes32(_readOr(_json, "$.multiproofConfigHash", 0));
+        multiproofGameType = _readOr(_json, "$.multiproofGameType", 621);
+        teeProposer = _readOr(_json, "$.teeProposer", finalSystemOwner);
+        nitroEnclaveVerifier = stdJson.readAddress(_json, "$.nitroEnclaveVerifier");
+        multiproofGenesisOutputRoot = bytes32(_readOr(_json, "$.multiproofGenesisOutputRoot", uint256(1)));
+        multiproofGenesisBlockNumber = _readOr(_json, "$.multiproofGenesisBlockNumber", 0);
+        multiproofBlockInterval = _readOr(_json, "$.multiproofBlockInterval", 100);
+        multiproofIntermediateBlockInterval = _readOr(_json, "$.multiproofIntermediateBlockInterval", 10);
+        multiproofProofThreshold = _readOr(_json, "$.multiproofProofThreshold", 1);
     }
 
     function fork() public view returns (Fork fork_) {
