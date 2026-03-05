@@ -59,7 +59,9 @@ contract TEEVerifierTest is Test {
 
         // Deploy TEEVerifier
         anchorStateRegistry = new MockAnchorStateRegistry();
-        verifier = new TEEVerifier(SystemConfigGlobal(address(systemConfigGlobal)), IAnchorStateRegistry(address(anchorStateRegistry)));
+        verifier = new TEEVerifier(
+            SystemConfigGlobal(address(systemConfigGlobal)), IAnchorStateRegistry(address(anchorStateRegistry))
+        );
     }
 
     function testVerifyValidSignature() public view {

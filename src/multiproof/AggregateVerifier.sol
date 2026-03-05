@@ -138,8 +138,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     uint256 public bondAmount;
 
     /// @notice The index of the intermediate root that countered this game.
-    /// @dev The index is 1-based, so the countered intermediate root index is counteredByIntermediateRootIndexPlusOne - 1.
-    ///      0 is used to indicate that the game was not countered.
+    /// @dev The index is 1-based, so the countered intermediate root index is counteredByIntermediateRootIndexPlusOne -
+    /// 1. 0 is used to indicate that the game was not countered.
     uint256 public counteredByIntermediateRootIndexPlusOne;
 
     /// @notice The address that provided a proof of the given type.
@@ -481,7 +481,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param proofBytes The proof bytes.
     /// @param intermediateRootIndex The index of the intermediate root to challenge.
     /// @param intermediateRootToProve The intermediate root that the proof claims to be correct.
-    function challenge(bytes calldata proofBytes, uint256 intermediateRootIndex, bytes32 intermediateRootToProve) external {
+    function challenge(
+        bytes calldata proofBytes,
+        uint256 intermediateRootIndex,
+        bytes32 intermediateRootToProve
+    )
+        external
+    {
         // Can only challenge a game that has not been challenged or resolved yet.
         if (status != GameStatus.IN_PROGRESS) revert ClaimAlreadyResolved();
 
@@ -502,7 +508,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         ProofType proofType = ProofType(uint8(proofBytes[0]));
         if (proofType != ProofType.ZK) revert InvalidProofType();
 
-        (bytes32 startingRoot, uint256 startingL2SequenceNumber, uint256 endingL2SequenceNumber) = _getStartingIntermediateRootAndL2SequenceNumbers(intermediateRootIndex);
+        (bytes32 startingRoot, uint256 startingL2SequenceNumber, uint256 endingL2SequenceNumber) =
+            _getStartingIntermediateRootAndL2SequenceNumbers(intermediateRootIndex);
 
         _verifyProof(
             proofBytes[1:],
@@ -556,12 +563,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         // If this game has been challenged, can only nullify the challenged intermediate root and only with ZK.
         if (counteredByIntermediateRootIndexPlusOne > 0) {
-            if (intermediateRootIndex != counteredByIntermediateRootIndexPlusOne - 1) revert InvalidIntermediateRootIndex();
+            if (intermediateRootIndex != counteredByIntermediateRootIndexPlusOne - 1) {
+                revert InvalidIntermediateRootIndex();
+            }
             if (proofType != ProofType.ZK) revert InvalidProofType();
         }
 
-        (bytes32 startingRoot, uint256 startingL2SequenceNumber, uint256 endingL2SequenceNumber) = _getStartingIntermediateRootAndL2SequenceNumbers(intermediateRootIndex);
-        
+        (bytes32 startingRoot, uint256 startingL2SequenceNumber, uint256 endingL2SequenceNumber) =
+            _getStartingIntermediateRootAndL2SequenceNumbers(intermediateRootIndex);
+
         _verifyProof(
             proofBytes[1:],
             proofType,
@@ -596,7 +606,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         if (bondClaimed) revert NoCreditToClaim();
 
         // The game must have resolved or 14 days have passed since creation.
-        // 14 days chosen as the proof system should have progressed enough so this can't update the 
+        // 14 days chosen as the proof system should have progressed enough so this can't update the
         // anchor state registry anymore.
         if (expectedResolution.raw() != type(uint64).max) {
             if (resolvedAt.raw() == 0) revert GameNotResolved();
@@ -993,20 +1003,26 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         }
     }
 
-    /// @notice Checks if the intermediate root index is valid and that the intermediate root differs from the proposed intermediate root.
-    /// @param intermediateRootIndex The index of the intermediate root to check.
+    /// @notice Checks if the intermediate root index is valid and that the intermediate root differs from the proposed
+    /// intermediate root. @param intermediateRootIndex The index of the intermediate root to check.
     /// @param intermediateRootToProve The intermediate root that the proof claims to be correct.
     function _checkIntermediateRoot(uint256 intermediateRootIndex, bytes32 intermediateRootToProve) internal view {
         if (intermediateRootIndex >= intermediateOutputRootsCount()) revert InvalidIntermediateRootIndex();
-        if (intermediateOutputRoot(intermediateRootIndex) == intermediateRootToProve) revert IntermediateRootSameAsProposed();
+        if (intermediateOutputRoot(intermediateRootIndex) == intermediateRootToProve) {
+            revert IntermediateRootSameAsProposed();
+        }
     }
 
     /// @notice Gets the starting intermediate root and the starting and ending L2 sequence numbers.
-    /// @param intermediateRootIndex The index of the intermediate root to get the starting intermediate root and L2 sequence numbers for.
-    /// @return startingRoot The starting intermediate root.
+    /// @param intermediateRootIndex The index of the intermediate root to get the starting intermediate root and L2
+    /// sequence numbers for. @return startingRoot The starting intermediate root.
     /// @return startingL2SequenceNumber The starting L2 sequence number.
     /// @return endingL2SequenceNumber The ending L2 sequence number.
-    function _getStartingIntermediateRootAndL2SequenceNumbers(uint256 intermediateRootIndex) internal view returns (bytes32, uint256, uint256) {
+    function _getStartingIntermediateRootAndL2SequenceNumbers(uint256 intermediateRootIndex)
+        internal
+        view
+        returns (bytes32, uint256, uint256)
+    {
         bytes32 startingRoot = intermediateRootIndex == 0
             ? startingOutputRoot.root.raw()
             : intermediateOutputRoot(intermediateRootIndex - 1);

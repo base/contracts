@@ -38,7 +38,12 @@ contract TEEVerifier is Verifier, ISemver {
 
     /// @notice Constructs the TEEVerifier contract.
     /// @param systemConfigGlobal The SystemConfigGlobal contract address.
-    constructor(SystemConfigGlobal systemConfigGlobal, IAnchorStateRegistry anchorStateRegistry) Verifier(anchorStateRegistry) {
+    constructor(
+        SystemConfigGlobal systemConfigGlobal,
+        IAnchorStateRegistry anchorStateRegistry
+    )
+        Verifier(anchorStateRegistry)
+    {
         SYSTEM_CONFIG_GLOBAL = systemConfigGlobal;
     }
 
@@ -47,8 +52,17 @@ contract TEEVerifier is Verifier, ISemver {
     /// @param imageId The claimed TEE image hash (PCR0). Must match the signer's registered PCR0.
     /// @param journal The keccak256 hash of the proof's public inputs.
     /// @return valid Whether the proof is valid.
-    function verify(bytes calldata proofBytes, bytes32 imageId, bytes32 journal) external view override notNullified returns (bool) {
-
+    function verify(
+        bytes calldata proofBytes,
+        bytes32 imageId,
+        bytes32 journal
+    )
+        external
+        view
+        override
+        notNullified
+        returns (bool)
+    {
         if (proofBytes.length < 85) revert InvalidProofFormat();
 
         address proposer = address(bytes20(proofBytes[0:20]));

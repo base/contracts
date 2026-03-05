@@ -33,7 +33,10 @@ abstract contract Verifier is IVerifier {
     /// @dev Should only occur if a soundness issue is found.
     /// @dev Should only be callable by a proper dispute game.
     function nullify() external override {
-        if (!ANCHOR_STATE_REGISTRY.isGameProper(IDisputeGame(msg.sender)) || !ANCHOR_STATE_REGISTRY.isGameRespected(IDisputeGame(msg.sender))) revert NotProperGame();
+        if (
+            !ANCHOR_STATE_REGISTRY.isGameProper(IDisputeGame(msg.sender))
+                || !ANCHOR_STATE_REGISTRY.isGameRespected(IDisputeGame(msg.sender))
+        ) revert NotProperGame();
         nullified = true;
     }
 
@@ -44,5 +47,16 @@ abstract contract Verifier is IVerifier {
     /// @return valid Whether the proof is valid.
     /// @dev This function must be overridden by the concrete verifier implementation.
     ///      Ensure the modifier stays.
-    function verify(bytes calldata proofBytes, bytes32 imageId, bytes32 journal) external view virtual override notNullified returns (bool) {}
+    function verify(
+        bytes calldata proofBytes,
+        bytes32 imageId,
+        bytes32 journal
+    )
+        external
+        view
+        virtual
+        override
+        notNullified
+        returns (bool)
+    { }
 }
