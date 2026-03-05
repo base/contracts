@@ -150,7 +150,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     Timestamp public expectedResolution;
 
     /// @notice The number of proofs provided.
-    int8 public proofCount;
+    uint8 public proofCount;
 
     ////////////////////////////////////////////////////////////////
     //                         Events                             //
@@ -450,9 +450,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             status = isChallenged ? GameStatus.CHALLENGER_WINS : GameStatus.DEFENDER_WINS;
         }
 
-        // casting to 'int256' is safe because 1 <= PROOF_THRESHOLD <= 2
-        // forge-lint: disable-next-line(unsafe-typecast)
-        if (proofCount < int256(PROOF_THRESHOLD)) revert NotEnoughProofs();
+        if (proofCount < PROOF_THRESHOLD) revert NotEnoughProofs();
 
         // Default bond recipient is the creator. We only change if successfully challenged.
         if (isChallenged) {
@@ -575,16 +573,14 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         _proofRefutedUpdate(proofType);
 
-        // If the ZK proof was nullified, delete the countered intermediate root index.
-        if (proofType == ProofType.ZK) delete counteredByIntermediateRootIndexPlusOne;
-
         emit Nullified(msg.sender, intermediateRootIndex, intermediateRootToProve);
 
         // Nullify the verifier to prevent further proof verification.
         if (proofType == ProofType.ZK) {
-            IVerifier(ZK_VERIFIER).nullify();
             // Delete the challenged intermediate root if one existed.
             delete counteredByIntermediateRootIndexPlusOne;
+
+            IVerifier(ZK_VERIFIER).nullify();
         } else if (proofType == ProofType.TEE) {
             IVerifier(TEE_VERIFIER).nullify();
         }
@@ -612,10 +608,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         }
 
         bondClaimed = true;
-        // This can fail if this game was challenged and the countered by game is
-        // blacklisted/retired after it resolved to DEFENDER_WINS.
-        // The centralized functions in DELAYED_WETH will handle this as it's a already
-        // a very centralized action to blacklist/retire a valid challenging game.
         DELAYED_WETH.withdraw(bondRecipient, bondAmount);
 
         // Transfer the credit to the bond recipient.

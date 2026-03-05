@@ -241,14 +241,14 @@
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0xa8fdf5cb9a7966da0aab10eb6ab59103ee401c6dbc9c02b5b18f7b92581cb9a0",
-    "sourceCodeHash": "0xc0e2502c677ab48cebaaa0079c2fd5f6391f75b7b09ee2499077b3d14d043dd9"
+    "sourceCodeHash": "0xdfe97218b4fcfad4a8b198e574506088b2bfd34147b80d8145878f7120f88bc6"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
-    "initCodeHash": "0xb85fcef72dd02c68abc4df29188a9ba4c6a0a7d79d84a2dfff3ca8b1766867f5",
-    "sourceCodeHash": "0xc0e2502c677ab48cebaaa0079c2fd5f6391f75b7b09ee2499077b3d14d043dd9"
+    "initCodeHash": "0x35e0845d63dd53d9ac2703e686c03971bd7c536db2a2917b9d2abe16744adf5e",
+    "sourceCodeHash": "0xdfe97218b4fcfad4a8b198e574506088b2bfd34147b80d8145878f7120f88bc6"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
-    "initCodeHash": "0xfae3a71157f3c64a7bda037ec116bf6e7265099397d9bcad22c01cc1f029ed7d",
+    "initCodeHash": "0x76da4f2a736d7a39a01720e5d900a85fcaa60ba0430fcacbb8ab367f55ba5411",
     "sourceCodeHash": "0xa6261402efe0105e2a4f9369818bafb4e65515e51850b44d47504151e1c39d01"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal:dispute": {
