@@ -486,8 +486,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         if (_getParentGameStatus() == GameStatus.CHALLENGER_WINS) revert InvalidParentGame();
 
         // The TEE prover must not be empty.
-        // You should nullify the game if a ZK proof has already been provided.
         if (proofTypeToProver[ProofType.TEE] == address(0)) revert MissingProof(ProofType.TEE);
+        // You should nullify the game if a ZK proof has already been provided.
+        // This also prevents another challenge while the current challenge is in progress.
         if (proofTypeToProver[ProofType.ZK] != address(0)) revert AlreadyProven(ProofType.ZK);
 
         _checkIntermediateRoot(intermediateRootIndex, intermediateRootToProve);
@@ -582,6 +583,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // Nullify the verifier to prevent further proof verification.
         if (proofType == ProofType.ZK) {
             IVerifier(ZK_VERIFIER).nullify();
+            // Delete the challenged intermediate root if one existed.
+            delete counteredByIntermediateRootIndexPlusOne;
         } else if (proofType == ProofType.TEE) {
             IVerifier(TEE_VERIFIER).nullify();
         }
