@@ -719,12 +719,15 @@ contract DeployImplementations is Script {
     function deployAggregateVerifierImpl(Input memory _input, Output memory _output) private {
         address zkVerifier = address(new MockVerifier());
 
-        SystemConfigGlobal scgImpl = new SystemConfigGlobal(INitroEnclaveVerifier(_input.nitroEnclaveVerifier));
-        vm.label(address(scgImpl), "SystemConfigGlobalImpl");
-        _output.systemConfigGlobalImpl = scgImpl;
-        address teeVerifierImpl = address(new TEEVerifier(scgImpl));
+        address teeVerifierImpl;
+        {
+            SystemConfigGlobal scgImpl = new SystemConfigGlobal(INitroEnclaveVerifier(_input.nitroEnclaveVerifier));
+            vm.label(address(scgImpl), "SystemConfigGlobalImpl");
+            _output.systemConfigGlobalImpl = scgImpl;
+            teeVerifierImpl = address(new TEEVerifier(scgImpl));
+        }
 
-        IVerifier aggregateVerifierImpl = IVerifier(
+        _output.aggregateVerifierImpl = IVerifier(
             address(
                 new AggregateVerifier(
                     GameType.wrap(uint32(_input.multiproofGameType)),
@@ -742,8 +745,7 @@ contract DeployImplementations is Script {
                 )
             )
         );
-        vm.label(address(aggregateVerifierImpl), "AggregateVerifierImpl");
-        _output.aggregateVerifierImpl = aggregateVerifierImpl;
+        vm.label(address(_output.aggregateVerifierImpl), "AggregateVerifierImpl");
     }
 
     function assertValidInput(Input memory _input) private pure {

@@ -240,12 +240,12 @@
     "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0xda3fa6778bd2bf6f0926920ee94fc4cd40b5f3a1dafe3861a398dd8a7368c758",
-    "sourceCodeHash": "0x17cfef34861039fa1b1f7e84a5e59438fe053622aa1eca7e6dbcd2b5a7d3ad33"
+    "initCodeHash": "0x6e30a9816642f1ea2887f16223868fcd04ac80c3a42a4583dfc611d8331f8674",
+    "sourceCodeHash": "0xb9786dc79b4b494d81905235f7bda044c5b1a98ad82416829f5f6948be1175cc"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
-    "initCodeHash": "0x98393b796c9074b6b2913d346ad3ef68d7f74d7755f14cbaf09650284d7e2427",
-    "sourceCodeHash": "0x17cfef34861039fa1b1f7e84a5e59438fe053622aa1eca7e6dbcd2b5a7d3ad33"
+    "initCodeHash": "0xc59c62a455533735aa9337d2db88b255713bd4dde20d3345265ec2fafe62af70",
+    "sourceCodeHash": "0xb9786dc79b4b494d81905235f7bda044c5b1a98ad82416829f5f6948be1175cc"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
     "initCodeHash": "0x76da4f2a736d7a39a01720e5d900a85fcaa60ba0430fcacbb8ab367f55ba5411",
