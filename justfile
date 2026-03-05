@@ -241,8 +241,8 @@ bindings-add SOL_PATH: build-source
   # Extract module (e.g. l2 from src/L2/FlashblockIndex.sol)
   module=$(echo "$sol_path" | sed 's|^src/||' | xargs dirname | tr '[:upper:]' '[:lower:]')
 
-  # Convert ContractName to snake_case (e.g. FlashblockIndex -> flashblock_index)
-  snake=$(echo "$contract" | sed 's/\([A-Z]\)/_\L\1/g' | sed 's/^_//')
+  # Convert PascalCase to snake_case by inserting _ at lower|upper and acronym|word boundaries
+  snake=$(echo "$contract" | sed -E 's/([a-z0-9])([A-Z])/\1_\2/g' | sed -E 's/([A-Z]+)([A-Z][a-z])/\1_\2/g' | tr '[:upper:]' '[:lower:]')
 
   rust_dir="bindings/rust/src/${module}"
   rust_file="${rust_dir}/${snake}.rs"
