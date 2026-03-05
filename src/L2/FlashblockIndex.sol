@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 
 /// @custom:upgradeable
@@ -9,7 +8,7 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 /// @notice Stores the current flashblock index alongside block.number.
 /// @dev The builder calls this via fallback with 1 byte of calldata (the index as uint8).
 ///      Both values are manually packed into a single uint256 to guarantee 1 SSTORE per write.
-contract FlashblockIndex is Initializable, ISemver {
+contract FlashblockIndex is ISemver {
     /// @notice Thrown when the caller is not the authorized builder.
     error OnlyBuilder();
 
@@ -36,11 +35,7 @@ contract FlashblockIndex is Initializable, ISemver {
     /// @param builder The address authorized to update the flashblock index.
     constructor(address builder) {
         BUILDER = builder;
-        _disableInitializers();
     }
-
-    /// @notice Initializer.
-    function initialize() external initializer { }
 
     /// @notice Sets the flashblock index for the current block.
     /// @dev Calldata must be exactly 1 byte representing the flashblock index (uint8).

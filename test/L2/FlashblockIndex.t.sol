@@ -20,12 +20,6 @@ contract FlashblockIndexTest is Test {
         assertEq(flashblockIndex.BUILDER(), builder);
     }
 
-    /// @notice Tests that initialize() reverts on the implementation contract since initializers are disabled.
-    function test_initialize_reverts_whenCalledOnImplementation() external {
-        vm.expectRevert("Initializable: contract is already initialized");
-        flashblockIndex.initialize();
-    }
-
     /// @notice Tests that version() returns "1.0.0".
     function test_version_returnsCorrectValue() external view {
         assertEq(flashblockIndex.version(), "1.0.0");
