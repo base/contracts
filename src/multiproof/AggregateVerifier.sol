@@ -217,18 +217,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice When an invalid proof type is provided.
     error InvalidProofType();
 
-    /// @notice When no proof was provided.
-    error NoProofProvided();
-
-    /// @notice When the countered by game is invalid.
-    error InvalidCounteredByGame();
-
-    /// @notice When the countered by game is not resolved.
-    error CounteredByGameNotResolved();
-
-    /// @notice When the bond recipient is empty.
-    error BondRecipientEmpty();
-
     /// @notice When the intermediate root index is invalid.
     error InvalidIntermediateRootIndex();
 
@@ -948,22 +936,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     function _isValidGame(IDisputeGame game) internal view returns (bool) {
         return ANCHOR_STATE_REGISTRY.isGameRespected(game) && !ANCHOR_STATE_REGISTRY.isGameBlacklisted(game)
             && !ANCHOR_STATE_REGISTRY.isGameRetired(game) && (game.status() != GameStatus.CHALLENGER_WINS);
-    }
-
-    /// @notice Checks if the game is a valid game used to challenge or nullify.
-    /// @param game The game to check.
-    function _isValidChallengingGame(IDisputeGame game) internal view returns (bool) {
-        return
-        // The game type must be the same.
-        game.gameType().raw() == GAME_TYPE.raw() && 
-            // The parent game must be the same.
-            AggregateVerifier(address(game)).parentIndex() == parentIndex() && 
-            // The block number must be the same.
-            game.l2SequenceNumber() == l2SequenceNumber() && 
-            // The root claim must be different.
-            game.rootClaim().raw() != rootClaim().raw() && 
-            // The game must be valid.
-            _isValidGame(game);
     }
 
     /// @notice Verifies that the claimed L1 origin hash matches the actual blockhash.
