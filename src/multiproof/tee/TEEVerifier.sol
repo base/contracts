@@ -5,6 +5,7 @@ import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
+import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
 
 import { SystemConfigGlobal } from "./SystemConfigGlobal.sol";
 
@@ -19,6 +20,10 @@ contract TEEVerifier is IVerifier, ISemver {
     /// @notice The SystemConfigGlobal contract that manages valid TEE signers.
     /// @dev Signers are registered via AWS Nitro attestation in SystemConfigGlobal.
     SystemConfigGlobal public immutable SYSTEM_CONFIG_GLOBAL;
+
+    /// @notice Whether this verifier has been nullified.
+    /// @dev This is used to prevent further proof verification after a soundness issue is found.
+    bool public nullified;
 
     /// @notice Thrown when the recovered signer is not a valid registered signer.
     error InvalidSigner(address signer);
@@ -41,12 +46,22 @@ contract TEEVerifier is IVerifier, ISemver {
         SYSTEM_CONFIG_GLOBAL = systemConfigGlobal;
     }
 
+    /// @notice Nullifies the verifier to prevent further proof verification.
+    /// @dev Should only occur if a soundness issue is found.
+    /// @dev Should only be callable by a proper dispute game.
+    function nullify() external override {
+        if (!ANCHOR_STATE_REGISTRY.isGameProper(IDisputeGame(msg.sender)) || !ANCHOR_STATE_REGISTRY.isGameRespected(IDisputeGame(msg.sender))) revert NotProperGame();
+        nullified = true;
+    }
+
     /// @notice Verifies a TEE proof for a state transition.
     /// @param proofBytes The proof: proposer(20) + signature(65) = 85 bytes.
     /// @param imageId The claimed TEE image hash (PCR0). Must match the signer's registered PCR0.
     /// @param journal The keccak256 hash of the proof's public inputs.
     /// @return valid Whether the proof is valid.
     function verify(bytes calldata proofBytes, bytes32 imageId, bytes32 journal) external view override returns (bool) {
+        if (nullified) revert SoundnessIssue();
+
         if (proofBytes.length < 85) revert InvalidProofFormat();
 
         address proposer = address(bytes20(proofBytes[0:20]));

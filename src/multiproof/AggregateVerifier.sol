@@ -56,10 +56,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The maximum number of blocks that EIP-2935 can look back (~8192).
     uint256 public constant EIP2935_WINDOW = 8191;
-
-    /// @notice For when the game no longer accepts proofs and prevents resolution.
-    int8 internal constant NEGATIVE_PROOF_COUNT = type(int8).min;
-
     ////////////////////////////////////////////////////////////////
     //                         Immutables                         //
     ////////////////////////////////////////////////////////////////
@@ -141,17 +137,19 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The amount of the bond.
     uint256 public bondAmount;
 
-    /// @notice The address of the game that countered this game.
-    address public counteredByGameAddress;
+    /// @notice The index of the intermediate root that countered this game.
+    /// @dev The index is 1-based, so the countered intermediate root index is counteredByIntermediateRootIndexPlusOne - 1.
+    ///      0 is used to indicate that the game was not countered.
+    uint256 public counteredByIntermediateRootIndexPlusOne;
 
     /// @notice The address that provided a proof of the given type.
+    /// @dev The address is the zero address if no proof has been provided or the proof has been nullified.
     mapping(ProofType => address) internal proofTypeToProver;
 
     /// @notice The timestamp of the game's expected resolution.
     Timestamp public expectedResolution;
 
     /// @notice The number of proofs provided.
-    /// @dev Can be negative if a ZK proof is nullified.
     int8 public proofCount;
 
     ////////////////////////////////////////////////////////////////
@@ -164,8 +162,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice Emitted when a proposal with a TEE proof is challenged with a ZK proof.
     /// @param challenger The address of the challenger.
-    /// @param game The game used to challenge this proposal.
-    event Challenged(address indexed challenger, IDisputeGame game);
+    /// @param intermediateRootIndex The index of the intermediate root that was countered.
+    event Challenged(address indexed challenger, uint256 intermediateRootIndex);
 
     /// @notice Emitted when the game is proved.
     /// @param prover The address of the prover.
@@ -405,9 +403,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             intermediateOutputRoots()
         );
 
-        _updateProvingData(proofType, gameCreator());
+        _proofVerifiedUpdate(proofType, gameCreator());
 
-        emit Proved(gameCreator(), proofType);
+        // Set the bond recipient to the creator. It can change if challenged successfully.
+        bondRecipient = gameCreator();
 
         // Deposit the bond.
         bondAmount = msg.value;
@@ -438,9 +437,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             l2SequenceNumber(),
             intermediateOutputRoots()
         );
-        _updateProvingData(proofType, msg.sender);
-
-        emit Proved(msg.sender, proofType);
+        _proofVerifiedUpdate(proofType, msg.sender);
     }
 
     /// @notice Resolves the game after a proof has been provided and enough time has passed.
@@ -452,21 +449,27 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // The parent game must have resolved.
         if (parentGameStatus == GameStatus.IN_PROGRESS) revert ParentGameNotResolved();
 
+        bool isChallenged = counteredByIntermediateRootIndexPlusOne > 0;
+
         // If the parent game's claim is invalid, blacklisted, or retired, then the current game's claim is invalid.
         if (parentGameStatus == GameStatus.CHALLENGER_WINS) {
             status = GameStatus.CHALLENGER_WINS;
         } else {
             // Game must be completed with a valid proof.
             if (!gameOver()) revert GameNotOver();
-            status = GameStatus.DEFENDER_WINS;
+            // If the game is challenged, status is CHALLENGER_WINS.
+            // If the game is not challenged, status is DEFENDER_WINS.
+            status = isChallenged ? GameStatus.CHALLENGER_WINS : GameStatus.DEFENDER_WINS;
         }
 
         // casting to 'int256' is safe because 1 <= PROOF_THRESHOLD <= 2
         // forge-lint: disable-next-line(unsafe-typecast)
         if (proofCount < int256(PROOF_THRESHOLD)) revert NotEnoughProofs();
 
-        // Bond is refunded as no challenge was made or parent is invalid.
-        bondRecipient = gameCreator();
+        // Default bond recipient is the creator. We only change if successfully challenged.
+        if (isChallenged) {
+            bondRecipient = proofTypeToProver[ProofType.ZK];
+        }
         // Mark the game as resolved.
         resolvedAt = Timestamp.wrap(uint64(block.timestamp));
         emit Resolved(status);
@@ -475,10 +478,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Challenges the TEE proof with a ZK proof.
-    /// @param gameIndex The index of the game used to challenge.
-    /// @dev The game used to challenge must have a ZK proof for the same
-    ///      block number but a different root claim as the current game.
-    function challenge(uint256 gameIndex) external {
+    /// @param proofBytes The proof bytes.
+    /// @param intermediateRootIndex The index of the intermediate root to challenge.
+    /// @param intermediateRootToProve The intermediate root that the proof claims to be correct.
+    function challenge(bytes calldata proofBytes, uint256 intermediateRootIndex, bytes32 intermediateRootToProve) external {
         // Can only challenge a game that has not been challenged or resolved yet.
         if (status != GameStatus.IN_PROGRESS) revert ClaimAlreadyResolved();
 
@@ -493,37 +496,42 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         if (proofTypeToProver[ProofType.TEE] == address(0)) revert MissingProof(ProofType.TEE);
         if (proofTypeToProver[ProofType.ZK] != address(0)) revert AlreadyProven(ProofType.ZK);
 
-        // Prevents challenging after TEE nullification.
-        if (proofCount != 1) revert NotEnoughProofs();
+        _checkIntermediateRoot(intermediateRootIndex, intermediateRootToProve);
 
-        (,, IDisputeGame game) = DISPUTE_GAME_FACTORY.gameAtIndex(gameIndex);
+        // Can only challenge with a ZK proof.
+        ProofType proofType = ProofType(uint8(proofBytes[0]));
+        if (proofType != ProofType.ZK) revert InvalidProofType();
 
-        // The game must be a valid game used to challenge.
-        if (!_isValidChallengingGame(game)) revert InvalidGame();
+        (bytes32 startingRoot, uint256 startingL2SequenceNumber, uint256 endingL2SequenceNumber) = _getStartingIntermediateRootAndL2SequenceNumbers(intermediateRootIndex);
 
-        AggregateVerifier challengingGame = AggregateVerifier(address(game));
+        _verifyProof(
+            proofBytes[1:],
+            proofType,
+            msg.sender,
+            l1Head().raw(),
+            startingRoot,
+            startingL2SequenceNumber,
+            intermediateRootToProve,
+            endingL2SequenceNumber,
+            abi.encodePacked(intermediateRootToProve)
+        );
 
-        // The ZK prover must not be empty.
-        if (challengingGame.zkProver() == address(0)) revert MissingProof(ProofType.ZK);
+        // This allows a ZK nullification to be performed.
+        proofTypeToProver[proofType] = msg.sender;
 
-        // Update the counteredBy address.
-        counteredByGameAddress = address(challengingGame);
+        // This is only in case the ZK proof is nullified, which would lower the proof count.
+        // If the ZK is nullified, we allow the remaining TEE proof to resolve.
+        // The expected resolution time can no longer be increased as both proof types have been submitted.
+        proofCount += 1;
 
-        // Set the game as challenged.
-        status = GameStatus.CHALLENGER_WINS;
+        // We purposely increase the resolution to allow for a ZK nullification.
+        expectedResolution = Timestamp.wrap(uint64(block.timestamp + SLOW_FINALIZATION_DELAY));
 
-        // Prevent resolution if any proof was somehow able to be provided later.
-        proofCount = NEGATIVE_PROOF_COUNT;
-
-        // Update the expected resolution.
-        _updateExpectedResolution();
-
-        // Set the bond recipient.
-        // Bond cannot be claimed until the game used to challenge resolves as DEFENDER_WINS.
-        bondRecipient = challengingGame.zkProver();
+        // Store which intermediate root was countered.
+        counteredByIntermediateRootIndexPlusOne = intermediateRootIndex + 1;
 
         // Emit the challenged event.
-        emit Challenged(challengingGame.zkProver(), game);
+        emit Challenged(msg.sender, intermediateRootIndex);
     }
 
     /// @notice Nullifies the game if a soundness issue is found.
@@ -538,24 +546,22 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     )
         external
     {
-        if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
+        // Can only nullify if the game is still in progress.
+        if (status != GameStatus.IN_PROGRESS) revert GameAlreadyResolved();
 
-        if (intermediateRootIndex >= intermediateOutputRootsCount()) revert InvalidIntermediateRootIndex();
-
-        bytes32 proposedIntermediateRoot = intermediateOutputRoot(intermediateRootIndex);
-        if (proposedIntermediateRoot == intermediateRootToProve) revert IntermediateRootSameAsProposed();
+        _checkIntermediateRoot(intermediateRootIndex, intermediateRootToProve);
 
         ProofType proofType = ProofType(uint8(proofBytes[0]));
-
         if (proofTypeToProver[proofType] == address(0)) revert MissingProof(proofType);
 
-        bytes32 startingRoot = intermediateRootIndex == 0
-            ? startingOutputRoot.root.raw()
-            : intermediateOutputRoot(intermediateRootIndex - 1);
-        uint256 startingL2SequenceNumber =
-            startingOutputRoot.l2SequenceNumber + intermediateRootIndex * INTERMEDIATE_BLOCK_INTERVAL;
-        uint256 endingL2SequenceNumber = startingL2SequenceNumber + INTERMEDIATE_BLOCK_INTERVAL;
+        // If this game has been challenged, can only nullify the challenged intermediate root and only with ZK.
+        if (counteredByIntermediateRootIndexPlusOne > 0) {
+            if (intermediateRootIndex != counteredByIntermediateRootIndexPlusOne - 1) revert InvalidIntermediateRootIndex();
+            if (proofType != ProofType.ZK) revert InvalidProofType();
+        }
 
+        (bytes32 startingRoot, uint256 startingL2SequenceNumber, uint256 endingL2SequenceNumber) = _getStartingIntermediateRootAndL2SequenceNumbers(intermediateRootIndex);
+        
         _verifyProof(
             proofBytes[1:],
             proofType,
@@ -568,33 +574,19 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             abi.encodePacked(intermediateRootToProve)
         );
 
-        if (proofType == ProofType.ZK) {
-            // Since a ZK proof vetoes a TEE proof, we make the proof count negative for ZK nullifications.
-            // This ensures that the game cannot resolve if a TEE proof can somehow be provided later.
-            proofCount = NEGATIVE_PROOF_COUNT;
+        _proofRefutedUpdate(proofType);
 
-            // Set the game as challenged so that child games can't resolve.
-            status = GameStatus.CHALLENGER_WINS;
-        } else if (proofType == ProofType.TEE) {
-            // The status is not updated here to still allow a ZK proof to be provided later.
-            proofCount -= 1;
-
-            // Increase the expected resolution by the SLOW_FINALIZATION_DELAY.
-            // This gives us enough time to nullify a ZK proof if it was already provided.
-            // Otherwise the below _updateExpectedResolution() makes the expected resolution
-            // the maximum timestamp.
-            expectedResolution = Timestamp.wrap(uint64(block.timestamp + SLOW_FINALIZATION_DELAY));
-        }
-
-        // If there are no proofs, the expected resolution will be set to type(uint64).max.
-        // It's not possible to go from FAST_FINALIZATION_DELAY to SLOW_FINALIZATION_DELAY
-        // as we can only do a ZK nullification in this case, causing proofCount to be negative.
-        _updateExpectedResolution();
-
-        // Refund the bond as either a ZK proof was nullified or a ZK proof has to be provided later.
-        bondRecipient = gameCreator();
+        // If the ZK proof was nullified, delete the countered intermediate root index.
+        if (proofType == ProofType.ZK) delete counteredByIntermediateRootIndexPlusOne;
 
         emit Nullified(msg.sender, intermediateRootIndex, intermediateRootToProve);
+
+        // Nullify the verifier to prevent further proof verification.
+        if (proofType == ProofType.ZK) {
+            IVerifier(ZK_VERIFIER).nullify();
+        } else if (proofType == ProofType.TEE) {
+            IVerifier(TEE_VERIFIER).nullify();
+        }
     }
 
     /// @notice Claim the credit belonging to the bond recipient. Reverts if the game isn't
@@ -606,17 +598,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // The bond recipient must not be empty.
         if (bondRecipient == address(0)) revert BondRecipientEmpty();
 
-        // If this game was challenged, the countered by game must be valid or else the bond is refunded.
-        if (counteredByGameAddress != address(0)) {
-            GameStatus counteredByGameStatus = IDisputeGame(counteredByGameAddress).status();
-            if (counteredByGameStatus == GameStatus.IN_PROGRESS) {
-                revert CounteredByGameNotResolved();
-            }
-            // If the countered by game is invalid or not resolved, the bond is refunded.
-            if (!_isValidChallengingGame(IDisputeGame(counteredByGameAddress))) {
-                bondRecipient = gameCreator();
-            }
-        }
+        // The game must be over.
+        if (!gameOver()) revert GameNotOver();
 
         if (!bondUnlocked) {
             DELAYED_WETH.unlock(bondRecipient, bondAmount);
@@ -766,13 +749,22 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         return _getArgUint32(0x74);
     }
 
-    /// @notice Updates the expected resolution timestamp.
-    function _updateExpectedResolution() internal {
+    function _proofVerifiedUpdate(ProofType proofType, address prover) internal {
+        proofTypeToProver[proofType] = prover;
+        proofCount += 1;
+
+        _decreaseExpectedResolution();
+
+        emit Proved(prover, proofType);
+    }
+
+    /// @notice Decreases the expected resolution timestamp.
+    function _decreaseExpectedResolution() internal {
         uint64 delay;
 
         if (proofCount >= 2) {
             delay = FAST_FINALIZATION_DELAY;
-        } else if (proofCount >= 1) {
+        } else if (proofCount == 1) {
             delay = SLOW_FINALIZATION_DELAY;
         } else {
             // If there are no proofs, don't allow the game to resolve.
@@ -780,21 +772,36 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             return;
         }
 
+        // Only allow decreases to the expected resolution.
         uint64 newResolution = uint64(block.timestamp) + delay;
         expectedResolution = Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, expectedResolution.raw())));
     }
 
-    function _updateProvingData(ProofType proofType, address prover) internal {
-        proofTypeToProver[proofType] = prover;
+    /// @dev Should only occur if challenged or nullified.
+    function _proofRefutedUpdate(ProofType proofType) internal {
+        delete proofTypeToProver[proofType];
+        proofCount -= 1;
 
-        // Bond can be reclaimed after a ZK proof is provided.
-        if (proofType == ProofType.ZK) {
-            bondRecipient = gameCreator();
+        _increaseExpectedResolution();
+    }
+
+    function _increaseExpectedResolution() internal {
+        uint64 delay;
+
+        if (proofCount >= 2) {
+            delay = FAST_FINALIZATION_DELAY;
+        } else if (proofCount == 1) {
+            delay = SLOW_FINALIZATION_DELAY;
+        } else {
+            // If there are no proofs, don't allow the game to resolve.
+            expectedResolution = Timestamp.wrap(type(uint64).max);
+            return;
         }
 
-        proofCount += 1;
-
-        _updateExpectedResolution();
+        // We purposely increase the resolution even if it's longer than it should be
+        // as this can only occur if there is an issue with the proof system so
+        // we give enough time to resolve the issue and possibly blacklist this game.
+        expectedResolution = Timestamp.wrap(uint64(block.timestamp) + delay);
     }
 
     function _verifyProof(
@@ -981,6 +988,29 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         if (actualHash != l1OriginHash) {
             revert L1OriginHashMismatch(l1OriginHash, actualHash);
         }
+    }
+
+    /// @notice Checks if the intermediate root index is valid and that the intermediate root differs from the proposed intermediate root.
+    /// @param intermediateRootIndex The index of the intermediate root to check.
+    /// @param intermediateRootToProve The intermediate root that the proof claims to be correct.
+    function _checkIntermediateRoot(uint256 intermediateRootIndex, bytes32 intermediateRootToProve) internal view {
+        if (intermediateRootIndex >= intermediateOutputRootsCount()) revert InvalidIntermediateRootIndex();
+        if (intermediateOutputRoot(intermediateRootIndex) == intermediateRootToProve) revert IntermediateRootSameAsProposed();
+    }
+
+    /// @notice Gets the starting intermediate root and the starting and ending L2 sequence numbers.
+    /// @param intermediateRootIndex The index of the intermediate root to get the starting intermediate root and L2 sequence numbers for.
+    /// @return startingRoot The starting intermediate root.
+    /// @return startingL2SequenceNumber The starting L2 sequence number.
+    /// @return endingL2SequenceNumber The ending L2 sequence number.
+    function _getStartingIntermediateRootAndL2SequenceNumbers(uint256 intermediateRootIndex) internal view returns (bytes32, uint256, uint256) {
+        bytes32 startingRoot = intermediateRootIndex == 0
+            ? startingOutputRoot.root.raw()
+            : intermediateOutputRoot(intermediateRootIndex - 1);
+        uint256 startingL2SequenceNumber =
+            startingOutputRoot.l2SequenceNumber + intermediateRootIndex * INTERMEDIATE_BLOCK_INTERVAL;
+        uint256 endingL2SequenceNumber = startingL2SequenceNumber + INTERMEDIATE_BLOCK_INTERVAL;
+        return (startingRoot, startingL2SequenceNumber, endingL2SequenceNumber);
     }
 
     /// @notice Semantic version.
