@@ -298,6 +298,10 @@ snapshots-check-no-build: snapshots-no-build
 # Checks if the snapshots are up to date.
 snapshots-check: build snapshots-check-no-build
 
+# Checks that the Rust bindings crate compiles.
+bindings-check:
+  cd bindings/rust && cargo check
+
 # Checks that committed Rust binding artifacts match forge-artifacts.
 bindings-artifacts-check-no-build:
   #!/bin/bash
