@@ -120,9 +120,9 @@ contract DeployDevNoNitro is Script {
 
         vm.startBroadcast();
 
-        _deployTEEContracts(cfg.finalSystemOwner());
         _registerProposer(cfg.teeProposer());
         _deployInfrastructure(gameType);
+        _deployTEEContracts(cfg.finalSystemOwner());
         _deployAggregateVerifier(gameType);
 
         vm.stopBroadcast();
@@ -140,7 +140,7 @@ contract DeployDevNoNitro is Script {
         );
         console.log("DevSystemConfigGlobal:", systemConfigGlobalProxy);
 
-        teeVerifier = address(new TEEVerifier(SystemConfigGlobal(systemConfigGlobalProxy)));
+        teeVerifier = address(new TEEVerifier(SystemConfigGlobal(systemConfigGlobalProxy), IAnchorStateRegistry(mockAnchorRegistry)));
         console.log("TEEVerifier:", teeVerifier);
     }
 
@@ -173,7 +173,7 @@ contract DeployDevNoNitro is Script {
     }
 
     function _deployAggregateVerifier(GameType gameType) internal {
-        address zkVerifier = address(new MockVerifier());
+        address zkVerifier = address(new MockVerifier(IAnchorStateRegistry(mockAnchorRegistry)));
         console.log("MockVerifier (ZK):", zkVerifier);
 
         mockDelayedWETH = address(new MockDelayedWETH());

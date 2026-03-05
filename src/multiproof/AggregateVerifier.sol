@@ -547,7 +547,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         external
     {
         // Can only nullify if the game is still in progress.
-        if (status != GameStatus.IN_PROGRESS) revert GameAlreadyResolved();
+        if (status != GameStatus.IN_PROGRESS) revert ClaimAlreadyResolved();
 
         _checkIntermediateRoot(intermediateRootIndex, intermediateRootToProve);
 
@@ -595,14 +595,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // The bond must not have been claimed yet.
         if (bondClaimed) revert NoCreditToClaim();
 
-        // The bond recipient must not be empty.
-        if (bondRecipient == address(0)) revert BondRecipientEmpty();
-
-        // The game must be over or 14 days have passed since creation.
+        // The game must have resolved or 14 days have passed since creation.
         // 14 days chosen as the proof system should have progressed enough so this can't update the 
         // anchor state registry anymore.
         if (expectedResolution.raw() != type(uint64).max) {
-            if (!gameOver()) revert GameNotOver();
+            if (resolvedAt.raw() == 0) revert GameNotResolved();
         } else {
             if (block.timestamp < createdAt.raw() + 14 days) revert GameNotOver();
         }

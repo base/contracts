@@ -2,8 +2,6 @@
 pragma solidity 0.8.15;
 
 interface IVerifier {
-    /// @notice When the prover is nullified to prevent further proof verification.
-    error SoundnessIssue();
 
     /// @notice Verifies a proof.
     /// @param proofBytes The proof.
