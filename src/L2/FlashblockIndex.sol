@@ -9,17 +9,6 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 /// @dev The builder calls this via fallback with 1 byte of calldata (the index as uint8).
 ///      Both values are manually packed into a single uint256 to guarantee 1 SSTORE per write.
 contract FlashblockIndex is ISemver {
-    /// @notice Thrown when the caller is not the authorized builder.
-    error OnlyBuilder();
-
-    /// @notice Thrown when calldata is not exactly 1 byte.
-    error InvalidCalldata();
-
-    /// @notice Emitted when the flashblock index is updated.
-    /// @param flashblockIndex The new flashblock index.
-    /// @param blockNumber The block number at which the index was set.
-    event FlashblockIndexUpdated(uint8 indexed flashblockIndex, uint48 indexed blockNumber);
-
     /// @notice Semantic version.
     /// @custom:semver 1.0.0
     string public constant override version = "1.0.0";
@@ -30,6 +19,17 @@ contract FlashblockIndex is ISemver {
     /// @notice Packed storage: blockNumber (uint48) in bits [55:8] | flashblockIndex (uint8) in bits [7:0].
     /// @dev Using uint48 for block numbers is safe for the foreseeable future (~281 trillion blocks).
     uint256 private _packed;
+
+    /// @notice Emitted when the flashblock index is updated.
+    /// @param flashblockIndex The new flashblock index.
+    /// @param blockNumber The block number at which the index was set.
+    event FlashblockIndexUpdated(uint8 indexed flashblockIndex, uint48 indexed blockNumber);
+
+    /// @notice Thrown when the caller is not the authorized builder.
+    error OnlyBuilder();
+
+    /// @notice Thrown when calldata is not exactly 1 byte.
+    error InvalidCalldata();
 
     /// @notice Constructor.
     /// @param builder The address authorized to update the flashblock index.
