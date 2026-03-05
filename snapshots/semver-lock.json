@@ -249,11 +249,11 @@
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
     "initCodeHash": "0x76da4f2a736d7a39a01720e5d900a85fcaa60ba0430fcacbb8ab367f55ba5411",
-    "sourceCodeHash": "0xba78bc35f234479e9844b595f109da6029d46c062d246af6dc410542c84c61a3"
+    "sourceCodeHash": "0xa6261402efe0105e2a4f9369818bafb4e65515e51850b44d47504151e1c39d01"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal:dispute": {
     "initCodeHash": "0xfae3a71157f3c64a7bda037ec116bf6e7265099397d9bcad22c01cc1f029ed7d",
-    "sourceCodeHash": "0xba78bc35f234479e9844b595f109da6029d46c062d246af6dc410542c84c61a3"
+    "sourceCodeHash": "0xa6261402efe0105e2a4f9369818bafb4e65515e51850b44d47504151e1c39d01"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0x78317d9088a26523d938ce0d88ed0134abc60292c0cdb3f8a6a9530638fd9e9a",
