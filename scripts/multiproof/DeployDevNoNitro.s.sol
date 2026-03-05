@@ -140,7 +140,9 @@ contract DeployDevNoNitro is Script {
         );
         console.log("DevSystemConfigGlobal:", systemConfigGlobalProxy);
 
-        teeVerifier = address(new TEEVerifier(SystemConfigGlobal(systemConfigGlobalProxy), IAnchorStateRegistry(mockAnchorRegistry)));
+        teeVerifier = address(
+            new TEEVerifier(SystemConfigGlobal(systemConfigGlobalProxy), IAnchorStateRegistry(mockAnchorRegistry))
+        );
         console.log("TEEVerifier:", teeVerifier);
     }
 
