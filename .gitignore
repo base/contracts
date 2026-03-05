@@ -3,6 +3,7 @@ artifacts
 !bindings/rust/artifacts/
 forge-artifacts
 target
+Cargo.lock
 cache
 broadcast
 kout-proofs
