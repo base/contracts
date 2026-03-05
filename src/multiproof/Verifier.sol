@@ -39,24 +39,4 @@ abstract contract Verifier is IVerifier {
         ) revert NotProperGame();
         nullified = true;
     }
-
-    /// @notice Verifies a proof.
-    /// @param proofBytes The proof.
-    /// @param imageId The image ID.
-    /// @param journal The journal.
-    /// @return valid Whether the proof is valid.
-    /// @dev This function must be overridden by the concrete verifier implementation.
-    ///      Ensure the modifier stays.
-    function verify(
-        bytes calldata proofBytes,
-        bytes32 imageId,
-        bytes32 journal
-    )
-        external
-        view
-        virtual
-        override
-        notNullified
-        returns (bool)
-    { }
 }
