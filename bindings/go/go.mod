@@ -1,4 +1,4 @@
-module github.com/base/contracts/bindings
+module github.com/base/contracts/bindings/go
 
 go 1.23.0
 

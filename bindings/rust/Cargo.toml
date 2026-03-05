@@ -1,0 +1,8 @@
+[package]
+name = "base-contracts-bindings"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alloy-contract = "1.5.0"
+alloy-sol-types = { version = "1.5.0", features = ["json"] }
