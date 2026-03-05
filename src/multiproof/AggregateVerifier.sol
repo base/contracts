@@ -598,8 +598,14 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // The bond recipient must not be empty.
         if (bondRecipient == address(0)) revert BondRecipientEmpty();
 
-        // The game must be over.
-        if (!gameOver()) revert GameNotOver();
+        // The game must be over or 14 days have passed since creation.
+        // 14 days chosen as the proof system should have progressed enough so this can't update the 
+        // anchor state registry anymore.
+        if (expectedResolution.raw() != type(uint64).max) {
+            if (!gameOver()) revert GameNotOver();
+        } else {
+            if (block.timestamp < createdAt.raw() + 14 days) revert GameNotOver();
+        }
 
         if (!bondUnlocked) {
             DELAYED_WETH.unlock(bondRecipient, bondAmount);
