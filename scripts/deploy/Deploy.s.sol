@@ -393,9 +393,9 @@ contract Deploy is Deployer {
         vm.broadcast(address(deployOutput.opChainProxyAdmin));
         IProxy(payable(delayedWETHPermissionlessGameProxy))
             .upgradeToAndCall({
-                _implementation: delayedWETHImpl,
-                _data: abi.encodeCall(IDelayedWETH.initialize, (deployOutput.systemConfigProxy))
-            });
+            _implementation: delayedWETHImpl,
+            _data: abi.encodeCall(IDelayedWETH.initialize, (deployOutput.systemConfigProxy))
+        });
     }
 
     ////////////////////////////////////////////////////////////////

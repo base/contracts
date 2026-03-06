@@ -1172,11 +1172,11 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
         vm.expectRevert(IOptimismPortalInterop.OptimismPortal_WrongProofMethod.selector);
         IOptimismPortalInterop(payable(optimismPortal2))
             .proveWithdrawalTransaction({
-                _tx: _defaultTx,
-                _disputeGameIndex: _proposedGameIndex,
-                _outputRootProof: _outputRootProof,
-                _withdrawalProof: _withdrawalProof
-            });
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
     }
 
     /// @notice Tests that `proveWithdrawalTransaction` reverts when using the Super Roots version
@@ -1196,13 +1196,13 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
         vm.expectRevert(IOptimismPortalInterop.OptimismPortal_WrongProofMethod.selector);
         IOptimismPortalInterop(payable(optimismPortal2))
             .proveWithdrawalTransaction({
-                _tx: _defaultTx,
-                _disputeGameProxy: game,
-                _outputRootIndex: 0,
-                _superRootProof: superRootProof,
-                _outputRootProof: _outputRootProof,
-                _withdrawalProof: _withdrawalProof
-            });
+            _tx: _defaultTx,
+            _disputeGameProxy: game,
+            _outputRootIndex: 0,
+            _superRootProof: superRootProof,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
     }
 
     /// @notice Tests that `proveWithdrawalTransaction` reverts when using the Super Roots version
@@ -1225,13 +1225,13 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
         vm.expectRevert(IOptimismPortalInterop.OptimismPortal_InvalidSuperRootProof.selector);
         IOptimismPortalInterop(payable(optimismPortal2))
             .proveWithdrawalTransaction({
-                _tx: _defaultTx,
-                _disputeGameProxy: game,
-                _outputRootIndex: 0,
-                _superRootProof: superRootProof,
-                _outputRootProof: _outputRootProof,
-                _withdrawalProof: _withdrawalProof
-            });
+            _tx: _defaultTx,
+            _disputeGameProxy: game,
+            _outputRootIndex: 0,
+            _superRootProof: superRootProof,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
     }
 
     /// @notice Tests that `proveWithdrawalTransaction` reverts when using the Super Roots version
@@ -1261,13 +1261,13 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
         vm.expectRevert(IOptimismPortalInterop.OptimismPortal_InvalidOutputRootIndex.selector);
         IOptimismPortalInterop(payable(optimismPortal2))
             .proveWithdrawalTransaction({
-                _tx: _defaultTx,
-                _disputeGameProxy: game,
-                _outputRootIndex: outputRootWithChainIdArr.length, // out of bounds
-                _superRootProof: superRootProof,
-                _outputRootProof: _outputRootProof,
-                _withdrawalProof: _withdrawalProof
-            });
+            _tx: _defaultTx,
+            _disputeGameProxy: game,
+            _outputRootIndex: outputRootWithChainIdArr.length, // out of bounds
+            _superRootProof: superRootProof,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
     }
 
     /// @notice Tests that `proveWithdrawalTransaction` reverts when using the Super Roots version
@@ -1299,13 +1299,13 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
         vm.expectRevert(IOptimismPortalInterop.OptimismPortal_InvalidOutputRootChainId.selector);
         IOptimismPortalInterop(payable(optimismPortal2))
             .proveWithdrawalTransaction({
-                _tx: _defaultTx,
-                _disputeGameProxy: game,
-                _outputRootIndex: 0,
-                _superRootProof: superRootProof,
-                _outputRootProof: _outputRootProof,
-                _withdrawalProof: _withdrawalProof
-            });
+            _tx: _defaultTx,
+            _disputeGameProxy: game,
+            _outputRootIndex: 0,
+            _superRootProof: superRootProof,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
     }
 
     /// @notice Tests that `proveWithdrawalTransaction` reverts when using the Super Roots version
@@ -1337,13 +1337,13 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
         vm.expectRevert(IOptimismPortalInterop.OptimismPortal_InvalidOutputRootProof.selector);
         IOptimismPortalInterop(payable(optimismPortal2))
             .proveWithdrawalTransaction({
-                _tx: _defaultTx,
-                _disputeGameProxy: game,
-                _outputRootIndex: 0,
-                _superRootProof: superRootProof,
-                _outputRootProof: _outputRootProof,
-                _withdrawalProof: _withdrawalProof
-            });
+            _tx: _defaultTx,
+            _disputeGameProxy: game,
+            _outputRootIndex: 0,
+            _superRootProof: superRootProof,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
     }
 
     /// @notice Tests that `proveWithdrawalTransaction` succeeds when all parameters are valid.
@@ -1370,13 +1370,13 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
         // Should succeed.
         IOptimismPortalInterop(payable(optimismPortal2))
             .proveWithdrawalTransaction({
-                _tx: _defaultTx,
-                _disputeGameProxy: game,
-                _outputRootIndex: 0,
-                _superRootProof: superRootProof,
-                _outputRootProof: _outputRootProof,
-                _withdrawalProof: _withdrawalProof
-            });
+            _tx: _defaultTx,
+            _disputeGameProxy: game,
+            _outputRootIndex: 0,
+            _superRootProof: superRootProof,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
     }
 
     /// @notice Tests that `proveWithdrawalTransaction` succeeds.
