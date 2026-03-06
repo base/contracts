@@ -349,8 +349,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
                 l2SequenceNumber: parentGame.l2SequenceNumber(), root: Hash.wrap(parentGame.rootClaim().raw())
             });
         } else {
-            // When there is no parent game, the starting output root is the anchor state for the game type.
-            (startingOutputRoot.root, startingOutputRoot.l2SequenceNumber) = ANCHOR_STATE_REGISTRY.getAnchorRoot();
+            // When there is no parent game, the starting output root is the starting root in the AnchorStateRegistry.
+            startingOutputRoot = ANCHOR_STATE_REGISTRY.getStartingAnchorRoot();
         }
 
         // The block number must be BLOCK_INTERVAL blocks after the starting block number.
