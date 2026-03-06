@@ -240,15 +240,15 @@
     "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0xc458e7a57cb0f2291de0f609d94589bf242fcc7a7b2ab089983a9ef5d6e48354",
-    "sourceCodeHash": "0xd39f61ba9886b04a5adc0350739cf23bb7fb7a76bed04afcb380398247295c57"
+    "initCodeHash": "0xa8fdf5cb9a7966da0aab10eb6ab59103ee401c6dbc9c02b5b18f7b92581cb9a0",
+    "sourceCodeHash": "0x4fb3fe897e702eb2d47cfaf67fa5b9651112580ed47028a5f5b3b810866635af"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
-    "initCodeHash": "0x019b91d97231d2b4d236208d4f0dafa4b0e33b3cbcc8061319ec09ebdb8b8888",
-    "sourceCodeHash": "0xd39f61ba9886b04a5adc0350739cf23bb7fb7a76bed04afcb380398247295c57"
+    "initCodeHash": "0x317136b944b743a70c447d78e362edc3e17cda44526ee97d90e66584ba64b21c",
+    "sourceCodeHash": "0x4fb3fe897e702eb2d47cfaf67fa5b9651112580ed47028a5f5b3b810866635af"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
-    "initCodeHash": "0xfae3a71157f3c64a7bda037ec116bf6e7265099397d9bcad22c01cc1f029ed7d",
+    "initCodeHash": "0x76da4f2a736d7a39a01720e5d900a85fcaa60ba0430fcacbb8ab367f55ba5411",
     "sourceCodeHash": "0xa6261402efe0105e2a4f9369818bafb4e65515e51850b44d47504151e1c39d01"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal:dispute": {
