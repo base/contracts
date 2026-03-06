@@ -717,14 +717,14 @@ contract DeployImplementations is Script {
     }
 
     function deployAggregateVerifierImpl(Input memory _input, Output memory _output) private {
-        address zkVerifier = address(new MockVerifier());
+        address zkVerifier = address(new MockVerifier(_output.anchorStateRegistryImpl));
 
         address teeVerifierImpl;
         {
             SystemConfigGlobal scgImpl = new SystemConfigGlobal(INitroEnclaveVerifier(_input.nitroEnclaveVerifier));
             vm.label(address(scgImpl), "SystemConfigGlobalImpl");
             _output.systemConfigGlobalImpl = scgImpl;
-            teeVerifierImpl = address(new TEEVerifier(scgImpl));
+            teeVerifierImpl = address(new TEEVerifier(scgImpl, _output.anchorStateRegistryImpl));
         }
 
         _output.aggregateVerifierImpl = IVerifier(

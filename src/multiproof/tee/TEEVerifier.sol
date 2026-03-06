@@ -3,10 +3,11 @@ pragma solidity 0.8.15;
 
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
+import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 
 import { SystemConfigGlobal } from "./SystemConfigGlobal.sol";
+import { Verifier } from "../Verifier.sol";
 
 /// @title TEEVerifier
 /// @notice Stateless TEE proof verifier that validates signatures against registered signers.
@@ -15,7 +16,7 @@ import { SystemConfigGlobal } from "./SystemConfigGlobal.sol";
 ///      via AWS Nitro attestation, and that the signer's PCR0 matches the claimed imageId.
 ///      The contract is intentionally stateless - all state related to output proposals and
 ///      L1 origin verification is managed by the calling contract (e.g., AggregateVerifier).
-contract TEEVerifier is IVerifier, ISemver {
+contract TEEVerifier is Verifier, ISemver {
     /// @notice The SystemConfigGlobal contract that manages valid TEE signers.
     /// @dev Signers are registered via AWS Nitro attestation in SystemConfigGlobal.
     SystemConfigGlobal public immutable SYSTEM_CONFIG_GLOBAL;
@@ -37,7 +38,12 @@ contract TEEVerifier is IVerifier, ISemver {
 
     /// @notice Constructs the TEEVerifier contract.
     /// @param systemConfigGlobal The SystemConfigGlobal contract address.
-    constructor(SystemConfigGlobal systemConfigGlobal) {
+    constructor(
+        SystemConfigGlobal systemConfigGlobal,
+        IAnchorStateRegistry anchorStateRegistry
+    )
+        Verifier(anchorStateRegistry)
+    {
         SYSTEM_CONFIG_GLOBAL = systemConfigGlobal;
     }
 
@@ -46,7 +52,17 @@ contract TEEVerifier is IVerifier, ISemver {
     /// @param imageId The claimed TEE image hash (PCR0). Must match the signer's registered PCR0.
     /// @param journal The keccak256 hash of the proof's public inputs.
     /// @return valid Whether the proof is valid.
-    function verify(bytes calldata proofBytes, bytes32 imageId, bytes32 journal) external view override returns (bool) {
+    function verify(
+        bytes calldata proofBytes,
+        bytes32 imageId,
+        bytes32 journal
+    )
+        external
+        view
+        override
+        notNullified
+        returns (bool)
+    {
         if (proofBytes.length < 85) revert InvalidProofFormat();
 
         address proposer = address(bytes20(proofBytes[0:20]));
