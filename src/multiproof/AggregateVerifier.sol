@@ -551,7 +551,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             if (intermediateRootIndex != counteredByIntermediateRootIndexPlusOne - 1) {
                 revert InvalidIntermediateRootIndex();
             }
-            if (intermediateRootToProve != intermediateOutputRoot(intermediateRootIndex)) revert IntermediateRootMismatch(intermediateRootToProve, intermediateOutputRoot(intermediateRootIndex));
+            if (intermediateRootToProve != intermediateOutputRoot(intermediateRootIndex)) {
+                revert IntermediateRootMismatch(intermediateRootToProve, intermediateOutputRoot(intermediateRootIndex));
+            }
             if (proofType != ProofType.ZK) revert InvalidProofType();
         } else {
             _checkIntermediateRoot(intermediateRootIndex, intermediateRootToProve);
