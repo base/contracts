@@ -236,6 +236,14 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             _faultGameV2SplitDepth, // faultGameV2SplitDepth (bounded)
             _faultGameV2ClockExtension, // faultGameV2ClockExtension (bounded)
             _faultGameV2MaxClockDuration, // faultGameV2MaxClockDuration (bounded)
+            bytes32(uint256(1)), // teeImageHash
+            bytes32(0), // multiproofConfigHash
+            621, // multiproofGameType
+            address(0), // nitroEnclaveVerifier
+            8453, // l2ChainID
+            100, // multiproofBlockInterval
+            10, // multiproofIntermediateBlockInterval
+            1, // multiproofProofThreshold
             superchainConfigProxy,
             protocolVersionsProxy,
             superchainProxyAdmin,
@@ -524,6 +532,14 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             30, // faultGameV2SplitDepth
             10800, // faultGameV2ClockExtension
             302400, // faultGameV2MaxClockDuration
+            bytes32(uint256(1)), // teeImageHash
+            bytes32(0), // multiproofConfigHash
+            621, // multiproofGameType
+            address(0), // nitroEnclaveVerifier
+            8453, // l2ChainID
+            100, // multiproofBlockInterval
+            10, // multiproofIntermediateBlockInterval
+            1, // multiproofProofThreshold
             superchainConfigProxy,
             protocolVersionsProxy,
             superchainProxyAdmin,

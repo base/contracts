@@ -139,11 +139,6 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
         (gameType_, timestamp_, proxy_) = (gameType, timestamp, IDisputeGame(proxy));
     }
 
-    /// @notice Creates a new DisputeGame proxy contract.
-    /// @param _gameType The type of the DisputeGame - used to decide the proxy implementation.
-    /// @param _rootClaim The root claim of the DisputeGame.
-    /// @param _extraData Any extra data that should be provided to the created dispute game.
-    /// @return proxy_ The address of the created DisputeGame proxy.
     function create(
         GameType _gameType,
         Claim _rootClaim,
@@ -151,6 +146,62 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
     )
         external
         payable
+        returns (IDisputeGame proxy_)
+    {
+        proxy_ = _createGameImpl(_gameType, _rootClaim, _extraData);
+        proxy_.initialize{ value: msg.value }();
+        _finalizeGameCreation(_gameType, _rootClaim, _extraData, proxy_);
+    }
+
+    function createWithInitData(
+        GameType _gameType,
+        Claim _rootClaim,
+        bytes calldata _extraData,
+        bytes calldata _initData
+    )
+        external
+        payable
+        returns (IDisputeGame proxy_)
+    {
+        proxy_ = _createGameImpl(_gameType, _rootClaim, _extraData);
+        proxy_.initializeWithInitData{ value: msg.value }(_initData);
+        _finalizeGameCreation(_gameType, _rootClaim, _extraData, proxy_);
+    }
+
+    /// @notice Creates a new DisputeGame proxy contract.
+    /// @param _gameType The type of the DisputeGame - used to decide the proxy implementation.
+    /// @param _rootClaim The root claim of the DisputeGame.
+    /// @param _extraData Any extra data that should be provided to the created dispute game.
+    /// @param proxy_ The address of the created DisputeGame proxy.
+    function _finalizeGameCreation(
+        GameType _gameType,
+        Claim _rootClaim,
+        bytes calldata _extraData,
+        IDisputeGame proxy_
+    )
+        internal
+    {
+        // Compute the unique identifier for the dispute game.
+        Hash uuid = getGameUUID(_gameType, _rootClaim, _extraData);
+
+        // If a dispute game with the same UUID already exists, revert.
+        if (GameId.unwrap(_disputeGames[uuid]) != bytes32(0)) revert GameAlreadyExists(uuid);
+
+        // Pack the game ID.
+        GameId id = LibGameId.pack(_gameType, Timestamp.wrap(uint64(block.timestamp)), address(proxy_));
+
+        // Store the dispute game id in the mapping & emit the `DisputeGameCreated` event.
+        _disputeGames[uuid] = id;
+        _disputeGameList.push(id);
+        emit DisputeGameCreated(address(proxy_), _gameType, _rootClaim);
+    }
+
+    function _createGameImpl(
+        GameType _gameType,
+        Claim _rootClaim,
+        bytes calldata _extraData
+    )
+        internal
         returns (IDisputeGame proxy_)
     {
         // Grab the implementation contract for the given `GameType`.
@@ -165,7 +216,9 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
         // Get the hash of the parent block.
         bytes32 parentHash = blockhash(block.number - 1);
 
-        if (gameArgs[_gameType].length == 0) {
+        // Cache gameArgs to avoid stack-too-deep errors
+        bytes memory implArgs = gameArgs[_gameType];
+        if (implArgs.length == 0) {
             // Clone the implementation contract and initialize it with the given parameters.
             //
             // CWIA Calldata Layout:
@@ -194,26 +247,9 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
             // └──────────────────────┴─────────────────────────────────────┘
             proxy_ = IDisputeGame(
                 address(impl)
-                    .clone(
-                        abi.encodePacked(msg.sender, _rootClaim, parentHash, _gameType, _extraData, gameArgs[_gameType])
-                    )
+                    .clone(abi.encodePacked(msg.sender, _rootClaim, parentHash, _gameType, _extraData, implArgs))
             );
         }
-        proxy_.initialize{ value: msg.value }();
-
-        // Compute the unique identifier for the dispute game.
-        Hash uuid = getGameUUID(_gameType, _rootClaim, _extraData);
-
-        // If a dispute game with the same UUID already exists, revert.
-        if (GameId.unwrap(_disputeGames[uuid]) != bytes32(0)) revert GameAlreadyExists(uuid);
-
-        // Pack the game ID.
-        GameId id = LibGameId.pack(_gameType, Timestamp.wrap(uint64(block.timestamp)), address(proxy_));
-
-        // Store the dispute game id in the mapping & emit the `DisputeGameCreated` event.
-        _disputeGames[uuid] = id;
-        _disputeGameList.push(id);
-        emit DisputeGameCreated(address(proxy_), _gameType, _rootClaim);
     }
 
     /// @notice Returns a unique identifier for the given dispute game parameters.

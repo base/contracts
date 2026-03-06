@@ -44,5 +44,8 @@ deploy-config/getting-started.json
 # IDE
 /.idea/
 
+# Foundry
+foundry.lock
+
 # OS
 .DS_Store

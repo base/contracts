@@ -39,10 +39,19 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IOPContractsManagerStandardValidator } from "interfaces/L1/IOPContractsManagerStandardValidator.sol";
+import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
 import { DevFeatures } from "src/libraries/DevFeatures.sol";
+import {
+    INitroEnclaveVerifier
+} from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
+import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
+import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
+import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
+import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
+import { GameType } from "src/dispute/lib/Types.sol";
 
 contract DeployImplementations is Script {
     struct Input {
@@ -58,6 +67,15 @@ contract DeployImplementations is Script {
         uint256 faultGameV2SplitDepth;
         uint256 faultGameV2ClockExtension;
         uint256 faultGameV2MaxClockDuration;
+        // Multiproof parameters
+        bytes32 teeImageHash;
+        bytes32 multiproofConfigHash;
+        uint256 multiproofGameType;
+        address nitroEnclaveVerifier;
+        uint256 l2ChainID;
+        uint256 multiproofBlockInterval;
+        uint256 multiproofIntermediateBlockInterval;
+        uint256 multiproofProofThreshold;
         // Outputs from DeploySuperchain.s.sol.
         ISuperchainConfig superchainConfigProxy;
         IProtocolVersions protocolVersionsProxy;
@@ -95,6 +113,8 @@ contract DeployImplementations is Script {
         IPermissionedDisputeGameV2 permissionedDisputeGameV2Impl;
         ISuperFaultDisputeGame superFaultDisputeGameImpl;
         ISuperPermissionedDisputeGame superPermissionedDisputeGameImpl;
+        IVerifier aggregateVerifierImpl;
+        SystemConfigGlobal systemConfigGlobalImpl;
     }
 
     bytes32 internal _salt = DeployUtils.DEFAULT_SALT;
@@ -128,6 +148,7 @@ contract DeployImplementations is Script {
         deployAnchorStateRegistryImpl(_input, output_);
         deployFaultDisputeGameV2Impl(_input, output_);
         deployPermissionedDisputeGameV2Impl(_input, output_);
+        deployAggregateVerifierImpl(_input, output_);
         if (DevFeatures.isDevFeatureEnabled(_input.devFeatureBitmap, DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
             deploySuperFaultDisputeGameImpl(_input, output_);
             deploySuperPermissionedDisputeGameImpl(_input, output_);
@@ -693,6 +714,38 @@ contract DeployImplementations is Script {
         );
         vm.label(address(impl), "OPContractsManagerStandardValidatorImpl");
         _output.opcmStandardValidator = impl;
+    }
+
+    function deployAggregateVerifierImpl(Input memory _input, Output memory _output) private {
+        address zkVerifier = address(new MockVerifier());
+
+        address teeVerifierImpl;
+        {
+            SystemConfigGlobal scgImpl = new SystemConfigGlobal(INitroEnclaveVerifier(_input.nitroEnclaveVerifier));
+            vm.label(address(scgImpl), "SystemConfigGlobalImpl");
+            _output.systemConfigGlobalImpl = scgImpl;
+            teeVerifierImpl = address(new TEEVerifier(scgImpl));
+        }
+
+        _output.aggregateVerifierImpl = IVerifier(
+            address(
+                new AggregateVerifier(
+                    GameType.wrap(uint32(_input.multiproofGameType)),
+                    _output.anchorStateRegistryImpl,
+                    _output.delayedWETHImpl,
+                    IVerifier(teeVerifierImpl),
+                    IVerifier(zkVerifier),
+                    _input.teeImageHash,
+                    bytes32(0),
+                    _input.multiproofConfigHash,
+                    _input.l2ChainID,
+                    _input.multiproofBlockInterval,
+                    _input.multiproofIntermediateBlockInterval,
+                    _input.multiproofProofThreshold
+                )
+            )
+        );
+        vm.label(address(_output.aggregateVerifierImpl), "AggregateVerifierImpl");
     }
 
     function assertValidInput(Input memory _input) private pure {

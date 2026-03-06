@@ -81,6 +81,16 @@ func processFile(file string) (*SemverLockResult, []error) {
 		sourceFilePath = path
 		contractName = name
 		contractKey = sourceFilePath + ":" + name
+		if strings.HasSuffix(file, ".dispute.json") {
+			// We have an additional compiler profile called "dispute".
+			// This can produce different bytecode for certain contracts
+			// and the output will contain 2 jsons: <contract>.sol and
+			// <contract>.dispute.sol. These both produce the same contractKey
+			// since the CompilationTarget is the same. However, this leads to
+			// non-determinstic initCode hashes. Here, we make the contractKey
+			// unique thus guranteeing deterministic hashes.
+			contractKey += ":dispute"
+		}
 		break
 	}
 

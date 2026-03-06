@@ -283,6 +283,14 @@ contract Deploy is Deployer {
                 faultGameV2SplitDepth: cfg.faultGameV2SplitDepth(),
                 faultGameV2ClockExtension: cfg.faultGameV2ClockExtension(),
                 faultGameV2MaxClockDuration: cfg.faultGameV2MaxClockDuration(),
+                teeImageHash: cfg.teeImageHash(),
+                multiproofConfigHash: cfg.multiproofConfigHash(),
+                multiproofGameType: cfg.multiproofGameType(),
+                nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
+                l2ChainID: cfg.l2ChainID(),
+                multiproofBlockInterval: cfg.multiproofBlockInterval(),
+                multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
+                multiproofProofThreshold: cfg.multiproofProofThreshold(),
                 protocolVersionsProxy: IProtocolVersions(artifacts.mustGetAddress("ProtocolVersionsProxy")),
                 superchainConfigProxy: superchainConfigProxy,
                 superchainProxyAdmin: superchainProxyAdmin,
@@ -300,6 +308,8 @@ contract Deploy is Deployer {
         artifacts.save("DelayedWETHImpl", address(dio.delayedWETHImpl));
         artifacts.save("PreimageOracle", address(dio.preimageOracleSingleton));
         artifacts.save("PermissionedDisputeGame", address(dio.permissionedDisputeGameV2Impl));
+        artifacts.save("AggregateVerifier", address(dio.aggregateVerifierImpl));
+        artifacts.save("SystemConfigGlobal", address(dio.systemConfigGlobalImpl));
 
         // Get a contract set from the implementation addresses which were just deployed.
         Types.ContractSet memory impls = ChainAssertions.dioToContractSet(dio);

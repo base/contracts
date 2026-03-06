@@ -21,6 +21,7 @@ additional_compiler_profiles = [
   { name = "dispute", optimizer_runs = 5000 },
 ]
 compilation_restrictions = [
+  { paths = "src/dispute/DisputeGameFactory.sol", optimizer_runs = 5000 },
   { paths = "src/dispute/FaultDisputeGame.sol", optimizer_runs = 5000 },
   { paths = "src/dispute/v2/FaultDisputeGameV2.sol", optimizer_runs = 5000 },
   { paths = "src/dispute/PermissionedDisputeGame.sol", optimizer_runs = 5000 },
@@ -29,7 +30,15 @@ compilation_restrictions = [
   { paths = "src/L1/OPContractsManager.sol", optimizer_runs = 5000 },
   { paths = "src/L1/OPContractsManagerStandardValidator.sol", optimizer_runs = 5000 },
   { paths = "src/L1/OptimismPortal2.sol", optimizer_runs = 5000 },
-  { paths = "src/L1/ProtocolVersions.sol", optimizer_runs = 5000 }
+  { paths = "src/L1/ProtocolVersions.sol", optimizer_runs = 5000 },
+  { paths = "src/L1/SystemConfig.sol", optimizer_runs = 5000 },
+  { paths = "src/universal/OptimismMintableERC20Factory.sol", optimizer_runs = 5000 },
+  { paths = "src/dispute/AnchorStateRegistry.sol", optimizer_runs = 5000 },
+  { paths = "src/dispute/DelayedWETH.sol", optimizer_runs = 5000 },
+  { paths = "src/universal/ProxyAdmin.sol", optimizer_runs = 5000 },
+  { paths = "src/universal/Proxy.sol", optimizer_runs = 5000 },
+  { paths = "src/L2/OptimismMintableERC721.sol", optimizer_runs = 5000 },
+  { paths = "src/L2/OptimismMintableERC721Factory.sol", optimizer_runs = 5000 },
 ]
 
 extra_output = ['devdoc', 'userdoc', 'metadata', 'storageLayout']
@@ -43,6 +52,7 @@ remappings = [
   '@openzeppelin/contracts-v5/=lib/openzeppelin-contracts-v5/contracts',
   '@rari-capital/solmate/=lib/solmate',
   '@lib-keccak/=lib/lib-keccak/contracts/lib',
+  'solady/=lib/solady/src/',
   '@solady/=lib/solady/src',
   '@solady-v0.0.245/=lib/solady-v0.0.245/src',
   'forge-std/=lib/forge-std/src',
@@ -153,6 +163,7 @@ additional_compiler_profiles = [
   { name = "dispute", optimizer_runs = 0 },
 ]
 compilation_restrictions = [
+  { paths = "src/dispute/DisputeGameFactory.sol", optimizer_runs = 0 },
   { paths = "src/dispute/FaultDisputeGame.sol", optimizer_runs = 0 },
   { paths = "src/dispute/v2/FaultDisputeGameV2.sol", optimizer_runs = 0 },
   { paths = "src/dispute/PermissionedDisputeGame.sol", optimizer_runs = 0 },
@@ -162,6 +173,14 @@ compilation_restrictions = [
   { paths = "src/L1/OPContractsManagerStandardValidator.sol", optimizer_runs = 0 },
   { paths = "src/L1/OptimismPortal2.sol", optimizer_runs = 0 },
   { paths = "src/L1/ProtocolVersions.sol", optimizer_runs = 0 },
+  { paths = "src/L1/SystemConfig.sol", optimizer_runs = 0 },
+  { paths = "src/universal/OptimismMintableERC20Factory.sol", optimizer_runs = 0 },
+  { paths = "src/dispute/AnchorStateRegistry.sol", optimizer_runs = 0 },
+  { paths = "src/dispute/DelayedWETH.sol", optimizer_runs = 0 },
+  { paths = "src/universal/ProxyAdmin.sol", optimizer_runs = 0 },
+  { paths = "src/universal/Proxy.sol", optimizer_runs = 0 },
+  { paths = "src/L2/OptimismMintableERC721.sol", optimizer_runs = 0 },
+  { paths = "src/L2/OptimismMintableERC721Factory.sol", optimizer_runs = 0 },
 ]
 
 ################################################################
