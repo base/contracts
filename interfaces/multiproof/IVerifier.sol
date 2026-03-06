@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 interface IVerifier {
+<<<<<<< simplify-and-modularize-aggregate-verifier
 
     /// @notice Verifies a proof.
     /// @param proofBytes The proof.
@@ -14,4 +15,7 @@ interface IVerifier {
     /// @dev Should only occur if a soundness issue is found.
     /// @dev Should only be callable by a proper dispute game.
     function nullify() external;
+=======
+    function verify(bytes calldata proofBytes, bytes32 imageId, bytes32 journal) external view returns (bool);
+>>>>>>> main
 }

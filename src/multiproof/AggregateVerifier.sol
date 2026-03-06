@@ -56,6 +56,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The maximum number of blocks that EIP-2935 can look back (~8192).
     uint256 public constant EIP2935_WINDOW = 8191;
+<<<<<<< simplify-and-modularize-aggregate-verifier
+=======
+
+    /// @notice For when the game no longer accepts proofs and prevents resolution.
+    int8 internal constant NEGATIVE_PROOF_COUNT = type(int8).min;
+
+>>>>>>> main
     ////////////////////////////////////////////////////////////////
     //                         Immutables                         //
     ////////////////////////////////////////////////////////////////
@@ -137,6 +144,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The amount of the bond.
     uint256 public bondAmount;
 
+<<<<<<< simplify-and-modularize-aggregate-verifier
     /// @notice The index of the intermediate root that countered this game.
     /// @dev The index is 1-based, so the countered intermediate root index is counteredByIntermediateRootIndexPlusOne -
     /// 1. 0 is used to indicate that the game was not countered.
@@ -144,13 +152,24 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The address that provided a proof of the given type.
     /// @dev The address is the zero address if no proof has been provided or the proof has been nullified.
+=======
+    /// @notice The address of the game that countered this game.
+    address public counteredByGameAddress;
+
+    /// @notice The address that provided a proof of the given type.
+>>>>>>> main
     mapping(ProofType => address) internal proofTypeToProver;
 
     /// @notice The timestamp of the game's expected resolution.
     Timestamp public expectedResolution;
 
     /// @notice The number of proofs provided.
+<<<<<<< simplify-and-modularize-aggregate-verifier
     uint8 public proofCount;
+=======
+    /// @dev Can be negative if a ZK proof is nullified.
+    int8 public proofCount;
+>>>>>>> main
 
     ////////////////////////////////////////////////////////////////
     //                         Events                             //
@@ -162,8 +181,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice Emitted when a proposal with a TEE proof is challenged with a ZK proof.
     /// @param challenger The address of the challenger.
+<<<<<<< simplify-and-modularize-aggregate-verifier
     /// @param intermediateRootIndex The index of the intermediate root that was countered.
     event Challenged(address indexed challenger, uint256 intermediateRootIndex);
+=======
+    /// @param game The game used to challenge this proposal.
+    event Challenged(address indexed challenger, IDisputeGame game);
+>>>>>>> main
 
     /// @notice Emitted when the game is proved.
     /// @param prover The address of the prover.
@@ -217,6 +241,21 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice When an invalid proof type is provided.
     error InvalidProofType();
 
+<<<<<<< simplify-and-modularize-aggregate-verifier
+=======
+    /// @notice When no proof was provided.
+    error NoProofProvided();
+
+    /// @notice When the countered by game is invalid.
+    error InvalidCounteredByGame();
+
+    /// @notice When the countered by game is not resolved.
+    error CounteredByGameNotResolved();
+
+    /// @notice When the bond recipient is empty.
+    error BondRecipientEmpty();
+
+>>>>>>> main
     /// @notice When the intermediate root index is invalid.
     error InvalidIntermediateRootIndex();
 
@@ -349,8 +388,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
                 l2SequenceNumber: parentGame.l2SequenceNumber(), root: Hash.wrap(parentGame.rootClaim().raw())
             });
         } else {
+<<<<<<< simplify-and-modularize-aggregate-verifier
             // When there is no parent game, the starting output root is the starting root in the AnchorStateRegistry.
             startingOutputRoot = ANCHOR_STATE_REGISTRY.getStartingAnchorRoot();
+=======
+            // When there is no parent game, the starting output root is the anchor state for the game type.
+            (startingOutputRoot.root, startingOutputRoot.l2SequenceNumber) = ANCHOR_STATE_REGISTRY.getAnchorRoot();
+>>>>>>> main
         }
 
         // The block number must be BLOCK_INTERVAL blocks after the starting block number.
@@ -391,10 +435,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             intermediateOutputRoots()
         );
 
+<<<<<<< simplify-and-modularize-aggregate-verifier
         _proofVerifiedUpdate(proofType, gameCreator());
 
         // Set the bond recipient to the creator. It can change if challenged successfully.
         bondRecipient = gameCreator();
+=======
+        _updateProvingData(proofType, gameCreator());
+
+        emit Proved(gameCreator(), proofType);
+>>>>>>> main
 
         // Deposit the bond.
         bondAmount = msg.value;
@@ -425,7 +475,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             l2SequenceNumber(),
             intermediateOutputRoots()
         );
+<<<<<<< simplify-and-modularize-aggregate-verifier
         _proofVerifiedUpdate(proofType, msg.sender);
+=======
+        _updateProvingData(proofType, msg.sender);
+
+        emit Proved(msg.sender, proofType);
+>>>>>>> main
     }
 
     /// @notice Resolves the game after a proof has been provided and enough time has passed.
@@ -437,14 +493,18 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // The parent game must have resolved.
         if (parentGameStatus == GameStatus.IN_PROGRESS) revert ParentGameNotResolved();
 
+<<<<<<< simplify-and-modularize-aggregate-verifier
         bool isChallenged = counteredByIntermediateRootIndexPlusOne > 0;
 
+=======
+>>>>>>> main
         // If the parent game's claim is invalid, blacklisted, or retired, then the current game's claim is invalid.
         if (parentGameStatus == GameStatus.CHALLENGER_WINS) {
             status = GameStatus.CHALLENGER_WINS;
         } else {
             // Game must be completed with a valid proof.
             if (!gameOver()) revert GameNotOver();
+<<<<<<< simplify-and-modularize-aggregate-verifier
             // If the game is challenged, status is CHALLENGER_WINS.
             // If the game is not challenged, status is DEFENDER_WINS.
             status = isChallenged ? GameStatus.CHALLENGER_WINS : GameStatus.DEFENDER_WINS;
@@ -456,6 +516,17 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         if (isChallenged) {
             bondRecipient = proofTypeToProver[ProofType.ZK];
         }
+=======
+            status = GameStatus.DEFENDER_WINS;
+        }
+
+        // casting to 'int256' is safe because 1 <= PROOF_THRESHOLD <= 2
+        // forge-lint: disable-next-line(unsafe-typecast)
+        if (proofCount < int256(PROOF_THRESHOLD)) revert NotEnoughProofs();
+
+        // Bond is refunded as no challenge was made or parent is invalid.
+        bondRecipient = gameCreator();
+>>>>>>> main
         // Mark the game as resolved.
         resolvedAt = Timestamp.wrap(uint64(block.timestamp));
         emit Resolved(status);
@@ -464,6 +535,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Challenges the TEE proof with a ZK proof.
+<<<<<<< simplify-and-modularize-aggregate-verifier
     /// @param proofBytes The proof bytes.
     /// @param intermediateRootIndex The index of the intermediate root to challenge.
     /// @param intermediateRootToProve The intermediate root that the proof claims to be correct.
@@ -474,6 +546,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     )
         external
     {
+=======
+    /// @param gameIndex The index of the game used to challenge.
+    /// @dev The game used to challenge must have a ZK proof for the same
+    ///      block number but a different root claim as the current game.
+    function challenge(uint256 gameIndex) external {
+>>>>>>> main
         // Can only challenge a game that has not been challenged or resolved yet.
         if (status != GameStatus.IN_PROGRESS) revert ClaimAlreadyResolved();
 
@@ -484,6 +562,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         if (_getParentGameStatus() == GameStatus.CHALLENGER_WINS) revert InvalidParentGame();
 
         // The TEE prover must not be empty.
+<<<<<<< simplify-and-modularize-aggregate-verifier
         if (proofTypeToProver[ProofType.TEE] == address(0)) revert MissingProof(ProofType.TEE);
         // You should nullify the game if a ZK proof has already been provided.
         // This also prevents another challenge while the current challenge is in progress.
@@ -526,6 +605,43 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         // Emit the challenged event.
         emit Challenged(msg.sender, intermediateRootIndex);
+=======
+        // You should nullify the game if a ZK proof has already been provided.
+        if (proofTypeToProver[ProofType.TEE] == address(0)) revert MissingProof(ProofType.TEE);
+        if (proofTypeToProver[ProofType.ZK] != address(0)) revert AlreadyProven(ProofType.ZK);
+
+        // Prevents challenging after TEE nullification.
+        if (proofCount != 1) revert NotEnoughProofs();
+
+        (,, IDisputeGame game) = DISPUTE_GAME_FACTORY.gameAtIndex(gameIndex);
+
+        // The game must be a valid game used to challenge.
+        if (!_isValidChallengingGame(game)) revert InvalidGame();
+
+        AggregateVerifier challengingGame = AggregateVerifier(address(game));
+
+        // The ZK prover must not be empty.
+        if (challengingGame.zkProver() == address(0)) revert MissingProof(ProofType.ZK);
+
+        // Update the counteredBy address.
+        counteredByGameAddress = address(challengingGame);
+
+        // Set the game as challenged.
+        status = GameStatus.CHALLENGER_WINS;
+
+        // Prevent resolution if any proof was somehow able to be provided later.
+        proofCount = NEGATIVE_PROOF_COUNT;
+
+        // Update the expected resolution.
+        _updateExpectedResolution();
+
+        // Set the bond recipient.
+        // Bond cannot be claimed until the game used to challenge resolves as DEFENDER_WINS.
+        bondRecipient = challengingGame.zkProver();
+
+        // Emit the challenged event.
+        emit Challenged(challengingGame.zkProver(), game);
+>>>>>>> main
     }
 
     /// @notice Nullifies the game if a soundness issue is found.
@@ -540,6 +656,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     )
         external
     {
+<<<<<<< simplify-and-modularize-aggregate-verifier
         // Can only nullify if the game is still in progress.
         if (status != GameStatus.IN_PROGRESS) revert ClaimAlreadyResolved();
 
@@ -561,6 +678,25 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         (bytes32 startingRoot, uint256 startingL2SequenceNumber, uint256 endingL2SequenceNumber) =
             _getStartingIntermediateRootAndL2SequenceNumbers(intermediateRootIndex);
+=======
+        if (status != GameStatus.IN_PROGRESS) revert GameNotInProgress();
+
+        if (intermediateRootIndex >= intermediateOutputRootsCount()) revert InvalidIntermediateRootIndex();
+
+        bytes32 proposedIntermediateRoot = intermediateOutputRoot(intermediateRootIndex);
+        if (proposedIntermediateRoot == intermediateRootToProve) revert IntermediateRootSameAsProposed();
+
+        ProofType proofType = ProofType(uint8(proofBytes[0]));
+
+        if (proofTypeToProver[proofType] == address(0)) revert MissingProof(proofType);
+
+        bytes32 startingRoot = intermediateRootIndex == 0
+            ? startingOutputRoot.root.raw()
+            : intermediateOutputRoot(intermediateRootIndex - 1);
+        uint256 startingL2SequenceNumber =
+            startingOutputRoot.l2SequenceNumber + intermediateRootIndex * INTERMEDIATE_BLOCK_INTERVAL;
+        uint256 endingL2SequenceNumber = startingL2SequenceNumber + INTERMEDIATE_BLOCK_INTERVAL;
+>>>>>>> main
 
         _verifyProof(
             proofBytes[1:],
@@ -574,6 +710,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             abi.encodePacked(intermediateRootToProve)
         );
 
+<<<<<<< simplify-and-modularize-aggregate-verifier
         _proofRefutedUpdate(proofType);
 
         emit Nullified(msg.sender, intermediateRootIndex, intermediateRootToProve);
@@ -587,6 +724,35 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         } else if (proofType == ProofType.TEE) {
             IVerifier(TEE_VERIFIER).nullify();
         }
+=======
+        if (proofType == ProofType.ZK) {
+            // Since a ZK proof vetoes a TEE proof, we make the proof count negative for ZK nullifications.
+            // This ensures that the game cannot resolve if a TEE proof can somehow be provided later.
+            proofCount = NEGATIVE_PROOF_COUNT;
+
+            // Set the game as challenged so that child games can't resolve.
+            status = GameStatus.CHALLENGER_WINS;
+        } else if (proofType == ProofType.TEE) {
+            // The status is not updated here to still allow a ZK proof to be provided later.
+            proofCount -= 1;
+
+            // Increase the expected resolution by the SLOW_FINALIZATION_DELAY.
+            // This gives us enough time to nullify a ZK proof if it was already provided.
+            // Otherwise the below _updateExpectedResolution() makes the expected resolution
+            // the maximum timestamp.
+            expectedResolution = Timestamp.wrap(uint64(block.timestamp + SLOW_FINALIZATION_DELAY));
+        }
+
+        // If there are no proofs, the expected resolution will be set to type(uint64).max.
+        // It's not possible to go from FAST_FINALIZATION_DELAY to SLOW_FINALIZATION_DELAY
+        // as we can only do a ZK nullification in this case, causing proofCount to be negative.
+        _updateExpectedResolution();
+
+        // Refund the bond as either a ZK proof was nullified or a ZK proof has to be provided later.
+        bondRecipient = gameCreator();
+
+        emit Nullified(msg.sender, intermediateRootIndex, intermediateRootToProve);
+>>>>>>> main
     }
 
     /// @notice Claim the credit belonging to the bond recipient. Reverts if the game isn't
@@ -595,6 +761,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // The bond must not have been claimed yet.
         if (bondClaimed) revert NoCreditToClaim();
 
+<<<<<<< simplify-and-modularize-aggregate-verifier
         // The game must have resolved or 14 days have passed since creation.
         // 14 days chosen as the proof system should have progressed enough so this can't update the
         // anchor state registry anymore.
@@ -602,6 +769,21 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             if (resolvedAt.raw() == 0) revert GameNotResolved();
         } else {
             if (block.timestamp < createdAt.raw() + 14 days) revert GameNotOver();
+=======
+        // The bond recipient must not be empty.
+        if (bondRecipient == address(0)) revert BondRecipientEmpty();
+
+        // If this game was challenged, the countered by game must be valid or else the bond is refunded.
+        if (counteredByGameAddress != address(0)) {
+            GameStatus counteredByGameStatus = IDisputeGame(counteredByGameAddress).status();
+            if (counteredByGameStatus == GameStatus.IN_PROGRESS) {
+                revert CounteredByGameNotResolved();
+            }
+            // If the countered by game is invalid or not resolved, the bond is refunded.
+            if (!_isValidChallengingGame(IDisputeGame(counteredByGameAddress))) {
+                bondRecipient = gameCreator();
+            }
+>>>>>>> main
         }
 
         if (!bondUnlocked) {
@@ -611,6 +793,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         }
 
         bondClaimed = true;
+<<<<<<< simplify-and-modularize-aggregate-verifier
+=======
+        // This can fail if this game was challenged and the countered by game is
+        // blacklisted/retired after it resolved to DEFENDER_WINS.
+        // The centralized functions in DELAYED_WETH will handle this as it's a already
+        // a very centralized action to blacklist/retire a valid challenging game.
+>>>>>>> main
         DELAYED_WETH.withdraw(bondRecipient, bondAmount);
 
         // Transfer the credit to the bond recipient.
@@ -748,6 +937,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         return _getArgUint32(0x74);
     }
 
+<<<<<<< simplify-and-modularize-aggregate-verifier
     function _proofVerifiedUpdate(ProofType proofType, address prover) internal {
         proofTypeToProver[proofType] = prover;
         proofCount += 1;
@@ -759,11 +949,19 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice Decreases the expected resolution timestamp.
     function _decreaseExpectedResolution() internal {
+=======
+    /// @notice Updates the expected resolution timestamp.
+    function _updateExpectedResolution() internal {
+>>>>>>> main
         uint64 delay;
 
         if (proofCount >= 2) {
             delay = FAST_FINALIZATION_DELAY;
+<<<<<<< simplify-and-modularize-aggregate-verifier
         } else if (proofCount == 1) {
+=======
+        } else if (proofCount >= 1) {
+>>>>>>> main
             delay = SLOW_FINALIZATION_DELAY;
         } else {
             // If there are no proofs, don't allow the game to resolve.
@@ -771,11 +969,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             return;
         }
 
+<<<<<<< simplify-and-modularize-aggregate-verifier
         // Only allow decreases to the expected resolution.
+=======
+>>>>>>> main
         uint64 newResolution = uint64(block.timestamp) + delay;
         expectedResolution = Timestamp.wrap(uint64(FixedPointMathLib.min(newResolution, expectedResolution.raw())));
     }
 
+<<<<<<< simplify-and-modularize-aggregate-verifier
     /// @dev Should only occur if challenged or nullified.
     function _proofRefutedUpdate(ProofType proofType) internal {
         delete proofTypeToProver[proofType];
@@ -801,6 +1003,19 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // as this can only occur if there is an issue with the proof system so
         // we give enough time to resolve the issue and possibly blacklist this game.
         expectedResolution = Timestamp.wrap(uint64(block.timestamp) + delay);
+=======
+    function _updateProvingData(ProofType proofType, address prover) internal {
+        proofTypeToProver[proofType] = prover;
+
+        // Bond can be reclaimed after a ZK proof is provided.
+        if (proofType == ProofType.ZK) {
+            bondRecipient = gameCreator();
+        }
+
+        proofCount += 1;
+
+        _updateExpectedResolution();
+>>>>>>> main
     }
 
     function _verifyProof(
@@ -936,6 +1151,25 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             && !ANCHOR_STATE_REGISTRY.isGameRetired(game) && (game.status() != GameStatus.CHALLENGER_WINS);
     }
 
+<<<<<<< simplify-and-modularize-aggregate-verifier
+=======
+    /// @notice Checks if the game is a valid game used to challenge or nullify.
+    /// @param game The game to check.
+    function _isValidChallengingGame(IDisputeGame game) internal view returns (bool) {
+        return
+        // The game type must be the same.
+        game.gameType().raw() == GAME_TYPE.raw() && 
+            // The parent game must be the same.
+            AggregateVerifier(address(game)).parentIndex() == parentIndex() && 
+            // The block number must be the same.
+            game.l2SequenceNumber() == l2SequenceNumber() && 
+            // The root claim must be different.
+            game.rootClaim().raw() != rootClaim().raw() && 
+            // The game must be valid.
+            _isValidGame(game);
+    }
+
+>>>>>>> main
     /// @notice Verifies that the claimed L1 origin hash matches the actual blockhash.
     /// @param l1OriginHash The L1 block hash claimed in the proof.
     /// @param l1OriginNumber The L1 block number claimed in the proof.
@@ -973,6 +1207,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         }
     }
 
+<<<<<<< simplify-and-modularize-aggregate-verifier
     /// @notice Checks if the intermediate root index is valid and that the intermediate root differs from the proposed
     /// intermediate root. @param intermediateRootIndex The index of the intermediate root to check.
     /// @param intermediateRootToProve The intermediate root that the proof claims to be correct.
@@ -1002,6 +1237,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         return (startingRoot, startingL2SequenceNumber, endingL2SequenceNumber);
     }
 
+=======
+>>>>>>> main
     /// @notice Semantic version.
     /// @custom:semver 0.1.0
     function version() public pure virtual returns (string memory) {

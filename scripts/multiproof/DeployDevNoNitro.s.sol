@@ -175,7 +175,11 @@ contract DeployDevNoNitro is Script {
     }
 
     function _deployAggregateVerifier(GameType gameType) internal {
+<<<<<<< simplify-and-modularize-aggregate-verifier
         address zkVerifier = address(new MockVerifier(IAnchorStateRegistry(mockAnchorRegistry)));
+=======
+        address zkVerifier = address(new MockVerifier());
+>>>>>>> main
         console.log("MockVerifier (ZK):", zkVerifier);
 
         mockDelayedWETH = address(new MockDelayedWETH());
