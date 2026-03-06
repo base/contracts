@@ -543,8 +543,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // Can only nullify if the game is still in progress.
         if (status != GameStatus.IN_PROGRESS) revert ClaimAlreadyResolved();
 
-        _checkIntermediateRoot(intermediateRootIndex, intermediateRootToProve);
-
         ProofType proofType = ProofType(uint8(proofBytes[0]));
         if (proofTypeToProver[proofType] == address(0)) revert MissingProof(proofType);
 
@@ -553,7 +551,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             if (intermediateRootIndex != counteredByIntermediateRootIndexPlusOne - 1) {
                 revert InvalidIntermediateRootIndex();
             }
+            if (intermediateRootToProve != intermediateOutputRoot(intermediateRootIndex)) revert IntermediateRootMismatch(intermediateRootToProve, intermediateOutputRoot(intermediateRootIndex));
             if (proofType != ProofType.ZK) revert InvalidProofType();
+        } else {
+            _checkIntermediateRoot(intermediateRootIndex, intermediateRootToProve);
         }
 
         (bytes32 startingRoot, uint256 startingL2SequenceNumber, uint256 endingL2SequenceNumber) =

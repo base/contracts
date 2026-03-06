@@ -240,15 +240,15 @@
     "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0x977b0a7135a272c3e9f4a61a88cc6862fab35f967e5c26dc54e23924b28eb6ed",
-    "sourceCodeHash": "0xdfe97218b4fcfad4a8b198e574506088b2bfd34147b80d8145878f7120f88bc6"
+    "initCodeHash": "0xa8fdf5cb9a7966da0aab10eb6ab59103ee401c6dbc9c02b5b18f7b92581cb9a0",
+    "sourceCodeHash": "0x480582750c1e118198ca1077dfe25d910785377c3e29c340c72a3e23e83a476f"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
-    "initCodeHash": "0x35e0845d63dd53d9ac2703e686c03971bd7c536db2a2917b9d2abe16744adf5e",
-    "sourceCodeHash": "0xdfe97218b4fcfad4a8b198e574506088b2bfd34147b80d8145878f7120f88bc6"
+    "initCodeHash": "0x019b91d97231d2b4d236208d4f0dafa4b0e33b3cbcc8061319ec09ebdb8b8888",
+    "sourceCodeHash": "0x480582750c1e118198ca1077dfe25d910785377c3e29c340c72a3e23e83a476f"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
-    "initCodeHash": "0xfae3a71157f3c64a7bda037ec116bf6e7265099397d9bcad22c01cc1f029ed7d",
+    "initCodeHash": "0x76da4f2a736d7a39a01720e5d900a85fcaa60ba0430fcacbb8ab367f55ba5411",
     "sourceCodeHash": "0xa6261402efe0105e2a4f9369818bafb4e65515e51850b44d47504151e1c39d01"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal:dispute": {
