@@ -232,7 +232,7 @@ contract DeployDevWithNitro is Script {
         );
         console.log("AggregateVerifier:", aggregateVerifier);
 
-        DisputeGameFactory(disputeGameFactory).setImplementation(gameType, IDisputeGame(aggregateVerifier));
+        DisputeGameFactory(disputeGameFactory).setImplementation(gameType, IDisputeGame(aggregateVerifier), "");
         DisputeGameFactory(disputeGameFactory).setInitBond(gameType, INIT_BOND);
         console.log("Registered AggregateVerifier with factory");
     }
