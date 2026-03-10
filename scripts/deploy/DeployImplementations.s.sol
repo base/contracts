@@ -719,26 +719,15 @@ contract DeployImplementations is Script {
     function deployAggregateVerifierImpl(Input memory _input, Output memory _output) private {
         address zkVerifier = address(new MockVerifier());
 
-        SystemConfigGlobal scgImpl = new SystemConfigGlobal(INitroEnclaveVerifier(_input.nitroEnclaveVerifier));
-        vm.label(address(scgImpl), "SystemConfigGlobalImpl");
-        _output.systemConfigGlobalImpl = scgImpl;
-        address teeVerifierImpl = address(new TEEVerifier(scgImpl));
+        address teeVerifierImpl;
+        {
+            SystemConfigGlobal scgImpl = new SystemConfigGlobal(INitroEnclaveVerifier(_input.nitroEnclaveVerifier));
+            vm.label(address(scgImpl), "SystemConfigGlobalImpl");
+            _output.systemConfigGlobalImpl = scgImpl;
+            teeVerifierImpl = address(new TEEVerifier(scgImpl));
+        }
 
-        _deployAggregateVerifier(_input, _output, teeVerifierImpl, zkVerifier);
-    }
-
-    /// @dev Extracted to avoid "stack too deep" in the legacy (non-IR) codegen pipeline.
-    ///      With 5+ live locals in the outer function, the 12-arg AggregateVerifier constructor
-    ///      would push _input beyond DUP16. A fresh call frame here keeps _input within DUP15.
-    function _deployAggregateVerifier(
-        Input memory _input,
-        Output memory _output,
-        address teeVerifierImpl,
-        address zkVerifier
-    )
-        private
-    {
-        IVerifier impl = IVerifier(
+        _output.aggregateVerifierImpl = IVerifier(
             address(
                 new AggregateVerifier(
                     GameType.wrap(uint32(_input.multiproofGameType)),
@@ -756,8 +745,7 @@ contract DeployImplementations is Script {
                 )
             )
         );
-        vm.label(address(impl), "AggregateVerifierImpl");
-        _output.aggregateVerifierImpl = impl;
+        vm.label(address(_output.aggregateVerifierImpl), "AggregateVerifierImpl");
     }
 
     function assertValidInput(Input memory _input) private pure {

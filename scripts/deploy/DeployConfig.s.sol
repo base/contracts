@@ -213,6 +213,7 @@ contract DeployConfig is Script {
         multiproofGenesisBlockNumber = _readOr(_json, "$.multiproofGenesisBlockNumber", 0);
         multiproofBlockInterval = _readOr(_json, "$.multiproofBlockInterval", 100);
         multiproofIntermediateBlockInterval = _readOr(_json, "$.multiproofIntermediateBlockInterval", 10);
+        multiproofProofThreshold = _readOr(_json, "$.multiproofProofThreshold", 1);
     }
 
     function fork() public view returns (Fork fork_) {
