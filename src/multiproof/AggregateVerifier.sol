@@ -489,11 +489,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // This also prevents another challenge while the current challenge is in progress.
         if (proofTypeToProver[ProofType.ZK] != address(0)) revert AlreadyProven(ProofType.ZK);
 
-        _checkIntermediateRoot(intermediateRootIndex, intermediateRootToProve);
-
         // Can only challenge with a ZK proof.
         ProofType proofType = ProofType(uint8(proofBytes[0]));
         if (proofType != ProofType.ZK) revert InvalidProofType();
+
+        _checkIntermediateRoot(intermediateRootIndex, intermediateRootToProve);
 
         (bytes32 startingRoot, uint256 startingL2SequenceNumber, uint256 endingL2SequenceNumber) =
             _getStartingIntermediateRootAndL2SequenceNumbers(intermediateRootIndex);
@@ -779,7 +779,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @dev Should only occur if challenged or nullified.
     function _proofRefutedUpdate(ProofType proofType) internal {
         delete proofTypeToProver[proofType];
-        proofCount -= 1;
+
+        // Should not be possible, but just in case.
+        if (proofCount == 0) revert NotEnoughProofs();
+        unchecked {
+            proofCount -= 1;
+        }
 
         _increaseExpectedResolution();
     }
@@ -974,7 +979,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Checks if the intermediate root index is valid and that the intermediate root differs from the proposed
-    /// intermediate root. @param intermediateRootIndex The index of the intermediate root to check.
+    /// intermediate root.
+    ///@param intermediateRootIndex The index of the intermediate root to check.
     /// @param intermediateRootToProve The intermediate root that the proof claims to be correct.
     function _checkIntermediateRoot(uint256 intermediateRootIndex, bytes32 intermediateRootToProve) internal view {
         if (intermediateRootIndex >= intermediateOutputRootsCount()) revert InvalidIntermediateRootIndex();
