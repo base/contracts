@@ -80,7 +80,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
     mapping(ZkCoProcessorType => mapping(bytes32 verifierId => bytes32 verifierProofId)) private _verifierProofIds;
 
     /// @dev Event emitted when the proof submitter address is changed
-    event ProofSubmitterChanged(address previousProofSubmitter, address newProofSubmitter);
+    event ProofSubmitterChanged(address newProofSubmitter);
 
     /// @dev Event emitted when the root certificate is changed
     event RootCertChanged(bytes32 newRootCert);
@@ -409,6 +409,15 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
 
         _zkVerifierRoutes[_zkCoProcessor][_selector] = FROZEN;
         emit ZkRouteWasFrozen(_zkCoProcessor, _selector);
+    }
+
+    /**
+     * @dev Sets the proof submitter address
+     * @param _proofSubmitter The address of the proof submitter
+     */
+    function setProofSubmitter(address _proofSubmitter) external onlyOwner {
+        proofSubmitter = _proofSubmitter;
+        emit ProofSubmitterChanged(_proofSubmitter);
     }
 
     // ============ Verification Functions ============
