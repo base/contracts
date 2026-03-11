@@ -101,8 +101,8 @@ contract BaseTest is Test {
         delayedWETH = DelayedWETH(payable(address(delayedWETHProxy)));
 
         // Deploy the verifiers
-        teeVerifier = new MockVerifier();
-        zkVerifier = new MockVerifier();
+        teeVerifier = new MockVerifier(IAnchorStateRegistry(address(anchorStateRegistry)));
+        zkVerifier = new MockVerifier(IAnchorStateRegistry(address(anchorStateRegistry)));
     }
 
     function _initializeProxies() internal {

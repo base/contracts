@@ -9,7 +9,9 @@ import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 import {
     INitroEnclaveVerifier
 } from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
+import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 
+import { MockAnchorStateRegistry } from "scripts/multiproof/mocks/MockAnchorStateRegistry.sol";
 import { DevSystemConfigGlobal } from "src/multiproof/mocks/MockDevSystemConfigGlobal.sol";
 import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
@@ -18,6 +20,7 @@ contract TEEVerifierTest is Test {
     TEEVerifier public verifier;
     DevSystemConfigGlobal public systemConfigGlobal;
     ProxyAdmin public proxyAdmin;
+    MockAnchorStateRegistry public anchorStateRegistry;
 
     // Test signer - we'll derive address from private key
     uint256 internal constant SIGNER_PRIVATE_KEY = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
@@ -55,7 +58,10 @@ contract TEEVerifierTest is Test {
         systemConfigGlobal.setProposer(PROPOSER, true);
 
         // Deploy TEEVerifier
-        verifier = new TEEVerifier(SystemConfigGlobal(address(systemConfigGlobal)));
+        anchorStateRegistry = new MockAnchorStateRegistry();
+        verifier = new TEEVerifier(
+            SystemConfigGlobal(address(systemConfigGlobal)), IAnchorStateRegistry(address(anchorStateRegistry))
+        );
     }
 
     function testVerifyValidSignature() public view {
