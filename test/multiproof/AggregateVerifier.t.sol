@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import { BadExtraData } from "src/dispute/lib/Errors.sol";
+import { BadExtraData, GameNotResolved } from "src/dispute/lib/Errors.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
@@ -34,7 +34,7 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(
             game.extraData(), abi.encodePacked(currentL2BlockNumber, type(uint32).max, game.intermediateOutputRoots())
         );
-        assertEq(game.bondRecipient(), address(0));
+        assertEq(game.bondRecipient(), TEE_PROVER);
         assertEq(anchorStateRegistry.isGameProper(IDisputeGame(address(game))), true);
         assertEq(delayedWETH.balanceOf(address(game)), INIT_BOND);
         assertEq(game.proofCount(), 1);
@@ -87,8 +87,8 @@ contract AggregateVerifierTest is BaseTest {
         AggregateVerifier game =
             _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof);
 
-        // Cannot claim bond before resolving
-        vm.expectRevert(AggregateVerifier.BondRecipientEmpty.selector);
+        // Cannot claim bond before game is over
+        vm.expectRevert(GameNotResolved.selector);
         game.claimCredit();
 
         // Resolve after 7 days
@@ -120,6 +120,11 @@ contract AggregateVerifierTest is BaseTest {
         AggregateVerifier game =
             _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof);
 
+        // Resolve after 7 days
+        vm.warp(block.timestamp + 7 days);
+        game.resolve();
+        assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
+
         // Unlock and reclaim bond after delay
         uint256 balanceBefore = game.gameCreator().balance;
         game.claimCredit();
@@ -127,11 +132,6 @@ contract AggregateVerifierTest is BaseTest {
         game.claimCredit();
         assertEq(game.gameCreator().balance, balanceBefore + INIT_BOND);
         assertEq(delayedWETH.balanceOf(address(game)), 0);
-
-        // Resolve after another 7 days
-        vm.warp(block.timestamp + 7 days);
-        game.resolve();
-        assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
 
         // Update AnchorStateRegistry
         vm.warp(block.timestamp + 1);
@@ -153,11 +153,7 @@ contract AggregateVerifierTest is BaseTest {
         _provideProof(game, ZK_PROVER, zkProof);
         assertEq(game.proofCount(), 2);
 
-        // Unlock bond
-        uint256 balanceBefore = game.gameCreator().balance;
-        game.claimCredit();
-
-        // Resolve after 1 day
+        // Resolve after 1 day (FAST_FINALIZATION_DELAY with 2 proofs)
         vm.warp(block.timestamp + 1 days);
         game.resolve();
         assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
@@ -170,6 +166,8 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(l2SequenceNumber, currentL2BlockNumber);
 
         // Unlock and reclaim bond after delay
+        uint256 balanceBefore = game.gameCreator().balance;
+        game.claimCredit();
         vm.warp(block.timestamp + DELAYED_WETH_DELAY);
         game.claimCredit();
         assertEq(game.gameCreator().balance, balanceBefore + INIT_BOND);

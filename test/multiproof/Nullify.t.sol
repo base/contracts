@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
-import { GameNotInProgress } from "src/dispute/lib/Errors.sol";
+import { ClaimAlreadyResolved } from "src/dispute/lib/Errors.sol";
 import { Claim, GameStatus } from "src/dispute/lib/Types.sol";
 
 import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
@@ -28,6 +28,9 @@ contract NullifyTest is BaseTest {
         assertEq(game.proofCount(), 0);
         assertEq(game.expectedResolution().raw(), type(uint64).max);
 
+        // expectedResolution is uint64.max (no proofs left), so must wait 14 days from creation
+        vm.warp(block.timestamp + 14 days);
+
         uint256 balanceBefore = game.gameCreator().balance;
         game.claimCredit();
         vm.warp(block.timestamp + DELAYED_WETH_DELAY);
@@ -50,10 +53,13 @@ contract NullifyTest is BaseTest {
 
         game1.nullify(zkProof2, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
 
-        assertEq(uint8(game1.status()), uint8(GameStatus.CHALLENGER_WINS));
+        assertEq(uint8(game1.status()), uint8(GameStatus.IN_PROGRESS));
         assertEq(game1.bondRecipient(), ZK_PROVER);
-        assertEq(game1.proofCount(), -128);
+        assertEq(game1.proofCount(), 0);
         assertEq(game1.expectedResolution().raw(), type(uint64).max);
+
+        // expectedResolution is uint64.max (no proofs left), so must wait 14 days from creation
+        vm.warp(block.timestamp + 14 days);
 
         uint256 balanceBefore = game1.gameCreator().balance;
         game1.claimCredit();
@@ -120,7 +126,7 @@ contract NullifyTest is BaseTest {
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk")));
         bytes memory teeProof2 = _generateProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
 
-        vm.expectRevert(GameNotInProgress.selector);
+        vm.expectRevert(ClaimAlreadyResolved.selector);
         game1.nullify(teeProof2, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
     }
 
@@ -133,23 +139,25 @@ contract NullifyTest is BaseTest {
         AggregateVerifier game1 =
             _createAggregateVerifierGame(TEE_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, teeProof1);
 
-        // Challenge game1
+        // Challenge game1 with ZK proof
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk")));
         bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
 
-        AggregateVerifier game2 =
-            _createAggregateVerifierGame(ZK_PROVER, rootClaim2, currentL2BlockNumber, type(uint32).max, zkProof);
-
-        uint256 challengeIndex = factory.gameCount() - 1;
-        game1.challenge(challengeIndex);
-        assertEq(game1.bondRecipient(), ZK_PROVER);
+        vm.prank(ZK_PROVER);
+        game1.challenge(zkProof, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
 
         // Nullify can override challenge
-        game2.nullify(zkProof, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim1.raw());
+        bytes memory zkProof2 = _generateProof("zk-proof-2", AggregateVerifier.ProofType.ZK);
+        game1.nullify(zkProof2, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim1.raw());
+
+        assertEq(game1.bondRecipient(), TEE_PROVER);
+
+        // After nullify, only TEE proof remains; expectedResolution = now + 7 days
+        vm.warp(block.timestamp + 7 days);
+        game1.resolve();
 
         uint256 balanceBefore = game1.gameCreator().balance;
         game1.claimCredit();
-        assertEq(game1.bondRecipient(), TEE_PROVER);
         vm.warp(block.timestamp + DELAYED_WETH_DELAY);
         game1.claimCredit();
         assertEq(game1.gameCreator().balance, balanceBefore + INIT_BOND);
