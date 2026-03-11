@@ -67,7 +67,7 @@ contract SystemConfigGlobalTest is Test {
     function testInitialization() public view {
         assertEq(systemConfigGlobal.owner(), owner);
         assertEq(systemConfigGlobal.manager(), manager);
-        assertEq(systemConfigGlobal.version(), "0.1.0");
+        assertEq(systemConfigGlobal.version(), "0.2.0");
     }
 
     // ============ PCR0 Registration Tests ============
@@ -394,4 +394,121 @@ contract SystemConfigGlobalTest is Test {
         assertEq(systemConfigGlobal.signerPCR0(signer2), pcr0Hash2);
         assertEq(systemConfigGlobal.signerPCR0(signer3), pcr0Hash3);
     }
+
+    // ============ getRegisteredSigners Tests ============
+
+    function testGetRegisteredSignersEmpty() public view {
+        address[] memory signers = systemConfigGlobal.getRegisteredSigners();
+        assertEq(signers.length, 0);
+    }
+
+    function testGetRegisteredSignersAfterRegister() public {
+        address signer = makeAddr("signer");
+        bytes32 signerPcr0 = keccak256("pcr0");
+
+        vm.prank(owner);
+        systemConfigGlobal.addDevSigner(signer, signerPcr0);
+
+        address[] memory signers = systemConfigGlobal.getRegisteredSigners();
+        assertEq(signers.length, 1);
+        assertEq(signers[0], signer);
+    }
+
+    function testGetRegisteredSignersAfterDeregister() public {
+        address signer = makeAddr("signer");
+        bytes32 signerPcr0 = keccak256("pcr0");
+
+        vm.prank(owner);
+        systemConfigGlobal.addDevSigner(signer, signerPcr0);
+
+        assertEq(systemConfigGlobal.getRegisteredSigners().length, 1);
+
+        vm.prank(owner);
+        systemConfigGlobal.deregisterSigner(signer);
+
+        address[] memory signers = systemConfigGlobal.getRegisteredSigners();
+        assertEq(signers.length, 0);
+    }
+
+    function testGetRegisteredSignersMultiple() public {
+        address signer1 = makeAddr("signer-1");
+        address signer2 = makeAddr("signer-2");
+        address signer3 = makeAddr("signer-3");
+
+        bytes32 sharedPcr0 = keccak256("pcr0");
+
+        vm.startPrank(owner);
+        systemConfigGlobal.addDevSigner(signer1, sharedPcr0);
+        systemConfigGlobal.addDevSigner(signer2, sharedPcr0);
+        systemConfigGlobal.addDevSigner(signer3, sharedPcr0);
+        vm.stopPrank();
+
+        address[] memory signers = systemConfigGlobal.getRegisteredSigners();
+        assertEq(signers.length, 3);
+
+        // Verify all three are present (order not guaranteed)
+        bool foundSigner1;
+        bool foundSigner2;
+        bool foundSigner3;
+        for (uint256 i = 0; i < signers.length; i++) {
+            if (signers[i] == signer1) foundSigner1 = true;
+            if (signers[i] == signer2) foundSigner2 = true;
+            if (signers[i] == signer3) foundSigner3 = true;
+        }
+        assertTrue(foundSigner1);
+        assertTrue(foundSigner2);
+        assertTrue(foundSigner3);
+    }
+
+    function testGetRegisteredSignersConsistencyAfterMixedOperations() public {
+        address signer1 = makeAddr("signer-1");
+        address signer2 = makeAddr("signer-2");
+        address signer3 = makeAddr("signer-3");
+
+        bytes32 sharedPcr0 = keccak256("pcr0");
+
+        // Register three signers
+        vm.startPrank(owner);
+        systemConfigGlobal.addDevSigner(signer1, sharedPcr0);
+        systemConfigGlobal.addDevSigner(signer2, sharedPcr0);
+        systemConfigGlobal.addDevSigner(signer3, sharedPcr0);
+        vm.stopPrank();
+
+        assertEq(systemConfigGlobal.getRegisteredSigners().length, 3);
+
+        // Deregister the middle one
+        vm.prank(manager);
+        systemConfigGlobal.deregisterSigner(signer2);
+
+        address[] memory signers = systemConfigGlobal.getRegisteredSigners();
+        assertEq(signers.length, 2);
+
+        // Mapping and set stay consistent
+        for (uint256 i = 0; i < signers.length; i++) {
+            assertTrue(systemConfigGlobal.isValidSigner(signers[i]));
+            assertNotEq(signers[i], signer2);
+        }
+
+        // Deregistered signer not in mapping either
+        assertFalse(systemConfigGlobal.isValidSigner(signer2));
+        assertEq(systemConfigGlobal.signerPCR0(signer2), bytes32(0));
+    }
+
+    function testGetRegisteredSignersDeregisterIdempotent() public {
+        address signer = makeAddr("signer");
+        bytes32 signerPcr0 = keccak256("pcr0");
+
+        vm.prank(owner);
+        systemConfigGlobal.addDevSigner(signer, signerPcr0);
+
+        vm.prank(owner);
+        systemConfigGlobal.deregisterSigner(signer);
+
+        // Deregistering again should not revert and set should still be empty
+        vm.prank(owner);
+        systemConfigGlobal.deregisterSigner(signer);
+
+        assertEq(systemConfigGlobal.getRegisteredSigners().length, 0);
+    }
+
 }

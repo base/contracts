@@ -11,6 +11,7 @@ import {
 } from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
 import { OwnableManagedUpgradeable } from "lib/op-enclave/contracts/src/OwnableManagedUpgradeable.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
+import { EnumerableSetLib } from "@solady-v0.0.245/utils/EnumerableSetLib.sol";
 
 /// @title SystemConfigGlobal
 /// @notice Manages TEE signer registration via ZK-verified AWS Nitro attestation.
@@ -19,6 +20,7 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 ///      Each signer is associated with the PCR0 (enclave image hash) from their attestation,
 ///      which allows TEEVerifier to validate that a signer was registered with a specific image.
 contract SystemConfigGlobal is OwnableManagedUpgradeable, ISemver {
+    using EnumerableSetLib for EnumerableSetLib.AddressSet;
     /// @notice Maximum age of an attestation document (60 minutes), in seconds.
     uint256 public constant MAX_AGE = 60 minutes;
 
@@ -40,6 +42,11 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, ISemver {
 
     /// @notice Mapping of whether an address is a valid proposer.
     mapping(address => bool) public isValidProposer;
+
+    /// @notice Enumerable set of all currently registered signer addresses.
+    /// @dev Kept in sync with `signerPCR0`: add on register, remove on deregister.
+    ///      Enables O(1) on-chain enumeration via `getRegisteredSigners()`.
+    EnumerableSetLib.AddressSet internal _registeredSigners;
 
     /// @notice Emitted when a signer is registered.
     event SignerRegistered(address indexed signer, bytes32 indexed pcr0);
@@ -128,6 +135,7 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, ISemver {
         address enclaveAddress = address(uint160(uint256(publicKeyHash)));
 
         signerPCR0[enclaveAddress] = pcr0Hash;
+        _registeredSigners.add(enclaveAddress);
         emit SignerRegistered(enclaveAddress, pcr0Hash);
     }
 
@@ -135,6 +143,7 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, ISemver {
     /// @param signer The address of the signer to deregister.
     function deregisterSigner(address signer) external onlyOwnerOrManager {
         delete signerPCR0[signer];
+        _registeredSigners.remove(signer);
         emit SignerDeregistered(signer);
     }
 
@@ -143,6 +152,14 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, ISemver {
     /// @return True if the signer is registered, false otherwise.
     function isValidSigner(address signer) external view returns (bool) {
         return signerPCR0[signer] != bytes32(0);
+    }
+
+    /// @notice Returns all currently registered signer addresses.
+    /// @dev Reads directly from the on-chain enumerable set — no event scanning required.
+    ///      The order of addresses in the returned array is not guaranteed.
+    /// @return An array of all registered signer addresses.
+    function getRegisteredSigners() external view returns (address[] memory) {
+        return _registeredSigners.values();
     }
 
     /// @notice Initializes the contract with owner and manager.
@@ -155,9 +172,9 @@ contract SystemConfigGlobal is OwnableManagedUpgradeable, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.1.0
+    /// @custom:semver 0.2.0
     function version() public pure virtual returns (string memory) {
-        return "0.1.0";
+        return "0.2.0";
     }
 
     /// @dev Finds PCR0 (index 0) in the PCR array and returns its keccak256 hash.
