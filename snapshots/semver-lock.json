@@ -240,7 +240,7 @@
     "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0xc3866b1d4515c9d7b0ac6679b182d836f79371402d9e649e301b24cf8ae8fade",
+    "initCodeHash": "0xe28eaeecda21594f6db23bb70127daa2b7b71debe38ce65b598f28d78d2561eb",
     "sourceCodeHash": "0x3a079ea52a26c8c38fb0cb3e9a9ff6ec9648cf83786b65c0fc1161e949b8f7e0"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
@@ -248,7 +248,7 @@
     "sourceCodeHash": "0x3a079ea52a26c8c38fb0cb3e9a9ff6ec9648cf83786b65c0fc1161e949b8f7e0"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
-    "initCodeHash": "0xee219c003a6af440b447e214e43d520e802001ae3d557262a7921ca3d57ebddf",
+    "initCodeHash": "0x8ae045f0121d2c63ab6f0a830be842aaf0445096bfabe29d85cfd9bd38b40565",
     "sourceCodeHash": "0xe350108585e0855f10bac20d0e8894b3de9afe3be413908b4c59a1036e7a9842"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal:dispute": {
