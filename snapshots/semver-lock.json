@@ -244,7 +244,7 @@
     "sourceCodeHash": "0x3a079ea52a26c8c38fb0cb3e9a9ff6ec9648cf83786b65c0fc1161e949b8f7e0"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
-    "initCodeHash": "0xe28eaeecda21594f6db23bb70127daa2b7b71debe38ce65b598f28d78d2561eb",
+    "initCodeHash": "0xc59c62a455533735aa9337d2db88b255713bd4dde20d3345265ec2fafe62af70",
     "sourceCodeHash": "0x3a079ea52a26c8c38fb0cb3e9a9ff6ec9648cf83786b65c0fc1161e949b8f7e0"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal": {
@@ -252,7 +252,7 @@
     "sourceCodeHash": "0xe350108585e0855f10bac20d0e8894b3de9afe3be413908b4c59a1036e7a9842"
   },
   "src/multiproof/tee/SystemConfigGlobal.sol:SystemConfigGlobal:dispute": {
-    "initCodeHash": "0x8ae045f0121d2c63ab6f0a830be842aaf0445096bfabe29d85cfd9bd38b40565",
+    "initCodeHash": "0xfae3a71157f3c64a7bda037ec116bf6e7265099397d9bcad22c01cc1f029ed7d",
     "sourceCodeHash": "0xe350108585e0855f10bac20d0e8894b3de9afe3be413908b4c59a1036e7a9842"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
@@ -260,7 +260,7 @@
     "sourceCodeHash": "0x87b0ad3f68294d64b584e54cc719cc3be0624cbab2940a0a341c502dcc69b4fc"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier:dispute": {
-    "initCodeHash": "0x090330a5c64206b523fd5d9e199269268131035c62ff9eb518247a9024c4b703",
+    "initCodeHash": "0x78317d9088a26523d938ce0d88ed0134abc60292c0cdb3f8a6a9530638fd9e9a",
     "sourceCodeHash": "0x87b0ad3f68294d64b584e54cc719cc3be0624cbab2940a0a341c502dcc69b4fc"
   },
   "src/revenue-share/FeeDisburser.sol:FeeDisburser": {
