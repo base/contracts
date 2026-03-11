@@ -510,5 +510,4 @@ contract SystemConfigGlobalTest is Test {
 
         assertEq(systemConfigGlobal.getRegisteredSigners().length, 0);
     }
-
 }
