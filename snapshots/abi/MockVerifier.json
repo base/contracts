@@ -2,6 +2,50 @@
   {
     "inputs": [
       {
+        "internalType": "contract IAnchorStateRegistry",
+        "name": "anchorStateRegistry",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "ANCHOR_STATE_REGISTRY",
+    "outputs": [
+      {
+        "internalType": "contract IAnchorStateRegistry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nullified",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nullify",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes",
         "name": "",
         "type": "bytes"
@@ -25,7 +69,17 @@
         "type": "bool"
       }
     ],
-    "stateMutability": "pure",
+    "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "NotProperGame",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Nullified",
+    "type": "error"
   }
 ]

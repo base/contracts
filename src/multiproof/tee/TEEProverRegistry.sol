@@ -13,13 +13,13 @@ import { OwnableManagedUpgradeable } from "lib/op-enclave/contracts/src/OwnableM
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { EnumerableSetLib } from "@solady-v0.0.245/utils/EnumerableSetLib.sol";
 
-/// @title SystemConfigGlobal
+/// @title TEEProverRegistry
 /// @notice Manages TEE signer registration via ZK-verified AWS Nitro attestation.
 /// @dev Signers are registered by providing a ZK proof of a valid AWS Nitro attestation document,
 ///      verified through an external NitroEnclaveVerifier contract (Risc0).
 ///      Each signer is associated with the PCR0 (enclave image hash) from their attestation,
 ///      which allows TEEVerifier to validate that a signer was registered with a specific image.
-contract SystemConfigGlobal is OwnableManagedUpgradeable, ISemver {
+contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     using EnumerableSetLib for EnumerableSetLib.AddressSet;
     /// @notice Maximum age of an attestation document (60 minutes), in seconds.
     uint256 public constant MAX_AGE = 60 minutes;

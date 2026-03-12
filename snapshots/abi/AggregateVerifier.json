@@ -55,6 +55,11 @@
         "internalType": "uint256",
         "name": "intermediateBlockInterval",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "proofThreshold",
+        "type": "uint256"
       }
     ],
     "stateMutability": "nonpayable",
@@ -180,6 +185,19 @@
   {
     "inputs": [],
     "name": "L2_CHAIN_ID",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "PROOF_THRESHOLD",
     "outputs": [
       {
         "internalType": "uint256",
@@ -323,9 +341,19 @@
   {
     "inputs": [
       {
+        "internalType": "bytes",
+        "name": "proofBytes",
+        "type": "bytes"
+      },
+      {
         "internalType": "uint256",
-        "name": "gameIndex",
+        "name": "intermediateRootIndex",
         "type": "uint256"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "intermediateRootToProve",
+        "type": "bytes32"
       }
     ],
     "name": "challenge",
@@ -349,12 +377,12 @@
   },
   {
     "inputs": [],
-    "name": "counteredByGameAddress",
+    "name": "counteredByIntermediateRootIndexPlusOne",
     "outputs": [
       {
-        "internalType": "address",
+        "internalType": "uint256",
         "name": "",
-        "type": "address"
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -583,6 +611,19 @@
   },
   {
     "inputs": [],
+    "name": "proofCount",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "resolve",
     "outputs": [
       {
@@ -753,9 +794,9 @@
       },
       {
         "indexed": false,
-        "internalType": "contract IDisputeGame",
-        "name": "game",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "intermediateRootIndex",
+        "type": "uint256"
       }
     ],
     "name": "Challenged",
@@ -855,22 +896,12 @@
   },
   {
     "inputs": [],
-    "name": "BondRecipientEmpty",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "BondTransferFailed",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "ClaimAlreadyResolved",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "CounteredByGameNotResolved",
     "type": "error"
   },
   {
@@ -942,11 +973,6 @@
   },
   {
     "inputs": [],
-    "name": "InvalidCounteredByGame",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "InvalidGame",
     "type": "error"
   },
@@ -963,6 +989,11 @@
   {
     "inputs": [],
     "name": "InvalidProof",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidProofThreshold",
     "type": "error"
   },
   {
@@ -1036,7 +1067,7 @@
   },
   {
     "inputs": [],
-    "name": "NoProofProvided",
+    "name": "NotEnoughProofs",
     "type": "error"
   },
   {

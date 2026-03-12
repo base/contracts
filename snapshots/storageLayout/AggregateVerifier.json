@@ -70,11 +70,11 @@
     "type": "uint256"
   },
   {
-    "bytes": "20",
-    "label": "counteredByGameAddress",
+    "bytes": "32",
+    "label": "counteredByIntermediateRootIndexPlusOne",
     "offset": 0,
     "slot": "5",
-    "type": "address"
+    "type": "uint256"
   },
   {
     "bytes": "32",
@@ -89,5 +89,12 @@
     "offset": 0,
     "slot": "7",
     "type": "Timestamp"
+  },
+  {
+    "bytes": "1",
+    "label": "proofCount",
+    "offset": 8,
+    "slot": "7",
+    "type": "uint8"
   }
 ]

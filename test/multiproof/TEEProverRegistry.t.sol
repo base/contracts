@@ -10,19 +10,19 @@ import {
     INitroEnclaveVerifier
 } from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
 
-import { DevSystemConfigGlobal } from "src/multiproof/mocks/MockDevSystemConfigGlobal.sol";
-import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
+import { DevTEEProverRegistry } from "src/multiproof/mocks/MockDevTEEProverRegistry.sol";
+import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 
-/// @notice Tests for SystemConfigGlobal and DevSystemConfigGlobal contracts.
-/// @dev IMPORTANT: This test file uses DevSystemConfigGlobal as the implementation because
-/// registering signers on the production SystemConfigGlobal requires a ZK proof of a valid
-/// AWS Nitro attestation, which cannot be generated in a test environment. DevSystemConfigGlobal extends
-/// SystemConfigGlobal with an `addDevSigner` function that bypasses attestation verification,
-/// allowing us to test all signer-related functionality. All tests for base SystemConfigGlobal
+/// @notice Tests for TEEProverRegistry and DevTEEProverRegistry contracts.
+/// @dev IMPORTANT: This test file uses DevTEEProverRegistry as the implementation because
+/// registering signers on the production TEEProverRegistry requires a ZK proof of a valid
+/// AWS Nitro attestation, which cannot be generated in a test environment. DevTEEProverRegistry extends
+/// TEEProverRegistry with an `addDevSigner` function that bypasses attestation verification,
+/// allowing us to test all signer-related functionality. All tests for base TEEProverRegistry
 /// functionality (PCR0 management, ownership, proposer, etc.) are equally valid since
-/// DevSystemConfigGlobal inherits from SystemConfigGlobal without modifying those functions.
-contract SystemConfigGlobalTest is Test {
-    DevSystemConfigGlobal public systemConfigGlobal;
+/// DevTEEProverRegistry inherits from TEEProverRegistry without modifying those functions.
+contract TEEProverRegistryTest is Test {
+    DevTEEProverRegistry public teeProverRegistry;
     ProxyAdmin public proxyAdmin;
 
     address public owner;
@@ -47,27 +47,27 @@ contract SystemConfigGlobalTest is Test {
 
         pcr0Hash = keccak256(TEST_PCR0);
 
-        // Deploy implementation (using DevSystemConfigGlobal for test flexibility)
+        // Deploy implementation (using DevTEEProverRegistry for test flexibility)
         // NitroEnclaveVerifier is not needed since tests use addDevSigner(), so pass address(0).
-        DevSystemConfigGlobal impl = new DevSystemConfigGlobal(INitroEnclaveVerifier(address(0)));
+        DevTEEProverRegistry impl = new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)));
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));
 
         // Deploy proxy
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(impl), address(proxyAdmin), abi.encodeCall(SystemConfigGlobal.initialize, (owner, manager))
+            address(impl), address(proxyAdmin), abi.encodeCall(TEEProverRegistry.initialize, (owner, manager))
         );
 
-        systemConfigGlobal = DevSystemConfigGlobal(address(proxy));
+        teeProverRegistry = DevTEEProverRegistry(address(proxy));
     }
 
     // ============ Initialization Tests ============
 
     function testInitialization() public view {
-        assertEq(systemConfigGlobal.owner(), owner);
-        assertEq(systemConfigGlobal.manager(), manager);
-        assertEq(systemConfigGlobal.version(), "0.2.0");
+        assertEq(teeProverRegistry.owner(), owner);
+        assertEq(teeProverRegistry.manager(), manager);
+        assertEq(teeProverRegistry.version(), "0.2.0");
     }
 
     // ============ PCR0 Registration Tests ============
@@ -77,44 +77,44 @@ contract SystemConfigGlobalTest is Test {
         emit PCR0Registered(pcr0Hash);
 
         vm.prank(owner);
-        systemConfigGlobal.registerPCR0(TEST_PCR0);
+        teeProverRegistry.registerPCR0(TEST_PCR0);
 
-        assertTrue(systemConfigGlobal.validPCR0s(pcr0Hash));
+        assertTrue(teeProverRegistry.validPCR0s(pcr0Hash));
     }
 
     function testRegisterPCR0FailsIfNotOwner() public {
         vm.prank(manager);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        systemConfigGlobal.registerPCR0(TEST_PCR0);
+        teeProverRegistry.registerPCR0(TEST_PCR0);
 
         vm.prank(unauthorized);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        systemConfigGlobal.registerPCR0(TEST_PCR0);
+        teeProverRegistry.registerPCR0(TEST_PCR0);
     }
 
     function testDeregisterPCR0() public {
         // First register
         vm.prank(owner);
-        systemConfigGlobal.registerPCR0(TEST_PCR0);
-        assertTrue(systemConfigGlobal.validPCR0s(pcr0Hash));
+        teeProverRegistry.registerPCR0(TEST_PCR0);
+        assertTrue(teeProverRegistry.validPCR0s(pcr0Hash));
 
         // Then deregister
         vm.expectEmit(true, false, false, false);
         emit PCR0Deregistered(pcr0Hash);
 
         vm.prank(owner);
-        systemConfigGlobal.deregisterPCR0(TEST_PCR0);
+        teeProverRegistry.deregisterPCR0(TEST_PCR0);
 
-        assertFalse(systemConfigGlobal.validPCR0s(pcr0Hash));
+        assertFalse(teeProverRegistry.validPCR0s(pcr0Hash));
     }
 
     function testDeregisterPCR0FailsIfNotOwner() public {
         vm.prank(owner);
-        systemConfigGlobal.registerPCR0(TEST_PCR0);
+        teeProverRegistry.registerPCR0(TEST_PCR0);
 
         vm.prank(manager);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        systemConfigGlobal.deregisterPCR0(TEST_PCR0);
+        teeProverRegistry.deregisterPCR0(TEST_PCR0);
     }
 
     // ============ Signer Deregistration Tests ============
@@ -123,38 +123,38 @@ contract SystemConfigGlobalTest is Test {
         address signer = makeAddr("signer");
         bytes32 signerPcr0 = keccak256("signer-pcr0");
 
-        // Add signer via DevSystemConfigGlobal
+        // Add signer via DevTEEProverRegistry
         vm.prank(owner);
-        systemConfigGlobal.addDevSigner(signer, signerPcr0);
+        teeProverRegistry.addDevSigner(signer, signerPcr0);
 
         // Verify signer is registered
-        assertTrue(systemConfigGlobal.isValidSigner(signer));
+        assertTrue(teeProverRegistry.isValidSigner(signer));
 
         // Deregister as owner
         vm.expectEmit(true, false, false, false);
         emit SignerDeregistered(signer);
 
         vm.prank(owner);
-        systemConfigGlobal.deregisterSigner(signer);
+        teeProverRegistry.deregisterSigner(signer);
 
-        assertFalse(systemConfigGlobal.isValidSigner(signer));
-        assertEq(systemConfigGlobal.signerPCR0(signer), bytes32(0));
+        assertFalse(teeProverRegistry.isValidSigner(signer));
+        assertEq(teeProverRegistry.signerPCR0(signer), bytes32(0));
     }
 
     function testDeregisterSignerAsManager() public {
         address signer = makeAddr("signer");
         bytes32 signerPcr0 = keccak256("signer-pcr0");
 
-        // Add signer via DevSystemConfigGlobal
+        // Add signer via DevTEEProverRegistry
         vm.prank(owner);
-        systemConfigGlobal.addDevSigner(signer, signerPcr0);
+        teeProverRegistry.addDevSigner(signer, signerPcr0);
 
-        assertTrue(systemConfigGlobal.isValidSigner(signer));
+        assertTrue(teeProverRegistry.isValidSigner(signer));
 
         vm.prank(manager);
-        systemConfigGlobal.deregisterSigner(signer);
+        teeProverRegistry.deregisterSigner(signer);
 
-        assertFalse(systemConfigGlobal.isValidSigner(signer));
+        assertFalse(teeProverRegistry.isValidSigner(signer));
     }
 
     function testDeregisterSignerFailsIfUnauthorized() public {
@@ -162,7 +162,7 @@ contract SystemConfigGlobalTest is Test {
 
         vm.prank(unauthorized);
         vm.expectRevert("OwnableManaged: caller is not the owner or the manager");
-        systemConfigGlobal.deregisterSigner(signer);
+        teeProverRegistry.deregisterSigner(signer);
     }
 
     // ============ Proposer Tests ============
@@ -174,9 +174,9 @@ contract SystemConfigGlobalTest is Test {
         emit ProposerSet(newProposer, true);
 
         vm.prank(owner);
-        systemConfigGlobal.setProposer(newProposer, true);
+        teeProverRegistry.setProposer(newProposer, true);
 
-        assertTrue(systemConfigGlobal.isValidProposer(newProposer));
+        assertTrue(teeProverRegistry.isValidProposer(newProposer));
     }
 
     function testSetProposerFailsIfNotOwner() public {
@@ -184,18 +184,18 @@ contract SystemConfigGlobalTest is Test {
 
         vm.prank(manager);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        systemConfigGlobal.setProposer(newProposer, true);
+        teeProverRegistry.setProposer(newProposer, true);
 
         vm.prank(unauthorized);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        systemConfigGlobal.setProposer(newProposer, true);
+        teeProverRegistry.setProposer(newProposer, true);
     }
 
     // ============ isValidSigner Tests ============
 
     function testIsValidSignerReturnsFalseForUnregistered() public {
         address unregistered = makeAddr("unregistered");
-        assertFalse(systemConfigGlobal.isValidSigner(unregistered));
+        assertFalse(teeProverRegistry.isValidSigner(unregistered));
     }
 
     function testIsValidSignerReturnsTrueForRegistered() public {
@@ -203,16 +203,16 @@ contract SystemConfigGlobalTest is Test {
         bytes32 signerPcr0 = keccak256("signer-pcr0");
 
         vm.prank(owner);
-        systemConfigGlobal.addDevSigner(signer, signerPcr0);
+        teeProverRegistry.addDevSigner(signer, signerPcr0);
 
-        assertTrue(systemConfigGlobal.isValidSigner(signer));
+        assertTrue(teeProverRegistry.isValidSigner(signer));
     }
 
     // ============ signerPCR0 Tests ============
 
     function testSignerPCR0ReturnsZeroForUnregistered() public {
         address unregistered = makeAddr("unregistered");
-        assertEq(systemConfigGlobal.signerPCR0(unregistered), bytes32(0));
+        assertEq(teeProverRegistry.signerPCR0(unregistered), bytes32(0));
     }
 
     function testSignerPCR0ReturnsCorrectValue() public {
@@ -220,15 +220,15 @@ contract SystemConfigGlobalTest is Test {
         bytes32 expectedPcr0 = keccak256("signer-pcr0");
 
         vm.prank(owner);
-        systemConfigGlobal.addDevSigner(signer, expectedPcr0);
+        teeProverRegistry.addDevSigner(signer, expectedPcr0);
 
-        assertEq(systemConfigGlobal.signerPCR0(signer), expectedPcr0);
+        assertEq(teeProverRegistry.signerPCR0(signer), expectedPcr0);
     }
 
     // ============ MAX_AGE Tests ============
 
     function testMaxAgeConstant() public view {
-        assertEq(systemConfigGlobal.MAX_AGE(), 60 minutes);
+        assertEq(teeProverRegistry.MAX_AGE(), 60 minutes);
     }
 
     // ============ Ownership Transfer Tests ============
@@ -237,9 +237,9 @@ contract SystemConfigGlobalTest is Test {
         address newOwner = makeAddr("newOwner");
 
         vm.prank(owner);
-        systemConfigGlobal.transferOwnership(newOwner);
+        teeProverRegistry.transferOwnership(newOwner);
 
-        assertEq(systemConfigGlobal.owner(), newOwner);
+        assertEq(teeProverRegistry.owner(), newOwner);
     }
 
     function testTransferOwnershipFailsIfNotOwner() public {
@@ -247,17 +247,17 @@ contract SystemConfigGlobalTest is Test {
 
         vm.prank(manager);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        systemConfigGlobal.transferOwnership(newOwner);
+        teeProverRegistry.transferOwnership(newOwner);
 
         vm.prank(unauthorized);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        systemConfigGlobal.transferOwnership(newOwner);
+        teeProverRegistry.transferOwnership(newOwner);
     }
 
     function testTransferOwnershipFailsForZeroAddress() public {
         vm.prank(owner);
         vm.expectRevert("OwnableManaged: new owner is the zero address");
-        systemConfigGlobal.transferOwnership(address(0));
+        teeProverRegistry.transferOwnership(address(0));
     }
 
     // ============ Management Transfer Tests ============
@@ -266,18 +266,18 @@ contract SystemConfigGlobalTest is Test {
         address newManager = makeAddr("newManager");
 
         vm.prank(owner);
-        systemConfigGlobal.transferManagement(newManager);
+        teeProverRegistry.transferManagement(newManager);
 
-        assertEq(systemConfigGlobal.manager(), newManager);
+        assertEq(teeProverRegistry.manager(), newManager);
     }
 
     function testTransferManagementAsManager() public {
         address newManager = makeAddr("newManager");
 
         vm.prank(manager);
-        systemConfigGlobal.transferManagement(newManager);
+        teeProverRegistry.transferManagement(newManager);
 
-        assertEq(systemConfigGlobal.manager(), newManager);
+        assertEq(teeProverRegistry.manager(), newManager);
     }
 
     function testTransferManagementFailsIfUnauthorized() public {
@@ -285,39 +285,39 @@ contract SystemConfigGlobalTest is Test {
 
         vm.prank(unauthorized);
         vm.expectRevert("OwnableManaged: caller is not the owner or the manager");
-        systemConfigGlobal.transferManagement(newManager);
+        teeProverRegistry.transferManagement(newManager);
     }
 
     function testTransferManagementFailsForZeroAddress() public {
         vm.prank(owner);
         vm.expectRevert("OwnableManaged: new manager is the zero address");
-        systemConfigGlobal.transferManagement(address(0));
+        teeProverRegistry.transferManagement(address(0));
     }
 
     // ============ Renounce Tests ============
 
     function testRenounceOwnership() public {
         vm.prank(owner);
-        systemConfigGlobal.renounceOwnership();
+        teeProverRegistry.renounceOwnership();
 
-        assertEq(systemConfigGlobal.owner(), address(0));
+        assertEq(teeProverRegistry.owner(), address(0));
     }
 
     function testRenounceManagementAsOwner() public {
         vm.prank(owner);
-        systemConfigGlobal.renounceManagement();
+        teeProverRegistry.renounceManagement();
 
-        assertEq(systemConfigGlobal.manager(), address(0));
+        assertEq(teeProverRegistry.manager(), address(0));
     }
 
     function testRenounceManagementAsManager() public {
         vm.prank(manager);
-        systemConfigGlobal.renounceManagement();
+        teeProverRegistry.renounceManagement();
 
-        assertEq(systemConfigGlobal.manager(), address(0));
+        assertEq(teeProverRegistry.manager(), address(0));
     }
 
-    // ============ DevSystemConfigGlobal: addDevSigner Tests ============
+    // ============ DevTEEProverRegistry: addDevSigner Tests ============
 
     function testAddDevSigner() public {
         address signer = makeAddr("dev-signer");
@@ -327,10 +327,10 @@ contract SystemConfigGlobalTest is Test {
         emit SignerRegistered(signer, devPcr0Hash);
 
         vm.prank(owner);
-        systemConfigGlobal.addDevSigner(signer, devPcr0Hash);
+        teeProverRegistry.addDevSigner(signer, devPcr0Hash);
 
-        assertTrue(systemConfigGlobal.isValidSigner(signer));
-        assertEq(systemConfigGlobal.signerPCR0(signer), devPcr0Hash);
+        assertTrue(teeProverRegistry.isValidSigner(signer));
+        assertEq(teeProverRegistry.signerPCR0(signer), devPcr0Hash);
     }
 
     function testAddDevSignerFailsIfNotOwner() public {
@@ -339,11 +339,11 @@ contract SystemConfigGlobalTest is Test {
 
         vm.prank(manager);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        systemConfigGlobal.addDevSigner(signer, devPcr0Hash);
+        teeProverRegistry.addDevSigner(signer, devPcr0Hash);
 
         vm.prank(unauthorized);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        systemConfigGlobal.addDevSigner(signer, devPcr0Hash);
+        teeProverRegistry.addDevSigner(signer, devPcr0Hash);
     }
 
     function testAddDevSignerCanOverwriteExisting() public {
@@ -352,23 +352,23 @@ contract SystemConfigGlobalTest is Test {
         bytes32 secondPcr0 = keccak256("second-pcr0");
 
         vm.prank(owner);
-        systemConfigGlobal.addDevSigner(signer, firstPcr0);
-        assertEq(systemConfigGlobal.signerPCR0(signer), firstPcr0);
+        teeProverRegistry.addDevSigner(signer, firstPcr0);
+        assertEq(teeProverRegistry.signerPCR0(signer), firstPcr0);
 
         vm.prank(owner);
-        systemConfigGlobal.addDevSigner(signer, secondPcr0);
-        assertEq(systemConfigGlobal.signerPCR0(signer), secondPcr0);
+        teeProverRegistry.addDevSigner(signer, secondPcr0);
+        assertEq(teeProverRegistry.signerPCR0(signer), secondPcr0);
     }
 
     function testAddDevSignerWithZeroPcr0() public {
         address signer = makeAddr("dev-signer");
 
         vm.prank(owner);
-        systemConfigGlobal.addDevSigner(signer, bytes32(0));
+        teeProverRegistry.addDevSigner(signer, bytes32(0));
 
         // Signer should not be valid because PCR0 is zero
-        assertFalse(systemConfigGlobal.isValidSigner(signer));
-        assertEq(systemConfigGlobal.signerPCR0(signer), bytes32(0));
+        assertFalse(teeProverRegistry.isValidSigner(signer));
+        assertEq(teeProverRegistry.signerPCR0(signer), bytes32(0));
     }
 
     function testAddMultipleDevSigners() public {
@@ -381,24 +381,24 @@ contract SystemConfigGlobalTest is Test {
         bytes32 pcr0Hash3 = keccak256("pcr0-3");
 
         vm.startPrank(owner);
-        systemConfigGlobal.addDevSigner(signer1, pcr0Hash1);
-        systemConfigGlobal.addDevSigner(signer2, pcr0Hash2);
-        systemConfigGlobal.addDevSigner(signer3, pcr0Hash3);
+        teeProverRegistry.addDevSigner(signer1, pcr0Hash1);
+        teeProverRegistry.addDevSigner(signer2, pcr0Hash2);
+        teeProverRegistry.addDevSigner(signer3, pcr0Hash3);
         vm.stopPrank();
 
-        assertTrue(systemConfigGlobal.isValidSigner(signer1));
-        assertTrue(systemConfigGlobal.isValidSigner(signer2));
-        assertTrue(systemConfigGlobal.isValidSigner(signer3));
+        assertTrue(teeProverRegistry.isValidSigner(signer1));
+        assertTrue(teeProverRegistry.isValidSigner(signer2));
+        assertTrue(teeProverRegistry.isValidSigner(signer3));
 
-        assertEq(systemConfigGlobal.signerPCR0(signer1), pcr0Hash1);
-        assertEq(systemConfigGlobal.signerPCR0(signer2), pcr0Hash2);
-        assertEq(systemConfigGlobal.signerPCR0(signer3), pcr0Hash3);
+        assertEq(teeProverRegistry.signerPCR0(signer1), pcr0Hash1);
+        assertEq(teeProverRegistry.signerPCR0(signer2), pcr0Hash2);
+        assertEq(teeProverRegistry.signerPCR0(signer3), pcr0Hash3);
     }
 
     // ============ getRegisteredSigners Tests ============
 
     function testGetRegisteredSignersEmpty() public view {
-        address[] memory signers = systemConfigGlobal.getRegisteredSigners();
+        address[] memory signers = teeProverRegistry.getRegisteredSigners();
         assertEq(signers.length, 0);
     }
 
@@ -407,9 +407,9 @@ contract SystemConfigGlobalTest is Test {
         bytes32 signerPcr0 = keccak256("pcr0");
 
         vm.prank(owner);
-        systemConfigGlobal.addDevSigner(signer, signerPcr0);
+        teeProverRegistry.addDevSigner(signer, signerPcr0);
 
-        address[] memory signers = systemConfigGlobal.getRegisteredSigners();
+        address[] memory signers = teeProverRegistry.getRegisteredSigners();
         assertEq(signers.length, 1);
         assertEq(signers[0], signer);
     }
@@ -419,14 +419,14 @@ contract SystemConfigGlobalTest is Test {
         bytes32 signerPcr0 = keccak256("pcr0");
 
         vm.prank(owner);
-        systemConfigGlobal.addDevSigner(signer, signerPcr0);
+        teeProverRegistry.addDevSigner(signer, signerPcr0);
 
-        assertEq(systemConfigGlobal.getRegisteredSigners().length, 1);
+        assertEq(teeProverRegistry.getRegisteredSigners().length, 1);
 
         vm.prank(owner);
-        systemConfigGlobal.deregisterSigner(signer);
+        teeProverRegistry.deregisterSigner(signer);
 
-        address[] memory signers = systemConfigGlobal.getRegisteredSigners();
+        address[] memory signers = teeProverRegistry.getRegisteredSigners();
         assertEq(signers.length, 0);
     }
 
@@ -438,12 +438,12 @@ contract SystemConfigGlobalTest is Test {
         bytes32 sharedPcr0 = keccak256("pcr0");
 
         vm.startPrank(owner);
-        systemConfigGlobal.addDevSigner(signer1, sharedPcr0);
-        systemConfigGlobal.addDevSigner(signer2, sharedPcr0);
-        systemConfigGlobal.addDevSigner(signer3, sharedPcr0);
+        teeProverRegistry.addDevSigner(signer1, sharedPcr0);
+        teeProverRegistry.addDevSigner(signer2, sharedPcr0);
+        teeProverRegistry.addDevSigner(signer3, sharedPcr0);
         vm.stopPrank();
 
-        address[] memory signers = systemConfigGlobal.getRegisteredSigners();
+        address[] memory signers = teeProverRegistry.getRegisteredSigners();
         assertEq(signers.length, 3);
 
         // Verify all three are present (order not guaranteed)
@@ -469,29 +469,29 @@ contract SystemConfigGlobalTest is Test {
 
         // Register three signers
         vm.startPrank(owner);
-        systemConfigGlobal.addDevSigner(signer1, sharedPcr0);
-        systemConfigGlobal.addDevSigner(signer2, sharedPcr0);
-        systemConfigGlobal.addDevSigner(signer3, sharedPcr0);
+        teeProverRegistry.addDevSigner(signer1, sharedPcr0);
+        teeProverRegistry.addDevSigner(signer2, sharedPcr0);
+        teeProverRegistry.addDevSigner(signer3, sharedPcr0);
         vm.stopPrank();
 
-        assertEq(systemConfigGlobal.getRegisteredSigners().length, 3);
+        assertEq(teeProverRegistry.getRegisteredSigners().length, 3);
 
         // Deregister the middle one
         vm.prank(manager);
-        systemConfigGlobal.deregisterSigner(signer2);
+        teeProverRegistry.deregisterSigner(signer2);
 
-        address[] memory signers = systemConfigGlobal.getRegisteredSigners();
+        address[] memory signers = teeProverRegistry.getRegisteredSigners();
         assertEq(signers.length, 2);
 
         // Mapping and set stay consistent
         for (uint256 i = 0; i < signers.length; i++) {
-            assertTrue(systemConfigGlobal.isValidSigner(signers[i]));
+            assertTrue(teeProverRegistry.isValidSigner(signers[i]));
             assertNotEq(signers[i], signer2);
         }
 
         // Deregistered signer not in mapping either
-        assertFalse(systemConfigGlobal.isValidSigner(signer2));
-        assertEq(systemConfigGlobal.signerPCR0(signer2), bytes32(0));
+        assertFalse(teeProverRegistry.isValidSigner(signer2));
+        assertEq(teeProverRegistry.signerPCR0(signer2), bytes32(0));
     }
 
     function testGetRegisteredSignersDeregisterIdempotent() public {
@@ -499,15 +499,15 @@ contract SystemConfigGlobalTest is Test {
         bytes32 signerPcr0 = keccak256("pcr0");
 
         vm.prank(owner);
-        systemConfigGlobal.addDevSigner(signer, signerPcr0);
+        teeProverRegistry.addDevSigner(signer, signerPcr0);
 
         vm.prank(owner);
-        systemConfigGlobal.deregisterSigner(signer);
+        teeProverRegistry.deregisterSigner(signer);
 
         // Deregistering again should not revert and set should still be empty
         vm.prank(owner);
-        systemConfigGlobal.deregisterSigner(signer);
+        teeProverRegistry.deregisterSigner(signer);
 
-        assertEq(systemConfigGlobal.getRegisteredSigners().length, 0);
+        assertEq(teeProverRegistry.getRegisteredSigners().length, 0);
     }
 }

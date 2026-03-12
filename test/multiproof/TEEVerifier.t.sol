@@ -12,13 +12,13 @@ import {
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 
 import { MockAnchorStateRegistry } from "scripts/multiproof/mocks/MockAnchorStateRegistry.sol";
-import { DevSystemConfigGlobal } from "src/multiproof/mocks/MockDevSystemConfigGlobal.sol";
-import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
+import { DevTEEProverRegistry } from "src/multiproof/mocks/MockDevTEEProverRegistry.sol";
+import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
 
 contract TEEVerifierTest is Test {
     TEEVerifier public verifier;
-    DevSystemConfigGlobal public systemConfigGlobal;
+    DevTEEProverRegistry public teeProverRegistry;
     ProxyAdmin public proxyAdmin;
     MockAnchorStateRegistry public anchorStateRegistry;
 
@@ -39,28 +39,28 @@ contract TEEVerifierTest is Test {
         signerAddress = vm.addr(SIGNER_PRIVATE_KEY);
 
         // Deploy implementation (NitroEnclaveVerifier not needed for dev signer tests)
-        DevSystemConfigGlobal impl = new DevSystemConfigGlobal(INitroEnclaveVerifier(address(0)));
+        DevTEEProverRegistry impl = new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)));
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));
 
         // Deploy proxy
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(impl), address(proxyAdmin), abi.encodeCall(SystemConfigGlobal.initialize, (owner, owner))
+            address(impl), address(proxyAdmin), abi.encodeCall(TEEProverRegistry.initialize, (owner, owner))
         );
 
-        systemConfigGlobal = DevSystemConfigGlobal(address(proxy));
+        teeProverRegistry = DevTEEProverRegistry(address(proxy));
 
         // Register the signer with PCR0 hash
-        systemConfigGlobal.addDevSigner(signerAddress, PCR0_HASH);
+        teeProverRegistry.addDevSigner(signerAddress, PCR0_HASH);
 
         // Set the proposer as valid
-        systemConfigGlobal.setProposer(PROPOSER, true);
+        teeProverRegistry.setProposer(PROPOSER, true);
 
         // Deploy TEEVerifier
         anchorStateRegistry = new MockAnchorStateRegistry();
         verifier = new TEEVerifier(
-            SystemConfigGlobal(address(systemConfigGlobal)), IAnchorStateRegistry(address(anchorStateRegistry))
+            TEEProverRegistry(address(teeProverRegistry)), IAnchorStateRegistry(address(anchorStateRegistry))
         );
     }
 
@@ -150,6 +150,6 @@ contract TEEVerifierTest is Test {
     }
 
     function testConstants() public view {
-        assertEq(address(verifier.SYSTEM_CONFIG_GLOBAL()), address(systemConfigGlobal));
+        assertEq(address(verifier.TEE_PROVER_REGISTRY()), address(teeProverRegistry));
     }
 }

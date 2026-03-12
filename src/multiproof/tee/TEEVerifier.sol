@@ -6,20 +6,20 @@ import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 
-import { SystemConfigGlobal } from "./SystemConfigGlobal.sol";
+import { TEEProverRegistry } from "./TEEProverRegistry.sol";
 import { Verifier } from "../Verifier.sol";
 
 /// @title TEEVerifier
 /// @notice Stateless TEE proof verifier that validates signatures against registered signers.
 /// @dev This contract is designed to be used as the TEE_VERIFIER in the AggregateVerifier.
-///      It verifies that proofs are signed by enclave addresses registered in SystemConfigGlobal
+///      It verifies that proofs are signed by enclave addresses registered in TEEProverRegistry
 ///      via AWS Nitro attestation, and that the signer's PCR0 matches the claimed imageId.
 ///      The contract is intentionally stateless - all state related to output proposals and
 ///      L1 origin verification is managed by the calling contract (e.g., AggregateVerifier).
 contract TEEVerifier is Verifier, ISemver {
-    /// @notice The SystemConfigGlobal contract that manages valid TEE signers.
-    /// @dev Signers are registered via AWS Nitro attestation in SystemConfigGlobal.
-    SystemConfigGlobal public immutable SYSTEM_CONFIG_GLOBAL;
+    /// @notice The TEEProverRegistry contract that manages valid TEE signers.
+    /// @dev Signers are registered via AWS Nitro attestation in TEEProverRegistry.
+    TEEProverRegistry public immutable TEE_PROVER_REGISTRY;
 
     /// @notice Thrown when the recovered signer is not a valid registered signer.
     error InvalidSigner(address signer);
@@ -37,14 +37,14 @@ contract TEEVerifier is Verifier, ISemver {
     error InvalidProposer(address proposer);
 
     /// @notice Constructs the TEEVerifier contract.
-    /// @param systemConfigGlobal The SystemConfigGlobal contract address.
+    /// @param teeProverRegistry The TEEProverRegistry contract address.
     constructor(
-        SystemConfigGlobal systemConfigGlobal,
+        TEEProverRegistry teeProverRegistry,
         IAnchorStateRegistry anchorStateRegistry
     )
         Verifier(anchorStateRegistry)
     {
-        SYSTEM_CONFIG_GLOBAL = systemConfigGlobal;
+        TEE_PROVER_REGISTRY = teeProverRegistry;
     }
 
     /// @notice Verifies a TEE proof for a state transition.
@@ -76,12 +76,12 @@ contract TEEVerifier is Verifier, ISemver {
             revert InvalidSignature();
         }
 
-        if (!SYSTEM_CONFIG_GLOBAL.isValidProposer(proposer)) {
+        if (!TEE_PROVER_REGISTRY.isValidProposer(proposer)) {
             revert InvalidProposer(proposer);
         }
 
         // Get the PCR0 the signer was registered with
-        bytes32 registeredPCR0 = SYSTEM_CONFIG_GLOBAL.signerPCR0(signer);
+        bytes32 registeredPCR0 = TEE_PROVER_REGISTRY.signerPCR0(signer);
 
         // Check that the signer is registered (PCR0 != 0)
         if (registeredPCR0 == bytes32(0)) {
