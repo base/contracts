@@ -55,6 +55,11 @@
         "internalType": "uint256",
         "name": "intermediateBlockInterval",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "proofThreshold",
+        "type": "uint256"
       }
     ],
     "stateMutability": "nonpayable",
@@ -180,6 +185,19 @@
   {
     "inputs": [],
     "name": "L2_CHAIN_ID",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "PROOF_THRESHOLD",
     "outputs": [
       {
         "internalType": "uint256",
@@ -583,6 +601,19 @@
   },
   {
     "inputs": [],
+    "name": "proofCount",
+    "outputs": [
+      {
+        "internalType": "int8",
+        "name": "",
+        "type": "int8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "resolve",
     "outputs": [
       {
@@ -967,6 +998,11 @@
   },
   {
     "inputs": [],
+    "name": "InvalidProofThreshold",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidProofType",
     "type": "error"
   },
@@ -1037,6 +1073,11 @@
   {
     "inputs": [],
     "name": "NoProofProvided",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotEnoughProofs",
     "type": "error"
   },
   {

@@ -89,5 +89,12 @@
     "offset": 0,
     "slot": "7",
     "type": "Timestamp"
+  },
+  {
+    "bytes": "1",
+    "label": "proofCount",
+    "offset": 8,
+    "slot": "7",
+    "type": "int8"
   }
 ]

@@ -9,7 +9,7 @@ pragma solidity 0.8.15;
  *                            DEPLOYMENT TYPE: DEV (WITH NITRO)
  * ══════════════════════════════════════════════════════════════════════════════════
  *
- * This script deploys infrastructure using the REAL SystemConfigGlobal, which
+ * This script deploys infrastructure using the REAL TEEProverRegistry, which
  * REQUIRES a ZK proof of a valid AWS Nitro attestation for signer registration.
  * You cannot use addDevSigner() - you must go through the full registerSigner() flow.
  * A pre-deployed NitroEnclaveVerifier contract address must be provided in the config.
@@ -38,7 +38,7 @@ pragma solidity 0.8.15;
  *   PCR0_RAW="0x<48_bytes_hex>"
  *
  *   # Register it (only owner can do this)
- *   cast send $SYSTEM_CONFIG_GLOBAL "registerPCR0(bytes)" $PCR0_RAW \
+ *   cast send $TEE_PROVER_REGISTRY "registerPCR0(bytes)" $PCR0_RAW \
  *     --private-key $OWNER_KEY --rpc-url $RPC_URL
  *
  * Note: The teeImageHash in deploy-config is keccak256(PCR0_RAW), not the raw bytes.
@@ -49,7 +49,7 @@ pragma solidity 0.8.15;
  *
  * Generate a Risc0 ZK proof of the Nitro attestation offchain, then call:
  *
- *   cast send $SYSTEM_CONFIG_GLOBAL \
+ *   cast send $TEE_PROVER_REGISTRY \
  *     "registerSigner(bytes,bytes)" $ZK_OUTPUT $ZK_PROOF_BYTES \
  *     --private-key $OWNER_OR_MANAGER_KEY --rpc-url $RPC_URL
  *
@@ -63,10 +63,10 @@ pragma solidity 0.8.15;
  * After registration, verify the signer is registered:
  *
  *   # Check if signer is valid
- *   cast call $SYSTEM_CONFIG_GLOBAL "isValidSigner(address)(bool)" $SIGNER_ADDRESS
+ *   cast call $TEE_PROVER_REGISTRY "isValidSigner(address)(bool)" $SIGNER_ADDRESS
  *
  *   # Get the PCR0 hash associated with the signer
- *   cast call $SYSTEM_CONFIG_GLOBAL "signerPCR0(address)(bytes32)" $SIGNER_ADDRESS
+ *   cast call $TEE_PROVER_REGISTRY "signerPCR0(address)(bytes32)" $SIGNER_ADDRESS
  *
  * ─────────────────────────────────────────────────────────────────────────────────
  * COMPARISON WITH DeployDevNoNitro
@@ -74,7 +74,7 @@ pragma solidity 0.8.15;
  *
  * | Feature                    | DeployDevNoNitro      | DeployDevWithNitro    |
  * |----------------------------|----------------------|------------------------|
- * | SystemConfigGlobal         | DevSystemConfigGlobal | SystemConfigGlobal    |
+ * | TEEProverRegistry         | DevTEEProverRegistry | TEEProverRegistry    |
  * | Signer registration        | addDevSigner()        | registerSigner()      |
  * | Requires Nitro enclave     | No                    | Yes                   |
  * | Validates attestation (ZK) | No                    | Yes                   |
@@ -105,7 +105,7 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
-import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
+import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
 
 import { MinimalProxyAdmin } from "./mocks/MinimalProxyAdmin.sol";
@@ -114,7 +114,7 @@ import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 
 /// @title DeployDevWithNitro
 /// @notice Development deployment WITH AWS Nitro attestation validation.
-/// @dev Uses real SystemConfigGlobal which requires registerSigner() with valid attestation.
+/// @dev Uses real TEEProverRegistry which requires registerSigner() with valid attestation.
 contract DeployDevWithNitro is Script {
     /// @notice Constant from Optimism's Constants.sol - the storage slot for proxy admin.
     bytes32 internal constant PROXY_OWNER_ADDRESS = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
@@ -128,7 +128,7 @@ contract DeployDevWithNitro is Script {
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
 
     // Deployed addresses
-    address public systemConfigGlobalProxy;
+    address public teeProverRegistryProxy;
     address public teeVerifier;
     address public disputeGameFactory;
     address public mockAnchorRegistry;
@@ -149,7 +149,7 @@ contract DeployDevWithNitro is Script {
         console.log("TEE Proposer:", cfg.teeProposer());
         console.log("Game Type:", cfg.multiproofGameType());
         console.log("");
-        console.log("NOTE: Using REAL SystemConfigGlobal - ZK attestation proof REQUIRED.");
+        console.log("NOTE: Using REAL TEEProverRegistry - ZK attestation proof REQUIRED.");
         console.log("NitroEnclaveVerifier:", cfg.nitroEnclaveVerifier());
 
         vm.startBroadcast();
@@ -166,23 +166,23 @@ contract DeployDevWithNitro is Script {
     }
 
     function _deployTEEContracts(address owner, address _nitroEnclaveVerifier) internal {
-        address scgImpl = address(new SystemConfigGlobal(INitroEnclaveVerifier(_nitroEnclaveVerifier)));
+        address scgImpl = address(new TEEProverRegistry(INitroEnclaveVerifier(_nitroEnclaveVerifier)));
         console.log("NitroEnclaveVerifier (external):", _nitroEnclaveVerifier);
-        systemConfigGlobalProxy = address(
+        teeProverRegistryProxy = address(
             new TransparentUpgradeableProxy(
-                scgImpl, address(0xdead), abi.encodeCall(SystemConfigGlobal.initialize, (owner, owner))
+                scgImpl, address(0xdead), abi.encodeCall(TEEProverRegistry.initialize, (owner, owner))
             )
         );
-        console.log("SystemConfigGlobal:", systemConfigGlobalProxy);
+        console.log("TEEProverRegistry:", teeProverRegistryProxy);
 
         teeVerifier = address(
-            new TEEVerifier(SystemConfigGlobal(systemConfigGlobalProxy), IAnchorStateRegistry(mockAnchorRegistry))
+            new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), IAnchorStateRegistry(mockAnchorRegistry))
         );
         console.log("TEEVerifier:", teeVerifier);
     }
 
     function _registerProposer(address teeProposer) internal {
-        SystemConfigGlobal(systemConfigGlobalProxy).setProposer(teeProposer, true);
+        TEEProverRegistry(teeProverRegistryProxy).setProposer(teeProposer, true);
         console.log("Registered TEE proposer:", teeProposer);
     }
 
@@ -245,7 +245,7 @@ contract DeployDevWithNitro is Script {
         console.log("========================================");
         console.log("\nTEE Contracts:");
         console.log("  NitroEnclaveVerifier (external):", cfg.nitroEnclaveVerifier());
-        console.log("  SystemConfigGlobal:", systemConfigGlobalProxy);
+        console.log("  TEEProverRegistry:", teeProverRegistryProxy);
         console.log("  TEEVerifier:", teeVerifier);
         console.log("\nInfrastructure:");
         console.log("  DisputeGameFactory:", disputeGameFactory);
@@ -259,12 +259,12 @@ contract DeployDevWithNitro is Script {
         console.log("========================================");
         console.log("\n>>> NEXT STEPS (ZK ATTESTATION PROOF REQUIRED) <<<");
         console.log("\n1. Register the PCR0 (raw 48-byte enclave image hash):");
-        console.log("   cast send", systemConfigGlobalProxy);
+        console.log("   cast send", teeProverRegistryProxy);
         console.log('     "registerPCR0(bytes)" <PCR0_RAW_BYTES>');
         console.log("     --private-key <OWNER_KEY> --rpc-url <RPC>");
         console.log("\n2. Generate a Risc0 ZK proof of the Nitro attestation offchain.");
         console.log("\n3. Register signer with ZK proof:");
-        console.log("   cast send", systemConfigGlobalProxy);
+        console.log("   cast send", teeProverRegistryProxy);
         console.log('     "registerSigner(bytes,bytes)" <ZK_OUTPUT> <ZK_PROOF_BYTES>');
         console.log("     --private-key <OWNER_OR_MANAGER_KEY> --rpc-url <RPC>");
         console.log("\nSee the comments at the top of this file for full details.");
@@ -274,8 +274,8 @@ contract DeployDevWithNitro is Script {
     function _writeOutput() internal {
         string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-dev-with-nitro.json");
         string memory output = string.concat(
-            '{"SystemConfigGlobal":"',
-            vm.toString(systemConfigGlobalProxy),
+            '{"TEEProverRegistry":"',
+            vm.toString(teeProverRegistryProxy),
             '","TEEVerifier":"',
             vm.toString(teeVerifier),
             '","DisputeGameFactory":"',

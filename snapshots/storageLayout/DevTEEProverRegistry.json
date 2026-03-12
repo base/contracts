@@ -61,5 +61,12 @@
     "offset": 0,
     "slot": "103",
     "type": "mapping(address => bool)"
+  },
+  {
+    "bytes": "32",
+    "label": "_registeredSigners",
+    "offset": 0,
+    "slot": "104",
+    "type": "struct EnumerableSetLib.AddressSet"
   }
 ]

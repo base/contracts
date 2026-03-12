@@ -2,8 +2,13 @@
   {
     "inputs": [
       {
-        "internalType": "contract SystemConfigGlobal",
-        "name": "systemConfigGlobal",
+        "internalType": "contract TEEProverRegistry",
+        "name": "teeProverRegistry",
+        "type": "address"
+      },
+      {
+        "internalType": "contract IAnchorStateRegistry",
+        "name": "anchorStateRegistry",
         "type": "address"
       }
     ],
@@ -12,15 +17,48 @@
   },
   {
     "inputs": [],
-    "name": "SYSTEM_CONFIG_GLOBAL",
+    "name": "ANCHOR_STATE_REGISTRY",
     "outputs": [
       {
-        "internalType": "contract SystemConfigGlobal",
+        "internalType": "contract IAnchorStateRegistry",
         "name": "",
         "type": "address"
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "TEE_PROVER_REGISTRY",
+    "outputs": [
+      {
+        "internalType": "contract TEEProverRegistry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nullified",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nullify",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -111,6 +149,16 @@
       }
     ],
     "name": "InvalidSigner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotProperGame",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Nullified",
     "type": "error"
   }
 ]

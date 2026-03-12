@@ -47,7 +47,7 @@ import { DevFeatures } from "src/libraries/DevFeatures.sol";
 import {
     INitroEnclaveVerifier
 } from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
-import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
+import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
 import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
@@ -114,7 +114,7 @@ contract DeployImplementations is Script {
         ISuperFaultDisputeGame superFaultDisputeGameImpl;
         ISuperPermissionedDisputeGame superPermissionedDisputeGameImpl;
         IVerifier aggregateVerifierImpl;
-        SystemConfigGlobal systemConfigGlobalImpl;
+        TEEProverRegistry teeProverRegistryImpl;
     }
 
     bytes32 internal _salt = DeployUtils.DEFAULT_SALT;
@@ -721,9 +721,9 @@ contract DeployImplementations is Script {
 
         address teeVerifierImpl;
         {
-            SystemConfigGlobal scgImpl = new SystemConfigGlobal(INitroEnclaveVerifier(_input.nitroEnclaveVerifier));
-            vm.label(address(scgImpl), "SystemConfigGlobalImpl");
-            _output.systemConfigGlobalImpl = scgImpl;
+            TEEProverRegistry scgImpl = new TEEProverRegistry(INitroEnclaveVerifier(_input.nitroEnclaveVerifier));
+            vm.label(address(scgImpl), "TEEProverRegistryImpl");
+            _output.teeProverRegistryImpl = scgImpl;
             teeVerifierImpl = address(new TEEVerifier(scgImpl, _output.anchorStateRegistryImpl));
         }
 

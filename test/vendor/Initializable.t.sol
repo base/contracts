@@ -22,7 +22,7 @@ import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol"
 import { ProtocolVersion } from "interfaces/L1/IProtocolVersions.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IOptimismPortalInterop } from "interfaces/L1/IOptimismPortalInterop.sol";
-import { SystemConfigGlobal } from "src/multiproof/tee/SystemConfigGlobal.sol";
+import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 
 /// @title Initializer_Test
 /// @dev Ensures that the `initialize()` function on contracts cannot be called more than
@@ -367,12 +367,12 @@ contract Initializer_Test is CommonTest {
         // AggregateVerifier uses a custom `bool initialized` instead of OpenZeppelin's `_initialized`
         // uint8, so it cannot be tested by this framework. It is excluded below.
 
-        // SystemConfigGlobalImpl
+        // TEEProverRegistryImpl
         contracts.push(
             InitializeableContract({
-                name: "SystemConfigGlobalImpl",
-                target: address(systemConfigGlobal),
-                initCalldata: abi.encodeCall(SystemConfigGlobal.initialize, (address(0), address(0)))
+                name: "TEEProverRegistryImpl",
+                target: address(teeProverRegistry),
+                initCalldata: abi.encodeCall(TEEProverRegistry.initialize, (address(0), address(0)))
             })
         );
     }
