@@ -38,14 +38,14 @@ pragma solidity 0.8.15;
  * COMPARISON WITH DeployDevWithNitro
  * ─────────────────────────────────────────────────────────────────────────────────
  *
- * | Feature                    | DeployDevNoNitro      | DeployDevWithNitro    |
- * |----------------------------|----------------------|------------------------|
- * | TEEProverRegistry         | DevTEEProverRegistry | TEEProverRegistry    |
- * | Signer registration        | addDevSigner()        | registerSigner()      |
- * | Requires Nitro enclave     | No                    | Yes                   |
- * | Validates attestation (ZK) | No                    | Yes                   |
- * | PCR0 pre-registration      | No                    | Yes                   |
- * | Attestation freshness      | N/A                   | < 60 minutes          |
+ * | Feature                    | DeployDevNoNitro       | DeployDevWithNitro     |
+ * |----------------------------|------------------------|------------------------|
+ * | TEEProverRegistry          | DevTEEProverRegistry   | TEEProverRegistry      |
+ * | Signer registration        | addDevSigner()         | registerSigner()       |
+ * | Requires Nitro enclave     | No                     | Yes                    |
+ * | Validates attestation (ZK) | No                     | Yes                    |
+ * | PCR0 pre-registration      | No                     | Yes                    |
+ * | Attestation freshness      | N/A                    | < 60 minutes           |
  *
  * Both scripts use mocks for AnchorStateRegistry, DelayedWETH, and ZK Verifier.
  *
