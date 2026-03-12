@@ -75,6 +75,10 @@
     "initCodeHash": "0xdaae3903628f760e36da47c8f8d75d20962d1811fb5129cb09eb01803e67c095",
     "sourceCodeHash": "0x95dd8da08e907fa398c98710bb12fda9fb50d9688c5d2144fd9a424c99e672c5"
   },
+  "src/L2/FlashblockIndex.sol:FlashblockIndex": {
+    "initCodeHash": "0x7e09adc445d209875b09e70f0ea025ec45e071f7ca6c1239187f08edc1645b04",
+    "sourceCodeHash": "0x7e52ea8b5725107344b51b89a365de33d0c8d158a3c32b539298b707149d9787"
+  },
   "src/L2/GasPriceOracle.sol:GasPriceOracle": {
     "initCodeHash": "0xf72c23d9c3775afd7b645fde429d09800622d329116feb5ff9829634655123ca",
     "sourceCodeHash": "0xb4d1bf3669ba87bbeaf4373145c7e1490478c4a05ba4838a524aa6f0ce7348a6"
