@@ -244,10 +244,14 @@
     "sourceCodeHash": "0x3a079ea52a26c8c38fb0cb3e9a9ff6ec9648cf83786b65c0fc1161e949b8f7e0"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
-    "initCodeHash": "0xc59c62a455533735aa9337d2db88b255713bd4dde20d3345265ec2fafe62af70",
+    "initCodeHash": "0xe28eaeecda21594f6db23bb70127daa2b7b71debe38ce65b598f28d78d2561eb",
     "sourceCodeHash": "0x3a079ea52a26c8c38fb0cb3e9a9ff6ec9648cf83786b65c0fc1161e949b8f7e0"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
+    "initCodeHash": "0xee219c003a6af440b447e214e43d520e802001ae3d557262a7921ca3d57ebddf",
+    "sourceCodeHash": "0x8be9aea4bb16c89a10444da8ce324e3914a2419654a80542692757fbdc9a2f5c"
+  },
+  "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry:dispute": {
     "initCodeHash": "0x8ae045f0121d2c63ab6f0a830be842aaf0445096bfabe29d85cfd9bd38b40565",
     "sourceCodeHash": "0x8be9aea4bb16c89a10444da8ce324e3914a2419654a80542692757fbdc9a2f5c"
   },
@@ -256,7 +260,7 @@
     "sourceCodeHash": "0xe8aa3c0710ee72546da52957730c11dc932065c444a013658bd2f5fd0c79085d"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier:dispute": {
-    "initCodeHash": "0x78317d9088a26523d938ce0d88ed0134abc60292c0cdb3f8a6a9530638fd9e9a",
+    "initCodeHash": "0xd65f1d604f979045a86d662e168cb7a867478da8a0ca294181872a90d209a66f",
     "sourceCodeHash": "0xe8aa3c0710ee72546da52957730c11dc932065c444a013658bd2f5fd0c79085d"
   },
   "src/revenue-share/FeeDisburser.sol:FeeDisburser": {

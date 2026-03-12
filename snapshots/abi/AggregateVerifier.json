@@ -341,9 +341,19 @@
   {
     "inputs": [
       {
+        "internalType": "bytes",
+        "name": "proofBytes",
+        "type": "bytes"
+      },
+      {
         "internalType": "uint256",
-        "name": "gameIndex",
+        "name": "intermediateRootIndex",
         "type": "uint256"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "intermediateRootToProve",
+        "type": "bytes32"
       }
     ],
     "name": "challenge",
@@ -367,12 +377,12 @@
   },
   {
     "inputs": [],
-    "name": "counteredByGameAddress",
+    "name": "counteredByIntermediateRootIndexPlusOne",
     "outputs": [
       {
-        "internalType": "address",
+        "internalType": "uint256",
         "name": "",
-        "type": "address"
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -604,9 +614,9 @@
     "name": "proofCount",
     "outputs": [
       {
-        "internalType": "int8",
+        "internalType": "uint8",
         "name": "",
-        "type": "int8"
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -784,9 +794,9 @@
       },
       {
         "indexed": false,
-        "internalType": "contract IDisputeGame",
-        "name": "game",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "intermediateRootIndex",
+        "type": "uint256"
       }
     ],
     "name": "Challenged",
@@ -886,22 +896,12 @@
   },
   {
     "inputs": [],
-    "name": "BondRecipientEmpty",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "BondTransferFailed",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "ClaimAlreadyResolved",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "CounteredByGameNotResolved",
     "type": "error"
   },
   {
@@ -969,11 +969,6 @@
       }
     ],
     "name": "InvalidBlockInterval",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidCounteredByGame",
     "type": "error"
   },
   {
@@ -1068,11 +1063,6 @@
   {
     "inputs": [],
     "name": "NoCreditToClaim",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NoProofProvided",
     "type": "error"
   },
   {
