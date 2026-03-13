@@ -1,4 +1,4 @@
-//SPDX-License-Identifier: Apache2.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import { Ownable } from "@solady/auth/Ownable.sol";
@@ -24,10 +24,10 @@ import {
  * @dev Custom version of Automata's NitroEnclaveVerifier contract at
  * https://github.com/automata-network/aws-nitro-enclave-attestation/tree/26c90565cb009e6539643a0956f9502a12ade672
  *
- * Differences:
- * - Verification of ZK proofs is now a privileged action
- * - All privileged actions are monitored
- * - Removes verification with Program ID and Pico logic
+ * Differences from the upstream Automata contract:
+ * - Verification of ZK proofs is restricted to an authorized proof submitter address
+ * - All privileged actions emit events for monitoring
+ * - Removes verification-with-explicit-program-ID and Pico logic
  *
  * This contract provides on-chain verification of AWS Nitro Enclave attestation reports by validating
  * zero-knowledge proofs generated off-chain. It supports both single and batch verification modes
@@ -79,6 +79,43 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
     /// @dev Mapping from verifierId to its corresponding verifierProofId representation
     mapping(ZkCoProcessorType => mapping(bytes32 verifierId => bytes32 verifierProofId)) private _verifierProofIds;
 
+    // ============ Custom Errors ============
+
+    /// @dev Thrown when a caller other than the authorized proof submitter calls verify or batchVerify
+    error CallerNotProofSubmitter();
+
+    /// @dev Thrown when a certificate hash is not found in the trusted intermediate certificates set
+    error CertificateNotFound(bytes32 certHash);
+
+    /// @dev Thrown when a program ID argument is bytes32(0)
+    error ZeroProgramId();
+
+    /// @dev Thrown when attempting to set a program ID that is already the latest
+    error ProgramIdAlreadyLatest(ZkCoProcessorType zkCoProcessor, bytes32 identifier);
+
+    /// @dev Thrown when attempting to remove or operate on a program ID that does not exist in the set
+    error ProgramIdNotFound(ZkCoProcessorType zkCoProcessor, bytes32 identifier);
+
+    /// @dev Thrown when a zero address is provided where a verifier address is required
+    error ZeroVerifierAddress();
+
+    /// @dev Thrown when a zero address is provided for the proof submitter
+    error ZeroProofSubmitter();
+
+    /// @dev Thrown when the batch journal's verifier VK does not match the expected verifier proof ID
+    error VerifierVkMismatch(bytes32 expected, bytes32 actual);
+
+    /// @dev Thrown when the first certificate in a chain does not match the stored root certificate
+    error RootCertMismatch(bytes32 expected, bytes32 actual);
+
+    /// @dev Thrown when calling verifyWithProgramId or batchVerifyWithProgramId, which are intentionally disabled
+    error NotImplemented();
+
+    /// @dev Thrown when a zero or zero-equivalent maxTimeDiff is provided
+    error ZeroMaxTimeDiff();
+
+    // ============ Events ============
+
     /// @dev Event emitted when the proof submitter address is changed
     event ProofSubmitterChanged(address newProofSubmitter);
 
@@ -91,6 +128,9 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
     /// @dev Event emitted when a certificate is revoked
     event CertRevoked(bytes32 certHash);
 
+    /// @dev Event emitted when the maximum time difference is updated
+    event MaxTimeDiffUpdated(uint64 newMaxTimeDiff);
+
     /**
      * @dev Initializes the contract with owner, time tolerance and initial trusted certificates
      * @param _owner Address to be set as the contract owner
@@ -101,6 +141,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * The root certificate must be set separately after deployment.
      */
     constructor(address _owner, uint64 _maxTimeDiff, bytes32[] memory _initializeTrustedCerts) {
+        if (_maxTimeDiff == 0) revert ZeroMaxTimeDiff();
         maxTimeDiff = _maxTimeDiff;
         for (uint256 i = 0; i < _initializeTrustedCerts.length; i++) {
             trustedIntermediateCerts[_initializeTrustedCerts[i]] = true;
@@ -215,7 +256,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
             bytes32[] calldata certs = _report_certs[i];
             uint8 trustedCertPrefixLen = 1;
             if (certs[0] != rootCertHash) {
-                revert("First certificate must be the root certificate");
+                revert RootCertMismatch(rootCertHash, certs[0]);
             }
             for (uint256 j = 1; j < certs.length; j++) {
                 if (!trustedIntermediateCerts[certs[j]]) {
@@ -243,6 +284,20 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
     function setRootCert(bytes32 _rootCert) external onlyOwner {
         rootCert = _rootCert;
         emit RootCertChanged(_rootCert);
+    }
+
+    /**
+     * @dev Updates the maximum allowed time difference for attestation timestamp validation
+     * @param _maxTimeDiff New maximum time difference in seconds
+     *
+     * Requirements:
+     * - Only callable by contract owner
+     * - Must be greater than zero
+     */
+    function setMaxTimeDiff(uint64 _maxTimeDiff) external onlyOwner {
+        if (_maxTimeDiff == 0) revert ZeroMaxTimeDiff();
+        maxTimeDiff = _maxTimeDiff;
+        emit MaxTimeDiffUpdated(_maxTimeDiff);
     }
 
     /**
@@ -296,7 +351,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      */
     function revokeCert(bytes32 _certHash) external onlyOwner {
         if (!trustedIntermediateCerts[_certHash]) {
-            revert("Certificate not found in trusted certs");
+            revert CertificateNotFound(_certHash);
         }
         delete trustedIntermediateCerts[_certHash];
         emit CertRevoked(_certHash);
@@ -316,8 +371,10 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         external
         onlyOwner
     {
-        require(_newVerifierId != bytes32(0), "Verifier ID cannot be zero");
-        require(zkConfig[_zkCoProcessor].verifierId != _newVerifierId, "Verifier ID is already the latest");
+        if (_newVerifierId == bytes32(0)) revert ZeroProgramId();
+        if (zkConfig[_zkCoProcessor].verifierId == _newVerifierId) {
+            revert ProgramIdAlreadyLatest(_zkCoProcessor, _newVerifierId);
+        }
 
         zkConfig[_zkCoProcessor].verifierId = _newVerifierId;
         _verifierIdSet[_zkCoProcessor].add(_newVerifierId);
@@ -332,8 +389,10 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * @param _newAggregatorId New aggregator program ID to set as latest
      */
     function updateAggregatorId(ZkCoProcessorType _zkCoProcessor, bytes32 _newAggregatorId) external onlyOwner {
-        require(_newAggregatorId != bytes32(0), "Aggregator ID cannot be zero");
-        require(zkConfig[_zkCoProcessor].aggregatorId != _newAggregatorId, "Aggregator ID is already the latest");
+        if (_newAggregatorId == bytes32(0)) revert ZeroProgramId();
+        if (zkConfig[_zkCoProcessor].aggregatorId == _newAggregatorId) {
+            revert ProgramIdAlreadyLatest(_zkCoProcessor, _newAggregatorId);
+        }
 
         zkConfig[_zkCoProcessor].aggregatorId = _newAggregatorId;
         _aggregatorIdSet[_zkCoProcessor].add(_newAggregatorId);
@@ -347,7 +406,9 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * @param _verifierId Verifier program ID to remove
      */
     function removeVerifierId(ZkCoProcessorType _zkCoProcessor, bytes32 _verifierId) external onlyOwner {
-        require(_verifierIdSet[_zkCoProcessor].contains(_verifierId), "Verifier ID does not exist");
+        if (!_verifierIdSet[_zkCoProcessor].contains(_verifierId)) {
+            revert ProgramIdNotFound(_zkCoProcessor, _verifierId);
+        }
 
         // Cannot remove the latest verifier ID - must update to a new one first
         if (zkConfig[_zkCoProcessor].verifierId == _verifierId) {
@@ -365,7 +426,9 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * @param _aggregatorId Aggregator program ID to remove
      */
     function removeAggregatorId(ZkCoProcessorType _zkCoProcessor, bytes32 _aggregatorId) external onlyOwner {
-        require(_aggregatorIdSet[_zkCoProcessor].contains(_aggregatorId), "Aggregator ID does not exist");
+        if (!_aggregatorIdSet[_zkCoProcessor].contains(_aggregatorId)) {
+            revert ProgramIdNotFound(_zkCoProcessor, _aggregatorId);
+        }
 
         // Cannot remove the latest aggregator ID - must update to a new one first
         if (zkConfig[_zkCoProcessor].aggregatorId == _aggregatorId) {
@@ -383,7 +446,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * @param _verifier Address of the verifier contract for this route
      */
     function addVerifyRoute(ZkCoProcessorType _zkCoProcessor, bytes4 _selector, address _verifier) external onlyOwner {
-        require(_verifier != address(0), "Verifier cannot be zero address");
+        if (_verifier == address(0)) revert ZeroVerifierAddress();
 
         if (_zkVerifierRoutes[_zkCoProcessor][_selector] == FROZEN) {
             revert ZkRouteFrozen(_zkCoProcessor, _selector);
@@ -414,8 +477,13 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
     /**
      * @dev Sets the proof submitter address
      * @param _proofSubmitter The address of the proof submitter
+     *
+     * Requirements:
+     * - Only callable by contract owner
+     * - Address must not be zero
      */
     function setProofSubmitter(address _proofSubmitter) external onlyOwner {
+        if (_proofSubmitter == address(0)) revert ZeroProofSubmitter();
         proofSubmitter = _proofSubmitter;
         emit ProofSubmitterChanged(_proofSubmitter);
     }
@@ -451,7 +519,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         external
         returns (VerifierJournal memory journal)
     {
-        require(msg.sender == proofSubmitter, "Only the proof submitter can verify proofs");
+        if (msg.sender != proofSubmitter) revert CallerNotProofSubmitter();
         bytes32 programId = zkConfig[zkCoprocessor].verifierId;
         _verifyZk(zkCoprocessor, programId, output, proofBytes);
         journal = abi.decode(output, (VerifierJournal));
@@ -483,7 +551,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         external
         returns (VerifierJournal[] memory results)
     {
-        require(msg.sender == proofSubmitter, "Only the proof submitter can verify proofs");
+        if (msg.sender != proofSubmitter) revert CallerNotProofSubmitter();
         bytes32 aggregatorId = zkConfig[zkCoprocessor].aggregatorId;
         bytes32 verifierId = zkConfig[zkCoprocessor].verifierId;
         bytes32 verifierProofId = _verifierProofIds[zkCoprocessor][verifierId];
@@ -491,7 +559,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         _verifyZk(zkCoprocessor, aggregatorId, output, proofBytes);
         BatchVerifierJournal memory batchJournal = abi.decode(output, (BatchVerifierJournal));
         if (batchJournal.verifierVk != verifierProofId) {
-            revert("Verifier VK does not match the expected verifier proof ID");
+            revert VerifierVkMismatch(verifierProofId, batchJournal.verifierVk);
         }
         uint256 n = batchJournal.outputs.length;
         results = new VerifierJournal[](n);
@@ -501,7 +569,10 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         emit BatchAttestationSubmitted(verifierId, zkCoprocessor, abi.encode(results));
     }
 
-    // To meet interface requirements
+    /**
+     * @notice Not implemented — explicit program ID verification is intentionally disabled.
+     * @dev This function exists solely to satisfy the INitroEnclaveVerifier interface.
+     */
     function verifyWithProgramId(
         bytes calldata,
         ZkCoProcessorType,
@@ -512,10 +583,13 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         pure
         returns (VerifierJournal memory)
     {
-        revert("Not implemented");
+        revert NotImplemented();
     }
 
-    // To meet interface requirements
+    /**
+     * @notice Not implemented — explicit program ID verification is intentionally disabled.
+     * @dev This function exists solely to satisfy the INitroEnclaveVerifier interface.
+     */
     function batchVerifyWithProgramId(
         bytes calldata,
         ZkCoProcessorType,
@@ -527,7 +601,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         pure
         returns (VerifierJournal[] memory)
     {
-        revert("Not implemented");
+        revert NotImplemented();
     }
 
     // ============ Internal Functions ============
