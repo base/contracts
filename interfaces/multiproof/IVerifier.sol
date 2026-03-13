@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 interface IVerifier {
-
     /// @notice Verifies a proof.
     /// @param proofBytes The proof.
     /// @param imageId The image ID.

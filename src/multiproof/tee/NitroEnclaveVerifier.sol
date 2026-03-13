@@ -10,7 +10,7 @@ import {
     VerifierJournal,
     BatchVerifierJournal,
     VerificationResult
-} from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
+} from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import {
     IRiscZeroVerifier
 } from "lib/aws-nitro-enclave-attestation/contracts/lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
@@ -81,6 +81,18 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
 
     // ============ Custom Errors ============
 
+    /// @dev Error thrown when an unsupported or unknown ZK coprocessor type is used
+    error Unknown_Zk_Coprocessor();
+
+    /// @dev Error thrown when attempting to remove the currently active (latest) program ID
+    error CannotRemoveLatestProgramId(ZkCoProcessorType zkCoProcessor, bytes32 identifier);
+
+    /// @dev Error thrown when a ZK route has been permanently frozen
+    error ZkRouteFrozen(ZkCoProcessorType zkCoProcessor, bytes4 selector);
+
+    /// @dev Error thrown when no ZK verifier is configured for the coprocessor
+    error ZkVerifierNotConfigured(ZkCoProcessorType zkCoProcessor);
+
     /// @dev Thrown when a caller other than the authorized proof submitter calls verify or batchVerify
     error CallerNotProofSubmitter();
 
@@ -111,10 +123,31 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
     /// @dev Thrown when calling verifyWithProgramId or batchVerifyWithProgramId, which are intentionally disabled
     error NotImplemented();
 
-    /// @dev Thrown when a zero or zero-equivalent maxTimeDiff is provided
+    /// @dev Error thrown when a zero maxTimeDiff is provided
     error ZeroMaxTimeDiff();
 
     // ============ Events ============
+
+    /// @dev Emitted when a new verifier program ID is added/updated
+    event VerifierIdUpdated(ZkCoProcessorType indexed zkCoProcessor, bytes32 indexed newId, bytes32 newProofId);
+
+    /// @dev Emitted when a new aggregator program ID is added/updated
+    event AggregatorIdUpdated(ZkCoProcessorType indexed zkCoProcessor, bytes32 indexed newId);
+
+    /// @dev Emitted when a program ID is removed from the supported set
+    event ProgramIdRemoved(ZkCoProcessorType indexed zkCoProcessor, bytes32 indexed programId, bool isAggregator);
+
+    /// @dev Emitted when a route-specific verifier is added
+    event ZkRouteAdded(ZkCoProcessorType indexed zkCoProcessor, bytes4 indexed selector, address verifier);
+
+    /// @dev Emitted when a route is permanently frozen
+    event ZkRouteWasFrozen(ZkCoProcessorType indexed zkCoProcessor, bytes4 indexed selector);
+
+    /// @dev Emitted when the proof of attestation has been successfully verified
+    event AttestationSubmitted(VerificationResult result, ZkCoProcessorType zkCoProcessor, bytes output);
+
+    /// @dev Emitted when a batched proof has been successfully verified; encodedBatched = abi.encode(VerifierJournal[])
+    event BatchAttestationSubmitted(bytes32 verifierId, ZkCoProcessorType zkCoProcessor, bytes encodedBatch);
 
     /// @dev Event emitted when the proof submitter address is changed
     event ProofSubmitterChanged(address newProofSubmitter);
@@ -567,41 +600,6 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
             results[i] = _verifyJournal(batchJournal.outputs[i]);
         }
         emit BatchAttestationSubmitted(verifierId, zkCoprocessor, abi.encode(results));
-    }
-
-    /**
-     * @notice Not implemented — explicit program ID verification is intentionally disabled.
-     * @dev This function exists solely to satisfy the INitroEnclaveVerifier interface.
-     */
-    function verifyWithProgramId(
-        bytes calldata,
-        ZkCoProcessorType,
-        bytes32,
-        bytes calldata
-    )
-        external
-        pure
-        returns (VerifierJournal memory)
-    {
-        revert NotImplemented();
-    }
-
-    /**
-     * @notice Not implemented — explicit program ID verification is intentionally disabled.
-     * @dev This function exists solely to satisfy the INitroEnclaveVerifier interface.
-     */
-    function batchVerifyWithProgramId(
-        bytes calldata,
-        ZkCoProcessorType,
-        bytes32,
-        bytes32,
-        bytes calldata
-    )
-        external
-        pure
-        returns (VerifierJournal[] memory)
-    {
-        revert NotImplemented();
     }
 
     // ============ Internal Functions ============

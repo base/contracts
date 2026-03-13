@@ -4,15 +4,13 @@ pragma solidity ^0.8.20;
 import { Test } from "forge-std/Test.sol";
 
 import {
-    INitroEnclaveVerifier,
     ZkCoProcessorType,
     ZkCoProcessorConfig,
     VerifierJournal,
     BatchVerifierJournal,
     VerificationResult,
-    Pcr,
-    Bytes48
-} from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
+    Pcr
+} from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 
 import { NitroEnclaveVerifier } from "src/multiproof/tee/NitroEnclaveVerifier.sol";
 
@@ -268,7 +266,7 @@ contract NitroEnclaveVerifierTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                INitroEnclaveVerifier.CannotRemoveLatestProgramId.selector, ZkCoProcessorType.RiscZero, VERIFIER_ID
+                NitroEnclaveVerifier.CannotRemoveLatestProgramId.selector, ZkCoProcessorType.RiscZero, VERIFIER_ID
             )
         );
         verifier.removeVerifierId(ZkCoProcessorType.RiscZero, VERIFIER_ID);
@@ -310,7 +308,7 @@ contract NitroEnclaveVerifierTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                INitroEnclaveVerifier.CannotRemoveLatestProgramId.selector, ZkCoProcessorType.RiscZero, AGGREGATOR_ID
+                NitroEnclaveVerifier.CannotRemoveLatestProgramId.selector, ZkCoProcessorType.RiscZero, AGGREGATOR_ID
             )
         );
         verifier.removeAggregatorId(ZkCoProcessorType.RiscZero, AGGREGATOR_ID);
@@ -363,7 +361,7 @@ contract NitroEnclaveVerifierTest is Test {
         verifier.freezeVerifyRoute(ZkCoProcessorType.RiscZero, selector);
 
         vm.expectRevert(
-            abi.encodeWithSelector(INitroEnclaveVerifier.ZkRouteFrozen.selector, ZkCoProcessorType.RiscZero, selector)
+            abi.encodeWithSelector(NitroEnclaveVerifier.ZkRouteFrozen.selector, ZkCoProcessorType.RiscZero, selector)
         );
         verifier.getZkVerifier(ZkCoProcessorType.RiscZero, selector);
     }
@@ -376,7 +374,7 @@ contract NitroEnclaveVerifierTest is Test {
         verifier.freezeVerifyRoute(ZkCoProcessorType.RiscZero, selector);
 
         vm.expectRevert(
-            abi.encodeWithSelector(INitroEnclaveVerifier.ZkRouteFrozen.selector, ZkCoProcessorType.RiscZero, selector)
+            abi.encodeWithSelector(NitroEnclaveVerifier.ZkRouteFrozen.selector, ZkCoProcessorType.RiscZero, selector)
         );
         verifier.addVerifyRoute(ZkCoProcessorType.RiscZero, selector, routeVerifier);
     }
@@ -387,7 +385,7 @@ contract NitroEnclaveVerifierTest is Test {
         verifier.freezeVerifyRoute(ZkCoProcessorType.RiscZero, selector);
 
         vm.expectRevert(
-            abi.encodeWithSelector(INitroEnclaveVerifier.ZkRouteFrozen.selector, ZkCoProcessorType.RiscZero, selector)
+            abi.encodeWithSelector(NitroEnclaveVerifier.ZkRouteFrozen.selector, ZkCoProcessorType.RiscZero, selector)
         );
         verifier.freezeVerifyRoute(ZkCoProcessorType.RiscZero, selector);
     }
@@ -464,7 +462,7 @@ contract NitroEnclaveVerifierTest is Test {
 
         vm.prank(submitter);
         vm.expectRevert(
-            abi.encodeWithSelector(INitroEnclaveVerifier.ZkVerifierNotConfigured.selector, ZkCoProcessorType.RiscZero)
+            abi.encodeWithSelector(NitroEnclaveVerifier.ZkVerifierNotConfigured.selector, ZkCoProcessorType.RiscZero)
         );
         verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
     }
@@ -483,7 +481,7 @@ contract NitroEnclaveVerifierTest is Test {
         bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
 
         vm.prank(submitter);
-        vm.expectRevert(INitroEnclaveVerifier.Unknown_Zk_Coprocessor.selector);
+        vm.expectRevert(NitroEnclaveVerifier.Unknown_Zk_Coprocessor.selector);
         verifier.verify(output, ZkCoProcessorType.Unknown, proofBytes);
     }
 
@@ -502,7 +500,7 @@ contract NitroEnclaveVerifierTest is Test {
 
         vm.prank(submitter);
         vm.expectRevert(
-            abi.encodeWithSelector(INitroEnclaveVerifier.ZkRouteFrozen.selector, ZkCoProcessorType.RiscZero, selector)
+            abi.encodeWithSelector(NitroEnclaveVerifier.ZkRouteFrozen.selector, ZkCoProcessorType.RiscZero, selector)
         );
         verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
     }
@@ -680,7 +678,7 @@ contract NitroEnclaveVerifierTest is Test {
 
         vm.prank(submitter);
         vm.expectRevert(
-            abi.encodeWithSelector(INitroEnclaveVerifier.ZkVerifierNotConfigured.selector, ZkCoProcessorType.Succinct)
+            abi.encodeWithSelector(NitroEnclaveVerifier.ZkVerifierNotConfigured.selector, ZkCoProcessorType.Succinct)
         );
         verifier.verify(abi.encode(_createSuccessJournal()), ZkCoProcessorType.Succinct, proofBytes);
     }
@@ -757,18 +755,6 @@ contract NitroEnclaveVerifierTest is Test {
 
         assertEq(results.length, 1);
         assertEq(uint8(results[0].result), uint8(VerificationResult.Success));
-    }
-
-    // ============ verifyWithProgramId / batchVerifyWithProgramId Tests ============
-
-    function testVerifyWithProgramIdReverts() public {
-        vm.expectRevert(NitroEnclaveVerifier.NotImplemented.selector);
-        verifier.verifyWithProgramId("", ZkCoProcessorType.RiscZero, bytes32(0), "");
-    }
-
-    function testBatchVerifyWithProgramIdReverts() public {
-        vm.expectRevert(NitroEnclaveVerifier.NotImplemented.selector);
-        verifier.batchVerifyWithProgramId("", ZkCoProcessorType.RiscZero, bytes32(0), bytes32(0), "");
     }
 
     // ============ Revoked Cert Invalidates Journal ============
