@@ -1,4 +1,4 @@
-//SPDX-License-Identifier: MIT
+//SPDX-License-Identifier: Apache2.0
 pragma solidity ^0.8.0;
 
 /// @dev Custom version of Automata's NitroEnclaveVerifier contract at
