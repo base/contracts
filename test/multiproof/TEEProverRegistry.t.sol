@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
 import { Test } from "forge-std/Test.sol";
@@ -6,9 +6,7 @@ import { Test } from "forge-std/Test.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
-import {
-    INitroEnclaveVerifier
-} from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
+import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 
 import { DevTEEProverRegistry } from "src/multiproof/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";

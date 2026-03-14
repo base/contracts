@@ -8,7 +8,7 @@ import {
     VerificationResult,
     Pcr,
     Bytes48
-} from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
+} from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import { OwnableManagedUpgradeable } from "lib/op-enclave/contracts/src/OwnableManagedUpgradeable.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { EnumerableSetLib } from "@solady-v0.0.245/utils/EnumerableSetLib.sol";
