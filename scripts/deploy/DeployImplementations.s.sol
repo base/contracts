@@ -46,7 +46,7 @@ import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
 import { DevFeatures } from "src/libraries/DevFeatures.sol";
 import {
     INitroEnclaveVerifier
-} from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
+} from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";

@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import {
     INitroEnclaveVerifier
-} from "lib/aws-nitro-enclave-attestation/contracts/src/interfaces/INitroEnclaveVerifier.sol";
+} from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import { EnumerableSetLib } from "@solady-v0.0.245/utils/EnumerableSetLib.sol";
 
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";

@@ -153,6 +153,12 @@ interface INitroEnclaveVerifier {
     function rootCert() external view returns (bytes32);
 
     /**
+     * @dev Returns the address of the proof submitter
+     * @return Address of the proof submitter
+     */
+    function proofSubmitter() external view returns (address);
+
+    /**
      * @dev Retrieves the configuration for a specific coprocessor
      * @param _zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
      * @return ZkCoProcessorConfig Configuration parameters including program IDs and verifier address
