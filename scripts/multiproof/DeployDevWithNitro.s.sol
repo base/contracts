@@ -86,9 +86,7 @@ pragma solidity 0.8.15;
  * ══════════════════════════════════════════════════════════════════════════════════
  */
 
-import {
-    INitroEnclaveVerifier
-} from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";

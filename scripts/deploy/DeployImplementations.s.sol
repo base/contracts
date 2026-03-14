@@ -44,9 +44,7 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
 import { DevFeatures } from "src/libraries/DevFeatures.sol";
-import {
-    INitroEnclaveVerifier
-} from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";

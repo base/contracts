@@ -6,9 +6,7 @@ import { Test } from "forge-std/Test.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
-import {
-    INitroEnclaveVerifier
-} from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 
 import { MockAnchorStateRegistry } from "scripts/multiproof/mocks/MockAnchorStateRegistry.sol";
