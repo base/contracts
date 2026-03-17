@@ -227,65 +227,18 @@ snapshots: build-source snapshots-no-build
 #                       BINDINGS                       #
 ########################################################
 
-# Adds a new Rust binding for a Solidity contract.
-# Usage: just bindings-add src/L2/FlashblockIndex.sol
-bindings-add SOL_PATH: build-source
+# Regenerates the Rust bindings crate from all contracts under src/.
+bindings-generate: build-source
   #!/bin/bash
   set -euo pipefail
-
-  sol_path="{{SOL_PATH}}"
-
-  # Extract contract name (e.g. FlashblockIndex from src/L2/FlashblockIndex.sol)
-  contract=$(basename "$sol_path" .sol)
-
-  # Extract module (e.g. l2 from src/L2/FlashblockIndex.sol)
-  module=$(echo "$sol_path" | sed 's|^src/||' | xargs dirname | tr '[:upper:]' '[:lower:]')
-
-  # Convert PascalCase to snake_case by inserting _ at lower|upper and acronym|word boundaries
-  snake=$(echo "$contract" | sed -E 's/([a-z0-9])([A-Z])/\1_\2/g' | sed -E 's/([A-Z]+)([A-Z][a-z])/\1_\2/g' | tr '[:upper:]' '[:lower:]')
-
-  rust_dir="bindings/rust/src/${module}"
-  rust_file="${rust_dir}/${snake}.rs"
-  mod_file="${rust_dir}/mod.rs"
-  artifact="bindings/rust/artifacts/${contract}.json"
-
-  # Ensure output directories exist before writing generated files.
-  mkdir -p "bindings/rust/artifacts" "$rust_dir"
-
-  # 1. Strip artifact
-  jq '{abi, bytecode: {object: .bytecode.object}, deployedBytecode: {object: .deployedBytecode.object}}' \
-    "forge-artifacts/${contract}.sol/${contract}.json" > "$artifact"
-
-  # 2. Create .rs file
-  cat > "$rust_file" << EOF
-  use alloy_sol_types::sol;
-
-  sol!(
-      #[sol(rpc, abi)]
-      ${contract},
-      concat!(
-          env!("CARGO_MANIFEST_DIR"),
-          "/artifacts/${contract}.json"
-      )
-  );
-  EOF
-
-  # 3. Add to mod.rs (skip if already present)
-  if ! grep -q "mod ${snake};" "$mod_file" 2>/dev/null; then
-    echo "" >> "$mod_file"
-    echo "mod ${snake};" >> "$mod_file"
-    echo "pub use ${snake}::${contract};" >> "$mod_file"
-  fi
-
-  # 4. Add module to lib.rs (skip if already present)
-  if ! grep -q "pub mod ${module};" "bindings/rust/src/lib.rs" 2>/dev/null; then
-    echo "pub mod ${module};" >> "bindings/rust/src/lib.rs"
-  fi
-
-  # 5. Format generated code
-  cd bindings/rust && cargo fmt
-
-  echo "Added binding: ${contract} -> ${rust_file}"
+  # forge bind filters by contract name, so derive an exact-match regex from src/*.sol filenames.
+  select_regex="^($(git ls-files ':(glob)src/**/*.sol' | sed 's#^.*/##; s#\.sol$##' | sort -u | paste -sd'|' -))$"
+  forge bind \
+    --bindings-path bindings/rust \
+    --crate-name base-contracts-bindings \
+    --select "$select_regex" \
+    --skip-build \
+    --overwrite
 
 
 ########################################################
@@ -298,20 +251,20 @@ snapshots-check-no-build: snapshots-no-build
 # Checks if the snapshots are up to date.
 snapshots-check: build snapshots-check-no-build
 
-# Checks that the Rust bindings crate compiles.
-bindings-check:
-  cd bindings/rust && cargo check
-
-# Checks that committed Rust binding artifacts match forge-artifacts.
-bindings-artifacts-check-no-build:
+# Checks that the committed Rust bindings are in sync with forge-artifacts.
+bindings-check-no-build:
   #!/bin/bash
   set -euo pipefail
-  for src in bindings/rust/artifacts/*.json; do
-    name=$(basename "$src" .json)
-    jq '{abi, bytecode: {object: .bytecode.object}, deployedBytecode: {object: .deployedBytecode.object}}' \
-      "forge-artifacts/${name}.sol/${name}.json" > "$src"
-  done
-  git diff --exit-code bindings/rust/artifacts/
+  select_regex="^($(git ls-files ':(glob)src/**/*.sol' | sed 's#^.*/##; s#\.sol$##' | sort -u | paste -sd'|' -))$"
+  forge bind \
+    --bindings-path bindings/rust \
+    --crate-name base-contracts-bindings \
+    --select "$select_regex" \
+    --skip-build
+
+# Checks that the Rust bindings crate is in sync and compiles.
+bindings-check: build-source bindings-check-no-build
+  cd bindings/rust && cargo check
 
 # Checks interface correctness without building.
 interfaces-check-no-build:
@@ -420,7 +373,7 @@ check:
   reinitializer-check-no-build \
   interfaces-check-no-build \
   lint-forge-tests-check-no-build \
-  bindings-artifacts-check-no-build
+  bindings-check-no-build
 
 ########################################################
 #                      DEV TOOLS                       #
