@@ -11,6 +11,10 @@
     "initCodeHash": "0xe52c51805cfd55967d037173159f18aaf4344e32e5c8ad41f8d5d0025b1d36a8",
     "sourceCodeHash": "0xe5f2b1915a201c0b8a107f168f5b9bc8aec8e8e95f938082e42ba5b5c8ebbd11"
   },
+  "src/L1/FeesDepositor.sol:FeesDepositor:dispute": {
+    "initCodeHash": "0xe52c51805cfd55967d037173159f18aaf4344e32e5c8ad41f8d5d0025b1d36a8",
+    "sourceCodeHash": "0xe5f2b1915a201c0b8a107f168f5b9bc8aec8e8e95f938082e42ba5b5c8ebbd11"
+  },
   "src/L1/L1CrossDomainMessenger.sol:L1CrossDomainMessenger": {
     "initCodeHash": "0x3dc659aafb03bd357f92abfc6794af89ee0ddd5212364551637422bf8d0b00f9",
     "sourceCodeHash": "0xfd67aae7ef1d684f3fccc036a80123e0ffa13de3e26c910cb7b927059c5a6289"
@@ -44,6 +48,10 @@
     "sourceCodeHash": "0x3b7b7a1023e6e87ce4680eee3cc4eebefc15b5ec80db3d39e824fbdd521762db"
   },
   "src/L1/SuperchainConfig.sol:SuperchainConfig": {
+    "initCodeHash": "0x9b1f3555b499709485d51d5d9665002c0eb1e5eb893be1fb978a30749e894858",
+    "sourceCodeHash": "0x572b5da38443fa5fc1c1873a733adee1894c6eba94f0e7867f2e81c5eb616a39"
+  },
+  "src/L1/SuperchainConfig.sol:SuperchainConfig:dispute": {
     "initCodeHash": "0x9b1f3555b499709485d51d5d9665002c0eb1e5eb893be1fb978a30749e894858",
     "sourceCodeHash": "0x572b5da38443fa5fc1c1873a733adee1894c6eba94f0e7867f2e81c5eb616a39"
   },
@@ -235,11 +243,23 @@
     "initCodeHash": "0xc3866b1d4515c9d7b0ac6679b182d836f79371402d9e649e301b24cf8ae8fade",
     "sourceCodeHash": "0x98267b52a71222506c4893d6632dc5a36dd197a8d60de9a1f6578a80f7ebdf2d"
   },
+  "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
+    "initCodeHash": "0xe28eaeecda21594f6db23bb70127daa2b7b71debe38ce65b598f28d78d2561eb",
+    "sourceCodeHash": "0x98267b52a71222506c4893d6632dc5a36dd197a8d60de9a1f6578a80f7ebdf2d"
+  },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
     "initCodeHash": "0x09760f3a16c82db6a0e292a394d8a97cc34cc4aa799aeee9c1e064c9e8181050",
     "sourceCodeHash": "0xae23e7c3e21c373d491a0e496ece54c63b5ad09171db1a011011eae3e2831c72"
   },
+  "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry:dispute": {
+    "initCodeHash": "0x7345fbc8139f09132ad1ee8432a0e30361e6e92b2cca18855cec81093f5f4ea7",
+    "sourceCodeHash": "0xae23e7c3e21c373d491a0e496ece54c63b5ad09171db1a011011eae3e2831c72"
+  },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
+    "initCodeHash": "0xd65f1d604f979045a86d662e168cb7a867478da8a0ca294181872a90d209a66f",
+    "sourceCodeHash": "0xe8aa3c0710ee72546da52957730c11dc932065c444a013658bd2f5fd0c79085d"
+  },
+  "src/multiproof/tee/TEEVerifier.sol:TEEVerifier:dispute": {
     "initCodeHash": "0xd65f1d604f979045a86d662e168cb7a867478da8a0ca294181872a90d209a66f",
     "sourceCodeHash": "0xe8aa3c0710ee72546da52957730c11dc932065c444a013658bd2f5fd0c79085d"
   },
