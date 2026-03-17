@@ -249,14 +249,14 @@ bindings-add SOL_PATH: build-source
   mod_file="${rust_dir}/mod.rs"
   artifact="bindings/rust/artifacts/${contract}.json"
 
+  # Ensure output directories exist before writing generated files.
+  mkdir -p "bindings/rust/artifacts" "$rust_dir"
+
   # 1. Strip artifact
   jq '{abi, bytecode: {object: .bytecode.object}, deployedBytecode: {object: .deployedBytecode.object}}' \
     "forge-artifacts/${contract}.sol/${contract}.json" > "$artifact"
 
-  # 2. Create module directory if needed
-  mkdir -p "$rust_dir"
-
-  # 3. Create .rs file
+  # 2. Create .rs file
   cat > "$rust_file" << EOF
   use alloy_sol_types::sol;
 
@@ -270,19 +270,19 @@ bindings-add SOL_PATH: build-source
   );
   EOF
 
-  # 4. Add to mod.rs (skip if already present)
+  # 3. Add to mod.rs (skip if already present)
   if ! grep -q "mod ${snake};" "$mod_file" 2>/dev/null; then
     echo "" >> "$mod_file"
     echo "mod ${snake};" >> "$mod_file"
     echo "pub use ${snake}::${contract};" >> "$mod_file"
   fi
 
-  # 5. Add module to lib.rs (skip if already present)
+  # 4. Add module to lib.rs (skip if already present)
   if ! grep -q "pub mod ${module};" "bindings/rust/src/lib.rs" 2>/dev/null; then
     echo "pub mod ${module};" >> "bindings/rust/src/lib.rs"
   fi
 
-  # 6. Format generated code
+  # 5. Format generated code
   cd bindings/rust && cargo fmt
 
   echo "Added binding: ${contract} -> ${rust_file}"
