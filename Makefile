@@ -21,7 +21,8 @@ deps: clean-lib
 		github.com/Vectorized/solady@502cc1ea718e6fa73b380635ee0868b0740595f0 \
 		github.com/base/nitro-validator@0f006d2075637dd9640e530c4a7065f5c8bb2132 \
 		github.com/base/op-enclave@a2d5398f04c3a8e4df929d58ee638ba4a037bfec \
-		github.com/automata-network/aws-nitro-enclave-attestation@10fe7be8d9840490f5655e4b2a2aba3a95ec88c1
+		github.com/risc0/risc0-ethereum@a78ac4a52fe9cfa14120c3b496430f0d42e1d8d3 \
+		github.com/succinctlabs/sp1-contracts@22c4a47cd0a388cb4e25b4f2513954e4275c74ca
 	forge install --no-git \
 		github.com/ethereum-optimism/superchain-registry@84bce73573f130008d84bae6e924163bab589a11
 	@# openzeppelin-contracts-v5 and solady-v0.0.245 use the same orgs as their

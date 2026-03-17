@@ -11,12 +11,8 @@ import {
     BatchVerifierJournal,
     VerificationResult
 } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
-import {
-    IRiscZeroVerifier
-} from "lib/aws-nitro-enclave-attestation/contracts/lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
-import {
-    ISP1Verifier
-} from "lib/aws-nitro-enclave-attestation/contracts/lib/sp1-contracts/contracts/src/ISP1Verifier.sol";
+import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
+import { ISP1Verifier } from "lib/sp1-contracts/contracts/src/ISP1Verifier.sol";
 
 /**
  * @title NitroEnclaveVerifier
