@@ -63,7 +63,16 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Check Rust bindings
-        run: just bindings-check
+        run: |
+          forge --version
+          just --version
+          rustc --version
+          cargo --version
+          if ! just bindings-check; then
+            git status --short -- bindings/rust
+            git diff -- bindings/rust
+            exit 1
+          fi
 
       - name: Run Forge tests
         run: just test
