@@ -68,8 +68,13 @@ jobs:
           just --version
           rustc --version
           cargo --version
+          select_regex="^($(git ls-files ':(glob)src/**/*.sol' | sed 's#^.*/##; s#\.sol$##' | sort -u | paste -sd'|' -))$"
           set +e
-          just bindings-check-no-build
+          forge bind \
+            --bindings-path bindings/rust \
+            --crate-name base-contracts-bindings \
+            --select "$select_regex" \
+            --skip-build
           status=$?
           set -e
           if [ "$status" -ne 0 ]; then
