@@ -81,6 +81,13 @@ jobs:
       - name: Debug Rust bindings mismatch
         if: steps.rust-bindings-check.outcome == 'failure'
         run: |
+          select_regex="^($(git ls-files ':(glob)src/**/*.sol' | sed 's#^.*/##; s#\.sol$##' | sort -u | paste -sd'|' -))$"
+          forge bind \
+            --bindings-path bindings/rust \
+            --crate-name base-contracts-bindings \
+            --select "$select_regex" \
+            --skip-build \
+            --overwrite
           git status --short -- bindings/rust
           git diff -- bindings/rust/src/admin_faucet_auth_module.rs || true
           git diff -- bindings/rust || true
