@@ -118,9 +118,9 @@ contract DeployDevNoNitro is Script {
 
         vm.startBroadcast();
 
-        _registerProposer(cfg.teeProposer());
         _deployInfrastructure(gameType);
         _deployTEEContracts(cfg.finalSystemOwner());
+        _registerProposer(cfg.teeProposer());
         _deployAggregateVerifier(gameType);
 
         vm.stopBroadcast();

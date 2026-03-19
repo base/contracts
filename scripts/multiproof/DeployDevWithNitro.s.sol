@@ -152,9 +152,9 @@ contract DeployDevWithNitro is Script {
 
         vm.startBroadcast();
 
-        _registerProposer(cfg.teeProposer());
         _deployInfrastructure(gameType);
         _deployTEEContracts(cfg.finalSystemOwner(), cfg.nitroEnclaveVerifier());
+        _registerProposer(cfg.teeProposer());
         _deployAggregateVerifier(gameType);
 
         vm.stopBroadcast();
