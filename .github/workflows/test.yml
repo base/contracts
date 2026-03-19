@@ -81,16 +81,34 @@ jobs:
       - name: Debug Rust bindings mismatch
         if: steps.rust-bindings-check.outcome == 'failure'
         run: |
-          select_regex="^($(git ls-files ':(glob)src/**/*.sol' | sed 's#^.*/##; s#\.sol$##' | sort -u | paste -sd'|' -))$"
-          forge bind \
-            --bindings-path bindings/rust \
-            --crate-name base-contracts-bindings \
-            --select "$select_regex" \
-            --skip-build \
-            --overwrite
+          echo "== Recursive submodule status =="
+          git submodule status --recursive
+
+          echo "== bindings/rust status =="
           git status --short -- bindings/rust
-          git diff -- bindings/rust/src/admin_faucet_auth_module.rs || true
-          git diff -- bindings/rust || true
+
+          echo "== AdminFaucetAuthModule artifact diagnostics =="
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          path = Path("forge-artifacts/AdminFaucetAuthModule.sol/AdminFaucetAuthModule.json")
+          data = json.loads(path.read_text())
+
+          bytecode = data["bytecode"]["object"]
+          deployed = data["deployedBytecode"]["object"]
+          metadata = data.get("metadata", "")
+
+          print(f"artifact_path={path}")
+          print(f"bytecode_len={len(bytecode)}")
+          print(f"deployed_bytecode_len={len(deployed)}")
+          print(f"bytecode_sha256={hashlib.sha256(bytecode.encode()).hexdigest()}")
+          print(f"deployed_bytecode_sha256={hashlib.sha256(deployed.encode()).hexdigest()}")
+          print(f"metadata_sha256={hashlib.sha256(metadata.encode()).hexdigest()}")
+          print(f"bytecode_suffix={bytecode[-120:]}")
+          print(f"deployed_bytecode_suffix={deployed[-120:]}")
+          PY
           exit 1
 
       - name: Run Forge tests
