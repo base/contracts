@@ -99,13 +99,14 @@ jobs:
           bytecode = data["bytecode"]["object"]
           deployed = data["deployedBytecode"]["object"]
           metadata = data.get("metadata", "")
+          metadata_json = json.dumps(metadata, sort_keys=True)
 
           print(f"artifact_path={path}")
           print(f"bytecode_len={len(bytecode)}")
           print(f"deployed_bytecode_len={len(deployed)}")
           print(f"bytecode_sha256={hashlib.sha256(bytecode.encode()).hexdigest()}")
           print(f"deployed_bytecode_sha256={hashlib.sha256(deployed.encode()).hexdigest()}")
-          print(f"metadata_sha256={hashlib.sha256(metadata.encode()).hexdigest()}")
+          print(f"metadata_sha256={hashlib.sha256(metadata_json.encode()).hexdigest()}")
           print(f"bytecode_suffix={bytecode[-120:]}")
           print(f"deployed_bytecode_suffix={deployed[-120:]}")
           PY
