@@ -68,11 +68,16 @@ jobs:
           just --version
           rustc --version
           cargo --version
-          if ! just bindings-check; then
+          set +e
+          just bindings-check-no-build
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
             git status --short -- bindings/rust
-            git diff -- bindings/rust
-            exit 1
+            git diff -- bindings/rust/src/admin_faucet_auth_module.rs || true
+            exit "$status"
           fi
+          cd bindings/rust && cargo check
 
       - name: Run Forge tests
         run: just test
