@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
-import { GameType, Hash } from "src/dispute/lib/Types.sol";
+import { GameType, Hash, Proposal } from "src/dispute/lib/Types.sol";
 
 /// @title MockAnchorStateRegistry
 /// @notice Minimal mock for testing - stores anchor state and factory reference.
@@ -41,6 +41,12 @@ contract MockAnchorStateRegistry {
     /// @return The anchor root hash and L2 block number.
     function getAnchorRoot() external view returns (Hash, uint256) {
         return (anchorRoot, anchorL2BlockNumber);
+    }
+
+    /// @notice Returns the starting anchor root as a Proposal.
+    /// @return The anchor root as a Proposal struct.
+    function getStartingAnchorRoot() external view returns (Proposal memory) {
+        return Proposal({ root: anchorRoot, l2SequenceNumber: anchorL2BlockNumber });
     }
 
     /// @notice Returns the dispute game factory address.
