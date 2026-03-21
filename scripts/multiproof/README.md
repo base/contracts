@@ -89,11 +89,11 @@ This returns a raw byte array representing an uncompressed secp256k1 public key 
 
 ```bash
 # Example — replace the array with the actual bytes returned by enclave_signerPublicKey
-% cast keccak $(python3 -c "data=[4,155,107,175,137,123,186,174,83,167,173,206,55,138,218,209,181,42,87,20,116,162,104,100,19,14,59,133,233,253,147,253,236,102,24,76,164,146,220,67,146,235,73,9,142,114,242,170,122,102,175,104,24,235,26,93,14,6,81,84,116,33,71,62,237]; print('0x' + bytes(data[1:]).hex())")
-0xaafcb729589f27eb76b25a90080f42420846c613158d7b4334257c78be5a9b90
-
-% cast to-check-sum-address 0x080f42420846c613158d7b4334257c78be5a9b90
-0x080f42420846c613158D7b4334257C78bE5A9B90
+% PUB_KEY_HEX=$(python3 -c 'data=[4,100,32,206,76,214,221,167,247,152,244,81,135,139,245,114,92,16,194,181,5,126,180,170,159,214,176,6,51,103,228,117,224,176,243,160,107,112,6,214,20,46,169,42,75,45,190,178,224,54,111,208,42,6,11,198,138,118,144,226,1,147,38,86,196]; print("0x" + bytes(data[1:]).hex())')
+% HASH=$(cast keccak $PUB_KEY_HEX)
+% RAW_ADDRESS="0x${HASH: -40}"
+% cast to-check-sum-address $RAW_ADDRESS
+0x0cbe4A965B41DA6B2D5AF4d53c0C16a37d6f9F7D
 ```
 
 ### Step 5: Register the dev signer
