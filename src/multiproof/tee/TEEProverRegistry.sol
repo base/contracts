@@ -80,7 +80,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
     constructor(INitroEnclaveVerifier nitroVerifier) {
         NITRO_VERIFIER = nitroVerifier;
-        initialize({ initialOwner: address(0xdEaD), initialManager: address(0xdEaD) });
+        initialize({ initialOwner: address(0xdEaD), initialManager: address(0xdEaD), initialProposer: address(0) });
     }
 
     /// @notice Sets the proposer address.
@@ -162,13 +162,18 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         return _registeredSigners.values();
     }
 
-    /// @notice Initializes the contract with owner and manager.
+    /// @notice Initializes the contract with owner, manager, and an optional initial proposer.
     /// @param initialOwner The initial owner address.
     /// @param initialManager The initial manager address.
-    function initialize(address initialOwner, address initialManager) public initializer {
+    /// @param initialProposer The initial proposer address (set to address(0) to skip).
+    function initialize(address initialOwner, address initialManager, address initialProposer) public initializer {
         __OwnableManaged_init();
         transferOwnership(initialOwner);
         transferManagement(initialManager);
+        if (initialProposer != address(0)) {
+            isValidProposer[initialProposer] = true;
+            emit ProposerSet(initialProposer, true);
+        }
     }
 
     /// @notice Semantic version.
