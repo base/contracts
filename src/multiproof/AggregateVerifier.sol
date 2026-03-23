@@ -166,9 +166,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     event Challenged(address indexed challenger, uint256 intermediateRootIndex);
 
     /// @notice Emitted when the game is proved.
-    /// @param prover The address of the prover.
+    /// @param proposer The address of the proposer.
     /// @param proofType The type of proof.
-    event Proved(address indexed prover, ProofType indexed proofType);
+    event Proved(address indexed proposer, ProofType indexed proofType);
 
     /// @notice Emitted when the game is nullified.
     /// @param nullifier The address of the nullifier.
@@ -748,13 +748,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         return _getArgUint32(0x74);
     }
 
-    function _proofVerifiedUpdate(ProofType proofType, address prover) internal {
-        proofTypeToProver[proofType] = prover;
+    function _proofVerifiedUpdate(ProofType proofType, address proposer) internal {
+        proofTypeToProver[proofType] = proposer;
         proofCount += 1;
 
         _decreaseExpectedResolution();
 
-        emit Proved(prover, proofType);
+        emit Proved(proposer, proofType);
     }
 
     /// @notice Decreases the expected resolution timestamp.
@@ -811,7 +811,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     function _verifyProof(
         bytes calldata proofBytes,
         ProofType proofType,
-        address prover,
+        address proposer,
         bytes32 l1OriginHash,
         bytes32 startingRoot,
         uint256 startingL2SequenceNumber,
@@ -827,7 +827,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         if (proofType == ProofType.TEE) {
             _verifyTeeProof(
                 proofBytes,
-                prover,
+                proposer,
                 l1OriginHash,
                 startingRoot,
                 startingL2SequenceNumber,
@@ -838,7 +838,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         } else if (proofType == ProofType.ZK) {
             _verifyZkProof(
                 proofBytes,
-                prover,
+                proposer,
                 l1OriginHash,
                 startingRoot,
                 startingL2SequenceNumber,
@@ -855,7 +855,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param proofBytes The proof: signature(65).
     function _verifyTeeProof(
         bytes calldata proofBytes,
-        address prover,
+        address proposer,
         bytes32 l1OriginHash,
         bytes32 startingRoot,
         uint256 startingL2SequenceNumber,
@@ -868,7 +868,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     {
         bytes32 journal = keccak256(
             abi.encodePacked(
-                prover,
+                proposer,
                 l1OriginHash,
                 startingRoot,
                 startingL2SequenceNumber,
@@ -881,7 +881,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         );
 
         // Validate the proof.
-        bytes memory proof = abi.encodePacked(prover, proofBytes);
+        bytes memory proof = abi.encodePacked(proposer, proofBytes);
         if (!TEE_VERIFIER.verify(proof, TEE_IMAGE_HASH, journal)) revert InvalidProof();
     }
 
@@ -889,7 +889,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param proofBytes The proof: zkProof (variable).
     function _verifyZkProof(
         bytes calldata proofBytes,
-        address prover,
+        address proposer,
         bytes32 l1OriginHash,
         bytes32 startingRoot,
         uint256 startingL2SequenceNumber,
@@ -902,7 +902,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     {
         bytes32 journal = keccak256(
             abi.encodePacked(
-                prover,
+                proposer,
                 l1OriginHash,
                 startingRoot,
                 startingL2SequenceNumber,
