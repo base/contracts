@@ -59,6 +59,12 @@ jobs:
           just semver-lock-no-build
           git diff --exit-code snapshots/semver-lock.json
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check Rust bindings
+        run: just bindings-check
+
       - name: Run Forge tests
         run: just test
         id: test

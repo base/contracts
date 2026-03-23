@@ -222,6 +222,25 @@ snapshots-no-build: snapshots-abi-storage-no-build semver-lock-no-build
 snapshots: build-source snapshots-no-build
 
 
+
+########################################################
+#                       BINDINGS                       #
+########################################################
+
+# Regenerates the Rust bindings crate from all contracts under src/.
+bindings-generate: build-source
+  #!/bin/bash
+  set -euo pipefail
+  # forge bind filters by contract name, so derive an exact-match regex from src/*.sol filenames.
+  select_regex="^($(git ls-files ':(glob)src/**/*.sol' | sed 's#^.*/##; s#\.sol$##' | sort -u | paste -sd'|' -))$"
+  forge bind \
+    --bindings-path bindings/rust \
+    --crate-name base-contracts-bindings \
+    --select "$select_regex" \
+    --skip-build \
+    --overwrite
+
+
 ########################################################
 #                        CHECKS                        #
 ########################################################
@@ -231,6 +250,21 @@ snapshots-check-no-build: snapshots-no-build
 
 # Checks if the snapshots are up to date.
 snapshots-check: build snapshots-check-no-build
+
+# Checks that the committed Rust bindings are in sync with forge-artifacts.
+bindings-check-no-build:
+  #!/bin/bash
+  set -euo pipefail
+  select_regex="^($(git ls-files ':(glob)src/**/*.sol' | sed 's#^.*/##; s#\.sol$##' | sort -u | paste -sd'|' -))$"
+  forge bind \
+    --bindings-path bindings/rust \
+    --crate-name base-contracts-bindings \
+    --select "$select_regex" \
+    --skip-build
+
+# Checks that the Rust bindings crate is in sync and compiles.
+bindings-check: build-source bindings-check-no-build
+  cd bindings/rust && cargo check
 
 # Checks interface correctness without building.
 interfaces-check-no-build:
@@ -338,7 +372,8 @@ check:
   validate-spacers-no-build \
   reinitializer-check-no-build \
   interfaces-check-no-build \
-  lint-forge-tests-check-no-build
+  lint-forge-tests-check-no-build \
+  bindings-check-no-build
 
 ########################################################
 #                      DEV TOOLS                       #
