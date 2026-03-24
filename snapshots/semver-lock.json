@@ -241,19 +241,19 @@
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0xc3866b1d4515c9d7b0ac6679b182d836f79371402d9e649e301b24cf8ae8fade",
-    "sourceCodeHash": "0x98267b52a71222506c4893d6632dc5a36dd197a8d60de9a1f6578a80f7ebdf2d"
+    "sourceCodeHash": "0x2bd04b43f2434dec3b66bfcbfbaf3df2d70f18abb915c35ffda86ea3f543078d"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
     "initCodeHash": "0xe28eaeecda21594f6db23bb70127daa2b7b71debe38ce65b598f28d78d2561eb",
-    "sourceCodeHash": "0x98267b52a71222506c4893d6632dc5a36dd197a8d60de9a1f6578a80f7ebdf2d"
+    "sourceCodeHash": "0x2bd04b43f2434dec3b66bfcbfbaf3df2d70f18abb915c35ffda86ea3f543078d"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0x09760f3a16c82db6a0e292a394d8a97cc34cc4aa799aeee9c1e064c9e8181050",
-    "sourceCodeHash": "0xae23e7c3e21c373d491a0e496ece54c63b5ad09171db1a011011eae3e2831c72"
+    "initCodeHash": "0x2bf09852825e1b3f333d7d55a2ff7edfade0b58e2b95edd5b1d5f487bab41b87",
+    "sourceCodeHash": "0xe1e29c983a5d2577f016174e8957f58b2566989847d164b4569fa4fead0b65ca"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry:dispute": {
-    "initCodeHash": "0x7345fbc8139f09132ad1ee8432a0e30361e6e92b2cca18855cec81093f5f4ea7",
-    "sourceCodeHash": "0xae23e7c3e21c373d491a0e496ece54c63b5ad09171db1a011011eae3e2831c72"
+    "initCodeHash": "0x82c6830fc1ccea9fd261ac71f13369eefdca6dd51c3b81a591c4772b3e43e3e5",
+    "sourceCodeHash": "0xe1e29c983a5d2577f016174e8957f58b2566989847d164b4569fa4fead0b65ca"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0xd65f1d604f979045a86d662e168cb7a867478da8a0ca294181872a90d209a66f",

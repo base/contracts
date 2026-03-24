@@ -104,6 +104,11 @@
         "internalType": "address",
         "name": "initialManager",
         "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "initialProposer",
+        "type": "address"
       }
     ],
     "name": "initialize",

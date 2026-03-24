@@ -1,0 +1,1263 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_owner",
+        "type": "address"
+      },
+      {
+        "internalType": "uint64",
+        "name": "_maxTimeDiff",
+        "type": "uint64"
+      },
+      {
+        "internalType": "bytes32[]",
+        "name": "_initializeTrustedCerts",
+        "type": "bytes32[]"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes4",
+        "name": "_selector",
+        "type": "bytes4"
+      },
+      {
+        "internalType": "address",
+        "name": "_verifier",
+        "type": "address"
+      }
+    ],
+    "name": "addVerifyRoute",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes",
+        "name": "output",
+        "type": "bytes"
+      },
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoprocessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes",
+        "name": "proofBytes",
+        "type": "bytes"
+      }
+    ],
+    "name": "batchVerify",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "enum VerificationResult",
+            "name": "result",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint8",
+            "name": "trustedCertsPrefixLen",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint64",
+            "name": "timestamp",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bytes32[]",
+            "name": "certs",
+            "type": "bytes32[]"
+          },
+          {
+            "internalType": "bytes",
+            "name": "userData",
+            "type": "bytes"
+          },
+          {
+            "internalType": "bytes",
+            "name": "nonce",
+            "type": "bytes"
+          },
+          {
+            "internalType": "bytes",
+            "name": "publicKey",
+            "type": "bytes"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint64",
+                "name": "index",
+                "type": "uint64"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "bytes32",
+                    "name": "first",
+                    "type": "bytes32"
+                  },
+                  {
+                    "internalType": "bytes16",
+                    "name": "second",
+                    "type": "bytes16"
+                  }
+                ],
+                "internalType": "struct Bytes48",
+                "name": "value",
+                "type": "tuple"
+              }
+            ],
+            "internalType": "struct Pcr[]",
+            "name": "pcrs",
+            "type": "tuple[]"
+          },
+          {
+            "internalType": "string",
+            "name": "moduleId",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct VerifierJournal[]",
+        "name": "results",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "cancelOwnershipHandover",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32[][]",
+        "name": "_report_certs",
+        "type": "bytes32[][]"
+      }
+    ],
+    "name": "checkTrustedIntermediateCerts",
+    "outputs": [
+      {
+        "internalType": "uint8[]",
+        "name": "",
+        "type": "uint8[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pendingOwner",
+        "type": "address"
+      }
+    ],
+    "name": "completeOwnershipHandover",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes4",
+        "name": "_selector",
+        "type": "bytes4"
+      }
+    ],
+    "name": "freezeVerifyRoute",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      }
+    ],
+    "name": "getAggregatorIds",
+    "outputs": [
+      {
+        "internalType": "bytes32[]",
+        "name": "",
+        "type": "bytes32[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      }
+    ],
+    "name": "getVerifierIds",
+    "outputs": [
+      {
+        "internalType": "bytes32[]",
+        "name": "",
+        "type": "bytes32[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "_verifierId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "getVerifierProofId",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      }
+    ],
+    "name": "getZkConfig",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "verifierId",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "aggregatorId",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "zkVerifier",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct ZkCoProcessorConfig",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes4",
+        "name": "_selector",
+        "type": "bytes4"
+      }
+    ],
+    "name": "getZkVerifier",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "_aggregatorId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "isAggregatorIdSupported",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "_verifierId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "isVerifierIdSupported",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "maxTimeDiff",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "result",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "pendingOwner",
+        "type": "address"
+      }
+    ],
+    "name": "ownershipHandoverExpiresAt",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "result",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "proofSubmitter",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "_aggregatorId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "removeAggregatorId",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "_verifierId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "removeVerifierId",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "requestOwnershipHandover",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_certHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "revokeCert",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "rootCert",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "_maxTimeDiff",
+        "type": "uint64"
+      }
+    ],
+    "name": "setMaxTimeDiff",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_proofSubmitter",
+        "type": "address"
+      }
+    ],
+    "name": "setProofSubmitter",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_rootCert",
+        "type": "bytes32"
+      }
+    ],
+    "name": "setRootCert",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "verifierId",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "aggregatorId",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "zkVerifier",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct ZkCoProcessorConfig",
+        "name": "_config",
+        "type": "tuple"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "_verifierProofId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "setZkConfiguration",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "trustedCertHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "trustedIntermediateCerts",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "_newAggregatorId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "updateAggregatorId",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "_zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "_newVerifierId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "_newVerifierProofId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "updateVerifierId",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes",
+        "name": "output",
+        "type": "bytes"
+      },
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoprocessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes",
+        "name": "proofBytes",
+        "type": "bytes"
+      }
+    ],
+    "name": "verify",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "enum VerificationResult",
+            "name": "result",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint8",
+            "name": "trustedCertsPrefixLen",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint64",
+            "name": "timestamp",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bytes32[]",
+            "name": "certs",
+            "type": "bytes32[]"
+          },
+          {
+            "internalType": "bytes",
+            "name": "userData",
+            "type": "bytes"
+          },
+          {
+            "internalType": "bytes",
+            "name": "nonce",
+            "type": "bytes"
+          },
+          {
+            "internalType": "bytes",
+            "name": "publicKey",
+            "type": "bytes"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint64",
+                "name": "index",
+                "type": "uint64"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "bytes32",
+                    "name": "first",
+                    "type": "bytes32"
+                  },
+                  {
+                    "internalType": "bytes16",
+                    "name": "second",
+                    "type": "bytes16"
+                  }
+                ],
+                "internalType": "struct Bytes48",
+                "name": "value",
+                "type": "tuple"
+              }
+            ],
+            "internalType": "struct Pcr[]",
+            "name": "pcrs",
+            "type": "tuple[]"
+          },
+          {
+            "internalType": "string",
+            "name": "moduleId",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct VerifierJournal",
+        "name": "journal",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "name": "zkConfig",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "verifierId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "aggregatorId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "zkVerifier",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "newId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "AggregatorIdUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "enum VerificationResult",
+        "name": "result",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "output",
+        "type": "bytes"
+      }
+    ],
+    "name": "AttestationSubmitted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "verifierId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "encodedBatch",
+        "type": "bytes"
+      }
+    ],
+    "name": "BatchAttestationSubmitted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "certHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "CertRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "newMaxTimeDiff",
+        "type": "uint64"
+      }
+    ],
+    "name": "MaxTimeDiffUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "pendingOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipHandoverCanceled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "pendingOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipHandoverRequested",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "oldOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "programId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "isAggregator",
+        "type": "bool"
+      }
+    ],
+    "name": "ProgramIdRemoved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "newProofSubmitter",
+        "type": "address"
+      }
+    ],
+    "name": "ProofSubmitterChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "newRootCert",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RootCertChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "newId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "newProofId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "VerifierIdUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "verifierId",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "aggregatorId",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "zkVerifier",
+            "type": "address"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct ZkCoProcessorConfig",
+        "name": "config",
+        "type": "tuple"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "verifierProofId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "ZKConfigurationUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes4",
+        "name": "selector",
+        "type": "bytes4"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "verifier",
+        "type": "address"
+      }
+    ],
+    "name": "ZkRouteAdded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes4",
+        "name": "selector",
+        "type": "bytes4"
+      }
+    ],
+    "name": "ZkRouteWasFrozen",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "AlreadyInitialized",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "CallerNotProofSubmitter",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "identifier",
+        "type": "bytes32"
+      }
+    ],
+    "name": "CannotRemoveLatestProgramId",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "certHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "CertificateNotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NewOwnerIsZeroAddress",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NoHandoverRequest",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotImplemented",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "identifier",
+        "type": "bytes32"
+      }
+    ],
+    "name": "ProgramIdAlreadyLatest",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "identifier",
+        "type": "bytes32"
+      }
+    ],
+    "name": "ProgramIdNotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "actual",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RootCertMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Unauthorized",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Unknown_Zk_Coprocessor",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "actual",
+        "type": "bytes32"
+      }
+    ],
+    "name": "VerifierVkMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroMaxTimeDiff",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroProgramId",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroProofSubmitter",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroVerifierAddress",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes4",
+        "name": "selector",
+        "type": "bytes4"
+      }
+    ],
+    "name": "ZkRouteFrozen",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      }
+    ],
+    "name": "ZkVerifierNotConfigured",
+    "type": "error"
+  }
+]

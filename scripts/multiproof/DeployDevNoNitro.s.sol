@@ -120,7 +120,6 @@ contract DeployDevNoNitro is Script {
 
         _deployInfrastructure(gameType);
         _deployTEEContracts(cfg.finalSystemOwner());
-        _registerProposer(cfg.teeProposer());
         _deployAggregateVerifier(gameType);
 
         vm.stopBroadcast();
@@ -133,7 +132,9 @@ contract DeployDevNoNitro is Script {
         address scgImpl = address(new DevTEEProverRegistry(INitroEnclaveVerifier(address(0))));
         teeProverRegistryProxy = address(
             new TransparentUpgradeableProxy(
-                scgImpl, address(0xdead), abi.encodeCall(TEEProverRegistry.initialize, (owner, owner))
+                scgImpl,
+                address(0xdead),
+                abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, cfg.teeProposer()))
             )
         );
         console.log("DevTEEProverRegistry:", teeProverRegistryProxy);
