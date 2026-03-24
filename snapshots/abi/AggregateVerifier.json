@@ -852,7 +852,7 @@
       {
         "indexed": true,
         "internalType": "address",
-        "name": "prover",
+        "name": "proposer",
         "type": "address"
       },
       {
