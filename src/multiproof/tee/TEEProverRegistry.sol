@@ -36,9 +36,11 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     INitroEnclaveVerifier public immutable NITRO_VERIFIER;
 
     /// @notice The DisputeGameFactory used to look up the current AggregateVerifier and its TEE_IMAGE_HASH.
+    /// @dev Set once during initialization and cannot be changed. To update, redeploy the registry.
     IDisputeGameFactory public disputeGameFactory;
 
     /// @notice The game type used to look up the AggregateVerifier in the factory.
+    /// @dev Owner-settable to support game type migrations (e.g., moving to a permissioned type).
     GameType public gameType;
 
     /// @notice Mapping of whether a signer address is registered.
@@ -61,8 +63,8 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Emitted when the proposer is set.
     event ProposerSet(address indexed proposer, bool isValid);
 
-    /// @notice Emitted when the dispute game factory is updated.
-    event DisputeGameFactoryUpdated(address indexed factory, GameType gameType);
+    /// @notice Emitted when the game type is updated.
+    event GameTypeUpdated(GameType gameType);
 
     /// @notice Thrown when the attestation document is too old.
     error AttestationTooOld();
@@ -85,6 +87,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Thrown when reading TEE_IMAGE_HASH from the AggregateVerifier fails.
     error ImageHashReadFailed();
 
+    /// @notice Thrown when setting a game type whose AggregateVerifier has no TEE_IMAGE_HASH.
+    error InvalidGameType();
+
     constructor(INitroEnclaveVerifier nitroVerifier) {
         NITRO_VERIFIER = nitroVerifier;
         initialize({
@@ -104,13 +109,20 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         emit ProposerSet(proposer, isValid);
     }
 
-    /// @notice Sets the dispute game factory and game type used for PCR0 validation.
-    /// @param factory The DisputeGameFactory contract address.
-    /// @param gameType_ The game type ID for the AggregateVerifier.
-    function setDisputeGameFactory(IDisputeGameFactory factory, GameType gameType_) external onlyOwner {
-        disputeGameFactory = factory;
+    /// @notice Updates the game type used to look up the AggregateVerifier.
+    /// @dev Validates that the new game type has an AggregateVerifier with a non-zero TEE_IMAGE_HASH.
+    /// @param gameType_ The new game type ID.
+    function setGameType(GameType gameType_) external onlyOwner {
+        if (address(disputeGameFactory) == address(0)) revert DisputeGameFactoryNotSet();
+        // Validate the new game type points to a valid AggregateVerifier with a TEE_IMAGE_HASH
+        GameType oldGameType = gameType;
         gameType = gameType_;
-        emit DisputeGameFactoryUpdated(address(factory), gameType_);
+        bytes32 imageHash = _getExpectedImageHash();
+        if (imageHash == bytes32(0)) {
+            gameType = oldGameType;
+            revert InvalidGameType();
+        }
+        emit GameTypeUpdated(gameType_);
     }
 
     /// @notice Registers a signer using a ZK proof of an AWS Nitro attestation document.
@@ -182,7 +194,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @param initialOwner The initial owner address.
     /// @param initialManager The initial manager address.
     /// @param initialProposer The initial proposer address (set to address(0) to skip).
-    /// @param factory The DisputeGameFactory address (set to address(0) to skip).
+    /// @param factory The DisputeGameFactory address. Set once and cannot be changed.
     /// @param gameType_ The game type for the AggregateVerifier.
     function initialize(
         address initialOwner,
@@ -197,14 +209,11 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         __OwnableManaged_init();
         transferOwnership(initialOwner);
         transferManagement(initialManager);
+        disputeGameFactory = factory;
+        gameType = gameType_;
         if (initialProposer != address(0)) {
             isValidProposer[initialProposer] = true;
             emit ProposerSet(initialProposer, true);
-        }
-        if (address(factory) != address(0)) {
-            disputeGameFactory = factory;
-            gameType = gameType_;
-            emit DisputeGameFactoryUpdated(address(factory), gameType_);
         }
     }
 
