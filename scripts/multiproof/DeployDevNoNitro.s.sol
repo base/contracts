@@ -59,6 +59,7 @@ import { console2 as console } from "forge-std/console2.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { DisputeGameFactory } from "src/dispute/DisputeGameFactory.sol";
 import { GameType, Hash } from "src/dispute/lib/Types.sol";
 
@@ -134,7 +135,16 @@ contract DeployDevNoNitro is Script {
             new TransparentUpgradeableProxy(
                 scgImpl,
                 address(0xdead),
-                abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, cfg.teeProposer()))
+                abi.encodeCall(
+                    TEEProverRegistry.initialize,
+                    (
+                        owner,
+                        owner,
+                        cfg.teeProposer(),
+                        IDisputeGameFactory(disputeGameFactory),
+                        GameType.wrap(uint32(cfg.multiproofGameType()))
+                    )
+                )
             )
         );
         console.log("DevTEEProverRegistry:", teeProverRegistryProxy);
@@ -222,8 +232,7 @@ contract DeployDevNoNitro is Script {
         console.log("========================================");
         console.log("\n>>> NEXT STEP - Register dev signer (NO ATTESTATION NEEDED) <<<");
         console.log("\ncast send", teeProverRegistryProxy);
-        console.log('  "addDevSigner(address,bytes32)" <SIGNER_ADDRESS>');
-        console.log(" ", vm.toString(cfg.teeImageHash()));
+        console.log('  "addDevSigner(address)" <SIGNER_ADDRESS>');
         console.log("  --private-key <OWNER_KEY> --rpc-url <RPC>");
         console.log("\n========================================\n");
     }

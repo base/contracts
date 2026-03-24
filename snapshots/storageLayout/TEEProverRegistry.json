@@ -42,18 +42,25 @@
     "type": "uint256[48]"
   },
   {
-    "bytes": "32",
-    "label": "validPCR0s",
+    "bytes": "20",
+    "label": "disputeGameFactory",
     "offset": 0,
     "slot": "101",
-    "type": "mapping(bytes32 => bool)"
+    "type": "contract IDisputeGameFactory"
+  },
+  {
+    "bytes": "4",
+    "label": "gameType",
+    "offset": 20,
+    "slot": "101",
+    "type": "GameType"
   },
   {
     "bytes": "32",
-    "label": "signerPCR0",
+    "label": "isRegisteredSigner",
     "offset": 0,
     "slot": "102",
-    "type": "mapping(address => bytes32)"
+    "type": "mapping(address => bool)"
   },
   {
     "bytes": "32",

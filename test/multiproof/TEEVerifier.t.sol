@@ -8,6 +8,8 @@ import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
+import { GameType } from "src/dispute/lib/Types.sol";
 
 import { MockAnchorStateRegistry } from "scripts/multiproof/mocks/MockAnchorStateRegistry.sol";
 import { DevTEEProverRegistry } from "src/multiproof/mocks/MockDevTEEProverRegistry.sol";
@@ -24,8 +26,7 @@ contract TEEVerifierTest is Test {
     uint256 internal constant SIGNER_PRIVATE_KEY = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
     address internal signerAddress;
 
-    bytes32 internal constant PCR0_HASH = keccak256("test-pcr0");
-    bytes32 internal constant IMAGE_ID = PCR0_HASH; // imageId must match PCR0 hash
+    bytes32 internal constant IMAGE_ID = keccak256("test-image-id");
     address internal immutable PROPOSER = makeAddr("proposer");
 
     address internal owner;
@@ -44,13 +45,18 @@ contract TEEVerifierTest is Test {
 
         // Deploy proxy
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(impl), address(proxyAdmin), abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, address(0)))
+            address(impl),
+            address(proxyAdmin),
+            abi.encodeCall(
+                TEEProverRegistry.initialize,
+                (owner, owner, address(0), IDisputeGameFactory(address(0)), GameType.wrap(0))
+            )
         );
 
         teeProverRegistry = DevTEEProverRegistry(address(proxy));
 
-        // Register the signer with PCR0 hash
-        teeProverRegistry.addDevSigner(signerAddress, PCR0_HASH);
+        // Register the signer
+        teeProverRegistry.addDevSigner(signerAddress);
 
         // Set the proposer as valid
         teeProverRegistry.setProposer(PROPOSER, true);
@@ -73,7 +79,7 @@ contract TEEVerifierTest is Test {
         // Construct proof: proposer(20) + signature(65) = 85 bytes
         bytes memory proofBytes = abi.encodePacked(PROPOSER, signature);
 
-        // Verify should return true
+        // Verify should return true regardless of imageId (enforced via journal hash, not registry)
         bool result = verifier.verify(proofBytes, IMAGE_ID, journal);
         assertTrue(result);
     }
@@ -122,7 +128,8 @@ contract TEEVerifierTest is Test {
         verifier.verify(proofBytes, IMAGE_ID, journal);
     }
 
-    function testVerifyFailsWithImageIdMismatch() public {
+    function testVerifySucceedsWithAnyImageId() public view {
+        // imageId is no longer checked against the registry — it's enforced via journal hash
         bytes32 journal = keccak256("test-journal");
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
@@ -130,11 +137,9 @@ contract TEEVerifierTest is Test {
 
         bytes memory proofBytes = abi.encodePacked(PROPOSER, signature);
 
-        // Use a different imageId that doesn't match the registered PCR0
-        bytes32 wrongImageId = keccak256("wrong-image-id");
-
-        vm.expectRevert(abi.encodeWithSelector(TEEVerifier.ImageIdMismatch.selector, PCR0_HASH, wrongImageId));
-        verifier.verify(proofBytes, wrongImageId, journal);
+        // Different imageId should still pass — registry doesn't check it
+        bool result = verifier.verify(proofBytes, keccak256("different-image"), journal);
+        assertTrue(result);
     }
 
     function testVerifyFailsWithInvalidProofFormat() public {

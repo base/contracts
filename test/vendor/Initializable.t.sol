@@ -372,7 +372,10 @@ contract Initializer_Test is CommonTest {
             InitializeableContract({
                 name: "TEEProverRegistryImpl",
                 target: address(teeProverRegistry),
-                initCalldata: abi.encodeCall(TEEProverRegistry.initialize, (address(0), address(0), address(0)))
+                initCalldata: abi.encodeCall(
+                    TEEProverRegistry.initialize,
+                    (address(0), address(0), address(0), IDisputeGameFactory(address(0)), GameType.wrap(0))
+                )
             })
         );
     }

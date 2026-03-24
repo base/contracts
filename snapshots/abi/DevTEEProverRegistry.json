@@ -42,27 +42,9 @@
         "internalType": "address",
         "name": "signer",
         "type": "address"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "pcr0Hash",
-        "type": "bytes32"
       }
     ],
     "name": "addDevSigner",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes",
-        "name": "pcr0",
-        "type": "bytes"
-      }
-    ],
-    "name": "deregisterPCR0",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -78,6 +60,45 @@
     "name": "deregisterSigner",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "disputeGameFactory",
+    "outputs": [
+      {
+        "internalType": "contract IDisputeGameFactory",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "gameType",
+    "outputs": [
+      {
+        "internalType": "GameType",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getExpectedImageHash",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -109,11 +130,40 @@
         "internalType": "address",
         "name": "initialProposer",
         "type": "address"
+      },
+      {
+        "internalType": "contract IDisputeGameFactory",
+        "name": "factory",
+        "type": "address"
+      },
+      {
+        "internalType": "GameType",
+        "name": "gameType_",
+        "type": "uint32"
       }
     ],
     "name": "initialize",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "isRegisteredSigner",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -184,19 +234,6 @@
     "inputs": [
       {
         "internalType": "bytes",
-        "name": "pcr0",
-        "type": "bytes"
-      }
-    ],
-    "name": "registerPCR0",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes",
         "name": "output",
         "type": "bytes"
       },
@@ -228,6 +265,24 @@
   {
     "inputs": [
       {
+        "internalType": "contract IDisputeGameFactory",
+        "name": "factory",
+        "type": "address"
+      },
+      {
+        "internalType": "GameType",
+        "name": "gameType_",
+        "type": "uint32"
+      }
+    ],
+    "name": "setDisputeGameFactory",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "proposer",
         "type": "address"
@@ -241,25 +296,6 @@
     "name": "setProposer",
     "outputs": [],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "signerPCR0",
-    "outputs": [
-      {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -289,25 +325,6 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
-      }
-    ],
-    "name": "validPCR0s",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [],
     "name": "version",
     "outputs": [
@@ -319,6 +336,25 @@
     ],
     "stateMutability": "pure",
     "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "factory",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "GameType",
+        "name": "gameType",
+        "type": "uint32"
+      }
+    ],
+    "name": "DisputeGameFactoryUpdated",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -376,32 +412,6 @@
     "inputs": [
       {
         "indexed": true,
-        "internalType": "bytes32",
-        "name": "pcr0Hash",
-        "type": "bytes32"
-      }
-    ],
-    "name": "PCR0Deregistered",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "pcr0Hash",
-        "type": "bytes32"
-      }
-    ],
-    "name": "PCR0Registered",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
         "internalType": "address",
         "name": "proposer",
         "type": "address"
@@ -437,12 +447,6 @@
         "internalType": "address",
         "name": "signer",
         "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "pcr0",
-        "type": "bytes32"
       }
     ],
     "name": "SignerRegistered",
@@ -460,12 +464,33 @@
   },
   {
     "inputs": [],
-    "name": "InvalidPCR0",
+    "name": "DisputeGameFactoryNotSet",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ImageHashReadFailed",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "InvalidPublicKey",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "actual",
+        "type": "bytes32"
+      }
+    ],
+    "name": "PCR0Mismatch",
     "type": "error"
   },
   {

@@ -18,10 +18,9 @@ contract DevTEEProverRegistry is TEEProverRegistry {
     /// @notice Registers a signer for testing (bypasses attestation verification).
     /// @dev Only callable by owner. For development/testing use only.
     /// @param signer The address of the signer to register.
-    /// @param pcr0Hash The PCR0 hash to associate with this signer.
-    function addDevSigner(address signer, bytes32 pcr0Hash) external onlyOwner {
-        signerPCR0[signer] = pcr0Hash;
+    function addDevSigner(address signer) external onlyOwner {
+        isRegisteredSigner[signer] = true;
         _registeredSigners.add(signer);
-        emit SignerRegistered(signer, pcr0Hash);
+        emit SignerRegistered(signer);
     }
 }

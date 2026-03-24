@@ -12,13 +12,16 @@ import {
 import { OwnableManagedUpgradeable } from "lib/op-enclave/contracts/src/OwnableManagedUpgradeable.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { EnumerableSetLib } from "@solady-v0.0.245/utils/EnumerableSetLib.sol";
+import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
+import { GameType } from "src/dispute/lib/Types.sol";
 
 /// @title TEEProverRegistry
 /// @notice Manages TEE signer registration via ZK-verified AWS Nitro attestation.
 /// @dev Signers are registered by providing a ZK proof of a valid AWS Nitro attestation document,
 ///      verified through an external NitroEnclaveVerifier contract (Risc0).
-///      Each signer is associated with the PCR0 (enclave image hash) from their attestation,
-///      which allows TEEVerifier to validate that a signer was registered with a specific image.
+///      At registration time, the attestation's PCR0 is checked against the TEE_IMAGE_HASH from
+///      the current AggregateVerifier implementation in the DisputeGameFactory, ensuring only
+///      signers from the expected enclave image can register.
 contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     using EnumerableSetLib for EnumerableSetLib.AddressSet;
     /// @notice Maximum age of an attestation document (60 minutes), in seconds.
@@ -32,39 +35,34 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice The external NitroEnclaveVerifier contract used for ZK attestation verification.
     INitroEnclaveVerifier public immutable NITRO_VERIFIER;
 
-    /// @notice Mapping of valid PCR0s (enclave image hashes) attested from AWS Nitro.
-    /// @dev Only attestations with a PCR0 in this mapping can register signers.
-    mapping(bytes32 => bool) public validPCR0s;
+    /// @notice The DisputeGameFactory used to look up the current AggregateVerifier and its TEE_IMAGE_HASH.
+    IDisputeGameFactory public disputeGameFactory;
 
-    /// @notice Mapping of signer address to the PCR0 they were registered with.
-    /// @dev A non-zero value indicates the signer is valid and was registered with that PCR0.
-    mapping(address => bytes32) public signerPCR0;
+    /// @notice The game type used to look up the AggregateVerifier in the factory.
+    GameType public gameType;
+
+    /// @notice Mapping of whether a signer address is registered.
+    mapping(address => bool) public isRegisteredSigner;
 
     /// @notice Mapping of whether an address is a valid proposer.
     mapping(address => bool) public isValidProposer;
 
     /// @notice Enumerable set of all currently registered signer addresses.
-    /// @dev Kept in sync with `signerPCR0`: add on register, remove on deregister.
+    /// @dev Kept in sync with `isRegisteredSigner`: add on register, remove on deregister.
     ///      Enables O(1) on-chain enumeration via `getRegisteredSigners()`.
     EnumerableSetLib.AddressSet internal _registeredSigners;
 
     /// @notice Emitted when a signer is registered.
-    event SignerRegistered(address indexed signer, bytes32 indexed pcr0);
+    event SignerRegistered(address indexed signer);
 
     /// @notice Emitted when a signer is deregistered.
     event SignerDeregistered(address indexed signer);
 
-    /// @notice Emitted when a PCR0 is registered.
-    event PCR0Registered(bytes32 indexed pcr0Hash);
-
-    /// @notice Emitted when a PCR0 is deregistered.
-    event PCR0Deregistered(bytes32 indexed pcr0Hash);
-
     /// @notice Emitted when the proposer is set.
     event ProposerSet(address indexed proposer, bool isValid);
 
-    /// @notice Thrown when the PCR0 in the attestation is not registered as valid.
-    error InvalidPCR0();
+    /// @notice Emitted when the dispute game factory is updated.
+    event DisputeGameFactoryUpdated(address indexed factory, GameType gameType);
 
     /// @notice Thrown when the attestation document is too old.
     error AttestationTooOld();
@@ -72,15 +70,30 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Thrown when the ZK attestation verification fails.
     error AttestationVerificationFailed();
 
-    /// @notice Thrown when PCR0 (index 0) is not found in the attestation's PCR list.
-    error PCR0NotFound();
-
     /// @notice Thrown when the attestation's public key is too short to derive a signer address.
     error InvalidPublicKey();
 
+    /// @notice Thrown when PCR0 (index 0) is not found in the attestation's PCR list.
+    error PCR0NotFound();
+
+    /// @notice Thrown when the attestation's PCR0 does not match the expected TEE_IMAGE_HASH.
+    error PCR0Mismatch(bytes32 expected, bytes32 actual);
+
+    /// @notice Thrown when the dispute game factory is not configured.
+    error DisputeGameFactoryNotSet();
+
+    /// @notice Thrown when reading TEE_IMAGE_HASH from the AggregateVerifier fails.
+    error ImageHashReadFailed();
+
     constructor(INitroEnclaveVerifier nitroVerifier) {
         NITRO_VERIFIER = nitroVerifier;
-        initialize({ initialOwner: address(0xdEaD), initialManager: address(0xdEaD), initialProposer: address(0) });
+        initialize({
+            initialOwner: address(0xdEaD),
+            initialManager: address(0xdEaD),
+            initialProposer: address(0),
+            factory: IDisputeGameFactory(address(0)),
+            gameType_: GameType.wrap(0)
+        });
     }
 
     /// @notice Sets the proposer address.
@@ -91,38 +104,35 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         emit ProposerSet(proposer, isValid);
     }
 
-    /// @notice Registers a PCR0 (enclave image hash) as valid.
-    /// @param pcr0 The raw PCR0 bytes from the enclave.
-    function registerPCR0(bytes calldata pcr0) external onlyOwner {
-        bytes32 pcr0Hash = keccak256(pcr0);
-        validPCR0s[pcr0Hash] = true;
-        emit PCR0Registered(pcr0Hash);
-    }
-
-    /// @notice Deregisters a PCR0 (enclave image hash).
-    /// @param pcr0 The raw PCR0 bytes from the enclave.
-    function deregisterPCR0(bytes calldata pcr0) external onlyOwner {
-        bytes32 pcr0Hash = keccak256(pcr0);
-        delete validPCR0s[pcr0Hash];
-        emit PCR0Deregistered(pcr0Hash);
+    /// @notice Sets the dispute game factory and game type used for PCR0 validation.
+    /// @param factory The DisputeGameFactory contract address.
+    /// @param gameType_ The game type ID for the AggregateVerifier.
+    function setDisputeGameFactory(IDisputeGameFactory factory, GameType gameType_) external onlyOwner {
+        disputeGameFactory = factory;
+        gameType = gameType_;
+        emit DisputeGameFactoryUpdated(address(factory), gameType_);
     }
 
     /// @notice Registers a signer using a ZK proof of an AWS Nitro attestation document.
     /// @dev The ZK proof must verify a valid attestation that:
     ///      1. Has a valid AWS Nitro certificate chain (verified offchain via ZK)
-    ///      2. Contains a PCR0 that has been pre-registered via registerPCR0
+    ///      2. Has a PCR0 matching the TEE_IMAGE_HASH from the current AggregateVerifier
     ///      3. Is less than MAX_AGE old
     /// @param output The ABI-encoded VerifierJournal from the ZK proof.
     /// @param proofBytes The Risc0 ZK proof bytes.
     function registerSigner(bytes calldata output, bytes calldata proofBytes) external onlyOwnerOrManager {
+        if (address(disputeGameFactory) == address(0)) revert DisputeGameFactoryNotSet();
+
         VerifierJournal memory journal = NITRO_VERIFIER.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
 
         if (journal.result != VerificationResult.Success) revert AttestationVerificationFailed();
 
         if (journal.timestamp / MS_PER_SECOND + MAX_AGE <= block.timestamp) revert AttestationTooOld();
 
+        // Validate PCR0 against the current AggregateVerifier's TEE_IMAGE_HASH
         bytes32 pcr0Hash = _extractPCR0Hash(journal.pcrs);
-        if (!validPCR0s[pcr0Hash]) revert InvalidPCR0();
+        bytes32 expectedImageHash = _getExpectedImageHash();
+        if (pcr0Hash != expectedImageHash) revert PCR0Mismatch(expectedImageHash, pcr0Hash);
 
         // The publicKey is encoded in ANSI X9.62 format: 0x04 || x || y (65 bytes).
         // We skip the first byte (0x04 prefix) when hashing to derive the address.
@@ -134,15 +144,15 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         }
         address enclaveAddress = address(uint160(uint256(publicKeyHash)));
 
-        signerPCR0[enclaveAddress] = pcr0Hash;
+        isRegisteredSigner[enclaveAddress] = true;
         _registeredSigners.add(enclaveAddress);
-        emit SignerRegistered(enclaveAddress, pcr0Hash);
+        emit SignerRegistered(enclaveAddress);
     }
 
     /// @notice Deregisters a signer.
     /// @param signer The address of the signer to deregister.
     function deregisterSigner(address signer) external onlyOwnerOrManager {
-        delete signerPCR0[signer];
+        delete isRegisteredSigner[signer];
         _registeredSigners.remove(signer);
         emit SignerDeregistered(signer);
     }
@@ -151,7 +161,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @param signer The address to check.
     /// @return True if the signer is registered, false otherwise.
     function isValidSigner(address signer) external view returns (bool) {
-        return signerPCR0[signer] != bytes32(0);
+        return isRegisteredSigner[signer];
     }
 
     /// @notice Returns all currently registered signer addresses.
@@ -162,11 +172,28 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         return _registeredSigners.values();
     }
 
-    /// @notice Initializes the contract with owner, manager, and an optional initial proposer.
+    /// @notice Returns the expected TEE image hash from the current AggregateVerifier.
+    /// @return The TEE_IMAGE_HASH from the AggregateVerifier registered in the factory.
+    function getExpectedImageHash() external view returns (bytes32) {
+        return _getExpectedImageHash();
+    }
+
+    /// @notice Initializes the contract with owner, manager, proposer, and factory config.
     /// @param initialOwner The initial owner address.
     /// @param initialManager The initial manager address.
     /// @param initialProposer The initial proposer address (set to address(0) to skip).
-    function initialize(address initialOwner, address initialManager, address initialProposer) public initializer {
+    /// @param factory The DisputeGameFactory address (set to address(0) to skip).
+    /// @param gameType_ The game type for the AggregateVerifier.
+    function initialize(
+        address initialOwner,
+        address initialManager,
+        address initialProposer,
+        IDisputeGameFactory factory,
+        GameType gameType_
+    )
+        public
+        initializer
+    {
         __OwnableManaged_init();
         transferOwnership(initialOwner);
         transferManagement(initialManager);
@@ -174,12 +201,26 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
             isValidProposer[initialProposer] = true;
             emit ProposerSet(initialProposer, true);
         }
+        if (address(factory) != address(0)) {
+            disputeGameFactory = factory;
+            gameType = gameType_;
+            emit DisputeGameFactoryUpdated(address(factory), gameType_);
+        }
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.2.0
+    /// @custom:semver 0.3.0
     function version() public pure virtual returns (string memory) {
-        return "0.2.0";
+        return "0.3.0";
+    }
+
+    /// @dev Reads TEE_IMAGE_HASH from the AggregateVerifier registered in the factory.
+    function _getExpectedImageHash() internal view returns (bytes32) {
+        address impl = address(disputeGameFactory.gameImpls(gameType));
+        // AggregateVerifier.TEE_IMAGE_HASH() selector
+        (bool success, bytes memory data) = impl.staticcall(abi.encodeWithSignature("TEE_IMAGE_HASH()"));
+        if (!success || data.length != 32) revert ImageHashReadFailed();
+        return abi.decode(data, (bytes32));
     }
 
     /// @dev Finds PCR0 (index 0) in the PCR array and returns its keccak256 hash.
