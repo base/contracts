@@ -36,8 +36,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     INitroEnclaveVerifier public immutable NITRO_VERIFIER;
 
     /// @notice The DisputeGameFactory used to look up the current AggregateVerifier and its TEE_IMAGE_HASH.
-    /// @dev Set once during initialization and cannot be changed. To update, redeploy the registry.
-    IDisputeGameFactory public disputeGameFactory;
+    IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
 
     /// @notice The game type used to look up the AggregateVerifier in the factory.
     /// @dev Owner-settable to support game type migrations (e.g., moving to a permissioned type).
@@ -90,13 +89,14 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Thrown when setting a game type whose AggregateVerifier has no TEE_IMAGE_HASH.
     error InvalidGameType();
 
-    constructor(INitroEnclaveVerifier nitroVerifier) {
+    constructor(INitroEnclaveVerifier nitroVerifier, IDisputeGameFactory factory) {
+        if (address(factory) == address(0)) revert DisputeGameFactoryNotSet();
         NITRO_VERIFIER = nitroVerifier;
+        DISPUTE_GAME_FACTORY = factory;
         initialize({
             initialOwner: address(0xdEaD),
             initialManager: address(0xdEaD),
             initialProposer: address(0),
-            factory: IDisputeGameFactory(address(0)),
             gameType_: GameType.wrap(0)
         });
     }
@@ -113,7 +113,6 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @dev Validates that the new game type has an AggregateVerifier with a non-zero TEE_IMAGE_HASH.
     /// @param gameType_ The new game type ID.
     function setGameType(GameType gameType_) external onlyOwner {
-        if (address(disputeGameFactory) == address(0)) revert DisputeGameFactoryNotSet();
         // Validate the new game type points to a valid AggregateVerifier with a TEE_IMAGE_HASH
         GameType oldGameType = gameType;
         gameType = gameType_;
@@ -133,8 +132,6 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @param output The ABI-encoded VerifierJournal from the ZK proof.
     /// @param proofBytes The Risc0 ZK proof bytes.
     function registerSigner(bytes calldata output, bytes calldata proofBytes) external onlyOwnerOrManager {
-        if (address(disputeGameFactory) == address(0)) revert DisputeGameFactoryNotSet();
-
         VerifierJournal memory journal = NITRO_VERIFIER.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
 
         if (journal.result != VerificationResult.Success) revert AttestationVerificationFailed();
@@ -190,17 +187,15 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         return _getExpectedImageHash();
     }
 
-    /// @notice Initializes the contract with owner, manager, proposer, and factory config.
+    /// @notice Initializes the contract with owner, manager, proposer, and game type.
     /// @param initialOwner The initial owner address.
     /// @param initialManager The initial manager address.
     /// @param initialProposer The initial proposer address (set to address(0) to skip).
-    /// @param factory The DisputeGameFactory address. Set once and cannot be changed.
     /// @param gameType_ The game type for the AggregateVerifier.
     function initialize(
         address initialOwner,
         address initialManager,
         address initialProposer,
-        IDisputeGameFactory factory,
         GameType gameType_
     )
         public
@@ -209,7 +204,6 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         __OwnableManaged_init();
         transferOwnership(initialOwner);
         transferManagement(initialManager);
-        disputeGameFactory = factory;
         gameType = gameType_;
         if (initialProposer != address(0)) {
             isValidProposer[initialProposer] = true;
@@ -225,7 +219,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
     /// @dev Reads TEE_IMAGE_HASH from the AggregateVerifier registered in the factory.
     function _getExpectedImageHash() internal view returns (bytes32) {
-        address impl = address(disputeGameFactory.gameImpls(gameType));
+        address impl = address(DISPUTE_GAME_FACTORY.gameImpls(gameType));
         // AggregateVerifier.TEE_IMAGE_HASH() selector
         (bool success, bytes memory data) = impl.staticcall(abi.encodeWithSignature("TEE_IMAGE_HASH()"));
         if (!success || data.length != 32) revert ImageHashReadFailed();

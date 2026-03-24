@@ -164,7 +164,9 @@ contract DeployDevWithNitro is Script {
     }
 
     function _deployTEEContracts(address owner, address _nitroEnclaveVerifier) internal {
-        address scgImpl = address(new TEEProverRegistry(INitroEnclaveVerifier(_nitroEnclaveVerifier)));
+        address scgImpl = address(
+            new TEEProverRegistry(INitroEnclaveVerifier(_nitroEnclaveVerifier), IDisputeGameFactory(disputeGameFactory))
+        );
         console.log("NitroEnclaveVerifier (external):", _nitroEnclaveVerifier);
         teeProverRegistryProxy = address(
             new TransparentUpgradeableProxy(
@@ -172,13 +174,7 @@ contract DeployDevWithNitro is Script {
                 address(0xdead),
                 abi.encodeCall(
                     TEEProverRegistry.initialize,
-                    (
-                        owner,
-                        owner,
-                        cfg.teeProposer(),
-                        IDisputeGameFactory(disputeGameFactory),
-                        GameType.wrap(uint32(cfg.multiproofGameType()))
-                    )
+                    (owner, owner, cfg.teeProposer(), GameType.wrap(uint32(cfg.multiproofGameType())))
                 )
             )
         );

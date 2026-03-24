@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { EnumerableSetLib } from "@solady-v0.0.245/utils/EnumerableSetLib.sol";
 
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
@@ -13,7 +14,12 @@ import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 contract DevTEEProverRegistry is TEEProverRegistry {
     using EnumerableSetLib for EnumerableSetLib.AddressSet;
 
-    constructor(INitroEnclaveVerifier nitroVerifier) TEEProverRegistry(nitroVerifier) { }
+    constructor(
+        INitroEnclaveVerifier nitroVerifier,
+        IDisputeGameFactory factory
+    )
+        TEEProverRegistry(nitroVerifier, factory)
+    { }
 
     /// @notice Registers a signer for testing (bypasses attestation verification).
     /// @dev Only callable by owner. For development/testing use only.

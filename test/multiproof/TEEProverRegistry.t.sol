@@ -42,7 +42,8 @@ contract TEEProverRegistryTest is Test {
 
         // Deploy implementation (using DevTEEProverRegistry for test flexibility)
         // NitroEnclaveVerifier is not needed since tests use addDevSigner(), so pass address(0).
-        DevTEEProverRegistry impl = new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)));
+        DevTEEProverRegistry impl =
+            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(1)));
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));
@@ -51,10 +52,7 @@ contract TEEProverRegistryTest is Test {
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),
             address(proxyAdmin),
-            abi.encodeCall(
-                TEEProverRegistry.initialize,
-                (owner, manager, address(0), IDisputeGameFactory(address(0)), GameType.wrap(0))
-            )
+            abi.encodeCall(TEEProverRegistry.initialize, (owner, manager, address(0), GameType.wrap(0)))
         );
 
         teeProverRegistry = DevTEEProverRegistry(address(proxy));
@@ -70,15 +68,13 @@ contract TEEProverRegistryTest is Test {
 
     function testInitializationWithProposer() public {
         address proposer = makeAddr("proposer");
-        DevTEEProverRegistry impl2 = new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)));
+        DevTEEProverRegistry impl2 =
+            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(1)));
         ProxyAdmin proxyAdmin2 = new ProxyAdmin(address(this));
         TransparentUpgradeableProxy proxy2 = new TransparentUpgradeableProxy(
             address(impl2),
             address(proxyAdmin2),
-            abi.encodeCall(
-                TEEProverRegistry.initialize,
-                (owner, manager, proposer, IDisputeGameFactory(address(0)), GameType.wrap(0))
-            )
+            abi.encodeCall(TEEProverRegistry.initialize, (owner, manager, proposer, GameType.wrap(0)))
         );
         DevTEEProverRegistry registry2 = DevTEEProverRegistry(address(proxy2));
         assertTrue(registry2.isValidProposer(proposer));

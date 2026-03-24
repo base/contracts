@@ -38,7 +38,8 @@ contract TEEVerifierTest is Test {
         signerAddress = vm.addr(SIGNER_PRIVATE_KEY);
 
         // Deploy implementation (NitroEnclaveVerifier not needed for dev signer tests)
-        DevTEEProverRegistry impl = new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)));
+        DevTEEProverRegistry impl =
+            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(1)));
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));
@@ -47,10 +48,7 @@ contract TEEVerifierTest is Test {
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),
             address(proxyAdmin),
-            abi.encodeCall(
-                TEEProverRegistry.initialize,
-                (owner, owner, address(0), IDisputeGameFactory(address(0)), GameType.wrap(0))
-            )
+            abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, address(0), GameType.wrap(0)))
         );
 
         teeProverRegistry = DevTEEProverRegistry(address(proxy));
