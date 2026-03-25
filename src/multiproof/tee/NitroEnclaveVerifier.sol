@@ -116,9 +116,6 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
     /// @dev Thrown when the first certificate in a chain does not match the stored root certificate
     error RootCertMismatch(bytes32 expected, bytes32 actual);
 
-    /// @dev Thrown when calling verifyWithProgramId or batchVerifyWithProgramId, which are intentionally disabled
-    error NotImplemented();
-
     /// @dev Error thrown when a zero maxTimeDiff is provided
     error ZeroMaxTimeDiff();
 
