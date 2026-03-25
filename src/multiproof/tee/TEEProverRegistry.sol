@@ -155,7 +155,8 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         if (pubKey.length != 65) revert InvalidPublicKey();
         bytes32 publicKeyHash;
         assembly {
-            publicKeyHash := keccak256(add(pubKey, 0x21), sub(mload(pubKey), 1))
+            // Length is hardcoded to 64 to skip the 0x04 prefix and hash only the x and y coordinates
+            publicKeyHash := keccak256(add(pubKey, 0x21), 64)
         }
         address enclaveAddress = address(uint160(uint256(publicKeyHash)));
 
