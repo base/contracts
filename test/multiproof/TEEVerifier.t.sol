@@ -11,10 +11,33 @@ import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.so
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { GameType } from "src/dispute/lib/Types.sol";
 
+import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
 import { MockAnchorStateRegistry } from "scripts/multiproof/mocks/MockAnchorStateRegistry.sol";
 import { DevTEEProverRegistry } from "src/multiproof/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
+
+/// @notice Mock AggregateVerifier that returns a configurable TEE_IMAGE_HASH.
+contract MockAggregateVerifierForVerifier {
+    bytes32 public TEE_IMAGE_HASH;
+
+    constructor(bytes32 imageHash) {
+        TEE_IMAGE_HASH = imageHash;
+    }
+}
+
+/// @notice Mock DisputeGameFactory that returns a fixed game implementation.
+contract MockDisputeGameFactoryForVerifier {
+    mapping(uint32 => address) internal _impls;
+
+    function setImpl(uint32 gameType_, address impl) external {
+        _impls[gameType_] = impl;
+    }
+
+    function gameImpls(GameType gameType_) external view returns (IDisputeGame) {
+        return IDisputeGame(_impls[GameType.unwrap(gameType_)]);
+    }
+}
 
 contract TEEVerifierTest is Test {
     TEEVerifier public verifier;
@@ -27,6 +50,7 @@ contract TEEVerifierTest is Test {
     address internal signerAddress;
 
     bytes32 internal constant IMAGE_ID = keccak256("test-image-id");
+    uint32 internal constant TEST_GAME_TYPE = 621;
     address internal immutable PROPOSER = makeAddr("proposer");
 
     address internal owner;
@@ -37,9 +61,14 @@ contract TEEVerifierTest is Test {
         // Derive signer address from private key
         signerAddress = vm.addr(SIGNER_PRIVATE_KEY);
 
+        // Deploy mock factory and verifier
+        MockAggregateVerifierForVerifier mockVerifier = new MockAggregateVerifierForVerifier(IMAGE_ID);
+        MockDisputeGameFactoryForVerifier mockFactory = new MockDisputeGameFactoryForVerifier();
+        mockFactory.setImpl(TEST_GAME_TYPE, address(mockVerifier));
+
         // Deploy implementation (NitroEnclaveVerifier not needed for dev signer tests)
         DevTEEProverRegistry impl =
-            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(1)));
+            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(mockFactory)));
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));
@@ -48,13 +77,13 @@ contract TEEVerifierTest is Test {
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),
             address(proxyAdmin),
-            abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, address(0), GameType.wrap(0)))
+            abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, address(0), GameType.wrap(TEST_GAME_TYPE)))
         );
 
         teeProverRegistry = DevTEEProverRegistry(address(proxy));
 
-        // Register the signer
-        teeProverRegistry.addDevSigner(signerAddress);
+        // Register the signer with the correct image hash
+        teeProverRegistry.addDevSigner(signerAddress, IMAGE_ID);
 
         // Set the proposer as valid
         teeProverRegistry.setProposer(PROPOSER, true);

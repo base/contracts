@@ -42,16 +42,9 @@
     "type": "uint256[48]"
   },
   {
-    "bytes": "20",
-    "label": "disputeGameFactory",
-    "offset": 0,
-    "slot": "101",
-    "type": "contract IDisputeGameFactory"
-  },
-  {
     "bytes": "4",
     "label": "gameType",
-    "offset": 20,
+    "offset": 0,
     "slot": "101",
     "type": "GameType"
   },
@@ -64,16 +57,23 @@
   },
   {
     "bytes": "32",
-    "label": "isValidProposer",
+    "label": "signerImageHash",
     "offset": 0,
     "slot": "103",
+    "type": "mapping(address => bytes32)"
+  },
+  {
+    "bytes": "32",
+    "label": "isValidProposer",
+    "offset": 0,
+    "slot": "104",
     "type": "mapping(address => bool)"
   },
   {
     "bytes": "32",
     "label": "_registeredSigners",
     "offset": 0,
-    "slot": "104",
+    "slot": "105",
     "type": "struct EnumerableSetLib.AddressSet"
   }
 ]

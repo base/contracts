@@ -248,12 +248,12 @@
     "sourceCodeHash": "0x2bd04b43f2434dec3b66bfcbfbaf3df2d70f18abb915c35ffda86ea3f543078d"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0xccbeda0d718d3d8299f7e64476c6f201ba0fd8a314fc1301577dbf4ae122285c",
-    "sourceCodeHash": "0x929b5738c549880680b2bddd79208cc14520133723bc45ece8a97ef2443fbd2e"
+    "initCodeHash": "0x4c89ecad0d48b6da64ef7f489326aae63b7fbcd33f4fed949a496afd1be49009",
+    "sourceCodeHash": "0x71a4016022b8a15f5ceddf2d597700046fcbe9ce4dbc7d7f2174d68606b3c614"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry:dispute": {
-    "initCodeHash": "0xc7120267298755b20d49a2194cef9e0d359d8e69cb81b2764cbdf9f08a4f5138",
-    "sourceCodeHash": "0x929b5738c549880680b2bddd79208cc14520133723bc45ece8a97ef2443fbd2e"
+    "initCodeHash": "0xfd56342b83d37499a848961ec12f982cee40297a4c59c5d448ed5a78795d3751",
+    "sourceCodeHash": "0x71a4016022b8a15f5ceddf2d597700046fcbe9ce4dbc7d7f2174d68606b3c614"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0xed09dc370c79737be0ef5d75e8600337a4dba58d18062136f09a6dc095a0c2b0",

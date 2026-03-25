@@ -5,10 +5,28 @@
         "internalType": "contract INitroEnclaveVerifier",
         "name": "nitroVerifier",
         "type": "address"
+      },
+      {
+        "internalType": "contract IDisputeGameFactory",
+        "name": "factory",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
     "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "DISPUTE_GAME_FACTORY",
+    "outputs": [
+      {
+        "internalType": "contract IDisputeGameFactory",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [],
@@ -47,19 +65,6 @@
     "name": "deregisterSigner",
     "outputs": [],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "disputeGameFactory",
-    "outputs": [
-      {
-        "internalType": "contract IDisputeGameFactory",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -116,11 +121,6 @@
       {
         "internalType": "address",
         "name": "initialProposer",
-        "type": "address"
-      },
-      {
-        "internalType": "contract IDisputeGameFactory",
-        "name": "factory",
         "type": "address"
       },
       {
@@ -252,17 +252,12 @@
   {
     "inputs": [
       {
-        "internalType": "contract IDisputeGameFactory",
-        "name": "factory",
-        "type": "address"
-      },
-      {
         "internalType": "GameType",
         "name": "gameType_",
         "type": "uint32"
       }
     ],
-    "name": "setDisputeGameFactory",
+    "name": "setGameType",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -283,6 +278,25 @@
     "name": "setProposer",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "signerImageHash",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -328,19 +342,13 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": true,
-        "internalType": "address",
-        "name": "factory",
-        "type": "address"
-      },
-      {
         "indexed": false,
         "internalType": "GameType",
         "name": "gameType",
         "type": "uint32"
       }
     ],
-    "name": "DisputeGameFactoryUpdated",
+    "name": "GameTypeUpdated",
     "type": "event"
   },
   {
@@ -457,6 +465,11 @@
   {
     "inputs": [],
     "name": "ImageHashReadFailed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidGameType",
     "type": "error"
   },
   {

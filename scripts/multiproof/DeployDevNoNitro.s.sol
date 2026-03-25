@@ -228,7 +228,8 @@ contract DeployDevNoNitro is Script {
         console.log("========================================");
         console.log("\n>>> NEXT STEP - Register dev signer (NO ATTESTATION NEEDED) <<<");
         console.log("\ncast send", teeProverRegistryProxy);
-        console.log('  "addDevSigner(address)" <SIGNER_ADDRESS>');
+        console.log('  "addDevSigner(address,bytes32)" <SIGNER_ADDRESS>');
+        console.log(" ", vm.toString(cfg.teeImageHash()));
         console.log("  --private-key <OWNER_KEY> --rpc-url <RPC>");
         console.log("\n========================================\n");
     }

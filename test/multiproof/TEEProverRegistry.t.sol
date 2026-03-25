@@ -10,8 +10,32 @@ import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVe
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { GameType } from "src/dispute/lib/Types.sol";
 
+import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
+
 import { DevTEEProverRegistry } from "src/multiproof/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
+
+/// @notice Mock AggregateVerifier that returns a configurable TEE_IMAGE_HASH.
+contract MockAggregateVerifierForRegistry {
+    bytes32 public TEE_IMAGE_HASH;
+
+    constructor(bytes32 imageHash) {
+        TEE_IMAGE_HASH = imageHash;
+    }
+}
+
+/// @notice Mock DisputeGameFactory that returns a fixed game implementation.
+contract MockDisputeGameFactoryForRegistry {
+    mapping(uint32 => address) internal _impls;
+
+    function setImpl(uint32 gameType, address impl) external {
+        _impls[gameType] = impl;
+    }
+
+    function gameImpls(GameType gameType) external view returns (IDisputeGame) {
+        return IDisputeGame(_impls[GameType.unwrap(gameType)]);
+    }
+}
 
 /// @notice Tests for TEEProverRegistry and DevTEEProverRegistry contracts.
 /// @dev IMPORTANT: This test file uses DevTEEProverRegistry as the implementation because
@@ -24,10 +48,15 @@ import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 contract TEEProverRegistryTest is Test {
     DevTEEProverRegistry public teeProverRegistry;
     ProxyAdmin public proxyAdmin;
+    MockDisputeGameFactoryForRegistry public mockFactory;
+    MockAggregateVerifierForRegistry public mockVerifier;
 
     address public owner;
     address public manager;
     address public unauthorized;
+
+    bytes32 public constant TEST_IMAGE_HASH = keccak256("test-image-hash");
+    uint32 public constant TEST_GAME_TYPE = 621;
 
     // Events must be redeclared here because Solidity 0.8.15 doesn't support
     // referencing events from other contracts via qualified names (requires 0.8.21+)
@@ -40,10 +69,14 @@ contract TEEProverRegistryTest is Test {
         manager = makeAddr("manager");
         unauthorized = makeAddr("unauthorized");
 
+        // Deploy mock factory and verifier
+        mockVerifier = new MockAggregateVerifierForRegistry(TEST_IMAGE_HASH);
+        mockFactory = new MockDisputeGameFactoryForRegistry();
+        mockFactory.setImpl(TEST_GAME_TYPE, address(mockVerifier));
+
         // Deploy implementation (using DevTEEProverRegistry for test flexibility)
-        // NitroEnclaveVerifier is not needed since tests use addDevSigner(), so pass address(0).
         DevTEEProverRegistry impl =
-            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(1)));
+            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(mockFactory)));
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));
@@ -52,7 +85,7 @@ contract TEEProverRegistryTest is Test {
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),
             address(proxyAdmin),
-            abi.encodeCall(TEEProverRegistry.initialize, (owner, manager, address(0), GameType.wrap(0)))
+            abi.encodeCall(TEEProverRegistry.initialize, (owner, manager, address(0), GameType.wrap(TEST_GAME_TYPE)))
         );
 
         teeProverRegistry = DevTEEProverRegistry(address(proxy));
@@ -92,7 +125,7 @@ contract TEEProverRegistryTest is Test {
 
         // Add signer via DevTEEProverRegistry
         vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
 
         // Verify signer is registered
         assertTrue(teeProverRegistry.isValidSigner(signer));
@@ -112,7 +145,7 @@ contract TEEProverRegistryTest is Test {
 
         // Add signer via DevTEEProverRegistry
         vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
 
         assertTrue(teeProverRegistry.isValidSigner(signer));
 
@@ -167,7 +200,7 @@ contract TEEProverRegistryTest is Test {
         address signer = makeAddr("signer");
 
         vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
 
         assertTrue(teeProverRegistry.isValidSigner(signer));
     }
@@ -273,7 +306,7 @@ contract TEEProverRegistryTest is Test {
         emit SignerRegistered(signer);
 
         vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
 
         assertTrue(teeProverRegistry.isValidSigner(signer));
     }
@@ -283,23 +316,23 @@ contract TEEProverRegistryTest is Test {
 
         vm.prank(manager);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        teeProverRegistry.addDevSigner(signer);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
 
         vm.prank(unauthorized);
         vm.expectRevert("OwnableManaged: caller is not the owner");
-        teeProverRegistry.addDevSigner(signer);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
     }
 
     function testAddDevSignerIdempotent() public {
         address signer = makeAddr("dev-signer");
 
         vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
         assertTrue(teeProverRegistry.isValidSigner(signer));
 
         // Adding again should not revert
         vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
         assertTrue(teeProverRegistry.isValidSigner(signer));
     }
 
@@ -309,9 +342,9 @@ contract TEEProverRegistryTest is Test {
         address signer3 = makeAddr("dev-signer-3");
 
         vm.startPrank(owner);
-        teeProverRegistry.addDevSigner(signer1);
-        teeProverRegistry.addDevSigner(signer2);
-        teeProverRegistry.addDevSigner(signer3);
+        teeProverRegistry.addDevSigner(signer1, TEST_IMAGE_HASH);
+        teeProverRegistry.addDevSigner(signer2, TEST_IMAGE_HASH);
+        teeProverRegistry.addDevSigner(signer3, TEST_IMAGE_HASH);
         vm.stopPrank();
 
         assertTrue(teeProverRegistry.isValidSigner(signer1));
@@ -330,7 +363,7 @@ contract TEEProverRegistryTest is Test {
         address signer = makeAddr("signer");
 
         vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
 
         address[] memory signers = teeProverRegistry.getRegisteredSigners();
         assertEq(signers.length, 1);
@@ -341,7 +374,7 @@ contract TEEProverRegistryTest is Test {
         address signer = makeAddr("signer");
 
         vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
 
         assertEq(teeProverRegistry.getRegisteredSigners().length, 1);
 
@@ -358,9 +391,9 @@ contract TEEProverRegistryTest is Test {
         address signer3 = makeAddr("signer-3");
 
         vm.startPrank(owner);
-        teeProverRegistry.addDevSigner(signer1);
-        teeProverRegistry.addDevSigner(signer2);
-        teeProverRegistry.addDevSigner(signer3);
+        teeProverRegistry.addDevSigner(signer1, TEST_IMAGE_HASH);
+        teeProverRegistry.addDevSigner(signer2, TEST_IMAGE_HASH);
+        teeProverRegistry.addDevSigner(signer3, TEST_IMAGE_HASH);
         vm.stopPrank();
 
         address[] memory signers = teeProverRegistry.getRegisteredSigners();
@@ -387,9 +420,9 @@ contract TEEProverRegistryTest is Test {
 
         // Register three signers
         vm.startPrank(owner);
-        teeProverRegistry.addDevSigner(signer1);
-        teeProverRegistry.addDevSigner(signer2);
-        teeProverRegistry.addDevSigner(signer3);
+        teeProverRegistry.addDevSigner(signer1, TEST_IMAGE_HASH);
+        teeProverRegistry.addDevSigner(signer2, TEST_IMAGE_HASH);
+        teeProverRegistry.addDevSigner(signer3, TEST_IMAGE_HASH);
         vm.stopPrank();
 
         assertEq(teeProverRegistry.getRegisteredSigners().length, 3);
@@ -415,7 +448,7 @@ contract TEEProverRegistryTest is Test {
         address signer = makeAddr("signer");
 
         vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
 
         vm.prank(owner);
         teeProverRegistry.deregisterSigner(signer);

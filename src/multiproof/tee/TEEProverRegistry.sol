@@ -45,6 +45,12 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Mapping of whether a signer address is registered.
     mapping(address => bool) public isRegisteredSigner;
 
+    /// @notice Mapping of signer address to the PCR0 image hash they were registered with.
+    /// @dev Used as defense-in-depth: isValidSigner checks this against the current
+    ///      AggregateVerifier's TEE_IMAGE_HASH, so signers automatically become invalid
+    ///      when the AggregateVerifier upgrades to a new image hash.
+    mapping(address => bytes32) public signerImageHash;
+
     /// @notice Mapping of whether an address is a valid proposer.
     mapping(address => bool) public isValidProposer;
 
@@ -154,6 +160,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         address enclaveAddress = address(uint160(uint256(publicKeyHash)));
 
         isRegisteredSigner[enclaveAddress] = true;
+        signerImageHash[enclaveAddress] = expectedImageHash;
         _registeredSigners.add(enclaveAddress);
         emit SignerRegistered(enclaveAddress);
     }
@@ -162,15 +169,19 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @param signer The address of the signer to deregister.
     function deregisterSigner(address signer) external onlyOwnerOrManager {
         delete isRegisteredSigner[signer];
+        delete signerImageHash[signer];
         _registeredSigners.remove(signer);
         emit SignerDeregistered(signer);
     }
 
     /// @notice Checks if an address is a valid signer.
+    /// @dev Defense-in-depth: checks both that the signer is registered AND that their
+    ///      registered image hash matches the current AggregateVerifier's TEE_IMAGE_HASH.
+    ///      This ensures signers automatically become invalid when the AggregateVerifier upgrades.
     /// @param signer The address to check.
-    /// @return True if the signer is registered, false otherwise.
+    /// @return True if the signer is registered with the current image hash, false otherwise.
     function isValidSigner(address signer) external view returns (bool) {
-        return isRegisteredSigner[signer];
+        return isRegisteredSigner[signer] && signerImageHash[signer] == _getExpectedImageHash();
     }
 
     /// @notice Returns all currently registered signer addresses.
