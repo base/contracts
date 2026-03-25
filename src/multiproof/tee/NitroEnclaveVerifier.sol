@@ -13,6 +13,7 @@ import {
 } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
 import { ISP1Verifier } from "lib/sp1-contracts/contracts/src/ISP1Verifier.sol";
+import { ISemver } from "interfaces/universal/ISemver.sol";
 
 /**
  * @title NitroEnclaveVerifier
@@ -42,7 +43,7 @@ import { ISP1Verifier } from "lib/sp1-contracts/contracts/src/ISP1Verifier.sol";
  * - Intermediate certificates are automatically cached but can be revoked
  * - Timestamp validation prevents replay attacks within the configured time window
  */
-contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
+contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     /// @dev Sentinel address to indicate a route has been permanently frozen
@@ -162,107 +163,107 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
 
     /**
      * @dev Initializes the contract with owner, time tolerance and initial trusted certificates
-     * @param _owner Address to be set as the contract owner
-     * @param _maxTimeDiff Maximum time difference in seconds for timestamp validation
-     * @param _initializeTrustedCerts Array of initial trusted intermediate certificate hashes
-     * @param _rootCert Hash of the AWS Nitro Enclave root certificate
-     * @param _proofSubmitter Address that is authorized to submit proofs
-     * @param _zkCoProcessor Type of ZK coprocessor to configure (RiscZero or Succinct)
-     * @param _zkConfig Configuration parameters for the ZK coprocessor
-     * @param _verifierProofId The verifierProofId corresponding to the verifierId in _zkConfig
+     * @param owner Address to be set as the contract owner
+     * @param initialMaxTimeDiff Maximum time difference in seconds for timestamp validation
+     * @param initializeTrustedCerts Array of initial trusted intermediate certificate hashes
+     * @param initialRootCert Hash of the AWS Nitro Enclave root certificate
+     * @param initialProofSubmitter Address that is authorized to submit proofs
+     * @param zkCoProcessor Type of ZK coprocessor to configure (RiscZero or Succinct)
+     * @param config Configuration parameters for the ZK coprocessor
+     * @param verifierProofId The verifierProofId corresponding to the verifierId in config
      */
     constructor(
-        address _owner,
-        uint64 _maxTimeDiff,
-        bytes32[] memory _initializeTrustedCerts,
-        bytes32 _rootCert,
-        address _proofSubmitter,
-        ZkCoProcessorType _zkCoProcessor,
-        ZkCoProcessorConfig memory _zkConfig,
-        bytes32 _verifierProofId
+        address owner,
+        uint64 initialMaxTimeDiff,
+        bytes32[] memory initializeTrustedCerts,
+        bytes32 initialRootCert,
+        address initialProofSubmitter,
+        ZkCoProcessorType zkCoProcessor,
+        ZkCoProcessorConfig memory config,
+        bytes32 verifierProofId
     ) {
-        if (_maxTimeDiff == 0) revert ZeroMaxTimeDiff();
-        maxTimeDiff = _maxTimeDiff;
-        for (uint256 i = 0; i < _initializeTrustedCerts.length; i++) {
-            trustedIntermediateCerts[_initializeTrustedCerts[i]] = true;
+        if (initialMaxTimeDiff == 0) revert ZeroMaxTimeDiff();
+        maxTimeDiff = initialMaxTimeDiff;
+        for (uint256 i = 0; i < initializeTrustedCerts.length; i++) {
+            trustedIntermediateCerts[initializeTrustedCerts[i]] = true;
         }
-        _initializeOwner(_owner);
-        _setRootCert(_rootCert);
-        _setProofSubmitter(_proofSubmitter);
-        _setZkConfiguration(_zkCoProcessor, _zkConfig, _verifierProofId);
+        _initializeOwner(owner);
+        _setRootCert(initialRootCert);
+        _setProofSubmitter(initialProofSubmitter);
+        _setZkConfiguration(zkCoProcessor, config, verifierProofId);
     }
 
     // ============ Query Functions ============
 
     /**
      * @dev Retrieves the configuration for a specific coprocessor
-     * @param _zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
+     * @param zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
      * @return ZkCoProcessorConfig Configuration parameters including program IDs and verifier address
      */
-    function getZkConfig(ZkCoProcessorType _zkCoProcessor) external view returns (ZkCoProcessorConfig memory) {
-        return zkConfig[_zkCoProcessor];
+    function getZkConfig(ZkCoProcessorType zkCoProcessor) external view returns (ZkCoProcessorConfig memory) {
+        return zkConfig[zkCoProcessor];
     }
 
     /**
      * @dev Returns all supported verifier program IDs for a coprocessor
-     * @param _zkCoProcessor Type of ZK coprocessor
+     * @param zkCoProcessor Type of ZK coprocessor
      * @return Array of all supported verifier program IDs
      */
-    function getVerifierIds(ZkCoProcessorType _zkCoProcessor) external view returns (bytes32[] memory) {
-        return _verifierIdSet[_zkCoProcessor].values();
+    function getVerifierIds(ZkCoProcessorType zkCoProcessor) external view returns (bytes32[] memory) {
+        return _verifierIdSet[zkCoProcessor].values();
     }
 
     /**
      * @dev Returns all supported aggregator program IDs for a coprocessor
-     * @param _zkCoProcessor Type of ZK coprocessor
+     * @param zkCoProcessor Type of ZK coprocessor
      * @return Array of all supported aggregator program IDs
      */
-    function getAggregatorIds(ZkCoProcessorType _zkCoProcessor) external view returns (bytes32[] memory) {
-        return _aggregatorIdSet[_zkCoProcessor].values();
+    function getAggregatorIds(ZkCoProcessorType zkCoProcessor) external view returns (bytes32[] memory) {
+        return _aggregatorIdSet[zkCoProcessor].values();
     }
 
     /**
      * @dev Checks if a verifier program ID is in the supported set
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _verifierId Verifier program ID to check
+     * @param zkCoProcessor Type of ZK coprocessor
+     * @param verifierId Verifier program ID to check
      * @return True if the ID is supported
      */
-    function isVerifierIdSupported(ZkCoProcessorType _zkCoProcessor, bytes32 _verifierId) external view returns (bool) {
-        return _verifierIdSet[_zkCoProcessor].contains(_verifierId);
+    function isVerifierIdSupported(ZkCoProcessorType zkCoProcessor, bytes32 verifierId) external view returns (bool) {
+        return _verifierIdSet[zkCoProcessor].contains(verifierId);
     }
 
     /**
      * @dev Checks if an aggregator program ID is in the supported set
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _aggregatorId Aggregator program ID to check
+     * @param zkCoProcessor Type of ZK coprocessor
+     * @param aggregatorId Aggregator program ID to check
      * @return True if the ID is supported
      */
     function isAggregatorIdSupported(
-        ZkCoProcessorType _zkCoProcessor,
-        bytes32 _aggregatorId
+        ZkCoProcessorType zkCoProcessor,
+        bytes32 aggregatorId
     )
         external
         view
         returns (bool)
     {
-        return _aggregatorIdSet[_zkCoProcessor].contains(_aggregatorId);
+        return _aggregatorIdSet[zkCoProcessor].contains(aggregatorId);
     }
 
     /**
      * @dev Gets the verifier address for a specific route
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _selector Proof selector
+     * @param zkCoProcessor Type of ZK coprocessor
+     * @param selector Proof selector
      * @return Verifier address (route-specific or default fallback)
      */
-    function getZkVerifier(ZkCoProcessorType _zkCoProcessor, bytes4 _selector) external view returns (address) {
-        address verifier = _zkVerifierRoutes[_zkCoProcessor][_selector];
+    function getZkVerifier(ZkCoProcessorType zkCoProcessor, bytes4 selector) external view returns (address) {
+        address verifier = _zkVerifierRoutes[zkCoProcessor][selector];
 
         if (verifier == FROZEN) {
-            revert ZkRouteFrozen(_zkCoProcessor, _selector);
+            revert ZkRouteFrozen(zkCoProcessor, selector);
         }
 
         if (verifier == address(0)) {
-            return zkConfig[_zkCoProcessor].zkVerifier;
+            return zkConfig[zkCoProcessor].zkVerifier;
         }
 
         return verifier;
@@ -270,17 +271,17 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
 
     /**
      * @dev Returns the verifierProofId for a given verifierId
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _verifierId The verifier program ID
+     * @param zkCoProcessor Type of ZK coprocessor
+     * @param verifierId The verifier program ID
      * @return The corresponding verifierProofId
      */
-    function getVerifierProofId(ZkCoProcessorType _zkCoProcessor, bytes32 _verifierId) external view returns (bytes32) {
-        return _verifierProofIds[_zkCoProcessor][_verifierId];
+    function getVerifierProofId(ZkCoProcessorType zkCoProcessor, bytes32 verifierId) external view returns (bytes32) {
+        return _verifierProofIds[zkCoProcessor][verifierId];
     }
 
     /**
      * @dev Checks the prefix length of trusted certificates in each provided certificate chain for reports
-     * @param _report_certs Array of certificate chains, each containing certificate hashes
+     * @param reportCerts Array of certificate chains, each containing certificate hashes
      * @return Array indicating the prefix length of trusted certificates in each chain
      *
      * For each certificate chain:
@@ -292,11 +293,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * helping to optimize the proving process by determining trusted certificate lengths.
      * Usually called from off-chain
      */
-    function checkTrustedIntermediateCerts(bytes32[][] calldata _report_certs) public view returns (uint8[] memory) {
-        uint8[] memory results = new uint8[](_report_certs.length);
+    function checkTrustedIntermediateCerts(bytes32[][] calldata reportCerts) public view returns (uint8[] memory) {
+        uint8[] memory results = new uint8[](reportCerts.length);
         bytes32 rootCertHash = rootCert;
-        for (uint256 i = 0; i < _report_certs.length; i++) {
-            bytes32[] calldata certs = _report_certs[i];
+        for (uint256 i = 0; i < reportCerts.length; i++) {
+            bytes32[] calldata certs = reportCerts[i];
             uint8 trustedCertPrefixLen = 1;
             if (certs[0] != rootCertHash) {
                 revert RootCertMismatch(rootCertHash, certs[0]);
@@ -316,7 +317,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
 
     /**
      * @dev Sets the trusted root certificate hash
-     * @param _rootCert Hash of the AWS Nitro Enclave root certificate
+     * @param newRootCert Hash of the AWS Nitro Enclave root certificate
      *
      * Requirements:
      * - Only callable by contract owner
@@ -324,29 +325,29 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * The root certificate serves as the trust anchor for all certificate chain validations.
      * This should be set to the hash of AWS's root certificate for Nitro Enclaves.
      */
-    function setRootCert(bytes32 _rootCert) external onlyOwner {
-        _setRootCert(_rootCert);
+    function setRootCert(bytes32 newRootCert) external onlyOwner {
+        _setRootCert(newRootCert);
     }
 
     /**
      * @dev Updates the maximum allowed time difference for attestation timestamp validation
-     * @param _maxTimeDiff New maximum time difference in seconds
+     * @param newMaxTimeDiff New maximum time difference in seconds
      *
      * Requirements:
      * - Only callable by contract owner
      * - Must be greater than zero
      */
-    function setMaxTimeDiff(uint64 _maxTimeDiff) external onlyOwner {
-        if (_maxTimeDiff == 0) revert ZeroMaxTimeDiff();
-        maxTimeDiff = _maxTimeDiff;
-        emit MaxTimeDiffUpdated(_maxTimeDiff);
+    function setMaxTimeDiff(uint64 newMaxTimeDiff) external onlyOwner {
+        if (newMaxTimeDiff == 0) revert ZeroMaxTimeDiff();
+        maxTimeDiff = newMaxTimeDiff;
+        emit MaxTimeDiffUpdated(newMaxTimeDiff);
     }
 
     /**
      * @dev Configures zero-knowledge verification parameters for a specific coprocessor
-     * @param _zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
-     * @param _config Configuration parameters including program IDs and verifier address
-     * @param _verifierProofId The verifierProofId corresponding to the verifierId in config
+     * @param zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
+     * @param config Configuration parameters including program IDs and verifier address
+     * @param verifierProofId The verifierProofId corresponding to the verifierId in config
      *
      * Requirements:
      * - Only callable by contract owner
@@ -360,19 +361,19 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * The verifierProofId is stored in a separate mapping (verifierId => verifierProofId)
      */
     function setZkConfiguration(
-        ZkCoProcessorType _zkCoProcessor,
-        ZkCoProcessorConfig memory _config,
-        bytes32 _verifierProofId
+        ZkCoProcessorType zkCoProcessor,
+        ZkCoProcessorConfig memory config,
+        bytes32 verifierProofId
     )
         external
         onlyOwner
     {
-        _setZkConfiguration(_zkCoProcessor, _config, _verifierProofId);
+        _setZkConfiguration(zkCoProcessor, config, verifierProofId);
     }
 
     /**
      * @dev Revokes a trusted intermediate certificate
-     * @param _certHash Hash of the certificate to revoke
+     * @param certHash Hash of the certificate to revoke
      *
      * Requirements:
      * - Only callable by contract owner
@@ -381,141 +382,141 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * This function allows the owner to revoke compromised intermediate certificates
      * without affecting the root certificate or other trusted certificates.
      */
-    function revokeCert(bytes32 _certHash) external onlyOwner {
-        if (!trustedIntermediateCerts[_certHash]) {
-            revert CertificateNotFound(_certHash);
+    function revokeCert(bytes32 certHash) external onlyOwner {
+        if (!trustedIntermediateCerts[certHash]) {
+            revert CertificateNotFound(certHash);
         }
-        delete trustedIntermediateCerts[_certHash];
-        emit CertRevoked(_certHash);
+        delete trustedIntermediateCerts[certHash];
+        emit CertRevoked(certHash);
     }
 
     /**
      * @dev Updates the verifier program ID, adding the new version to the supported set
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _newVerifierId New verifier program ID to set as latest
-     * @param _newVerifierProofId New verifier proof ID (stored in mapping, used in batch verification)
+     * @param zkCoProcessor Type of ZK coprocessor
+     * @param newVerifierId New verifier program ID to set as latest
+     * @param newVerifierProofId New verifier proof ID (stored in mapping, used in batch verification)
      */
     function updateVerifierId(
-        ZkCoProcessorType _zkCoProcessor,
-        bytes32 _newVerifierId,
-        bytes32 _newVerifierProofId
+        ZkCoProcessorType zkCoProcessor,
+        bytes32 newVerifierId,
+        bytes32 newVerifierProofId
     )
         external
         onlyOwner
     {
-        if (_newVerifierId == bytes32(0)) revert ZeroProgramId();
-        if (zkConfig[_zkCoProcessor].verifierId == _newVerifierId) {
-            revert ProgramIdAlreadyLatest(_zkCoProcessor, _newVerifierId);
+        if (newVerifierId == bytes32(0)) revert ZeroProgramId();
+        if (zkConfig[zkCoProcessor].verifierId == newVerifierId) {
+            revert ProgramIdAlreadyLatest(zkCoProcessor, newVerifierId);
         }
 
-        zkConfig[_zkCoProcessor].verifierId = _newVerifierId;
-        _verifierIdSet[_zkCoProcessor].add(_newVerifierId);
-        _verifierProofIds[_zkCoProcessor][_newVerifierId] = _newVerifierProofId;
+        zkConfig[zkCoProcessor].verifierId = newVerifierId;
+        _verifierIdSet[zkCoProcessor].add(newVerifierId);
+        _verifierProofIds[zkCoProcessor][newVerifierId] = newVerifierProofId;
 
-        emit VerifierIdUpdated(_zkCoProcessor, _newVerifierId, _newVerifierProofId);
+        emit VerifierIdUpdated(zkCoProcessor, newVerifierId, newVerifierProofId);
     }
 
     /**
      * @dev Updates the aggregator program ID, adding the new version to the supported set
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _newAggregatorId New aggregator program ID to set as latest
+     * @param zkCoProcessor Type of ZK coprocessor
+     * @param newAggregatorId New aggregator program ID to set as latest
      */
-    function updateAggregatorId(ZkCoProcessorType _zkCoProcessor, bytes32 _newAggregatorId) external onlyOwner {
-        if (_newAggregatorId == bytes32(0)) revert ZeroProgramId();
-        if (zkConfig[_zkCoProcessor].aggregatorId == _newAggregatorId) {
-            revert ProgramIdAlreadyLatest(_zkCoProcessor, _newAggregatorId);
+    function updateAggregatorId(ZkCoProcessorType zkCoProcessor, bytes32 newAggregatorId) external onlyOwner {
+        if (newAggregatorId == bytes32(0)) revert ZeroProgramId();
+        if (zkConfig[zkCoProcessor].aggregatorId == newAggregatorId) {
+            revert ProgramIdAlreadyLatest(zkCoProcessor, newAggregatorId);
         }
 
-        zkConfig[_zkCoProcessor].aggregatorId = _newAggregatorId;
-        _aggregatorIdSet[_zkCoProcessor].add(_newAggregatorId);
+        zkConfig[zkCoProcessor].aggregatorId = newAggregatorId;
+        _aggregatorIdSet[zkCoProcessor].add(newAggregatorId);
 
-        emit AggregatorIdUpdated(_zkCoProcessor, _newAggregatorId);
+        emit AggregatorIdUpdated(zkCoProcessor, newAggregatorId);
     }
 
     /**
      * @dev Removes a verifier program ID from the supported set
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _verifierId Verifier program ID to remove
+     * @param zkCoProcessor Type of ZK coprocessor
+     * @param verifierId Verifier program ID to remove
      */
-    function removeVerifierId(ZkCoProcessorType _zkCoProcessor, bytes32 _verifierId) external onlyOwner {
-        if (!_verifierIdSet[_zkCoProcessor].contains(_verifierId)) {
-            revert ProgramIdNotFound(_zkCoProcessor, _verifierId);
+    function removeVerifierId(ZkCoProcessorType zkCoProcessor, bytes32 verifierId) external onlyOwner {
+        if (!_verifierIdSet[zkCoProcessor].contains(verifierId)) {
+            revert ProgramIdNotFound(zkCoProcessor, verifierId);
         }
 
         // Cannot remove the latest verifier ID - must update to a new one first
-        if (zkConfig[_zkCoProcessor].verifierId == _verifierId) {
-            revert CannotRemoveLatestProgramId(_zkCoProcessor, _verifierId);
+        if (zkConfig[zkCoProcessor].verifierId == verifierId) {
+            revert CannotRemoveLatestProgramId(zkCoProcessor, verifierId);
         }
 
-        _verifierIdSet[_zkCoProcessor].remove(_verifierId);
-        delete _verifierProofIds[_zkCoProcessor][_verifierId];
-        emit ProgramIdRemoved(_zkCoProcessor, _verifierId, false);
+        _verifierIdSet[zkCoProcessor].remove(verifierId);
+        delete _verifierProofIds[zkCoProcessor][verifierId];
+        emit ProgramIdRemoved(zkCoProcessor, verifierId, false);
     }
 
     /**
      * @dev Removes an aggregator program ID from the supported set
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _aggregatorId Aggregator program ID to remove
+     * @param zkCoProcessor Type of ZK coprocessor
+     * @param aggregatorId Aggregator program ID to remove
      */
-    function removeAggregatorId(ZkCoProcessorType _zkCoProcessor, bytes32 _aggregatorId) external onlyOwner {
-        if (!_aggregatorIdSet[_zkCoProcessor].contains(_aggregatorId)) {
-            revert ProgramIdNotFound(_zkCoProcessor, _aggregatorId);
+    function removeAggregatorId(ZkCoProcessorType zkCoProcessor, bytes32 aggregatorId) external onlyOwner {
+        if (!_aggregatorIdSet[zkCoProcessor].contains(aggregatorId)) {
+            revert ProgramIdNotFound(zkCoProcessor, aggregatorId);
         }
 
         // Cannot remove the latest aggregator ID - must update to a new one first
-        if (zkConfig[_zkCoProcessor].aggregatorId == _aggregatorId) {
-            revert CannotRemoveLatestProgramId(_zkCoProcessor, _aggregatorId);
+        if (zkConfig[zkCoProcessor].aggregatorId == aggregatorId) {
+            revert CannotRemoveLatestProgramId(zkCoProcessor, aggregatorId);
         }
 
-        _aggregatorIdSet[_zkCoProcessor].remove(_aggregatorId);
-        emit ProgramIdRemoved(_zkCoProcessor, _aggregatorId, true);
+        _aggregatorIdSet[zkCoProcessor].remove(aggregatorId);
+        emit ProgramIdRemoved(zkCoProcessor, aggregatorId, true);
     }
 
     /**
      * @dev Adds a route-specific verifier override
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _selector Proof selector (first 4 bytes of proof data)
-     * @param _verifier Address of the verifier contract for this route
+     * @param zkCoProcessor Type of ZK coprocessor
+     * @param selector Proof selector (first 4 bytes of proof data)
+     * @param verifier Address of the verifier contract for this route
      */
-    function addVerifyRoute(ZkCoProcessorType _zkCoProcessor, bytes4 _selector, address _verifier) external onlyOwner {
-        if (_verifier == address(0)) revert ZeroVerifierAddress();
+    function addVerifyRoute(ZkCoProcessorType zkCoProcessor, bytes4 selector, address verifier) external onlyOwner {
+        if (verifier == address(0)) revert ZeroVerifierAddress();
 
-        if (_zkVerifierRoutes[_zkCoProcessor][_selector] == FROZEN) {
-            revert ZkRouteFrozen(_zkCoProcessor, _selector);
+        if (_zkVerifierRoutes[zkCoProcessor][selector] == FROZEN) {
+            revert ZkRouteFrozen(zkCoProcessor, selector);
         }
 
-        _zkVerifierRoutes[_zkCoProcessor][_selector] = _verifier;
-        emit ZkRouteAdded(_zkCoProcessor, _selector, _verifier);
+        _zkVerifierRoutes[zkCoProcessor][selector] = verifier;
+        emit ZkRouteAdded(zkCoProcessor, selector, verifier);
     }
 
     /**
      * @dev Permanently freezes a verification route
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _selector Proof selector to freeze
+     * @param zkCoProcessor Type of ZK coprocessor
+     * @param selector Proof selector to freeze
      *
      * WARNING: This action is IRREVERSIBLE
      */
-    function freezeVerifyRoute(ZkCoProcessorType _zkCoProcessor, bytes4 _selector) external onlyOwner {
-        address currentVerifier = _zkVerifierRoutes[_zkCoProcessor][_selector];
+    function freezeVerifyRoute(ZkCoProcessorType zkCoProcessor, bytes4 selector) external onlyOwner {
+        address currentVerifier = _zkVerifierRoutes[zkCoProcessor][selector];
 
         if (currentVerifier == FROZEN) {
-            revert ZkRouteFrozen(_zkCoProcessor, _selector);
+            revert ZkRouteFrozen(zkCoProcessor, selector);
         }
 
-        _zkVerifierRoutes[_zkCoProcessor][_selector] = FROZEN;
-        emit ZkRouteWasFrozen(_zkCoProcessor, _selector);
+        _zkVerifierRoutes[zkCoProcessor][selector] = FROZEN;
+        emit ZkRouteWasFrozen(zkCoProcessor, selector);
     }
 
     /**
      * @dev Sets the proof submitter address
-     * @param _proofSubmitter The address of the proof submitter
+     * @param submitter The address of the proof submitter
      *
      * Requirements:
      * - Only callable by contract owner
      * - Address must not be zero
      */
-    function setProofSubmitter(address _proofSubmitter) external onlyOwner {
-        _setProofSubmitter(_proofSubmitter);
+    function setProofSubmitter(address submitter) external onlyOwner {
+        _setProofSubmitter(submitter);
     }
 
     // ============ Verification Functions ============
@@ -601,35 +602,35 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
 
     // ============ Internal Functions ============
 
-    function _setRootCert(bytes32 _rootCert) internal {
-        rootCert = _rootCert;
-        emit RootCertChanged(_rootCert);
+    function _setRootCert(bytes32 newRootCert) internal {
+        rootCert = newRootCert;
+        emit RootCertChanged(newRootCert);
     }
 
-    function _setProofSubmitter(address _proofSubmitter) internal {
-        if (_proofSubmitter == address(0)) revert ZeroProofSubmitter();
-        proofSubmitter = _proofSubmitter;
-        emit ProofSubmitterChanged(_proofSubmitter);
+    function _setProofSubmitter(address submitter) internal {
+        if (submitter == address(0)) revert ZeroProofSubmitter();
+        proofSubmitter = submitter;
+        emit ProofSubmitterChanged(submitter);
     }
 
     function _setZkConfiguration(
-        ZkCoProcessorType _zkCoProcessor,
-        ZkCoProcessorConfig memory _config,
-        bytes32 _verifierProofId
+        ZkCoProcessorType zkCoProcessor,
+        ZkCoProcessorConfig memory config,
+        bytes32 verifierProofId
     )
         internal
     {
-        zkConfig[_zkCoProcessor] = _config;
+        zkConfig[zkCoProcessor] = config;
 
         // Auto-add program IDs to the version sets and store verifierProofId mapping
-        if (_config.verifierId != bytes32(0)) {
-            _verifierIdSet[_zkCoProcessor].add(_config.verifierId);
-            _verifierProofIds[_zkCoProcessor][_config.verifierId] = _verifierProofId;
+        if (config.verifierId != bytes32(0)) {
+            _verifierIdSet[zkCoProcessor].add(config.verifierId);
+            _verifierProofIds[zkCoProcessor][config.verifierId] = verifierProofId;
         }
-        if (_config.aggregatorId != bytes32(0)) {
-            _aggregatorIdSet[_zkCoProcessor].add(_config.aggregatorId);
+        if (config.aggregatorId != bytes32(0)) {
+            _aggregatorIdSet[zkCoProcessor].add(config.aggregatorId);
         }
-        emit ZKConfigurationUpdated(_zkCoProcessor, _config, _verifierProofId);
+        emit ZKConfigurationUpdated(zkCoProcessor, config, verifierProofId);
     }
 
     /**
@@ -756,5 +757,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         }
 
         return verifier;
+    }
+
+    /// @notice Semantic version.
+    /// @custom:semver 0.1.0
+    function version() public pure virtual returns (string memory) {
+        return "0.1.0";
     }
 }
