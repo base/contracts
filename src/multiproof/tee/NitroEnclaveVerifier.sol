@@ -580,7 +580,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
             }
         }
         uint64 timestamp = journal.timestamp / 1000;
-        if (timestamp + maxTimeDiff < block.timestamp || timestamp > block.timestamp) {
+        if (timestamp + maxTimeDiff <= block.timestamp || timestamp >= block.timestamp) {
             journal.result = VerificationResult.InvalidTimestamp;
             return journal;
         }
