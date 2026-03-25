@@ -760,13 +760,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice Decreases the expected resolution timestamp.
     function _decreaseExpectedResolution() internal {
-        uint64 delay;
+        uint64 delay = _getDelay();
 
-        if (proofCount >= 2) {
-            delay = FAST_FINALIZATION_DELAY;
-        } else if (proofCount == 1) {
-            delay = SLOW_FINALIZATION_DELAY;
-        } else {
+        if (delay == type(uint64).max) {
             // If there are no proofs, don't allow the game to resolve.
             expectedResolution = Timestamp.wrap(type(uint64).max);
             return;
@@ -791,13 +787,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     function _increaseExpectedResolution() internal {
-        uint64 delay;
+        uint64 delay = _getDelay();
 
-        if (proofCount >= 2) {
-            delay = FAST_FINALIZATION_DELAY;
-        } else if (proofCount == 1) {
-            delay = SLOW_FINALIZATION_DELAY;
-        } else {
+        if (delay == type(uint64).max) {
             // If there are no proofs, don't allow the game to resolve.
             expectedResolution = Timestamp.wrap(type(uint64).max);
             return;
@@ -807,6 +799,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // as this can only occur if there is an issue with the proof system so
         // we give enough time to resolve the issue and possibly blacklist this game.
         expectedResolution = Timestamp.wrap(uint64(block.timestamp) + delay);
+    }
+
+    function _getDelay() internal view returns (uint64) {
+        if (proofCount >= 2) {
+            return FAST_FINALIZATION_DELAY;
+        } else if (proofCount == 1) {
+            return SLOW_FINALIZATION_DELAY;
+        } else {
+            return type(uint64).max;
+        }
     }
 
     function _verifyProof(
