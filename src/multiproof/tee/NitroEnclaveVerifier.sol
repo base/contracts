@@ -165,17 +165,31 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * @param _owner Address to be set as the contract owner
      * @param _maxTimeDiff Maximum time difference in seconds for timestamp validation
      * @param _initializeTrustedCerts Array of initial trusted intermediate certificate hashes
-     *
-     * Sets the provided address as the contract owner and initializes the trusted certificate set.
-     * The root certificate must be set separately after deployment.
+     * @param _rootCert Hash of the AWS Nitro Enclave root certificate
+     * @param _proofSubmitter Address that is authorized to submit proofs
+     * @param _zkCoProcessor Type of ZK coprocessor to configure (RiscZero or Succinct)
+     * @param _zkConfig Configuration parameters for the ZK coprocessor
+     * @param _verifierProofId The verifierProofId corresponding to the verifierId in _zkConfig
      */
-    constructor(address _owner, uint64 _maxTimeDiff, bytes32[] memory _initializeTrustedCerts) {
+    constructor(
+        address _owner,
+        uint64 _maxTimeDiff,
+        bytes32[] memory _initializeTrustedCerts,
+        bytes32 _rootCert,
+        address _proofSubmitter,
+        ZkCoProcessorType _zkCoProcessor,
+        ZkCoProcessorConfig memory _zkConfig,
+        bytes32 _verifierProofId
+    ) {
         if (_maxTimeDiff == 0) revert ZeroMaxTimeDiff();
         maxTimeDiff = _maxTimeDiff;
         for (uint256 i = 0; i < _initializeTrustedCerts.length; i++) {
             trustedIntermediateCerts[_initializeTrustedCerts[i]] = true;
         }
         _initializeOwner(_owner);
+        _setRootCert(_rootCert);
+        _setProofSubmitter(_proofSubmitter);
+        _setZkConfiguration(_zkCoProcessor, _zkConfig, _verifierProofId);
     }
 
     // ============ Query Functions ============
@@ -311,8 +325,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * This should be set to the hash of AWS's root certificate for Nitro Enclaves.
      */
     function setRootCert(bytes32 _rootCert) external onlyOwner {
-        rootCert = _rootCert;
-        emit RootCertChanged(_rootCert);
+        _setRootCert(_rootCert);
     }
 
     /**
@@ -354,17 +367,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         external
         onlyOwner
     {
-        zkConfig[_zkCoProcessor] = _config;
-
-        // Auto-add program IDs to the version sets and store verifierProofId mapping
-        if (_config.verifierId != bytes32(0)) {
-            _verifierIdSet[_zkCoProcessor].add(_config.verifierId);
-            _verifierProofIds[_zkCoProcessor][_config.verifierId] = _verifierProofId;
-        }
-        if (_config.aggregatorId != bytes32(0)) {
-            _aggregatorIdSet[_zkCoProcessor].add(_config.aggregatorId);
-        }
-        emit ZKConfigurationUpdated(_zkCoProcessor, _config, _verifierProofId);
+        _setZkConfiguration(_zkCoProcessor, _config, _verifierProofId);
     }
 
     /**
@@ -512,9 +515,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      * - Address must not be zero
      */
     function setProofSubmitter(address _proofSubmitter) external onlyOwner {
-        if (_proofSubmitter == address(0)) revert ZeroProofSubmitter();
-        proofSubmitter = _proofSubmitter;
-        emit ProofSubmitterChanged(_proofSubmitter);
+        _setProofSubmitter(_proofSubmitter);
     }
 
     // ============ Verification Functions ============
@@ -599,6 +600,37 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
     }
 
     // ============ Internal Functions ============
+
+    function _setRootCert(bytes32 _rootCert) internal {
+        rootCert = _rootCert;
+        emit RootCertChanged(_rootCert);
+    }
+
+    function _setProofSubmitter(address _proofSubmitter) internal {
+        if (_proofSubmitter == address(0)) revert ZeroProofSubmitter();
+        proofSubmitter = _proofSubmitter;
+        emit ProofSubmitterChanged(_proofSubmitter);
+    }
+
+    function _setZkConfiguration(
+        ZkCoProcessorType _zkCoProcessor,
+        ZkCoProcessorConfig memory _config,
+        bytes32 _verifierProofId
+    )
+        internal
+    {
+        zkConfig[_zkCoProcessor] = _config;
+
+        // Auto-add program IDs to the version sets and store verifierProofId mapping
+        if (_config.verifierId != bytes32(0)) {
+            _verifierIdSet[_zkCoProcessor].add(_config.verifierId);
+            _verifierProofIds[_zkCoProcessor][_config.verifierId] = _verifierProofId;
+        }
+        if (_config.aggregatorId != bytes32(0)) {
+            _aggregatorIdSet[_zkCoProcessor].add(_config.aggregatorId);
+        }
+        emit ZKConfigurationUpdated(_zkCoProcessor, _config, _verifierProofId);
+    }
 
     /**
      * @dev Internal function to cache newly discovered trusted certificates
