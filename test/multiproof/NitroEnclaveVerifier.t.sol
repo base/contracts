@@ -729,7 +729,7 @@ contract NitroEnclaveVerifierTest is Test {
         return VerifierJournal({
             result: VerificationResult.Success,
             trustedCertsPrefixLen: 2,
-            timestamp: uint64(block.timestamp) * 1000,
+            timestamp: uint64(block.timestamp - 1) * 1000,
             certs: certs,
             userData: "",
             nonce: "",
