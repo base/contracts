@@ -142,6 +142,8 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
         if (journal.result != VerificationResult.Success) revert AttestationVerificationFailed();
 
+        // We allow attestations up to MAX_AGE old. This means a cert may be expired between when
+        // the attestation is generated and when it is submitted to this contract.
         if (journal.timestamp / MS_PER_SECOND + MAX_AGE <= block.timestamp) revert AttestationTooOld();
 
         // Validate PCR0 against the current AggregateVerifier's TEE_IMAGE_HASH
