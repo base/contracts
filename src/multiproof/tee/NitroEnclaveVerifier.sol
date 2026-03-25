@@ -13,6 +13,7 @@ import {
 } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
 import { ISP1Verifier } from "lib/sp1-contracts/contracts/src/ISP1Verifier.sol";
+import { ISemver } from "interfaces/universal/ISemver.sol";
 
 /**
  * @title NitroEnclaveVerifier
@@ -42,7 +43,7 @@ import { ISP1Verifier } from "lib/sp1-contracts/contracts/src/ISP1Verifier.sol";
  * - Intermediate certificates are automatically cached but can be revoked
  * - Timestamp validation prevents replay attacks within the configured time window
  */
-contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
+contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     /// @dev Sentinel address to indicate a route has been permanently frozen
@@ -756,5 +757,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         }
 
         return verifier;
+    }
+
+    /// @notice Semantic version.
+    /// @custom:semver 0.1.0
+    function version() public pure virtual returns (string memory) {
+        return "0.1.0";
     }
 }

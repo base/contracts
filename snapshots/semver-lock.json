@@ -247,6 +247,10 @@
     "initCodeHash": "0x89f15344142ede7ca9d6af3c998fb3ffec84293105b28daa8427aa0608dd1d9e",
     "sourceCodeHash": "0xfa0464c07c06fddc98ba20e9a362ba10ecf94496556d0f7ac88d1986f79a8a6b"
   },
+  "src/multiproof/tee/NitroEnclaveVerifier.sol:NitroEnclaveVerifier": {
+    "initCodeHash": "0x339f7b174480929ff3d095717ad121bd775c69dbe753c7e8cd6de5bcae40a992",
+    "sourceCodeHash": "0xf64bd59ce689eaa3e6dcc72c9b5525790aa205b4a5bec9fb4601ab99d0213667"
+  },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
     "initCodeHash": "0x4c89ecad0d48b6da64ef7f489326aae63b7fbcd33f4fed949a496afd1be49009",
     "sourceCodeHash": "0x71a4016022b8a15f5ceddf2d597700046fcbe9ce4dbc7d7f2174d68606b3c614"
