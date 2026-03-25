@@ -5,10 +5,28 @@
         "internalType": "contract INitroEnclaveVerifier",
         "name": "nitroVerifier",
         "type": "address"
+      },
+      {
+        "internalType": "contract IDisputeGameFactory",
+        "name": "factory",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
     "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "DISPUTE_GAME_FACTORY",
+    "outputs": [
+      {
+        "internalType": "contract IDisputeGameFactory",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [],
@@ -39,19 +57,6 @@
   {
     "inputs": [
       {
-        "internalType": "bytes",
-        "name": "pcr0",
-        "type": "bytes"
-      }
-    ],
-    "name": "deregisterPCR0",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "address",
         "name": "signer",
         "type": "address"
@@ -60,6 +65,32 @@
     "name": "deregisterSigner",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "gameType",
+    "outputs": [
+      {
+        "internalType": "GameType",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getExpectedImageHash",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -91,11 +122,35 @@
         "internalType": "address",
         "name": "initialProposer",
         "type": "address"
+      },
+      {
+        "internalType": "GameType",
+        "name": "gameType_",
+        "type": "uint32"
       }
     ],
     "name": "initialize",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "isRegisteredSigner",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -166,19 +221,6 @@
     "inputs": [
       {
         "internalType": "bytes",
-        "name": "pcr0",
-        "type": "bytes"
-      }
-    ],
-    "name": "registerPCR0",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes",
         "name": "output",
         "type": "bytes"
       },
@@ -210,6 +252,19 @@
   {
     "inputs": [
       {
+        "internalType": "GameType",
+        "name": "gameType_",
+        "type": "uint32"
+      }
+    ],
+    "name": "setGameType",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "proposer",
         "type": "address"
@@ -233,7 +288,7 @@
         "type": "address"
       }
     ],
-    "name": "signerPCR0",
+    "name": "signerImageHash",
     "outputs": [
       {
         "internalType": "bytes32",
@@ -271,25 +326,6 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
-      }
-    ],
-    "name": "validPCR0s",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [],
     "name": "version",
     "outputs": [
@@ -301,6 +337,19 @@
     ],
     "stateMutability": "pure",
     "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "GameType",
+        "name": "gameType",
+        "type": "uint32"
+      }
+    ],
+    "name": "GameTypeUpdated",
+    "type": "event"
   },
   {
     "anonymous": false,
@@ -358,32 +407,6 @@
     "inputs": [
       {
         "indexed": true,
-        "internalType": "bytes32",
-        "name": "pcr0Hash",
-        "type": "bytes32"
-      }
-    ],
-    "name": "PCR0Deregistered",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "pcr0Hash",
-        "type": "bytes32"
-      }
-    ],
-    "name": "PCR0Registered",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
         "internalType": "address",
         "name": "proposer",
         "type": "address"
@@ -419,12 +442,6 @@
         "internalType": "address",
         "name": "signer",
         "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "pcr0",
-        "type": "bytes32"
       }
     ],
     "name": "SignerRegistered",
@@ -442,12 +459,38 @@
   },
   {
     "inputs": [],
-    "name": "InvalidPCR0",
+    "name": "DisputeGameFactoryNotSet",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ImageHashReadFailed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidGameType",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "InvalidPublicKey",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "actual",
+        "type": "bytes32"
+      }
+    ],
+    "name": "PCR0Mismatch",
     "type": "error"
   },
   {

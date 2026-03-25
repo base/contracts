@@ -13,7 +13,8 @@ import { Verifier } from "../Verifier.sol";
 /// @notice Stateless TEE proof verifier that validates signatures against registered signers.
 /// @dev This contract is designed to be used as the TEE_VERIFIER in the AggregateVerifier.
 ///      It verifies that proofs are signed by enclave addresses registered in TEEProverRegistry
-///      via AWS Nitro attestation, and that the signer's PCR0 matches the claimed imageId.
+///      via AWS Nitro attestation. PCR0 (enclave image hash) enforcement is handled by
+///      AggregateVerifier, which bakes TEE_IMAGE_HASH into the journal that the enclave signs.
 ///      The contract is intentionally stateless - all state related to output proposals and
 ///      L1 origin verification is managed by the calling contract (e.g., AggregateVerifier).
 contract TEEVerifier is Verifier, ISemver {
@@ -24,11 +25,11 @@ contract TEEVerifier is Verifier, ISemver {
     /// @notice Thrown when the recovered signer is not a valid registered signer.
     error InvalidSigner(address signer);
 
+    /// @notice Thrown when the signer's registered image hash does not match the claimed imageId.
+    error ImageIdMismatch(bytes32 signerImageHash, bytes32 claimedImageId);
+
     /// @notice Thrown when the signature format is invalid.
     error InvalidSignature();
-
-    /// @notice Thrown when the signer's registered PCR0 does not match the claimed imageId.
-    error ImageIdMismatch(bytes32 signerPCR0, bytes32 claimedImageId);
 
     /// @notice Thrown when the proof format is invalid.
     error InvalidProofFormat();
@@ -49,7 +50,8 @@ contract TEEVerifier is Verifier, ISemver {
 
     /// @notice Verifies a TEE proof for a state transition.
     /// @param proofBytes The proof: proposer(20) + signature(65) = 85 bytes.
-    /// @param imageId The claimed TEE image hash (PCR0). Must match the signer's registered PCR0.
+    /// @param imageId The claimed TEE image hash (from the calling AggregateVerifier's TEE_IMAGE_HASH).
+    ///        Validated against the signer's registered image hash to prevent cross-game-type attacks.
     /// @param journal The keccak256 hash of the proof's public inputs.
     /// @return valid Whether the proof is valid.
     function verify(
@@ -80,26 +82,25 @@ contract TEEVerifier is Verifier, ISemver {
             revert InvalidProposer(proposer);
         }
 
-        // Get the PCR0 the signer was registered with
-        bytes32 registeredPCR0 = TEE_PROVER_REGISTRY.signerPCR0(signer);
-
-        // Check that the signer is registered (PCR0 != 0)
-        if (registeredPCR0 == bytes32(0)) {
+        // Check that the signer is registered
+        if (!TEE_PROVER_REGISTRY.isRegisteredSigner(signer)) {
             revert InvalidSigner(signer);
         }
 
-        // Check that the signer's registered PCR0 matches the claimed imageId
-        // This ensures the signer was running the exact enclave image specified
-        if (registeredPCR0 != imageId) {
-            revert ImageIdMismatch(registeredPCR0, imageId);
+        // Check that the signer's registered image hash matches the calling AggregateVerifier's imageId.
+        // This prevents a signer registered under one enclave image from being used in a game
+        // that expects a different image (e.g., after an upgrade or across game types).
+        bytes32 registeredImageHash = TEE_PROVER_REGISTRY.signerImageHash(signer);
+        if (registeredImageHash != imageId) {
+            revert ImageIdMismatch(registeredImageHash, imageId);
         }
 
         return true;
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.1.0
+    /// @custom:semver 0.2.0
     function version() public pure virtual returns (string memory) {
-        return "0.1.0";
+        return "0.2.0";
     }
 }

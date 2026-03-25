@@ -59,6 +59,7 @@ import { console2 as console } from "forge-std/console2.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { DisputeGameFactory } from "src/dispute/DisputeGameFactory.sol";
 import { GameType, Hash } from "src/dispute/lib/Types.sol";
 
@@ -129,12 +130,17 @@ contract DeployDevNoNitro is Script {
     }
 
     function _deployTEEContracts(address owner) internal {
-        address scgImpl = address(new DevTEEProverRegistry(INitroEnclaveVerifier(address(0))));
+        address scgImpl = address(
+            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(disputeGameFactory))
+        );
         teeProverRegistryProxy = address(
             new TransparentUpgradeableProxy(
                 scgImpl,
                 address(0xdead),
-                abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, cfg.teeProposer()))
+                abi.encodeCall(
+                    TEEProverRegistry.initialize,
+                    (owner, owner, cfg.teeProposer(), GameType.wrap(uint32(cfg.multiproofGameType())))
+                )
             )
         );
         console.log("DevTEEProverRegistry:", teeProverRegistryProxy);

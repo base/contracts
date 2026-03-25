@@ -8,11 +8,36 @@ import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
+import { GameType } from "src/dispute/lib/Types.sol";
 
+import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
 import { MockAnchorStateRegistry } from "scripts/multiproof/mocks/MockAnchorStateRegistry.sol";
 import { DevTEEProverRegistry } from "src/multiproof/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
+
+/// @notice Mock AggregateVerifier that returns a configurable TEE_IMAGE_HASH.
+contract MockAggregateVerifierForVerifier {
+    bytes32 public TEE_IMAGE_HASH;
+
+    constructor(bytes32 imageHash) {
+        TEE_IMAGE_HASH = imageHash;
+    }
+}
+
+/// @notice Mock DisputeGameFactory that returns a fixed game implementation.
+contract MockDisputeGameFactoryForVerifier {
+    mapping(uint32 => address) internal _impls;
+
+    function setImpl(uint32 gameType_, address impl) external {
+        _impls[gameType_] = impl;
+    }
+
+    function gameImpls(GameType gameType_) external view returns (IDisputeGame) {
+        return IDisputeGame(_impls[GameType.unwrap(gameType_)]);
+    }
+}
 
 contract TEEVerifierTest is Test {
     TEEVerifier public verifier;
@@ -24,8 +49,8 @@ contract TEEVerifierTest is Test {
     uint256 internal constant SIGNER_PRIVATE_KEY = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
     address internal signerAddress;
 
-    bytes32 internal constant PCR0_HASH = keccak256("test-pcr0");
-    bytes32 internal constant IMAGE_ID = PCR0_HASH; // imageId must match PCR0 hash
+    bytes32 internal constant IMAGE_ID = keccak256("test-image-id");
+    uint32 internal constant TEST_GAME_TYPE = 621;
     address internal immutable PROPOSER = makeAddr("proposer");
 
     address internal owner;
@@ -36,21 +61,29 @@ contract TEEVerifierTest is Test {
         // Derive signer address from private key
         signerAddress = vm.addr(SIGNER_PRIVATE_KEY);
 
+        // Deploy mock factory and verifier
+        MockAggregateVerifierForVerifier mockVerifier = new MockAggregateVerifierForVerifier(IMAGE_ID);
+        MockDisputeGameFactoryForVerifier mockFactory = new MockDisputeGameFactoryForVerifier();
+        mockFactory.setImpl(TEST_GAME_TYPE, address(mockVerifier));
+
         // Deploy implementation (NitroEnclaveVerifier not needed for dev signer tests)
-        DevTEEProverRegistry impl = new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)));
+        DevTEEProverRegistry impl =
+            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(mockFactory)));
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));
 
         // Deploy proxy
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(impl), address(proxyAdmin), abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, address(0)))
+            address(impl),
+            address(proxyAdmin),
+            abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, address(0), GameType.wrap(TEST_GAME_TYPE)))
         );
 
         teeProverRegistry = DevTEEProverRegistry(address(proxy));
 
-        // Register the signer with PCR0 hash
-        teeProverRegistry.addDevSigner(signerAddress, PCR0_HASH);
+        // Register the signer with the correct image hash
+        teeProverRegistry.addDevSigner(signerAddress, IMAGE_ID);
 
         // Set the proposer as valid
         teeProverRegistry.setProposer(PROPOSER, true);
@@ -73,7 +106,7 @@ contract TEEVerifierTest is Test {
         // Construct proof: proposer(20) + signature(65) = 85 bytes
         bytes memory proofBytes = abi.encodePacked(PROPOSER, signature);
 
-        // Verify should return true
+        // Verify should return true regardless of imageId (enforced via journal hash, not registry)
         bool result = verifier.verify(proofBytes, IMAGE_ID, journal);
         assertTrue(result);
     }
@@ -130,10 +163,9 @@ contract TEEVerifierTest is Test {
 
         bytes memory proofBytes = abi.encodePacked(PROPOSER, signature);
 
-        // Use a different imageId that doesn't match the registered PCR0
-        bytes32 wrongImageId = keccak256("wrong-image-id");
-
-        vm.expectRevert(abi.encodeWithSelector(TEEVerifier.ImageIdMismatch.selector, PCR0_HASH, wrongImageId));
+        // Different imageId should fail — signer was registered with IMAGE_ID
+        bytes32 wrongImageId = keccak256("different-image");
+        vm.expectRevert(abi.encodeWithSelector(TEEVerifier.ImageIdMismatch.selector, IMAGE_ID, wrongImageId));
         verifier.verify(proofBytes, wrongImageId, journal);
     }
 

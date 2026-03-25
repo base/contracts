@@ -65,8 +65,8 @@ pragma solidity 0.8.15;
  *   # Check if signer is valid
  *   cast call $TEE_PROVER_REGISTRY "isValidSigner(address)(bool)" $SIGNER_ADDRESS
  *
- *   # Get the PCR0 hash associated with the signer
- *   cast call $TEE_PROVER_REGISTRY "signerPCR0(address)(bytes32)" $SIGNER_ADDRESS
+ *   # Check if the signer is registered
+ *   cast call $TEE_PROVER_REGISTRY "isValidSigner(address)(bool)" $SIGNER_ADDRESS
  *
  * ─────────────────────────────────────────────────────────────────────────────────
  * COMPARISON WITH DeployDevNoNitro
@@ -93,6 +93,7 @@ import { console2 as console } from "forge-std/console2.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { DisputeGameFactory } from "src/dispute/DisputeGameFactory.sol";
 import { GameType, Hash } from "src/dispute/lib/Types.sol";
 
@@ -163,13 +164,18 @@ contract DeployDevWithNitro is Script {
     }
 
     function _deployTEEContracts(address owner, address _nitroEnclaveVerifier) internal {
-        address scgImpl = address(new TEEProverRegistry(INitroEnclaveVerifier(_nitroEnclaveVerifier)));
+        address scgImpl = address(
+            new TEEProverRegistry(INitroEnclaveVerifier(_nitroEnclaveVerifier), IDisputeGameFactory(disputeGameFactory))
+        );
         console.log("NitroEnclaveVerifier (external):", _nitroEnclaveVerifier);
         teeProverRegistryProxy = address(
             new TransparentUpgradeableProxy(
                 scgImpl,
                 address(0xdead),
-                abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, cfg.teeProposer()))
+                abi.encodeCall(
+                    TEEProverRegistry.initialize,
+                    (owner, owner, cfg.teeProposer(), GameType.wrap(uint32(cfg.multiproofGameType())))
+                )
             )
         );
         console.log("TEEProverRegistry:", teeProverRegistryProxy);

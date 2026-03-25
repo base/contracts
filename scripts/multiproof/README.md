@@ -98,19 +98,18 @@ This returns a raw byte array representing an uncompressed secp256k1 public key 
 
 ### Step 5: Register the dev signer
 
-Call `addDevSigner` on the deployed `DevTEEProverRegistry` with:
-- The **signer address** derived in Step 4
-- The **PCR0 hash** — this must match the `teeImageHash` set in `deploy-config/sepolia.json`, since that value is baked into `AggregateVerifier` as an immutable at deploy time. Changing it requires redeploying `AggregateVerifier`
+Call `addDevSigner` on the deployed `DevTEEProverRegistry` with the **signer address** derived in Step 4.
+
+> **Note:** PCR0 enforcement is handled by `AggregateVerifier` (which bakes `teeImageHash` into the
+> journal the enclave signs). The registry only tracks which signer addresses are valid.
 
 ```bash
 # Replace:
 #   0x587d... with the TEEProverRegistry address from your deployment output
 #   0x080f... with the signer address derived in Step 4
-#   0x0000...0001 with the teeImageHash from deploy-config/sepolia.json
 cast send 0x587d410B205449fB889EC4a5b351D375C656d084 \
-  "addDevSigner(address,bytes32)" \
+  "addDevSigner(address)" \
   0x080f42420846c613158D7b4334257C78bE5A9B90 \
-  0x0000000000000000000000000000000000000000000000000000000000000001 \
   --rpc-url https://c3-chainproxy-eth-sepolia-full-dev.cbhq.net \
   --ledger --mnemonic-derivation-path "m/44'/60'/1'/0/0"
 ```

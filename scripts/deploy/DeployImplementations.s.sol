@@ -719,7 +719,9 @@ contract DeployImplementations is Script {
 
         address teeVerifierImpl;
         {
-            TEEProverRegistry scgImpl = new TEEProverRegistry(INitroEnclaveVerifier(_input.nitroEnclaveVerifier));
+            TEEProverRegistry scgImpl = new TEEProverRegistry(
+                INitroEnclaveVerifier(_input.nitroEnclaveVerifier), IDisputeGameFactory(address(1))
+            );
             vm.label(address(scgImpl), "TEEProverRegistryImpl");
             _output.teeProverRegistryImpl = scgImpl;
             teeVerifierImpl = address(new TEEVerifier(scgImpl, _output.anchorStateRegistryImpl));
