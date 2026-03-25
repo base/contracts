@@ -437,25 +437,24 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // The parent game must have resolved.
         if (parentGameStatus == GameStatus.IN_PROGRESS) revert ParentGameNotResolved();
 
-        bool isChallenged = counteredByIntermediateRootIndexPlusOne > 0;
-
         // If the parent game's claim is invalid, blacklisted, or retired, then the current game's claim is invalid.
+        // We don't care about what happens in this game once the parent is invalid.
         if (parentGameStatus == GameStatus.CHALLENGER_WINS) {
             status = GameStatus.CHALLENGER_WINS;
         } else {
-            // Game must be completed with a valid proof.
+            // Game must be completed with a valid proof and enough proofs.
             if (!gameOver()) revert GameNotOver();
-            // If the game is challenged, status is CHALLENGER_WINS.
-            // If the game is not challenged, status is DEFENDER_WINS.
-            status = isChallenged ? GameStatus.CHALLENGER_WINS : GameStatus.DEFENDER_WINS;
+            if (proofCount < PROOF_THRESHOLD) revert NotEnoughProofs();
+
+            // If the game is challenged, reward the challenger.
+            if (counteredByIntermediateRootIndexPlusOne > 0) {
+                status = GameStatus.CHALLENGER_WINS;
+                bondRecipient = proofTypeToProver[ProofType.ZK];
+            } else {
+                status = GameStatus.DEFENDER_WINS;
+            }
         }
 
-        if (proofCount < PROOF_THRESHOLD) revert NotEnoughProofs();
-
-        // Default bond recipient is the creator. We only change if successfully challenged.
-        if (isChallenged) {
-            bondRecipient = proofTypeToProver[ProofType.ZK];
-        }
         // Mark the game as resolved.
         resolvedAt = Timestamp.wrap(uint64(block.timestamp));
         emit Resolved(status);
