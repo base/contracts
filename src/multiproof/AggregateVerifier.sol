@@ -515,6 +515,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // This is only in case the ZK proof is nullified, which would lower the proof count.
         // If the ZK is nullified, we allow the remaining TEE proof to resolve.
         // The expected resolution time can no longer be increased as both proof types have been submitted.
+        // The exception is if the ZK proof is nullified, in which case the expected resolution will be
+        // increased by SLOW_FINALIZATION_DELAY from the time of nullification.
         proofCount += 1;
 
         // We purposely increase the resolution to allow for a ZK nullification.
