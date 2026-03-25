@@ -140,10 +140,10 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
     event ZkRouteWasFrozen(ZkCoProcessorType indexed zkCoProcessor, bytes4 indexed selector);
 
     /// @dev Emitted when the proof of attestation has been successfully verified
-    event AttestationSubmitted(VerificationResult result, ZkCoProcessorType zkCoProcessor, bytes output);
+    event AttestationSubmitted(VerificationResult result, ZkCoProcessorType indexed zkCoProcessor, bytes output);
 
     /// @dev Emitted when a batched proof has been successfully verified; encodedBatched = abi.encode(VerifierJournal[])
-    event BatchAttestationSubmitted(bytes32 verifierId, ZkCoProcessorType zkCoProcessor, bytes encodedBatch);
+    event BatchAttestationSubmitted(bytes32 verifierId, ZkCoProcessorType indexed zkCoProcessor, bytes encodedBatch);
 
     /// @dev Event emitted when the proof submitter address is changed
     event ProofSubmitterChanged(address newProofSubmitter);
@@ -554,7 +554,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
         _verifyZk(zkCoprocessor, programId, output, proofBytes);
         journal = abi.decode(output, (VerifierJournal));
         journal = _verifyJournal(journal);
-        emit AttestationSubmitted(journal.result, zkCoprocessor, output);
+        emit AttestationSubmitted(journal.result, zkCoprocessor, abi.encode(journal));
     }
 
     /**
