@@ -45,9 +45,19 @@ contract NitroEnclaveVerifierTest is Test {
         bytes32[] memory trustedCerts = new bytes32[](1);
         trustedCerts[0] = INTERMEDIATE_CERT_1;
 
-        verifier = new NitroEnclaveVerifier(owner, MAX_TIME_DIFF, trustedCerts);
-        verifier.setRootCert(ROOT_CERT);
-        verifier.setProofSubmitter(submitter);
+        ZkCoProcessorConfig memory zkCfg =
+            ZkCoProcessorConfig({ verifierId: VERIFIER_ID, aggregatorId: AGGREGATOR_ID, zkVerifier: mockSP1Verifier });
+
+        verifier = new NitroEnclaveVerifier(
+            owner,
+            MAX_TIME_DIFF,
+            trustedCerts,
+            ROOT_CERT,
+            submitter,
+            ZkCoProcessorType.Succinct,
+            zkCfg,
+            VERIFIER_PROOF_ID
+        );
     }
 
     // ============ Constructor Tests ============
@@ -67,8 +77,10 @@ contract NitroEnclaveVerifierTest is Test {
 
     function testConstructorRevertsIfZeroMaxTimeDiff() public {
         bytes32[] memory certs = new bytes32[](0);
+        ZkCoProcessorConfig memory zkCfg =
+            ZkCoProcessorConfig({ verifierId: bytes32(0), aggregatorId: bytes32(0), zkVerifier: address(0) });
         vm.expectRevert(NitroEnclaveVerifier.ZeroMaxTimeDiff.selector);
-        new NitroEnclaveVerifier(owner, 0, certs);
+        new NitroEnclaveVerifier(owner, 0, certs, bytes32(0), submitter, ZkCoProcessorType.Succinct, zkCfg, bytes32(0));
     }
 
     // ============ setRootCert Tests ============
