@@ -155,8 +155,7 @@ contract TEEVerifierTest is Test {
         verifier.verify(proofBytes, IMAGE_ID, journal);
     }
 
-    function testVerifySucceedsWithAnyImageId() public view {
-        // imageId is no longer checked against the registry — it's enforced via journal hash
+    function testVerifyFailsWithImageIdMismatch() public {
         bytes32 journal = keccak256("test-journal");
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
@@ -164,9 +163,10 @@ contract TEEVerifierTest is Test {
 
         bytes memory proofBytes = abi.encodePacked(PROPOSER, signature);
 
-        // Different imageId should still pass — registry doesn't check it
-        bool result = verifier.verify(proofBytes, keccak256("different-image"), journal);
-        assertTrue(result);
+        // Different imageId should fail — signer was registered with IMAGE_ID
+        bytes32 wrongImageId = keccak256("different-image");
+        vm.expectRevert(abi.encodeWithSelector(TEEVerifier.ImageIdMismatch.selector, IMAGE_ID, wrongImageId));
+        verifier.verify(proofBytes, wrongImageId, journal);
     }
 
     function testVerifyFailsWithInvalidProofFormat() public {

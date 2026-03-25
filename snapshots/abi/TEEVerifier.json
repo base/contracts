@@ -104,6 +104,22 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "signerImageHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "claimedImageId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "ImageIdMismatch",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "InvalidProofFormat",
     "type": "error"

@@ -25,6 +25,9 @@ contract TEEVerifier is Verifier, ISemver {
     /// @notice Thrown when the recovered signer is not a valid registered signer.
     error InvalidSigner(address signer);
 
+    /// @notice Thrown when the signer's registered image hash does not match the claimed imageId.
+    error ImageIdMismatch(bytes32 signerImageHash, bytes32 claimedImageId);
+
     /// @notice Thrown when the signature format is invalid.
     error InvalidSignature();
 
@@ -47,8 +50,8 @@ contract TEEVerifier is Verifier, ISemver {
 
     /// @notice Verifies a TEE proof for a state transition.
     /// @param proofBytes The proof: proposer(20) + signature(65) = 85 bytes.
-    /// @param imageId The claimed TEE image hash. Kept in the interface for journal construction
-    ///        but no longer validated against the registry (enforced via journal hash instead).
+    /// @param imageId The claimed TEE image hash (from the calling AggregateVerifier's TEE_IMAGE_HASH).
+    ///        Validated against the signer's registered image hash to prevent cross-game-type attacks.
     /// @param journal The keccak256 hash of the proof's public inputs.
     /// @return valid Whether the proof is valid.
     function verify(
@@ -62,10 +65,6 @@ contract TEEVerifier is Verifier, ISemver {
         notNullified
         returns (bool)
     {
-        // Silence unused variable warning — imageId is part of the IVerifier interface
-        // and enforced via the journal hash (AggregateVerifier bakes TEE_IMAGE_HASH into it).
-        imageId;
-
         if (proofBytes.length < 85) revert InvalidProofFormat();
 
         address proposer = address(bytes20(proofBytes[0:20]));
@@ -84,8 +83,16 @@ contract TEEVerifier is Verifier, ISemver {
         }
 
         // Check that the signer is registered
-        if (!TEE_PROVER_REGISTRY.isValidSigner(signer)) {
+        if (!TEE_PROVER_REGISTRY.isRegisteredSigner(signer)) {
             revert InvalidSigner(signer);
+        }
+
+        // Check that the signer's registered image hash matches the calling AggregateVerifier's imageId.
+        // This prevents a signer registered under one enclave image from being used in a game
+        // that expects a different image (e.g., after an upgrade or across game types).
+        bytes32 registeredImageHash = TEE_PROVER_REGISTRY.signerImageHash(signer);
+        if (registeredImageHash != imageId) {
+            revert ImageIdMismatch(registeredImageHash, imageId);
         }
 
         return true;
