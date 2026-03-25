@@ -269,6 +269,11 @@ contract NitroEnclaveVerifierTest is Test {
         verifier.addVerifyRoute(ZkCoProcessorType.RiscZero, bytes4(uint32(0x01)), address(0));
     }
 
+    function testAddVerifyRouteRevertsIfFrozenSentinel() public {
+        vm.expectRevert(NitroEnclaveVerifier.InvalidVerifierAddress.selector);
+        verifier.addVerifyRoute(ZkCoProcessorType.RiscZero, bytes4(uint32(0x01)), address(0xdead));
+    }
+
     function testAddVerifyRouteRevertsIfNotOwner() public {
         vm.prank(submitter);
         vm.expectRevert();

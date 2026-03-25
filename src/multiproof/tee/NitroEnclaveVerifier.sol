@@ -104,6 +104,9 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
     /// @dev Error thrown when a zero maxTimeDiff is provided
     error ZeroMaxTimeDiff();
 
+    /// @dev Thrown when a zero address is provided for the verifier
+    error InvalidVerifierAddress();
+
     // ============ Events ============
 
     /// @dev Emitted when a new verifier program ID is added/updated
@@ -372,6 +375,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier {
      */
     function addVerifyRoute(ZkCoProcessorType _zkCoProcessor, bytes4 _selector, address _verifier) external onlyOwner {
         if (_verifier == address(0)) revert ZeroVerifierAddress();
+        if (_verifier == FROZEN) revert InvalidVerifierAddress();
 
         if (_zkVerifierRoutes[_zkCoProcessor][_selector] == FROZEN) {
             revert ZkRouteFrozen(_zkCoProcessor, _selector);
