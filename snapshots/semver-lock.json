@@ -240,12 +240,12 @@
     "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0xc3866b1d4515c9d7b0ac6679b182d836f79371402d9e649e301b24cf8ae8fade",
-    "sourceCodeHash": "0x2bd04b43f2434dec3b66bfcbfbaf3df2d70f18abb915c35ffda86ea3f543078d"
+    "initCodeHash": "0xe631e0c2e8e86711f83cb97884065ce38d1ff519e0d2dbf8704e7e4c183a56cc",
+    "sourceCodeHash": "0xfa0464c07c06fddc98ba20e9a362ba10ecf94496556d0f7ac88d1986f79a8a6b"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
-    "initCodeHash": "0xe28eaeecda21594f6db23bb70127daa2b7b71debe38ce65b598f28d78d2561eb",
-    "sourceCodeHash": "0x2bd04b43f2434dec3b66bfcbfbaf3df2d70f18abb915c35ffda86ea3f543078d"
+    "initCodeHash": "0x89f15344142ede7ca9d6af3c998fb3ffec84293105b28daa8427aa0608dd1d9e",
+    "sourceCodeHash": "0xfa0464c07c06fddc98ba20e9a362ba10ecf94496556d0f7ac88d1986f79a8a6b"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
     "initCodeHash": "0x4c89ecad0d48b6da64ef7f489326aae63b7fbcd33f4fed949a496afd1be49009",
