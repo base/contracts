@@ -385,9 +385,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             gameCreator(),
             l1OriginHash,
             startingOutputRoot.root.raw(),
-            startingOutputRoot.l2SequenceNumber,
+            uint64(startingOutputRoot.l2SequenceNumber),
             rootClaim().raw(),
-            l2SequenceNumber(),
+            uint64(l2SequenceNumber()),
             intermediateOutputRoots()
         );
 
@@ -420,9 +420,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             msg.sender,
             l1Head().raw(),
             startingOutputRoot.root.raw(),
-            startingOutputRoot.l2SequenceNumber,
+            uint64(startingOutputRoot.l2SequenceNumber),
             rootClaim().raw(),
-            l2SequenceNumber(),
+            uint64(l2SequenceNumber()),
             intermediateOutputRoots()
         );
         _proofVerifiedUpdate(proofType, msg.sender);
@@ -495,7 +495,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         _checkIntermediateRoot(intermediateRootIndex, intermediateRootToProve);
 
-        (bytes32 startingRoot, uint256 startingL2SequenceNumber, uint256 endingL2SequenceNumber) =
+        (bytes32 startingRoot, uint64 startingL2SequenceNumber, uint64 endingL2SequenceNumber) =
             _getStartingIntermediateRootAndL2SequenceNumbers(intermediateRootIndex);
 
         _verifyProof(
@@ -559,7 +559,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             _checkIntermediateRoot(intermediateRootIndex, intermediateRootToProve);
         }
 
-        (bytes32 startingRoot, uint256 startingL2SequenceNumber, uint256 endingL2SequenceNumber) =
+        (bytes32 startingRoot, uint64 startingL2SequenceNumber, uint64 endingL2SequenceNumber) =
             _getStartingIntermediateRootAndL2SequenceNumbers(intermediateRootIndex);
 
         _verifyProof(
@@ -814,9 +814,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         address proposer,
         bytes32 l1OriginHash,
         bytes32 startingRoot,
-        uint256 startingL2SequenceNumber,
+        uint64 startingL2SequenceNumber,
         bytes32 endingRoot,
-        uint256 endingL2SequenceNumber,
+        uint64 endingL2SequenceNumber,
         bytes memory intermediateRoots
     )
         internal
@@ -858,9 +858,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         address proposer,
         bytes32 l1OriginHash,
         bytes32 startingRoot,
-        uint256 startingL2SequenceNumber,
+        uint64 startingL2SequenceNumber,
         bytes32 endingRoot,
-        uint256 endingL2SequenceNumber,
+        uint64 endingL2SequenceNumber,
         bytes memory intermediateRoots
     )
         internal
@@ -892,9 +892,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         address proposer,
         bytes32 l1OriginHash,
         bytes32 startingRoot,
-        uint256 startingL2SequenceNumber,
+        uint64 startingL2SequenceNumber,
         bytes32 endingRoot,
-        uint256 endingL2SequenceNumber,
+        uint64 endingL2SequenceNumber,
         bytes memory intermediateRoots
     )
         internal
@@ -997,14 +997,14 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     function _getStartingIntermediateRootAndL2SequenceNumbers(uint256 intermediateRootIndex)
         internal
         view
-        returns (bytes32, uint256, uint256)
+        returns (bytes32, uint64, uint64)
     {
         bytes32 startingRoot = intermediateRootIndex == 0
             ? startingOutputRoot.root.raw()
             : intermediateOutputRoot(intermediateRootIndex - 1);
-        uint256 startingL2SequenceNumber =
-            startingOutputRoot.l2SequenceNumber + intermediateRootIndex * INTERMEDIATE_BLOCK_INTERVAL;
-        uint256 endingL2SequenceNumber = startingL2SequenceNumber + INTERMEDIATE_BLOCK_INTERVAL;
+        uint64 startingL2SequenceNumber =
+            uint64(startingOutputRoot.l2SequenceNumber + intermediateRootIndex * INTERMEDIATE_BLOCK_INTERVAL);
+        uint64 endingL2SequenceNumber = startingL2SequenceNumber + uint64(INTERMEDIATE_BLOCK_INTERVAL);
         return (startingRoot, startingL2SequenceNumber, endingL2SequenceNumber);
     }
 
