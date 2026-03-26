@@ -3,18 +3,60 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_owner",
+        "name": "owner",
         "type": "address"
       },
       {
         "internalType": "uint64",
-        "name": "_maxTimeDiff",
+        "name": "initialMaxTimeDiff",
         "type": "uint64"
       },
       {
         "internalType": "bytes32[]",
-        "name": "_initializeTrustedCerts",
+        "name": "initializeTrustedCerts",
         "type": "bytes32[]"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "initialRootCert",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "initialProofSubmitter",
+        "type": "address"
+      },
+      {
+        "internalType": "enum ZkCoProcessorType",
+        "name": "zkCoProcessor",
+        "type": "uint8"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "verifierId",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "aggregatorId",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "zkVerifier",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct ZkCoProcessorConfig",
+        "name": "config",
+        "type": "tuple"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "verifierProofId",
+        "type": "bytes32"
       }
     ],
     "stateMutability": "nonpayable",
@@ -24,17 +66,17 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       },
       {
         "internalType": "bytes4",
-        "name": "_selector",
+        "name": "selector",
         "type": "bytes4"
       },
       {
         "internalType": "address",
-        "name": "_verifier",
+        "name": "verifier",
         "type": "address"
       }
     ],
@@ -154,7 +196,7 @@
     "inputs": [
       {
         "internalType": "bytes32[][]",
-        "name": "_report_certs",
+        "name": "reportCerts",
         "type": "bytes32[][]"
       }
     ],
@@ -186,12 +228,12 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       },
       {
         "internalType": "bytes4",
-        "name": "_selector",
+        "name": "selector",
         "type": "bytes4"
       }
     ],
@@ -204,7 +246,7 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       }
     ],
@@ -223,7 +265,7 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       }
     ],
@@ -242,12 +284,12 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       },
       {
         "internalType": "bytes32",
-        "name": "_verifierId",
+        "name": "verifierId",
         "type": "bytes32"
       }
     ],
@@ -266,7 +308,7 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       }
     ],
@@ -302,12 +344,12 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       },
       {
         "internalType": "bytes4",
-        "name": "_selector",
+        "name": "selector",
         "type": "bytes4"
       }
     ],
@@ -326,12 +368,12 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       },
       {
         "internalType": "bytes32",
-        "name": "_aggregatorId",
+        "name": "aggregatorId",
         "type": "bytes32"
       }
     ],
@@ -350,12 +392,12 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       },
       {
         "internalType": "bytes32",
-        "name": "_verifierId",
+        "name": "verifierId",
         "type": "bytes32"
       }
     ],
@@ -432,12 +474,12 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       },
       {
         "internalType": "bytes32",
-        "name": "_aggregatorId",
+        "name": "aggregatorId",
         "type": "bytes32"
       }
     ],
@@ -450,12 +492,12 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       },
       {
         "internalType": "bytes32",
-        "name": "_verifierId",
+        "name": "verifierId",
         "type": "bytes32"
       }
     ],
@@ -482,7 +524,7 @@
     "inputs": [
       {
         "internalType": "bytes32",
-        "name": "_certHash",
+        "name": "certHash",
         "type": "bytes32"
       }
     ],
@@ -508,7 +550,7 @@
     "inputs": [
       {
         "internalType": "uint64",
-        "name": "_maxTimeDiff",
+        "name": "newMaxTimeDiff",
         "type": "uint64"
       }
     ],
@@ -521,7 +563,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_proofSubmitter",
+        "name": "submitter",
         "type": "address"
       }
     ],
@@ -534,7 +576,7 @@
     "inputs": [
       {
         "internalType": "bytes32",
-        "name": "_rootCert",
+        "name": "newRootCert",
         "type": "bytes32"
       }
     ],
@@ -547,7 +589,7 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       },
       {
@@ -569,12 +611,12 @@
           }
         ],
         "internalType": "struct ZkCoProcessorConfig",
-        "name": "_config",
+        "name": "config",
         "type": "tuple"
       },
       {
         "internalType": "bytes32",
-        "name": "_verifierProofId",
+        "name": "verifierProofId",
         "type": "bytes32"
       }
     ],
@@ -600,7 +642,7 @@
     "inputs": [
       {
         "internalType": "bytes32",
-        "name": "trustedCertHash",
+        "name": "",
         "type": "bytes32"
       }
     ],
@@ -619,12 +661,12 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       },
       {
         "internalType": "bytes32",
-        "name": "_newAggregatorId",
+        "name": "newAggregatorId",
         "type": "bytes32"
       }
     ],
@@ -637,17 +679,17 @@
     "inputs": [
       {
         "internalType": "enum ZkCoProcessorType",
-        "name": "_zkCoProcessor",
+        "name": "zkCoProcessor",
         "type": "uint8"
       },
       {
         "internalType": "bytes32",
-        "name": "_newVerifierId",
+        "name": "newVerifierId",
         "type": "bytes32"
       },
       {
         "internalType": "bytes32",
-        "name": "_newVerifierProofId",
+        "name": "newVerifierProofId",
         "type": "bytes32"
       }
     ],
@@ -754,6 +796,19 @@
       }
     ],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "version",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "pure",
     "type": "function"
   },
   {

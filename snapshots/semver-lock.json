@@ -188,8 +188,8 @@
     "sourceCodeHash": "0xd3fd2d07ea417c97590c5b1895890186faf7d1f12f1e2d368ba270d077c088fd"
   },
   "src/dispute/AnchorStateRegistry.sol:AnchorStateRegistry": {
-    "initCodeHash": "0x4795cc818d507942e953f1ed412218f5cdbf5802a98e5fa1c73450dd6dfa39e9",
-    "sourceCodeHash": "0x93fcf998d69b2a72273c4043c465010d53e338be95331cdd122ea55ff5bb0ef8"
+    "initCodeHash": "0x6f3afd2d0ef97a82ca3111976322b99343a270e54cd4a405028f2f29c75f7fb1",
+    "sourceCodeHash": "0x84b99fce0a2fd87b2d634305239496cc660c920f1787a7a57a42cd65ba6a76a7"
   },
   "src/dispute/DelayedWETH.sol:DelayedWETH": {
     "initCodeHash": "0x592a6e22e1d02797eeb6fa622806e58f867bb6066944852e120b5871d3110825",
@@ -246,6 +246,10 @@
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
     "initCodeHash": "0x89f15344142ede7ca9d6af3c998fb3ffec84293105b28daa8427aa0608dd1d9e",
     "sourceCodeHash": "0xfa0464c07c06fddc98ba20e9a362ba10ecf94496556d0f7ac88d1986f79a8a6b"
+  },
+  "src/multiproof/tee/NitroEnclaveVerifier.sol:NitroEnclaveVerifier": {
+    "initCodeHash": "0x03faa271d3dda376088dfed1c675c691a7a4f2155052d4f66860d388ad4eff31",
+    "sourceCodeHash": "0x19364958672085b709d7475e06145ab997512b79184f287d7d7bbfe0e8c81dfc"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
     "initCodeHash": "0x95bf7d37bd7218dc48a176d443599af7dffcb83b57ed63226bd84a3facd8d5f2",
