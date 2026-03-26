@@ -46,6 +46,6 @@
     "label": "_verifierProofIds",
     "offset": 0,
     "slot": "6",
-    "type": "mapping(enum ZkCoProcessorType => mapping(bytes32 => bytes32))"
+    "type": "mapping(enum ZkCoProcessorType => bytes32)"
   }
 ]

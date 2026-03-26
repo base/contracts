@@ -176,12 +176,11 @@ interface INitroEnclaveVerifier {
     function getZkVerifier(ZkCoProcessorType _zkCoProcessor, bytes4 _selector) external view returns (address);
 
     /**
-     * @dev Returns the verifierProofId for a given verifierId
+     * @dev Returns the verifierProofId for a given ZkCoProcessorType
      * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _verifierId The verifier program ID
      * @return The corresponding verifierProofId
      */
-    function getVerifierProofId(ZkCoProcessorType _zkCoProcessor, bytes32 _verifierId) external view returns (bytes32);
+    function getVerifierProofId(ZkCoProcessorType _zkCoProcessor) external view returns (bytes32);
 
     /**
      * @dev Checks how many certificates in each report are trusted

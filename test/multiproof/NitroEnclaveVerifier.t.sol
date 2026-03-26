@@ -149,7 +149,7 @@ contract NitroEnclaveVerifierTest is Test {
         assertEq(stored.aggregatorId, AGGREGATOR_ID);
         assertEq(stored.zkVerifier, mockRiscZeroVerifier);
 
-        assertEq(verifier.getVerifierProofId(ZkCoProcessorType.RiscZero, VERIFIER_ID), VERIFIER_PROOF_ID);
+        assertEq(verifier.getVerifierProofId(ZkCoProcessorType.RiscZero), VERIFIER_PROOF_ID);
     }
 
     function testSetZkConfigurationRevertsIfNotOwner() public {
@@ -193,7 +193,7 @@ contract NitroEnclaveVerifierTest is Test {
 
         ZkCoProcessorConfig memory config = verifier.getZkConfig(ZkCoProcessorType.RiscZero);
         assertEq(config.verifierId, newVerifierId);
-        assertEq(verifier.getVerifierProofId(ZkCoProcessorType.RiscZero, newVerifierId), newVerifierProofId);
+        assertEq(verifier.getVerifierProofId(ZkCoProcessorType.RiscZero), newVerifierProofId);
     }
 
     function testUpdateVerifierIdRevertsIfZero() public {

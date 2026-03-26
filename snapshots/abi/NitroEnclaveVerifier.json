@@ -248,11 +248,6 @@
         "internalType": "enum ZkCoProcessorType",
         "name": "zkCoProcessor",
         "type": "uint8"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "verifierId",
-        "type": "bytes32"
       }
     ],
     "name": "getVerifierProofId",

@@ -64,8 +64,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Route-specific verifier overrides (selector -> verifier address)
     mapping(ZkCoProcessorType => mapping(bytes4 => address)) private _zkVerifierRoutes;
 
-    /// @dev Mapping from verifierId to its corresponding verifierProofId representation
-    mapping(ZkCoProcessorType => mapping(bytes32 => bytes32)) private _verifierProofIds;
+    /// @dev Mapping from ZkCoProcessorType to its corresponding verifierProofId representation
+    mapping(ZkCoProcessorType => bytes32) private _verifierProofIds;
 
     // ============ Custom Errors ============
 
@@ -207,13 +207,12 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     }
 
     /**
-     * @dev Returns the verifierProofId for a given verifierId
+     * @dev Returns the verifierProofId for a given ZkCoProcessorType
      * @param zkCoProcessor Type of ZK coprocessor
-     * @param verifierId The verifier program ID
      * @return The corresponding verifierProofId
      */
-    function getVerifierProofId(ZkCoProcessorType zkCoProcessor, bytes32 verifierId) external view returns (bytes32) {
-        return _verifierProofIds[zkCoProcessor][verifierId];
+    function getVerifierProofId(ZkCoProcessorType zkCoProcessor) external view returns (bytes32) {
+        return _verifierProofIds[zkCoProcessor];
     }
 
     /**
@@ -347,7 +346,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         }
 
         zkConfig[zkCoProcessor].verifierId = newVerifierId;
-        _verifierProofIds[zkCoProcessor][newVerifierId] = newVerifierProofId;
+        _verifierProofIds[zkCoProcessor] = newVerifierProofId;
 
         emit VerifierIdUpdated(zkCoProcessor, newVerifierId, newVerifierProofId);
     }
@@ -482,7 +481,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         if (msg.sender != proofSubmitter) revert CallerNotProofSubmitter();
         bytes32 aggregatorId = zkConfig[zkCoprocessor].aggregatorId;
         bytes32 verifierId = zkConfig[zkCoprocessor].verifierId;
-        bytes32 verifierProofId = _verifierProofIds[zkCoprocessor][verifierId];
+        bytes32 verifierProofId = _verifierProofIds[zkCoprocessor];
 
         _verifyZk(zkCoprocessor, aggregatorId, output, proofBytes);
         BatchVerifierJournal memory batchJournal = abi.decode(output, (BatchVerifierJournal));
@@ -521,7 +520,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
 
         // Auto-add program IDs to the version sets and store verifierProofId mapping
         if (config.verifierId != bytes32(0)) {
-            _verifierProofIds[zkCoProcessor][config.verifierId] = verifierProofId;
+            _verifierProofIds[zkCoProcessor] = verifierProofId;
         }
         emit ZKConfigurationUpdated(zkCoProcessor, config, verifierProofId);
     }
