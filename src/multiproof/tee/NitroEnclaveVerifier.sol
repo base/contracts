@@ -56,7 +56,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     mapping(ZkCoProcessorType => ZkCoProcessorConfig) public zkConfig;
 
     /// @dev Mapping of trusted intermediate certificate hashes (excludes root certificate)
-    mapping(bytes32 trustedCertHash => bool) public trustedIntermediateCerts;
+    mapping(bytes32 => bool) public trustedIntermediateCerts;
 
     /// @dev Maximum allowed time difference in seconds for attestation timestamp validation
     uint64 public maxTimeDiff;
@@ -71,10 +71,10 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     mapping(ZkCoProcessorType => EnumerableSet.Bytes32Set) private _aggregatorIdSet;
 
     /// @dev Route-specific verifier overrides (selector -> verifier address)
-    mapping(ZkCoProcessorType => mapping(bytes4 selector => address zkVerifier)) private _zkVerifierRoutes;
+    mapping(ZkCoProcessorType => mapping(bytes4 => address)) private _zkVerifierRoutes;
 
     /// @dev Mapping from verifierId to its corresponding verifierProofId representation
-    mapping(ZkCoProcessorType => mapping(bytes32 verifierId => bytes32 verifierProofId)) private _verifierProofIds;
+    mapping(ZkCoProcessorType => mapping(bytes32 => bytes32)) private _verifierProofIds;
 
     // ============ Custom Errors ============
 
