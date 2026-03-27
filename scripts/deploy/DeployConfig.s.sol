@@ -105,6 +105,13 @@ contract DeployConfig is Script {
     uint256 public multiproofIntermediateBlockInterval;
     uint256 public multiproofProofThreshold;
 
+    // NitroEnclaveVerifier Configuration (used by DeployDevWithNitro when deploying the verifier inline)
+    bytes32 public nitroRootCert;
+    bytes32 public nitroVerifierId;
+    bytes32 public nitroVerifierProofId;
+    address public nitroProofSubmitter;
+    address public risc0VerifierRouter;
+
     bool public useInterop;
     bool public useUpgradedFork;
     bytes32 public devFeatureBitmap;
@@ -208,12 +215,18 @@ contract DeployConfig is Script {
         multiproofConfigHash = bytes32(_readOr(_json, "$.multiproofConfigHash", 0));
         multiproofGameType = _readOr(_json, "$.multiproofGameType", 621);
         teeProposer = _readOr(_json, "$.teeProposer", finalSystemOwner);
-        nitroEnclaveVerifier = stdJson.readAddress(_json, "$.nitroEnclaveVerifier");
+        nitroEnclaveVerifier = _readOr(_json, "$.nitroEnclaveVerifier", address(0));
         multiproofGenesisOutputRoot = bytes32(_readOr(_json, "$.multiproofGenesisOutputRoot", uint256(1)));
         multiproofGenesisBlockNumber = _readOr(_json, "$.multiproofGenesisBlockNumber", 0);
         multiproofBlockInterval = _readOr(_json, "$.multiproofBlockInterval", 100);
         multiproofIntermediateBlockInterval = _readOr(_json, "$.multiproofIntermediateBlockInterval", 10);
         multiproofProofThreshold = _readOr(_json, "$.multiproofProofThreshold", 1);
+
+        nitroRootCert = bytes32(_readOr(_json, "$.nitroRootCert", 0));
+        nitroVerifierId = bytes32(_readOr(_json, "$.nitroVerifierId", 0));
+        nitroVerifierProofId = bytes32(_readOr(_json, "$.nitroVerifierProofId", 0));
+        nitroProofSubmitter = _readOr(_json, "$.nitroProofSubmitter", address(0));
+        risc0VerifierRouter = _readOr(_json, "$.risc0VerifierRouter", address(0));
     }
 
     function fork() public view returns (Fork fork_) {
