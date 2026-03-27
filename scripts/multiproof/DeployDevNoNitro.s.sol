@@ -194,7 +194,7 @@ contract DeployDevNoNitro is Script {
                 IVerifier(teeVerifier),
                 IVerifier(zkVerifier),
                 cfg.teeImageHash(),
-                bytes32(0),
+                AggregateVerifier.ZkHashes(bytes32(0), bytes32(0)),
                 cfg.multiproofConfigHash(),
                 8453,
                 BLOCK_INTERVAL,
