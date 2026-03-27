@@ -37,6 +37,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         ZK
     }
 
+    /// @notice Hashes for the ZK proving programs.
+    struct ZkHashes {
+        bytes32 rangeHash;
+        bytes32 aggregateHash;
+    }
+
     ////////////////////////////////////////////////////////////////
     //                         Constants                          //
     ////////////////////////////////////////////////////////////////
@@ -77,8 +83,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The ZK prover.
     IVerifier public immutable ZK_VERIFIER;
 
-    /// @notice The hash of the ZK image.
-    bytes32 public immutable ZK_IMAGE_HASH;
+    /// @notice The hash of the ZK range program.
+    bytes32 public immutable ZK_RANGE_HASH;
+
+    /// @notice The hash of the ZK aggregate program.
+    bytes32 public immutable ZK_AGGREGATE_HASH;
 
     /// @notice The hash of the rollup configuration.
     bytes32 public immutable CONFIG_HASH;
@@ -247,7 +256,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param teeVerifier The TEE verifier.
     /// @param zkVerifier The ZK verifier.
     /// @param teeImageHash The hash of the TEE image.
-    /// @param zkImageHash The hash of the ZK image.
+    /// @param zkHashes The hashes of the ZK range and aggregate programs.
     /// @param configHash The hash of the rollup configuration.
     /// @param l2ChainId The chain ID of the L2 network.
     /// @param blockInterval The block interval.
@@ -260,7 +269,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         IVerifier teeVerifier,
         IVerifier zkVerifier,
         bytes32 teeImageHash,
-        bytes32 zkImageHash,
+        ZkHashes memory zkHashes,
         bytes32 configHash,
         uint256 l2ChainId,
         uint256 blockInterval,
@@ -283,7 +292,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         TEE_VERIFIER = teeVerifier;
         ZK_VERIFIER = zkVerifier;
         TEE_IMAGE_HASH = teeImageHash;
-        ZK_IMAGE_HASH = zkImageHash;
+        ZK_RANGE_HASH = zkHashes.rangeHash;
+        ZK_AGGREGATE_HASH = zkHashes.aggregateHash;
         CONFIG_HASH = configHash;
         L2_CHAIN_ID = l2ChainId;
         BLOCK_INTERVAL = blockInterval;
@@ -910,12 +920,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
                 endingL2SequenceNumber,
                 intermediateRoots,
                 CONFIG_HASH,
-                ZK_IMAGE_HASH
+                ZK_RANGE_HASH
             )
         );
 
         // Validate the proof.
-        if (!ZK_VERIFIER.verify(proofBytes, ZK_IMAGE_HASH, journal)) revert InvalidProof();
+        if (!ZK_VERIFIER.verify(proofBytes, ZK_AGGREGATE_HASH, journal)) revert InvalidProof();
     }
 
     /// @notice Returns the status of the parent game.
