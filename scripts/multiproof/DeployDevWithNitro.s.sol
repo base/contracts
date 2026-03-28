@@ -128,13 +128,15 @@ contract DeployDevWithNitro is Script {
                 INitroEnclaveVerifier(nitroEnclaveVerifierAddr), IDisputeGameFactory(disputeGameFactory)
             )
         );
+        address[] memory initialProposers = new address[](1);
+        initialProposers[0] = cfg.teeProposer();
         teeProverRegistryProxy = address(
             new TransparentUpgradeableProxy(
                 scgImpl,
                 address(0xdead),
                 abi.encodeCall(
                     TEEProverRegistry.initialize,
-                    (owner, owner, cfg.teeProposer(), GameType.wrap(uint32(cfg.multiproofGameType())))
+                    (owner, owner, initialProposers, GameType.wrap(uint32(cfg.multiproofGameType())))
                 )
             )
         );
