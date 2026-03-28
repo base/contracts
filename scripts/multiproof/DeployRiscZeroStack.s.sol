@@ -3,26 +3,48 @@ pragma solidity ^0.8.20;
 
 /**
  * @title DeployRiscZeroStack
- * @notice Deploys the RISC Zero verifier stack and NitroEnclaveVerifier.
+ * @notice Deploys a RiscZeroSetVerifier and NitroEnclaveVerifier that work with
+ *         an existing RISC Zero verifier router (e.g. the Boundless-deployed
+ *         Router on Sepolia).
  *
- * This script is separated from the main deployment scripts because the RISC Zero
- * set verifier and NitroEnclaveVerifier contracts (via ISP1Verifier) require
- * Solidity ^0.8.20, while the main deployment scripts and their transitive
- * dependencies are pinned to =0.8.15.
+ * This script is separated from the main deployment scripts because the
+ * RiscZeroSetVerifier and NitroEnclaveVerifier contracts (via ISP1Verifier)
+ * require Solidity ^0.8.20, while the main deployment scripts and their
+ * transitive dependencies are pinned to =0.8.15.
+ *
+ * The RISC Zero Groth16 verifier and Router are NOT deployed by this script.
+ * They are assumed to already exist on-chain (typically deployed by the
+ * Boundless marketplace). Pass the router address as a parameter.
+ *
+ * A local RiscZeroSetVerifier is deployed that delegates root seal verification
+ * to the existing Router. This is necessary because the Boundless-deployed
+ * SetVerifier may have an outdated inner Groth16 verifier. By routing through
+ * the Router, root seals are dispatched to the correct Groth16 verifier
+ * regardless of version.
  *
  * ─────────────────────────────────────────────────────────────────────────────────
  * USAGE
  * ─────────────────────────────────────────────────────────────────────────────────
  *
  *   forge script scripts/multiproof/DeployRiscZeroStack.s.sol:DeployRiscZeroStack \
- *     --sig "run(address,bytes32,bytes32,bytes32,address,bytes32)" \
- *     <OWNER> <SET_BUILDER_IMAGE_ID> <NITRO_ROOT_CERT> <NITRO_VERIFIER_ID> \
- *     <NITRO_PROOF_SUBMITTER> <NITRO_VERIFIER_PROOF_ID> \
+ *     --sig "run(address,address,bytes32,bytes32,bytes32)" \
+ *     <OWNER> <RISC0_VERIFIER_ROUTER> <SET_BUILDER_IMAGE_ID> \
+ *     <NITRO_ROOT_CERT> <NITRO_VERIFIER_ID> \
  *     --broadcast --rpc-url <RPC_URL> --private-key <DEPLOYER_KEY>
  *
+ * NOTE: The deployer MUST be the same address as OWNER, since the script calls
+ *       addVerifyRoute() on the NitroEnclaveVerifier (onlyOwner).
+ *
  * Outputs:
- *   - RiscZeroGroth16Verifier, RiscZeroSetVerifier, RiscZeroVerifierRouter
- *   - NitroEnclaveVerifier (set `nitroEnclaveVerifier` in deploy config to this address)
+ *   - RiscZeroSetVerifier (delegates to existing Router for root verification)
+ *   - NitroEnclaveVerifier with route wired to the local SetVerifier
+ *
+ * POST-DEPLOY:
+ *   After deploying TEEProverRegistry via DeployDevWithNitro.s.sol, update the
+ *   proofSubmitter on NitroEnclaveVerifier to the TEEProverRegistry address:
+ *
+ *     cast send <NITRO_ENCLAVE_VERIFIER> "setProofSubmitter(address)" <TEE_PROVER_REGISTRY> \
+ *       --rpc-url <RPC_URL> --private-key <OWNER_KEY>
  *
  * ─────────────────────────────────────────────────────────────────────────────────
  */
@@ -31,11 +53,7 @@ import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
 
 import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
-import { IRiscZeroSelectable } from "lib/risc0-ethereum/contracts/src/IRiscZeroSelectable.sol";
-import { RiscZeroVerifierRouter } from "lib/risc0-ethereum/contracts/src/RiscZeroVerifierRouter.sol";
-import { RiscZeroGroth16Verifier } from "lib/risc0-ethereum/contracts/src/groth16/RiscZeroGroth16Verifier.sol";
-import { ControlID } from "lib/risc0-ethereum/contracts/src/groth16/ControlID.sol";
-import { RiscZeroSetVerifier } from "lib/risc0-ethereum/contracts/src/RiscZeroSetVerifier.sol";
+import { RiscZeroSetVerifier, RiscZeroSetVerifierLib } from "lib/risc0-ethereum/contracts/src/RiscZeroSetVerifier.sol";
 
 import {
     NitroEnclaveVerifier,
@@ -44,96 +62,94 @@ import {
 } from "src/multiproof/tee/NitroEnclaveVerifier.sol";
 
 /// @title DeployRiscZeroStack
-/// @notice Deploys the RISC Zero verifier stack + NitroEnclaveVerifier for use with DeployDevWithNitro.
+/// @notice Deploys RiscZeroSetVerifier + NitroEnclaveVerifier using an existing Router.
 contract DeployRiscZeroStack is Script {
     /// @notice Maximum attestation age accepted by the NitroEnclaveVerifier (1 hour).
     uint64 public constant NITRO_MAX_TIME_DIFF = 3600;
 
-    address public groth16Verifier;
     address public setVerifier;
-    address public router;
     address public nitroEnclaveVerifier;
 
-    /// @param owner               Owner for the Router and NitroEnclaveVerifier.
-    /// @param setBuilderImageId   RISC Zero set builder image ID (from Boundless deployment).
-    /// @param nitroRootCert       SHA-256 hash of the AWS Nitro root certificate.
-    /// @param nitroVerifierId     RISC Zero image ID of the attestation verifier guest.
-    /// @param nitroProofSubmitter Address authorized to submit proofs (e.g. TEE registrar).
-    /// @param nitroVerifierProofId Proof ID for batch verification (bytes32(0) if unused).
+    /// @param owner                Owner for the NitroEnclaveVerifier (must equal msg.sender).
+    /// @param risc0VerifierRouter  Address of an existing RISC Zero verifier router
+    ///                             (e.g. Boundless-deployed Router).
+    /// @param setBuilderImageId    RISC Zero set builder image ID (from Boundless deployment).
+    /// @param nitroRootCert        SHA-256 hash of the AWS Nitro root certificate.
+    /// @param nitroVerifierId      RISC Zero image ID of the attestation verifier guest.
     function run(
         address owner,
+        address risc0VerifierRouter,
         bytes32 setBuilderImageId,
         bytes32 nitroRootCert,
-        bytes32 nitroVerifierId,
-        address nitroProofSubmitter,
-        bytes32 nitroVerifierProofId
+        bytes32 nitroVerifierId
     ) public {
         require(owner != address(0), "owner must be non-zero");
+        require(risc0VerifierRouter != address(0), "risc0VerifierRouter must be non-zero");
         require(setBuilderImageId != bytes32(0), "setBuilderImageId must be non-zero");
         require(nitroRootCert != bytes32(0), "nitroRootCert must be non-zero");
         require(nitroVerifierId != bytes32(0), "nitroVerifierId must be non-zero");
-        require(nitroProofSubmitter != address(0), "nitroProofSubmitter must be non-zero");
 
-        console.log("=== Deploying RISC Zero Verifier Stack + NitroEnclaveVerifier ===");
+        bytes4 setVerifierSelector = RiscZeroSetVerifierLib.selector(setBuilderImageId);
+
+        console.log("=== Deploying RiscZeroSetVerifier + NitroEnclaveVerifier ===");
         console.log("Owner:", owner);
+        console.log("RISC Zero Verifier Router:", risc0VerifierRouter);
         console.log("Set Builder Image ID:", vm.toString(setBuilderImageId));
+        console.log("Set Verifier Selector:", vm.toString(setVerifierSelector));
         console.log("Nitro Root Cert:", vm.toString(nitroRootCert));
         console.log("Nitro Verifier ID:", vm.toString(nitroVerifierId));
-        console.log("Nitro Proof Submitter:", nitroProofSubmitter);
+        console.log("");
+        console.log("NOTE: proofSubmitter is set to owner as placeholder.");
+        console.log("      Update it to TEEProverRegistry after deploying via setProofSubmitter().");
         console.log("");
 
         vm.startBroadcast();
 
-        // ── RISC Zero verifier stack ──────────────────────────────────────
-
-        // 1. Deploy Groth16 verifier (uses version-locked ControlID constants)
-        groth16Verifier = address(
-            new RiscZeroGroth16Verifier(ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID)
-        );
-        console.log("RiscZeroGroth16Verifier:", groth16Verifier);
-
-        // 2. Deploy set verifier (delegates root verification to Groth16 verifier)
+        // ── RiscZeroSetVerifier ──────────────────────────────────────────────
+        //
+        // Deploy a SetVerifier whose inner VERIFIER is the Router. This ensures
+        // root seals are dispatched to the correct Groth16 verifier regardless
+        // of version, avoiding selector mismatches when the Boundless provers
+        // upgrade to newer Groth16 ControlIDs.
         setVerifier = address(
-            new RiscZeroSetVerifier(IRiscZeroVerifier(groth16Verifier), setBuilderImageId, "")
+            new RiscZeroSetVerifier(IRiscZeroVerifier(risc0VerifierRouter), setBuilderImageId, "")
         );
         console.log("RiscZeroSetVerifier:", setVerifier);
+        console.log("  SELECTOR:", vm.toString(setVerifierSelector));
 
-        // 3. Deploy router and register both verifiers
-        RiscZeroVerifierRouter routerContract = new RiscZeroVerifierRouter(owner);
-        router = address(routerContract);
-        console.log("RiscZeroVerifierRouter:", router);
-
-        bytes4 groth16Selector = IRiscZeroSelectable(groth16Verifier).SELECTOR();
-        bytes4 setVerifierSelector = IRiscZeroSelectable(setVerifier).SELECTOR();
-        routerContract.addVerifier(groth16Selector, IRiscZeroVerifier(groth16Verifier));
-        routerContract.addVerifier(setVerifierSelector, IRiscZeroVerifier(setVerifier));
-        console.log("  Groth16 selector:", vm.toString(groth16Selector));
-        console.log("  SetVerifier selector:", vm.toString(setVerifierSelector));
-
-        // ── NitroEnclaveVerifier ──────────────────────────────────────────
+        // ── NitroEnclaveVerifier ─────────────────────────────────────────────
 
         ZkCoProcessorConfig memory zkConfig = ZkCoProcessorConfig({
             verifierId: nitroVerifierId,
             aggregatorId: bytes32(0),
-            zkVerifier: router
+            zkVerifier: risc0VerifierRouter
         });
 
         // Start with an empty trusted certs array; certs will be auto-cached on first valid proof.
         bytes32[] memory trustedCerts = new bytes32[](0);
 
-        nitroEnclaveVerifier = address(
-            new NitroEnclaveVerifier(
-                owner,
-                NITRO_MAX_TIME_DIFF,
-                trustedCerts,
-                nitroRootCert,
-                nitroProofSubmitter,
-                ZkCoProcessorType.RiscZero,
-                zkConfig,
-                nitroVerifierProofId
-            )
+        // Use owner as placeholder proofSubmitter; must be updated to TEEProverRegistry
+        // address after deployment via setProofSubmitter().
+        NitroEnclaveVerifier nev = new NitroEnclaveVerifier(
+            owner,
+            NITRO_MAX_TIME_DIFF,
+            trustedCerts,
+            nitroRootCert,
+            owner,
+            ZkCoProcessorType.RiscZero,
+            zkConfig,
+            bytes32(0)
         );
+        nitroEnclaveVerifier = address(nev);
         console.log("NitroEnclaveVerifier:", nitroEnclaveVerifier);
+
+        // ── Wire up the per-selector route ───────────────────────────────────
+        //
+        // Set inclusion proofs from Boundless carry the SetVerifier selector as
+        // their first 4 bytes. Route that selector to our local SetVerifier so
+        // root seals go through the Router (which has the correct Groth16).
+        nev.addVerifyRoute(ZkCoProcessorType.RiscZero, setVerifierSelector, setVerifier);
+        console.log("  Route added: selector", vm.toString(setVerifierSelector), "->", setVerifier);
 
         vm.stopBroadcast();
 
@@ -142,21 +158,20 @@ contract DeployRiscZeroStack is Script {
         console.log("========================================");
         console.log("   RISC ZERO STACK + NITRO DEPLOYED");
         console.log("========================================");
-        console.log("RiscZeroGroth16Verifier:", groth16Verifier);
         console.log("RiscZeroSetVerifier:", setVerifier);
-        console.log("RiscZeroVerifierRouter:", router);
         console.log("NitroEnclaveVerifier:", nitroEnclaveVerifier);
+        console.log("RISC Zero Router (external):", risc0VerifierRouter);
         console.log("");
         console.log(">>> Set nitroEnclaveVerifier in deploy config to:", nitroEnclaveVerifier);
         console.log(">>> Then run DeployDevWithNitro.s.sol <<<");
+        console.log(">>> Then call setProofSubmitter(TEEProverRegistry) on NitroEnclaveVerifier <<<");
         console.log("========================================");
 
         // Write output
         string memory json = string.concat(
-            '{"RiscZeroGroth16Verifier":"', vm.toString(groth16Verifier),
-            '","RiscZeroSetVerifier":"', vm.toString(setVerifier),
-            '","RiscZeroVerifierRouter":"', vm.toString(router),
+            '{"RiscZeroSetVerifier":"', vm.toString(setVerifier),
             '","NitroEnclaveVerifier":"', vm.toString(nitroEnclaveVerifier),
+            '","RiscZeroVerifierRouter":"', vm.toString(risc0VerifierRouter),
             '"}'
         );
         string memory outPath = string.concat(

@@ -105,7 +105,8 @@ contract DeployConfig is Script {
     uint256 public multiproofIntermediateBlockInterval;
     uint256 public multiproofProofThreshold;
 
-    // NitroEnclaveVerifier Configuration (used by DeployDevWithNitro when deploying the verifier inline)
+    // RISC Zero / NitroEnclaveVerifier Configuration (reference values; DeployRiscZeroStack takes these as CLI args)
+    bytes32 public risc0SetBuilderImageId;
     bytes32 public nitroRootCert;
     bytes32 public nitroVerifierId;
     bytes32 public nitroVerifierProofId;
@@ -222,6 +223,7 @@ contract DeployConfig is Script {
         multiproofIntermediateBlockInterval = _readOr(_json, "$.multiproofIntermediateBlockInterval", 10);
         multiproofProofThreshold = _readOr(_json, "$.multiproofProofThreshold", 1);
 
+        risc0SetBuilderImageId = bytes32(_readOr(_json, "$.risc0SetBuilderImageId", 0));
         nitroRootCert = bytes32(_readOr(_json, "$.nitroRootCert", 0));
         nitroVerifierId = bytes32(_readOr(_json, "$.nitroVerifierId", 0));
         nitroVerifierProofId = bytes32(_readOr(_json, "$.nitroVerifierProofId", 0));
