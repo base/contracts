@@ -222,7 +222,9 @@ semver-lock:
 snapshots-no-build: snapshots-abi-storage-no-build semver-lock-no-build
 
 # Builds contracts and then generates core snapshots.
-snapshots: build-source snapshots-no-build
+# Uses `semver-lock` (which includes --force) instead of `semver-lock-no-build`
+# to ensure artifacts reflect the current profile regardless of cache state.
+snapshots: snapshots-abi-storage semver-lock
 
 
 ########################################################
