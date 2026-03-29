@@ -55,15 +55,20 @@ contract RelayActor is StdUtils {
         // will not reject value being sent to it.
         _value = _value % 2;
 
-        // If the message should succeed, supply it `baseGas`. If not, supply it an amount of
-        // gas that is too low to complete the call.
-        uint256 gas = doFail ? bound(minGasLimit, 90_000, 100_000) : xdm.baseGas(_message, minGasLimit);
+        // For the failure case, we use an impossibly large minGasLimit so that the hasMinGas
+        // check always fails regardless of available gas. We provide baseGas-level gas (enough
+        // for relayMessage's overhead) to avoid OOG reverts. Limiting gas directly is fragile
+        // because the proxy-to-proxy call overhead (SystemConfig → SuperchainConfig,
+        // OptimismPortal) leaves a razor-thin window between "enough to not OOG" and
+        // "not enough for hasMinGas to pass".
+        uint32 relayMinGasLimit = doFail ? type(uint32).max : minGasLimit;
+        uint256 gas = xdm.baseGas(_message, minGasLimit);
 
         // Compute the cross domain message hash and store it in `hashes`.
         // The `relayMessage` function will always encode the message as a version 1
         // message after checking that the V0 hash has not already been relayed.
         bytes32 _hash = Hashing.hashCrossDomainMessageV1(
-            Encoding.encodeVersionedNonce(0, _version), sender, target, _value, minGasLimit, _message
+            Encoding.encodeVersionedNonce(0, _version), sender, target, _value, relayMinGasLimit, _message
         );
         hashes.push(_hash);
         numHashes += 1;
@@ -78,7 +83,7 @@ contract RelayActor is StdUtils {
             vm.expectCallMinGas(address(0x04), _value, minGasLimit, _message);
         }
         try xdm.relayMessage{ gas: gas, value: _value }(
-            Encoding.encodeVersionedNonce(0, _version), sender, target, _value, minGasLimit, _message
+            Encoding.encodeVersionedNonce(0, _version), sender, target, _value, relayMinGasLimit, _message
         ) { }
         catch {
             // If any of these calls revert, set `reverted` to true to fail the invariant test.

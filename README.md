@@ -27,6 +27,19 @@ For contract deployment artifacts, see [base-org/contract-deployments](https://g
 [![GitHub pull requests by-label](https://img.shields.io/github/issues-pr-raw/base-org/contracts)](https://github.com/base/contracts/pulls)
 [![GitHub Issues](https://img.shields.io/github/issues-raw/base-org/contracts.svg)](https://github.com/base/contracts/issues)
 
+### Fixing semver-lock CI failures
+
+If the `semver-lock` CI check fails, regenerate locally and commit:
+```bash
+just semver-lock
+```
+
+If CI still rejects it (Foundry version mismatch), update your local Foundry first:
+```bash
+foundryup
+just semver-lock
+```
+
 ### setup and testing
 
 - If you don't have foundry installed, run `make install-foundry`.
