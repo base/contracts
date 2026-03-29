@@ -85,7 +85,9 @@ contract TEEProverRegistryTest is Test {
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),
             address(proxyAdmin),
-            abi.encodeCall(TEEProverRegistry.initialize, (owner, manager, address(0), GameType.wrap(TEST_GAME_TYPE)))
+            abi.encodeCall(
+                TEEProverRegistry.initialize, (owner, manager, new address[](0), GameType.wrap(TEST_GAME_TYPE))
+            )
         );
 
         teeProverRegistry = DevTEEProverRegistry(address(proxy));
@@ -96,25 +98,33 @@ contract TEEProverRegistryTest is Test {
     function testInitialization() public view {
         assertEq(teeProverRegistry.owner(), owner);
         assertEq(teeProverRegistry.manager(), manager);
-        assertEq(teeProverRegistry.version(), "0.3.0");
+        assertEq(teeProverRegistry.version(), "0.4.0");
     }
 
-    function testInitializationWithProposer() public {
-        address proposer = makeAddr("proposer");
+    function testInitializationWithProposers() public {
+        address proposer1 = makeAddr("proposer1");
+        address proposer2 = makeAddr("proposer2");
+        address proposer3 = makeAddr("proposer3");
         DevTEEProverRegistry impl2 =
             new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(1)));
         ProxyAdmin proxyAdmin2 = new ProxyAdmin(address(this));
+        address[] memory proposers = new address[](3);
+        proposers[0] = proposer1;
+        proposers[1] = proposer2;
+        proposers[2] = proposer3;
         TransparentUpgradeableProxy proxy2 = new TransparentUpgradeableProxy(
             address(impl2),
             address(proxyAdmin2),
-            abi.encodeCall(TEEProverRegistry.initialize, (owner, manager, proposer, GameType.wrap(0)))
+            abi.encodeCall(TEEProverRegistry.initialize, (owner, manager, proposers, GameType.wrap(0)))
         );
         DevTEEProverRegistry registry2 = DevTEEProverRegistry(address(proxy2));
-        assertTrue(registry2.isValidProposer(proposer));
+        assertTrue(registry2.isValidProposer(proposer1));
+        assertTrue(registry2.isValidProposer(proposer2));
+        assertTrue(registry2.isValidProposer(proposer3));
     }
 
-    function testInitializationWithZeroProposer() public view {
-        // Default setUp uses address(0) as proposer — no proposer should be set
+    function testInitializationWithEmptyProposers() public view {
+        // Default setUp uses an empty proposer array — no proposer should be set
         assertFalse(teeProverRegistry.isValidProposer(address(0)));
     }
 

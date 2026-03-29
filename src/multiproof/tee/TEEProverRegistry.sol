@@ -102,7 +102,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         initialize({
             initialOwner: address(0xdEaD),
             initialManager: address(0xdEaD),
-            initialProposer: address(0),
+            initialProposers: new address[](0),
             gameType_: GameType.wrap(0)
         });
     }
@@ -198,15 +198,15 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         return _getExpectedImageHash();
     }
 
-    /// @notice Initializes the contract with owner, manager, proposer, and game type.
+    /// @notice Initializes the contract with owner, manager, proposers, and game type.
     /// @param initialOwner The initial owner address.
     /// @param initialManager The initial manager address.
-    /// @param initialProposer The initial proposer address (set to address(0) to skip).
+    /// @param initialProposers Array of initial proposer addresses (zero addresses are skipped).
     /// @param gameType_ The game type for the AggregateVerifier.
     function initialize(
         address initialOwner,
         address initialManager,
-        address initialProposer,
+        address[] memory initialProposers,
         GameType gameType_
     )
         public
@@ -216,16 +216,18 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         transferOwnership(initialOwner);
         transferManagement(initialManager);
         gameType = gameType_;
-        if (initialProposer != address(0)) {
-            isValidProposer[initialProposer] = true;
-            emit ProposerSet(initialProposer, true);
+        for (uint256 i = 0; i < initialProposers.length; i++) {
+            if (initialProposers[i] != address(0)) {
+                isValidProposer[initialProposers[i]] = true;
+                emit ProposerSet(initialProposers[i], true);
+            }
         }
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.3.0
+    /// @custom:semver 0.4.0
     function version() public pure virtual returns (string memory) {
-        return "0.3.0";
+        return "0.4.0";
     }
 
     /// @dev Reads TEE_IMAGE_HASH from the AggregateVerifier registered in the factory.

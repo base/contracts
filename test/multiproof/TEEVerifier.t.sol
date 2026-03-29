@@ -77,7 +77,9 @@ contract TEEVerifierTest is Test {
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),
             address(proxyAdmin),
-            abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, address(0), GameType.wrap(TEST_GAME_TYPE)))
+            abi.encodeCall(
+                TEEProverRegistry.initialize, (owner, owner, new address[](0), GameType.wrap(TEST_GAME_TYPE))
+            )
         );
 
         teeProverRegistry = DevTEEProverRegistry(address(proxy));
