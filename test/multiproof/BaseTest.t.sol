@@ -46,7 +46,8 @@ contract BaseTest is Test {
     address public immutable ATTACKER = makeAddr("attacker");
 
     bytes32 public immutable TEE_IMAGE_HASH = keccak256("tee-image");
-    bytes32 public immutable ZK_IMAGE_HASH = keccak256("zk-image");
+    bytes32 public immutable ZK_RANGE_HASH = keccak256("zk-range");
+    bytes32 public immutable ZK_AGGREGATE_HASH = keccak256("zk-aggregate");
     bytes32 public immutable CONFIG_HASH = keccak256("config");
 
     ProxyAdmin public proxyAdmin;
@@ -128,7 +129,7 @@ contract BaseTest is Test {
             IVerifier(address(teeVerifier)),
             IVerifier(address(zkVerifier)),
             TEE_IMAGE_HASH,
-            ZK_IMAGE_HASH,
+            AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
             CONFIG_HASH,
             L2_CHAIN_ID,
             BLOCK_INTERVAL,

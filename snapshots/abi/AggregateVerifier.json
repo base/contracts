@@ -32,9 +32,21 @@
         "type": "bytes32"
       },
       {
-        "internalType": "bytes32",
-        "name": "zkImageHash",
-        "type": "bytes32"
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "rangeHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "aggregateHash",
+            "type": "bytes32"
+          }
+        ],
+        "internalType": "struct AggregateVerifier.ZkHashes",
+        "name": "zkHashes",
+        "type": "tuple"
       },
       {
         "internalType": "bytes32",
@@ -249,7 +261,20 @@
   },
   {
     "inputs": [],
-    "name": "ZK_IMAGE_HASH",
+    "name": "ZK_AGGREGATE_HASH",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "ZK_RANGE_HASH",
     "outputs": [
       {
         "internalType": "bytes32",

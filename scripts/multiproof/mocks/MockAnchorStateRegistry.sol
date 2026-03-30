@@ -92,4 +92,30 @@ contract MockAnchorStateRegistry {
     function isGameRespected(IDisputeGame) external pure returns (bool) {
         return true;
     }
+
+    /// @notice Checks if a game is proper (registered, not blacklisted, not retired, not paused).
+    /// @return Always returns true for testing.
+    function isGameProper(IDisputeGame) external pure returns (bool) {
+        return true;
+    }
+
+    /// @notice Checks if the system is paused.
+    /// @return Always returns false for testing.
+    function paused() external pure returns (bool) {
+        return false;
+    }
+
+    /// @notice Checks if a game is finalized.
+    /// @dev Mirrors the real AnchorStateRegistry: requires the game to be resolved.
+    ///      Skips the airgap delay check since this is a dev mock without a finality delay.
+    /// @return Whether the game has been resolved.
+    function isGameFinalized(IDisputeGame _game) external view returns (bool) {
+        return _game.resolvedAt().raw() != 0;
+    }
+
+    /// @notice Sets the anchor state from a dispute game.
+    /// @dev No-op for testing.
+    function setAnchorState(IDisputeGame) external {
+        // No-op in mock
+    }
 }

@@ -11,10 +11,6 @@
     "initCodeHash": "0xe52c51805cfd55967d037173159f18aaf4344e32e5c8ad41f8d5d0025b1d36a8",
     "sourceCodeHash": "0xe5f2b1915a201c0b8a107f168f5b9bc8aec8e8e95f938082e42ba5b5c8ebbd11"
   },
-  "src/L1/FeesDepositor.sol:FeesDepositor:dispute": {
-    "initCodeHash": "0xe52c51805cfd55967d037173159f18aaf4344e32e5c8ad41f8d5d0025b1d36a8",
-    "sourceCodeHash": "0xe5f2b1915a201c0b8a107f168f5b9bc8aec8e8e95f938082e42ba5b5c8ebbd11"
-  },
   "src/L1/L1CrossDomainMessenger.sol:L1CrossDomainMessenger": {
     "initCodeHash": "0x3dc659aafb03bd357f92abfc6794af89ee0ddd5212364551637422bf8d0b00f9",
     "sourceCodeHash": "0xfd67aae7ef1d684f3fccc036a80123e0ffa13de3e26c910cb7b927059c5a6289"
@@ -48,10 +44,6 @@
     "sourceCodeHash": "0x3b7b7a1023e6e87ce4680eee3cc4eebefc15b5ec80db3d39e824fbdd521762db"
   },
   "src/L1/SuperchainConfig.sol:SuperchainConfig": {
-    "initCodeHash": "0x9b1f3555b499709485d51d5d9665002c0eb1e5eb893be1fb978a30749e894858",
-    "sourceCodeHash": "0x572b5da38443fa5fc1c1873a733adee1894c6eba94f0e7867f2e81c5eb616a39"
-  },
-  "src/L1/SuperchainConfig.sol:SuperchainConfig:dispute": {
     "initCodeHash": "0x9b1f3555b499709485d51d5d9665002c0eb1e5eb893be1fb978a30749e894858",
     "sourceCodeHash": "0x572b5da38443fa5fc1c1873a733adee1894c6eba94f0e7867f2e81c5eb616a39"
   },
@@ -240,30 +232,18 @@
     "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0xe631e0c2e8e86711f83cb97884065ce38d1ff519e0d2dbf8704e7e4c183a56cc",
-    "sourceCodeHash": "0xfa0464c07c06fddc98ba20e9a362ba10ecf94496556d0f7ac88d1986f79a8a6b"
-  },
-  "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
-    "initCodeHash": "0x89f15344142ede7ca9d6af3c998fb3ffec84293105b28daa8427aa0608dd1d9e",
-    "sourceCodeHash": "0xfa0464c07c06fddc98ba20e9a362ba10ecf94496556d0f7ac88d1986f79a8a6b"
+    "initCodeHash": "0x720595c92e78d68910ee2c853ffafa828e390f0db87285bd5f6fc2efc46cef23",
+    "sourceCodeHash": "0x829e926bac073d6754e7dd7003c25d562d6281eb4155b47e2538cfc1b2e39481"
   },
   "src/multiproof/tee/NitroEnclaveVerifier.sol:NitroEnclaveVerifier": {
-    "initCodeHash": "0x64ca7a3c66eeae2278cdfffd2a1feaa8ada470403dd1fce23d9157c093f6320e",
-    "sourceCodeHash": "0x5bd92e57f25881aed184a9c7408676191bab858bf908ca7f8993896019e127b2"
+    "initCodeHash": "0x339f7b174480929ff3d095717ad121bd775c69dbe753c7e8cd6de5bcae40a992",
+    "sourceCodeHash": "0xd0e5da001f950a9d7325b0ecdffd46ef1c361eb749133c30689853dbf9886ff5"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0x95bf7d37bd7218dc48a176d443599af7dffcb83b57ed63226bd84a3facd8d5f2",
-    "sourceCodeHash": "0x4435163589299d9b0bc42a80258ebb3eee12ef94e6f1bd439d144b6628b366c8"
-  },
-  "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry:dispute": {
-    "initCodeHash": "0x3a50409059ad8313df38cd76747defa6ae976dcc8ca37b8333c78ef85c7661cd",
-    "sourceCodeHash": "0x4435163589299d9b0bc42a80258ebb3eee12ef94e6f1bd439d144b6628b366c8"
+    "initCodeHash": "0xd5f1b74862d8200c024e7b4ca21a95d44acee9fe6483d47b8a0ed71cdd805007",
+    "sourceCodeHash": "0x054cb05fbe76450b4c28cfe32f1c7ea598b3c0f834b2715c0e43335cef3aa206"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
-    "initCodeHash": "0xeab3964cb2e6bbf3b660a8dedcd01286b74894bf76cf979d0b415fc7ca140ade",
-    "sourceCodeHash": "0xd5e01b4f4e69313e56e51f2f46b7bbe699ef8dc24b8a6385b8ebac4162e05353"
-  },
-  "src/multiproof/tee/TEEVerifier.sol:TEEVerifier:dispute": {
     "initCodeHash": "0xeab3964cb2e6bbf3b660a8dedcd01286b74894bf76cf979d0b415fc7ca140ade",
     "sourceCodeHash": "0xd5e01b4f4e69313e56e51f2f46b7bbe699ef8dc24b8a6385b8ebac4162e05353"
   },

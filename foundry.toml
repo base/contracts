@@ -50,6 +50,7 @@ remappings = [
   '@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts',
   '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts',
   '@openzeppelin/contracts-v5/=lib/openzeppelin-contracts-v5/contracts',
+  'openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/',
   '@rari-capital/solmate/=lib/solmate',
   '@lib-keccak/=lib/lib-keccak/contracts/lib',
   'solady/=lib/solady/src/',
