@@ -147,6 +147,8 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
         if (journal.result != VerificationResult.Success) revert AttestationVerificationFailed();
 
+        // We allow attestations up to MAX_AGE old. This means a cert may be expired between when
+        // the attestation is generated and when it is submitted to this contract.
         if (journal.timestamp / MS_PER_SECOND + MAX_AGE <= block.timestamp) revert AttestationTooOld();
 
         // Extract the attestation's PCR0 and store it for TEEVerifier to check at
@@ -160,7 +162,8 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         if (pubKey.length != 65) revert InvalidPublicKey();
         bytes32 publicKeyHash;
         assembly {
-            publicKeyHash := keccak256(add(pubKey, 0x21), sub(mload(pubKey), 1))
+            // Length is hardcoded to 64 to skip the 0x04 prefix and hash only the x and y coordinates
+            publicKeyHash := keccak256(add(pubKey, 0x21), 64)
         }
         address enclaveAddress = address(uint160(uint256(publicKeyHash)));
 

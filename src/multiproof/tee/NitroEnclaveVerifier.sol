@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import { Ownable } from "@solady/auth/Ownable.sol";
-import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {
     INitroEnclaveVerifier,
     ZkCoProcessorType,
@@ -44,8 +43,6 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
  * - Timestamp validation prevents replay attacks within the configured time window
  */
 contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
-    using EnumerableSet for EnumerableSet.Bytes32Set;
-
     /// @dev Sentinel address to indicate a route has been permanently frozen
     address private constant FROZEN = address(0xdead);
 
@@ -64,25 +61,16 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Hash of the trusted AWS Nitro Enclave root certificate
     bytes32 public rootCert;
 
-    /// @dev Set of all supported verifier program IDs per coprocessor
-    mapping(ZkCoProcessorType => EnumerableSet.Bytes32Set) private _verifierIdSet;
-
-    /// @dev Set of all supported aggregator program IDs per coprocessor
-    mapping(ZkCoProcessorType => EnumerableSet.Bytes32Set) private _aggregatorIdSet;
-
     /// @dev Route-specific verifier overrides (selector -> verifier address)
     mapping(ZkCoProcessorType => mapping(bytes4 => address)) private _zkVerifierRoutes;
 
-    /// @dev Mapping from verifierId to its corresponding verifierProofId representation
-    mapping(ZkCoProcessorType => mapping(bytes32 => bytes32)) private _verifierProofIds;
+    /// @dev Mapping from ZkCoProcessorType to its corresponding verifierProofId representation
+    mapping(ZkCoProcessorType => bytes32) private _verifierProofIds;
 
     // ============ Custom Errors ============
 
     /// @dev Error thrown when an unsupported or unknown ZK coprocessor type is used
     error Unknown_Zk_Coprocessor();
-
-    /// @dev Error thrown when attempting to remove the currently active (latest) program ID
-    error CannotRemoveLatestProgramId(ZkCoProcessorType zkCoProcessor, bytes32 identifier);
 
     /// @dev Error thrown when a ZK route has been permanently frozen
     error ZkRouteFrozen(ZkCoProcessorType zkCoProcessor, bytes4 selector);
@@ -102,9 +90,6 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Thrown when attempting to set a program ID that is already the latest
     error ProgramIdAlreadyLatest(ZkCoProcessorType zkCoProcessor, bytes32 identifier);
 
-    /// @dev Thrown when attempting to remove or operate on a program ID that does not exist in the set
-    error ProgramIdNotFound(ZkCoProcessorType zkCoProcessor, bytes32 identifier);
-
     /// @dev Thrown when a zero address is provided where a verifier address is required
     error ZeroVerifierAddress();
 
@@ -117,11 +102,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Thrown when the first certificate in a chain does not match the stored root certificate
     error RootCertMismatch(bytes32 expected, bytes32 actual);
 
-    /// @dev Thrown when calling verifyWithProgramId or batchVerifyWithProgramId, which are intentionally disabled
-    error NotImplemented();
-
     /// @dev Error thrown when a zero maxTimeDiff is provided
     error ZeroMaxTimeDiff();
+
+    /// @dev Thrown when a zero address is provided for the verifier
+    error InvalidVerifierAddress();
 
     // ============ Events ============
 
@@ -130,9 +115,6 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
 
     /// @dev Emitted when a new aggregator program ID is added/updated
     event AggregatorIdUpdated(ZkCoProcessorType indexed zkCoProcessor, bytes32 indexed newId);
-
-    /// @dev Emitted when a program ID is removed from the supported set
-    event ProgramIdRemoved(ZkCoProcessorType indexed zkCoProcessor, bytes32 indexed programId, bool isAggregator);
 
     /// @dev Emitted when a route-specific verifier is added
     event ZkRouteAdded(ZkCoProcessorType indexed zkCoProcessor, bytes4 indexed selector, address verifier);
@@ -205,51 +187,6 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     }
 
     /**
-     * @dev Returns all supported verifier program IDs for a coprocessor
-     * @param zkCoProcessor Type of ZK coprocessor
-     * @return Array of all supported verifier program IDs
-     */
-    function getVerifierIds(ZkCoProcessorType zkCoProcessor) external view returns (bytes32[] memory) {
-        return _verifierIdSet[zkCoProcessor].values();
-    }
-
-    /**
-     * @dev Returns all supported aggregator program IDs for a coprocessor
-     * @param zkCoProcessor Type of ZK coprocessor
-     * @return Array of all supported aggregator program IDs
-     */
-    function getAggregatorIds(ZkCoProcessorType zkCoProcessor) external view returns (bytes32[] memory) {
-        return _aggregatorIdSet[zkCoProcessor].values();
-    }
-
-    /**
-     * @dev Checks if a verifier program ID is in the supported set
-     * @param zkCoProcessor Type of ZK coprocessor
-     * @param verifierId Verifier program ID to check
-     * @return True if the ID is supported
-     */
-    function isVerifierIdSupported(ZkCoProcessorType zkCoProcessor, bytes32 verifierId) external view returns (bool) {
-        return _verifierIdSet[zkCoProcessor].contains(verifierId);
-    }
-
-    /**
-     * @dev Checks if an aggregator program ID is in the supported set
-     * @param zkCoProcessor Type of ZK coprocessor
-     * @param aggregatorId Aggregator program ID to check
-     * @return True if the ID is supported
-     */
-    function isAggregatorIdSupported(
-        ZkCoProcessorType zkCoProcessor,
-        bytes32 aggregatorId
-    )
-        external
-        view
-        returns (bool)
-    {
-        return _aggregatorIdSet[zkCoProcessor].contains(aggregatorId);
-    }
-
-    /**
      * @dev Gets the verifier address for a specific route
      * @param zkCoProcessor Type of ZK coprocessor
      * @param selector Proof selector
@@ -270,13 +207,12 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     }
 
     /**
-     * @dev Returns the verifierProofId for a given verifierId
+     * @dev Returns the verifierProofId for a given ZkCoProcessorType
      * @param zkCoProcessor Type of ZK coprocessor
-     * @param verifierId The verifier program ID
      * @return The corresponding verifierProofId
      */
-    function getVerifierProofId(ZkCoProcessorType zkCoProcessor, bytes32 verifierId) external view returns (bytes32) {
-        return _verifierProofIds[zkCoProcessor][verifierId];
+    function getVerifierProofId(ZkCoProcessorType zkCoProcessor) external view returns (bytes32) {
+        return _verifierProofIds[zkCoProcessor];
     }
 
     /**
@@ -410,8 +346,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         }
 
         zkConfig[zkCoProcessor].verifierId = newVerifierId;
-        _verifierIdSet[zkCoProcessor].add(newVerifierId);
-        _verifierProofIds[zkCoProcessor][newVerifierId] = newVerifierProofId;
+        _verifierProofIds[zkCoProcessor] = newVerifierProofId;
 
         emit VerifierIdUpdated(zkCoProcessor, newVerifierId, newVerifierProofId);
     }
@@ -428,48 +363,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         }
 
         zkConfig[zkCoProcessor].aggregatorId = newAggregatorId;
-        _aggregatorIdSet[zkCoProcessor].add(newAggregatorId);
 
         emit AggregatorIdUpdated(zkCoProcessor, newAggregatorId);
-    }
-
-    /**
-     * @dev Removes a verifier program ID from the supported set
-     * @param zkCoProcessor Type of ZK coprocessor
-     * @param verifierId Verifier program ID to remove
-     */
-    function removeVerifierId(ZkCoProcessorType zkCoProcessor, bytes32 verifierId) external onlyOwner {
-        if (!_verifierIdSet[zkCoProcessor].contains(verifierId)) {
-            revert ProgramIdNotFound(zkCoProcessor, verifierId);
-        }
-
-        // Cannot remove the latest verifier ID - must update to a new one first
-        if (zkConfig[zkCoProcessor].verifierId == verifierId) {
-            revert CannotRemoveLatestProgramId(zkCoProcessor, verifierId);
-        }
-
-        _verifierIdSet[zkCoProcessor].remove(verifierId);
-        delete _verifierProofIds[zkCoProcessor][verifierId];
-        emit ProgramIdRemoved(zkCoProcessor, verifierId, false);
-    }
-
-    /**
-     * @dev Removes an aggregator program ID from the supported set
-     * @param zkCoProcessor Type of ZK coprocessor
-     * @param aggregatorId Aggregator program ID to remove
-     */
-    function removeAggregatorId(ZkCoProcessorType zkCoProcessor, bytes32 aggregatorId) external onlyOwner {
-        if (!_aggregatorIdSet[zkCoProcessor].contains(aggregatorId)) {
-            revert ProgramIdNotFound(zkCoProcessor, aggregatorId);
-        }
-
-        // Cannot remove the latest aggregator ID - must update to a new one first
-        if (zkConfig[zkCoProcessor].aggregatorId == aggregatorId) {
-            revert CannotRemoveLatestProgramId(zkCoProcessor, aggregatorId);
-        }
-
-        _aggregatorIdSet[zkCoProcessor].remove(aggregatorId);
-        emit ProgramIdRemoved(zkCoProcessor, aggregatorId, true);
     }
 
     /**
@@ -480,6 +375,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      */
     function addVerifyRoute(ZkCoProcessorType zkCoProcessor, bytes4 selector, address verifier) external onlyOwner {
         if (verifier == address(0)) revert ZeroVerifierAddress();
+        if (verifier == FROZEN) revert InvalidVerifierAddress();
 
         if (_zkVerifierRoutes[zkCoProcessor][selector] == FROZEN) {
             revert ZkRouteFrozen(zkCoProcessor, selector);
@@ -585,7 +481,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         if (msg.sender != proofSubmitter) revert CallerNotProofSubmitter();
         bytes32 aggregatorId = zkConfig[zkCoprocessor].aggregatorId;
         bytes32 verifierId = zkConfig[zkCoprocessor].verifierId;
-        bytes32 verifierProofId = _verifierProofIds[zkCoprocessor][verifierId];
+        bytes32 verifierProofId = _verifierProofIds[zkCoprocessor];
 
         _verifyZk(zkCoprocessor, aggregatorId, output, proofBytes);
         BatchVerifierJournal memory batchJournal = abi.decode(output, (BatchVerifierJournal));
@@ -624,11 +520,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
 
         // Auto-add program IDs to the version sets and store verifierProofId mapping
         if (config.verifierId != bytes32(0)) {
-            _verifierIdSet[zkCoProcessor].add(config.verifierId);
-            _verifierProofIds[zkCoProcessor][config.verifierId] = verifierProofId;
-        }
-        if (config.aggregatorId != bytes32(0)) {
-            _aggregatorIdSet[zkCoProcessor].add(config.aggregatorId);
+            _verifierProofIds[zkCoProcessor] = verifierProofId;
         }
         emit ZKConfigurationUpdated(zkCoProcessor, config, verifierProofId);
     }
@@ -688,7 +580,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
             }
         }
         uint64 timestamp = journal.timestamp / 1000;
-        if (timestamp + maxTimeDiff < block.timestamp || timestamp > block.timestamp) {
+        if (timestamp + maxTimeDiff <= block.timestamp || timestamp >= block.timestamp) {
             journal.result = VerificationResult.InvalidTimestamp;
             return journal;
         }

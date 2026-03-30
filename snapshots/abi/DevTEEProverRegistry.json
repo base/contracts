@@ -137,9 +137,9 @@
         "type": "address"
       },
       {
-        "internalType": "address",
-        "name": "initialProposer",
-        "type": "address"
+        "internalType": "address[]",
+        "name": "initialProposers",
+        "type": "address[]"
       },
       {
         "internalType": "GameType",
@@ -493,22 +493,6 @@
   {
     "inputs": [],
     "name": "InvalidPublicKey",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "expected",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "actual",
-        "type": "bytes32"
-      }
-    ],
-    "name": "PCR0Mismatch",
     "type": "error"
   },
   {
