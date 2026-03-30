@@ -13,6 +13,10 @@ abstract contract Verifier is IVerifier {
     /// @dev This is used to prevent further proof verification after a soundness issue is found.
     bool public nullified;
 
+    /// @notice Emitted when the verifier is nullified.
+    /// @param game The game that nullified this verifier.
+    event Nullified(IDisputeGame game);
+
     /// @notice Thrown when the verifier has been nullified.
     error Nullified();
 
@@ -38,5 +42,7 @@ abstract contract Verifier is IVerifier {
                 || !ANCHOR_STATE_REGISTRY.isGameRespected(IDisputeGame(msg.sender))
         ) revert NotProperGame();
         nullified = true;
+
+        emit Nullified(IDisputeGame(msg.sender));
     }
 }
