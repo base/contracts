@@ -236,12 +236,12 @@
     "sourceCodeHash": "0x829e926bac073d6754e7dd7003c25d562d6281eb4155b47e2538cfc1b2e39481"
   },
   "src/multiproof/tee/NitroEnclaveVerifier.sol:NitroEnclaveVerifier": {
-    "initCodeHash": "0x339f7b174480929ff3d095717ad121bd775c69dbe753c7e8cd6de5bcae40a992",
-    "sourceCodeHash": "0xd0e5da001f950a9d7325b0ecdffd46ef1c361eb749133c30689853dbf9886ff5"
+    "initCodeHash": "0x64ca7a3c66eeae2278cdfffd2a1feaa8ada470403dd1fce23d9157c093f6320e",
+    "sourceCodeHash": "0x5bd92e57f25881aed184a9c7408676191bab858bf908ca7f8993896019e127b2"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0xd5f1b74862d8200c024e7b4ca21a95d44acee9fe6483d47b8a0ed71cdd805007",
-    "sourceCodeHash": "0x054cb05fbe76450b4c28cfe32f1c7ea598b3c0f834b2715c0e43335cef3aa206"
+    "initCodeHash": "0x2f9be34a6a0ed105a272193b6cec2b47321e1b468fac887c6c7cadd870949ffe",
+    "sourceCodeHash": "0xf1ec1f02f540da659a204b26acf986fdce7d7d63bba67a87923f52453fb92ccb"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0xeab3964cb2e6bbf3b660a8dedcd01286b74894bf76cf979d0b415fc7ca140ade",
