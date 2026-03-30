@@ -736,7 +736,7 @@ contract DeployImplementations is Script {
                     IVerifier(teeVerifierImpl),
                     IVerifier(zkVerifier),
                     _input.teeImageHash,
-                    bytes32(0),
+                    AggregateVerifier.ZkHashes(bytes32(0), bytes32(0)),
                     _input.multiproofConfigHash,
                     _input.l2ChainID,
                     _input.multiproofBlockInterval,

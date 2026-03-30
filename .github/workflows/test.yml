@@ -56,7 +56,7 @@ jobs:
       - name: Validate semver-lock
         id: semver-lock
         run: |
-          just semver-lock-no-build
+          just semver-lock
           git diff --exit-code snapshots/semver-lock.json
 
       - name: Run Forge tests

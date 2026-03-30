@@ -19,9 +19,10 @@ import { GameType } from "src/dispute/lib/Types.sol";
 /// @notice Manages TEE signer registration via ZK-verified AWS Nitro attestation.
 /// @dev Signers are registered by providing a ZK proof of a valid AWS Nitro attestation document,
 ///      verified through an external NitroEnclaveVerifier contract (Risc0).
-///      At registration time, the attestation's PCR0 is checked against the TEE_IMAGE_HASH from
-///      the current AggregateVerifier implementation in the DisputeGameFactory, ensuring only
-///      signers from the expected enclave image can register.
+///      Registration is PCR0-agnostic: any enclave with a valid attestation can register,
+///      enabling pre-registration before hardforks. PCR0 enforcement happens at proof-submission
+///      time in TEEVerifier, which checks signerImageHash against the AggregateVerifier's
+///      TEE_IMAGE_HASH.
 contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     using EnumerableSetLib for EnumerableSetLib.AddressSet;
     /// @notice Maximum age of an attestation document (60 minutes), in seconds.
@@ -45,10 +46,12 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Mapping of whether a signer address is registered.
     mapping(address => bool) public isRegisteredSigner;
 
-    /// @notice Mapping of signer address to the PCR0 image hash they were registered with.
-    /// @dev Used as defense-in-depth: isValidSigner checks this against the current
-    ///      AggregateVerifier's TEE_IMAGE_HASH, so signers automatically become invalid
-    ///      when the AggregateVerifier upgrades to a new image hash.
+    /// @notice Mapping of signer address to the PCR0 image hash from their attestation.
+    /// @dev Stored at registration time from the ZK-verified attestation document.
+    ///      TEEVerifier checks this against the AggregateVerifier's TEE_IMAGE_HASH at
+    ///      proof-submission time, so signers automatically become unusable when the
+    ///      AggregateVerifier upgrades to a new image hash. isValidSigner also uses
+    ///      this for off-chain pre-submission checks.
     mapping(address => bytes32) public signerImageHash;
 
     /// @notice Mapping of whether an address is a valid proposer.
@@ -83,9 +86,6 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Thrown when PCR0 (index 0) is not found in the attestation's PCR list.
     error PCR0NotFound();
 
-    /// @notice Thrown when the attestation's PCR0 does not match the expected TEE_IMAGE_HASH.
-    error PCR0Mismatch(bytes32 expected, bytes32 actual);
-
     /// @notice Thrown when the dispute game factory is not configured.
     error DisputeGameFactoryNotSet();
 
@@ -102,7 +102,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         initialize({
             initialOwner: address(0xdEaD),
             initialManager: address(0xdEaD),
-            initialProposer: address(0),
+            initialProposers: new address[](0),
             gameType_: GameType.wrap(0)
         });
     }
@@ -133,8 +133,13 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Registers a signer using a ZK proof of an AWS Nitro attestation document.
     /// @dev The ZK proof must verify a valid attestation that:
     ///      1. Has a valid AWS Nitro certificate chain (verified offchain via ZK)
-    ///      2. Has a PCR0 matching the TEE_IMAGE_HASH from the current AggregateVerifier
-    ///      3. Is less than MAX_AGE old
+    ///      2. Is less than MAX_AGE old
+    ///      Registration is PCR0-agnostic: any enclave with a valid attestation can register.
+    ///      This enables pre-registration of new-PCR0 enclaves before a hardfork, eliminating
+    ///      proof-generation delay when the on-chain TEE_IMAGE_HASH rotates. The TEEVerifier
+    ///      enforces PCR0 correctness at proof-submission time by checking signerImageHash
+    ///      against the AggregateVerifier's TEE_IMAGE_HASH, so pre-registered enclaves cannot
+    ///      produce accepted proofs until the hardfork activates.
     /// @param output The ABI-encoded VerifierJournal from the ZK proof.
     /// @param proofBytes The Risc0 ZK proof bytes.
     function registerSigner(bytes calldata output, bytes calldata proofBytes) external onlyOwnerOrManager {
@@ -142,12 +147,14 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
         if (journal.result != VerificationResult.Success) revert AttestationVerificationFailed();
 
+        // We allow attestations up to MAX_AGE old. This means a cert may be expired between when
+        // the attestation is generated and when it is submitted to this contract.
         if (journal.timestamp / MS_PER_SECOND + MAX_AGE <= block.timestamp) revert AttestationTooOld();
 
-        // Validate PCR0 against the current AggregateVerifier's TEE_IMAGE_HASH
+        // Extract the attestation's PCR0 and store it for TEEVerifier to check at
+        // proof-submission time. No comparison against the current TEE_IMAGE_HASH
+        // here — the registry accepts any valid attestation.
         bytes32 pcr0Hash = _extractPCR0Hash(journal.pcrs);
-        bytes32 expectedImageHash = _getExpectedImageHash();
-        if (pcr0Hash != expectedImageHash) revert PCR0Mismatch(expectedImageHash, pcr0Hash);
 
         // The publicKey is encoded in ANSI X9.62 format: 0x04 || x || y (65 bytes).
         // We skip the first byte (0x04 prefix) when hashing to derive the address.
@@ -155,12 +162,13 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         if (pubKey.length != 65) revert InvalidPublicKey();
         bytes32 publicKeyHash;
         assembly {
-            publicKeyHash := keccak256(add(pubKey, 0x21), sub(mload(pubKey), 1))
+            // Length is hardcoded to 64 to skip the 0x04 prefix and hash only the x and y coordinates
+            publicKeyHash := keccak256(add(pubKey, 0x21), 64)
         }
         address enclaveAddress = address(uint160(uint256(publicKeyHash)));
 
         isRegisteredSigner[enclaveAddress] = true;
-        signerImageHash[enclaveAddress] = expectedImageHash;
+        signerImageHash[enclaveAddress] = pcr0Hash;
         _registeredSigners.add(enclaveAddress);
         emit SignerRegistered(enclaveAddress);
     }
@@ -198,15 +206,15 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         return _getExpectedImageHash();
     }
 
-    /// @notice Initializes the contract with owner, manager, proposer, and game type.
+    /// @notice Initializes the contract with owner, manager, proposers, and game type.
     /// @param initialOwner The initial owner address.
     /// @param initialManager The initial manager address.
-    /// @param initialProposer The initial proposer address (set to address(0) to skip).
+    /// @param initialProposers Array of initial proposer addresses (zero addresses are skipped).
     /// @param gameType_ The game type for the AggregateVerifier.
     function initialize(
         address initialOwner,
         address initialManager,
-        address initialProposer,
+        address[] memory initialProposers,
         GameType gameType_
     )
         public
@@ -216,16 +224,18 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         transferOwnership(initialOwner);
         transferManagement(initialManager);
         gameType = gameType_;
-        if (initialProposer != address(0)) {
-            isValidProposer[initialProposer] = true;
-            emit ProposerSet(initialProposer, true);
+        for (uint256 i = 0; i < initialProposers.length; i++) {
+            if (initialProposers[i] != address(0)) {
+                isValidProposer[initialProposers[i]] = true;
+                emit ProposerSet(initialProposers[i], true);
+            }
         }
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.3.0
+    /// @custom:semver 0.5.0
     function version() public pure virtual returns (string memory) {
-        return "0.3.0";
+        return "0.5.0";
     }
 
     /// @dev Reads TEE_IMAGE_HASH from the AggregateVerifier registered in the factory.

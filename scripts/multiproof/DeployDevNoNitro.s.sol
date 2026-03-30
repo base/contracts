@@ -133,13 +133,15 @@ contract DeployDevNoNitro is Script {
         address scgImpl = address(
             new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(disputeGameFactory))
         );
+        address[] memory initialProposers = new address[](1);
+        initialProposers[0] = cfg.teeProposer();
         teeProverRegistryProxy = address(
             new TransparentUpgradeableProxy(
                 scgImpl,
                 address(0xdead),
                 abi.encodeCall(
                     TEEProverRegistry.initialize,
-                    (owner, owner, cfg.teeProposer(), GameType.wrap(uint32(cfg.multiproofGameType())))
+                    (owner, owner, initialProposers, GameType.wrap(uint32(cfg.multiproofGameType())))
                 )
             )
         );
@@ -194,7 +196,7 @@ contract DeployDevNoNitro is Script {
                 IVerifier(teeVerifier),
                 IVerifier(zkVerifier),
                 cfg.teeImageHash(),
-                bytes32(0),
+                AggregateVerifier.ZkHashes(bytes32(0), bytes32(0)),
                 cfg.multiproofConfigHash(),
                 8453,
                 BLOCK_INTERVAL,

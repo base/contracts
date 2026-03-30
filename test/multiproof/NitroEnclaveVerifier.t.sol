@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.0;
 
 import { Test } from "forge-std/Test.sol";
 
@@ -149,9 +149,7 @@ contract NitroEnclaveVerifierTest is Test {
         assertEq(stored.aggregatorId, AGGREGATOR_ID);
         assertEq(stored.zkVerifier, mockRiscZeroVerifier);
 
-        assertTrue(verifier.isVerifierIdSupported(ZkCoProcessorType.RiscZero, VERIFIER_ID));
-        assertTrue(verifier.isAggregatorIdSupported(ZkCoProcessorType.RiscZero, AGGREGATOR_ID));
-        assertEq(verifier.getVerifierProofId(ZkCoProcessorType.RiscZero, VERIFIER_ID), VERIFIER_PROOF_ID);
+        assertEq(verifier.getVerifierProofId(ZkCoProcessorType.RiscZero), VERIFIER_PROOF_ID);
     }
 
     function testSetZkConfigurationRevertsIfNotOwner() public {
@@ -195,9 +193,7 @@ contract NitroEnclaveVerifierTest is Test {
 
         ZkCoProcessorConfig memory config = verifier.getZkConfig(ZkCoProcessorType.RiscZero);
         assertEq(config.verifierId, newVerifierId);
-        assertTrue(verifier.isVerifierIdSupported(ZkCoProcessorType.RiscZero, newVerifierId));
-        assertTrue(verifier.isVerifierIdSupported(ZkCoProcessorType.RiscZero, VERIFIER_ID));
-        assertEq(verifier.getVerifierProofId(ZkCoProcessorType.RiscZero, newVerifierId), newVerifierProofId);
+        assertEq(verifier.getVerifierProofId(ZkCoProcessorType.RiscZero), newVerifierProofId);
     }
 
     function testUpdateVerifierIdRevertsIfZero() public {
@@ -233,8 +229,6 @@ contract NitroEnclaveVerifierTest is Test {
 
         ZkCoProcessorConfig memory config = verifier.getZkConfig(ZkCoProcessorType.RiscZero);
         assertEq(config.aggregatorId, newAggregatorId);
-        assertTrue(verifier.isAggregatorIdSupported(ZkCoProcessorType.RiscZero, newAggregatorId));
-        assertTrue(verifier.isAggregatorIdSupported(ZkCoProcessorType.RiscZero, AGGREGATOR_ID));
     }
 
     function testUpdateAggregatorIdRevertsIfZero() public {
@@ -260,90 +254,6 @@ contract NitroEnclaveVerifierTest is Test {
         verifier.updateAggregatorId(ZkCoProcessorType.RiscZero, keccak256("new"));
     }
 
-    // ============ removeVerifierId Tests ============
-
-    function testRemoveVerifierId() public {
-        _setUpRiscZeroConfig();
-
-        bytes32 newId = keccak256("new-verifier-id");
-        verifier.updateVerifierId(ZkCoProcessorType.RiscZero, newId, keccak256("proof"));
-
-        verifier.removeVerifierId(ZkCoProcessorType.RiscZero, VERIFIER_ID);
-        assertFalse(verifier.isVerifierIdSupported(ZkCoProcessorType.RiscZero, VERIFIER_ID));
-        assertTrue(verifier.isVerifierIdSupported(ZkCoProcessorType.RiscZero, newId));
-    }
-
-    function testRemoveVerifierIdRevertsIfLatest() public {
-        _setUpRiscZeroConfig();
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                NitroEnclaveVerifier.CannotRemoveLatestProgramId.selector, ZkCoProcessorType.RiscZero, VERIFIER_ID
-            )
-        );
-        verifier.removeVerifierId(ZkCoProcessorType.RiscZero, VERIFIER_ID);
-    }
-
-    function testRemoveVerifierIdRevertsIfNotExists() public {
-        _setUpRiscZeroConfig();
-        bytes32 nonexistent = keccak256("nonexistent");
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                NitroEnclaveVerifier.ProgramIdNotFound.selector, ZkCoProcessorType.RiscZero, nonexistent
-            )
-        );
-        verifier.removeVerifierId(ZkCoProcessorType.RiscZero, nonexistent);
-    }
-
-    function testRemoveVerifierIdRevertsIfNotOwner() public {
-        _setUpRiscZeroConfig();
-        vm.prank(submitter);
-        vm.expectRevert();
-        verifier.removeVerifierId(ZkCoProcessorType.RiscZero, VERIFIER_ID);
-    }
-
-    // ============ removeAggregatorId Tests ============
-
-    function testRemoveAggregatorId() public {
-        _setUpRiscZeroConfig();
-
-        bytes32 newId = keccak256("new-aggregator-id");
-        verifier.updateAggregatorId(ZkCoProcessorType.RiscZero, newId);
-
-        verifier.removeAggregatorId(ZkCoProcessorType.RiscZero, AGGREGATOR_ID);
-        assertFalse(verifier.isAggregatorIdSupported(ZkCoProcessorType.RiscZero, AGGREGATOR_ID));
-        assertTrue(verifier.isAggregatorIdSupported(ZkCoProcessorType.RiscZero, newId));
-    }
-
-    function testRemoveAggregatorIdRevertsIfLatest() public {
-        _setUpRiscZeroConfig();
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                NitroEnclaveVerifier.CannotRemoveLatestProgramId.selector, ZkCoProcessorType.RiscZero, AGGREGATOR_ID
-            )
-        );
-        verifier.removeAggregatorId(ZkCoProcessorType.RiscZero, AGGREGATOR_ID);
-    }
-
-    function testRemoveAggregatorIdRevertsIfNotExists() public {
-        _setUpRiscZeroConfig();
-        bytes32 nonexistent = keccak256("nonexistent");
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                NitroEnclaveVerifier.ProgramIdNotFound.selector, ZkCoProcessorType.RiscZero, nonexistent
-            )
-        );
-        verifier.removeAggregatorId(ZkCoProcessorType.RiscZero, nonexistent);
-    }
-
-    function testRemoveAggregatorIdRevertsIfNotOwner() public {
-        _setUpRiscZeroConfig();
-        vm.prank(submitter);
-        vm.expectRevert();
-        verifier.removeAggregatorId(ZkCoProcessorType.RiscZero, AGGREGATOR_ID);
-    }
-
     // ============ addVerifyRoute / freezeVerifyRoute Tests ============
 
     function testAddVerifyRoute() public {
@@ -357,6 +267,11 @@ contract NitroEnclaveVerifierTest is Test {
     function testAddVerifyRouteRevertsIfZeroAddress() public {
         vm.expectRevert(NitroEnclaveVerifier.ZeroVerifierAddress.selector);
         verifier.addVerifyRoute(ZkCoProcessorType.RiscZero, bytes4(uint32(0x01)), address(0));
+    }
+
+    function testAddVerifyRouteRevertsIfFrozenSentinel() public {
+        vm.expectRevert(NitroEnclaveVerifier.InvalidVerifierAddress.selector);
+        verifier.addVerifyRoute(ZkCoProcessorType.RiscZero, bytes4(uint32(0x01)), address(0xdead));
     }
 
     function testAddVerifyRouteRevertsIfNotOwner() public {
@@ -814,7 +729,7 @@ contract NitroEnclaveVerifierTest is Test {
         return VerifierJournal({
             result: VerificationResult.Success,
             trustedCertsPrefixLen: 2,
-            timestamp: uint64(block.timestamp) * 1000,
+            timestamp: uint64(block.timestamp - 1) * 1000,
             certs: certs,
             userData: "",
             nonce: "",
