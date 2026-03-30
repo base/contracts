@@ -742,7 +742,7 @@
         "type": "uint8"
       },
       {
-        "indexed": false,
+        "indexed": true,
         "internalType": "enum ZkCoProcessorType",
         "name": "zkCoProcessor",
         "type": "uint8"
@@ -767,7 +767,7 @@
         "type": "bytes32"
       },
       {
-        "indexed": false,
+        "indexed": true,
         "internalType": "enum ZkCoProcessorType",
         "name": "zkCoProcessor",
         "type": "uint8"

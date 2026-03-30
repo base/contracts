@@ -104,6 +104,19 @@
     "type": "function"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "contract IDisputeGame",
+        "name": "game",
+        "type": "address"
+      }
+    ],
+    "name": "VerifierNullified",
+    "type": "event"
+  },
+  {
     "inputs": [
       {
         "internalType": "bytes32",
