@@ -240,8 +240,8 @@
     "sourceCodeHash": "0xd0e5da001f950a9d7325b0ecdffd46ef1c361eb749133c30689853dbf9886ff5"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0x9b3d2940d3b6822e764c480ad9b764c6b53982a6aaf21b7cd718b4c5666470da",
-    "sourceCodeHash": "0x2190ebffa114ad241879086ff5e5f2b6fc849bdc78e316f5fcc17ae511c85a09"
+    "initCodeHash": "0xd5f1b74862d8200c024e7b4ca21a95d44acee9fe6483d47b8a0ed71cdd805007",
+    "sourceCodeHash": "0x054cb05fbe76450b4c28cfe32f1c7ea598b3c0f834b2715c0e43335cef3aa206"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0xeab3964cb2e6bbf3b660a8dedcd01286b74894bf76cf979d0b415fc7ca140ade",

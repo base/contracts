@@ -98,7 +98,7 @@ contract TEEProverRegistryTest is Test {
     function testInitialization() public view {
         assertEq(teeProverRegistry.owner(), owner);
         assertEq(teeProverRegistry.manager(), manager);
-        assertEq(teeProverRegistry.version(), "0.4.0");
+        assertEq(teeProverRegistry.version(), "0.5.0");
     }
 
     function testInitializationWithProposers() public {
