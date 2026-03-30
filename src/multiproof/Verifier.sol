@@ -15,7 +15,7 @@ abstract contract Verifier is IVerifier {
 
     /// @notice Emitted when the verifier is nullified.
     /// @param game The game that nullified this verifier.
-    event Nullified(IDisputeGame game);
+    event VerifierNullified(IDisputeGame game);
 
     /// @notice Thrown when the verifier has been nullified.
     error Nullified();
@@ -43,6 +43,6 @@ abstract contract Verifier is IVerifier {
         ) revert NotProperGame();
         nullified = true;
 
-        emit Nullified(IDisputeGame(msg.sender));
+        emit VerifierNullified(IDisputeGame(msg.sender));
     }
 }
