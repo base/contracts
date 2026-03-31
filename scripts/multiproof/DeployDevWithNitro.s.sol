@@ -126,18 +126,15 @@ contract DeployDevWithNitro is Script {
                 INitroEnclaveVerifier(nitroEnclaveVerifierAddr), IDisputeGameFactory(disputeGameFactory)
             )
         );
-        address[] memory initialProposers = new address[](1);
+        address[] memory initialProposers = new address[](2);
         initialProposers[0] = cfg.teeProposer();
+        initialProposers[1] = cfg.teeChallenger();
         Proxy teeProxy = new Proxy(msg.sender);
         teeProxy.upgradeToAndCall(
-            teeRegistryImpl,
-            abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, initialProposers, gameType))
+            teeRegistryImpl, abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, initialProposers, gameType))
         );
         teeProxy.changeAdmin(address(0xdead));
         teeProverRegistryProxy = address(teeProxy);
-
-        // Challenger also needs proposer privileges to submit counter-proofs.
-        TEEProverRegistry(teeProverRegistryProxy).setProposer(cfg.teeChallenger(), true);
 
         teeVerifier = address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), mockAnchorRegistry));
     }
