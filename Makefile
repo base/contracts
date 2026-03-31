@@ -30,7 +30,7 @@ deps: clean-lib
 	git clone --no-checkout https://github.com/OpenZeppelin/openzeppelin-contracts.git lib/openzeppelin-contracts-v5 && \
 		cd lib/openzeppelin-contracts-v5 && git checkout dbb6104ce834628e473d2173bbc9d47f81a9eec3
 	git clone --no-checkout https://github.com/Vectorized/solady.git lib/solady-v0.0.245 && \
-		cd lib/solady-v0.0.245 && git checkout e0ef35adb0ccd1032794731a995cb599bba7b537
+		cd lib/solady-v0.0.245 && git checkout 8583a6e386b897f3db142a541f86d5953eccd835
 
 .PHONY: test
 test:
