@@ -53,7 +53,7 @@ pragma solidity 0.8.15;
  */
 
 import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
-import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { Proxy } from "src/universal/Proxy.sol";
 import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
@@ -82,9 +82,6 @@ import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 /// @notice Development deployment WITHOUT AWS Nitro attestation validation.
 /// @dev Uses DevTEEProverRegistry which allows addDevSigner() to bypass attestation.
 contract DeployDevNoNitro is Script {
-    /// @notice Constant from Optimism's Constants.sol - the storage slot for proxy admin.
-    bytes32 internal constant PROXY_OWNER_ADDRESS = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-
     uint256 public constant BLOCK_INTERVAL = 100;
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 10;
     uint256 public constant PROOF_THRESHOLD = 1;
@@ -93,11 +90,10 @@ contract DeployDevNoNitro is Script {
     DeployConfig public constant cfg =
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
 
-    // Deployed addresses
     address public teeProverRegistryProxy;
     address public teeVerifier;
     address public disputeGameFactory;
-    address public mockAnchorRegistry;
+    IAnchorStateRegistry public mockAnchorRegistry;
     address public mockDelayedWETH;
     address public aggregateVerifier;
 
@@ -113,6 +109,7 @@ contract DeployDevNoNitro is Script {
         console.log("Chain ID:", block.chainid);
         console.log("Owner:", cfg.finalSystemOwner());
         console.log("TEE Proposer:", cfg.teeProposer());
+        console.log("TEE Challenger:", cfg.teeChallenger());
         console.log("Game Type:", cfg.multiproofGameType());
         console.log("");
         console.log("NOTE: Using DevTEEProverRegistry - NO attestation required.");
@@ -120,7 +117,7 @@ contract DeployDevNoNitro is Script {
         vm.startBroadcast();
 
         _deployInfrastructure(gameType);
-        _deployTEEContracts(cfg.finalSystemOwner());
+        _deployTEEContracts(gameType);
         _deployAggregateVerifier(gameType);
 
         vm.stopBroadcast();
@@ -129,86 +126,71 @@ contract DeployDevNoNitro is Script {
         _writeOutput();
     }
 
-    function _deployTEEContracts(address owner) internal {
-        address scgImpl = address(
+    function _deployTEEContracts(GameType gameType) internal {
+        address owner = cfg.finalSystemOwner();
+        address teeRegistryImpl = address(
             new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(disputeGameFactory))
         );
-        address[] memory initialProposers = new address[](1);
+        address[] memory initialProposers = new address[](2);
         initialProposers[0] = cfg.teeProposer();
-        teeProverRegistryProxy = address(
-            new TransparentUpgradeableProxy(
-                scgImpl,
-                address(0xdead),
-                abi.encodeCall(
-                    TEEProverRegistry.initialize,
-                    (owner, owner, initialProposers, GameType.wrap(uint32(cfg.multiproofGameType())))
-                )
-            )
+        initialProposers[1] = cfg.teeChallenger();
+        Proxy teeProxy = new Proxy(msg.sender);
+        teeProxy.upgradeToAndCall(
+            teeRegistryImpl, abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, initialProposers, gameType))
         );
-        console.log("DevTEEProverRegistry:", teeProverRegistryProxy);
+        teeProxy.changeAdmin(address(0xdead));
+        teeProverRegistryProxy = address(teeProxy);
 
-        teeVerifier = address(
-            new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), IAnchorStateRegistry(mockAnchorRegistry))
-        );
-        console.log("TEEVerifier:", teeVerifier);
-    }
-
-    function _registerProposer(address teeProposer) internal {
-        TEEProverRegistry(teeProverRegistryProxy).setProposer(teeProposer, true);
-        console.log("Registered TEE proposer:", teeProposer);
+        teeVerifier = address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), mockAnchorRegistry));
     }
 
     function _deployInfrastructure(GameType gameType) internal {
         address factoryImpl = address(new DisputeGameFactory());
         MinimalProxyAdmin proxyAdmin = new MinimalProxyAdmin(cfg.finalSystemOwner());
 
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(factoryImpl, address(proxyAdmin), "");
-
-        vm.store(address(proxy), PROXY_OWNER_ADDRESS, bytes32(uint256(uint160(address(proxyAdmin)))));
+        Proxy proxy = new Proxy(msg.sender);
+        proxy.upgradeTo(factoryImpl);
+        proxy.changeAdmin(address(proxyAdmin));
         DisputeGameFactory(address(proxy)).initialize(cfg.finalSystemOwner());
-
         disputeGameFactory = address(proxy);
-        console.log("DisputeGameFactory:", disputeGameFactory);
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
-        mockAnchorRegistry = address(asr);
+        mockAnchorRegistry = IAnchorStateRegistry(address(asr));
         asr.initialize(
             disputeGameFactory,
             Hash.wrap(cfg.multiproofGenesisOutputRoot()),
             cfg.multiproofGenesisBlockNumber(),
             gameType
         );
-        console.log("AnchorStateRegistry (mock):", mockAnchorRegistry);
     }
 
     function _deployAggregateVerifier(GameType gameType) internal {
-        address zkVerifier = address(new MockVerifier(IAnchorStateRegistry(mockAnchorRegistry)));
-        console.log("MockVerifier (ZK):", zkVerifier);
-
+        address zkVerifier = address(new MockVerifier(mockAnchorRegistry));
         mockDelayedWETH = address(new MockDelayedWETH());
-        console.log("MockDelayedWETH:", mockDelayedWETH);
+
+        AggregateVerifier.ZkHashes memory zkHashes =
+            AggregateVerifier.ZkHashes({ rangeHash: cfg.zkRangeHash(), aggregateHash: cfg.zkAggregationHash() });
 
         aggregateVerifier = address(
             new AggregateVerifier(
                 gameType,
-                IAnchorStateRegistry(mockAnchorRegistry),
+                mockAnchorRegistry,
                 IDelayedWETH(payable(mockDelayedWETH)),
                 IVerifier(teeVerifier),
                 IVerifier(zkVerifier),
                 cfg.teeImageHash(),
-                AggregateVerifier.ZkHashes(bytes32(0), bytes32(0)),
+                zkHashes,
                 cfg.multiproofConfigHash(),
-                8453,
+                cfg.l2ChainID(),
                 BLOCK_INTERVAL,
                 INTERMEDIATE_BLOCK_INTERVAL,
                 PROOF_THRESHOLD
             )
         );
-        console.log("AggregateVerifier:", aggregateVerifier);
 
-        DisputeGameFactory(disputeGameFactory).setImplementation(gameType, IDisputeGame(aggregateVerifier), "");
-        DisputeGameFactory(disputeGameFactory).setInitBond(gameType, INIT_BOND);
-        console.log("Registered AggregateVerifier with factory");
+        DisputeGameFactory factory = DisputeGameFactory(disputeGameFactory);
+        factory.setImplementation(gameType, IDisputeGame(aggregateVerifier), "");
+        factory.setInitBond(gameType, INIT_BOND);
     }
 
     function _printSummary() internal view {
@@ -220,7 +202,7 @@ contract DeployDevNoNitro is Script {
         console.log("  TEEVerifier:", teeVerifier);
         console.log("\nInfrastructure:");
         console.log("  DisputeGameFactory:", disputeGameFactory);
-        console.log("  AnchorStateRegistry (mock):", mockAnchorRegistry);
+        console.log("  AnchorStateRegistry (mock):", address(mockAnchorRegistry));
         console.log("  DelayedWETH (mock):", mockDelayedWETH);
         console.log("\nGame:");
         console.log("  AggregateVerifier:", aggregateVerifier);
@@ -237,23 +219,16 @@ contract DeployDevNoNitro is Script {
     }
 
     function _writeOutput() internal {
+        string memory key = "deployment";
+        vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
+        vm.serializeAddress(key, "TEEVerifier", teeVerifier);
+        vm.serializeAddress(key, "DisputeGameFactory", disputeGameFactory);
+        vm.serializeAddress(key, "AnchorStateRegistry", address(mockAnchorRegistry));
+        vm.serializeAddress(key, "DelayedWETH", mockDelayedWETH);
+        string memory json = vm.serializeAddress(key, "AggregateVerifier", aggregateVerifier);
+
         string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-dev-no-nitro.json");
-        string memory output = string.concat(
-            '{"TEEProverRegistry":"',
-            vm.toString(teeProverRegistryProxy),
-            '","TEEVerifier":"',
-            vm.toString(teeVerifier),
-            '","DisputeGameFactory":"',
-            vm.toString(disputeGameFactory),
-            '","AnchorStateRegistry":"',
-            vm.toString(mockAnchorRegistry),
-            '","DelayedWETH":"',
-            vm.toString(mockDelayedWETH),
-            '","AggregateVerifier":"',
-            vm.toString(aggregateVerifier),
-            '"}'
-        );
-        vm.writeFile(outPath, output);
+        vm.writeJson(json, outPath);
         console.log("Deployment saved to:", outPath);
     }
 }
