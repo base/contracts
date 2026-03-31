@@ -240,7 +240,7 @@
     "sourceCodeHash": "0x78d6c704d56ae8de255be71f5cc94e73e0bea1abd5b7e6dfcb4132174f89202b"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0x2f9be34a6a0ed105a272193b6cec2b47321e1b468fac887c6c7cadd870949ffe",
+    "initCodeHash": "0x0ed3443601cd3b08c016dbe4a743fb6f1c1800d211e2edd739e588ed455783b1",
     "sourceCodeHash": "0xf1ec1f02f540da659a204b26acf986fdce7d7d63bba67a87923f52453fb92ccb"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
