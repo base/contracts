@@ -250,49 +250,6 @@
         "type": "uint8"
       }
     ],
-    "name": "getAggregatorIds",
-    "outputs": [
-      {
-        "internalType": "bytes32[]",
-        "name": "",
-        "type": "bytes32[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoProcessor",
-        "type": "uint8"
-      }
-    ],
-    "name": "getVerifierIds",
-    "outputs": [
-      {
-        "internalType": "bytes32[]",
-        "name": "",
-        "type": "bytes32[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoProcessor",
-        "type": "uint8"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "verifierId",
-        "type": "bytes32"
-      }
-    ],
     "name": "getVerifierProofId",
     "outputs": [
       {
@@ -365,54 +322,6 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoProcessor",
-        "type": "uint8"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "aggregatorId",
-        "type": "bytes32"
-      }
-    ],
-    "name": "isAggregatorIdSupported",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoProcessor",
-        "type": "uint8"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "verifierId",
-        "type": "bytes32"
-      }
-    ],
-    "name": "isVerifierIdSupported",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [],
     "name": "maxTimeDiff",
     "outputs": [
@@ -468,42 +377,6 @@
       }
     ],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoProcessor",
-        "type": "uint8"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "aggregatorId",
-        "type": "bytes32"
-      }
-    ],
-    "name": "removeAggregatorId",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoProcessor",
-        "type": "uint8"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "verifierId",
-        "type": "bytes32"
-      }
-    ],
-    "name": "removeVerifierId",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -869,7 +742,7 @@
         "type": "uint8"
       },
       {
-        "indexed": false,
+        "indexed": true,
         "internalType": "enum ZkCoProcessorType",
         "name": "zkCoProcessor",
         "type": "uint8"
@@ -894,7 +767,7 @@
         "type": "bytes32"
       },
       {
-        "indexed": false,
+        "indexed": true,
         "internalType": "enum ZkCoProcessorType",
         "name": "zkCoProcessor",
         "type": "uint8"
@@ -978,31 +851,6 @@
       }
     ],
     "name": "OwnershipTransferred",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoProcessor",
-        "type": "uint8"
-      },
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "programId",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "isAggregator",
-        "type": "bool"
-      }
-    ],
-    "name": "ProgramIdRemoved",
     "type": "event"
   },
   {
@@ -1155,22 +1003,6 @@
   {
     "inputs": [
       {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoProcessor",
-        "type": "uint8"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "identifier",
-        "type": "bytes32"
-      }
-    ],
-    "name": "CannotRemoveLatestProgramId",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "bytes32",
         "name": "certHash",
         "type": "bytes32"
@@ -1181,17 +1013,17 @@
   },
   {
     "inputs": [],
+    "name": "InvalidVerifierAddress",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NewOwnerIsZeroAddress",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "NoHandoverRequest",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NotImplemented",
     "type": "error"
   },
   {
@@ -1208,22 +1040,6 @@
       }
     ],
     "name": "ProgramIdAlreadyLatest",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoProcessor",
-        "type": "uint8"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "identifier",
-        "type": "bytes32"
-      }
-    ],
-    "name": "ProgramIdNotFound",
     "type": "error"
   },
   {

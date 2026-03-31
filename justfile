@@ -213,13 +213,18 @@ semver-lock-no-build:
   go run scripts/autogen/generate-semver-lock/main.go
 
 # Updates the snapshots/semver-lock.json file.
-semver-lock: build-source semver-lock-no-build
+# Uses --force to ensure artifacts reflect the current profile regardless of cache state.
+semver-lock:
+  forge build --force --skip "/**/test/**" --skip "/**/scripts/**"
+  just semver-lock-no-build
 
 # Generates core snapshots without building contracts.
 snapshots-no-build: snapshots-abi-storage-no-build semver-lock-no-build
 
 # Builds contracts and then generates core snapshots.
-snapshots: build-source snapshots-no-build
+# Uses `semver-lock` (which includes --force) instead of `semver-lock-no-build`
+# to ensure artifacts reflect the current profile regardless of cache state.
+snapshots: snapshots-abi-storage semver-lock
 
 
 ########################################################
@@ -375,6 +380,11 @@ pre-pr *ARGS:
   cp -r artifacts "$TEMP_BUILD_DIR/"
   cp -r forge-artifacts "$TEMP_BUILD_DIR/"
   cp -r cache "$TEMP_BUILD_DIR/"
+
+  # Clean forge-artifacts and cache so build-source starts fresh with the
+  # default profile. Without this, stale lite-profile bytecode can survive
+  # incremental compilation and produce incorrect semver-lock hashes.
+  rm -rf forge-artifacts cache
 
   just lint
   just build-source

@@ -166,42 +166,6 @@ interface INitroEnclaveVerifier {
     function getZkConfig(ZkCoProcessorType _zkCoProcessor) external view returns (ZkCoProcessorConfig memory);
 
     /**
-     * @dev Returns all supported verifier program IDs for a coprocessor
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @return Array of all supported verifier program IDs
-     */
-    function getVerifierIds(ZkCoProcessorType _zkCoProcessor) external view returns (bytes32[] memory);
-
-    /**
-     * @dev Returns all supported aggregator program IDs for a coprocessor
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @return Array of all supported aggregator program IDs
-     */
-    function getAggregatorIds(ZkCoProcessorType _zkCoProcessor) external view returns (bytes32[] memory);
-
-    /**
-     * @dev Checks if a verifier program ID is in the supported set
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _verifierId Verifier program ID to check
-     * @return True if the ID is supported
-     */
-    function isVerifierIdSupported(ZkCoProcessorType _zkCoProcessor, bytes32 _verifierId) external view returns (bool);
-
-    /**
-     * @dev Checks if an aggregator program ID is in the supported set
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _aggregatorId Aggregator program ID to check
-     * @return True if the ID is supported
-     */
-    function isAggregatorIdSupported(
-        ZkCoProcessorType _zkCoProcessor,
-        bytes32 _aggregatorId
-    )
-        external
-        view
-        returns (bool);
-
-    /**
      * @dev Gets the verifier address for a specific route
      * @param _zkCoProcessor Type of ZK coprocessor
      * @param _selector Proof selector
@@ -212,12 +176,11 @@ interface INitroEnclaveVerifier {
     function getZkVerifier(ZkCoProcessorType _zkCoProcessor, bytes4 _selector) external view returns (address);
 
     /**
-     * @dev Returns the verifierProofId for a given verifierId
+     * @dev Returns the verifierProofId for a given ZkCoProcessorType
      * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _verifierId The verifier program ID
      * @return The corresponding verifierProofId
      */
-    function getVerifierProofId(ZkCoProcessorType _zkCoProcessor, bytes32 _verifierId) external view returns (bytes32);
+    function getVerifierProofId(ZkCoProcessorType _zkCoProcessor) external view returns (bytes32);
 
     /**
      * @dev Checks how many certificates in each report are trusted
@@ -316,30 +279,6 @@ interface INitroEnclaveVerifier {
      * - New ID must be different from current latest
      */
     function updateAggregatorId(ZkCoProcessorType _zkCoProcessor, bytes32 _newAggregatorId) external;
-
-    /**
-     * @dev Removes a verifier program ID from the supported set
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _verifierId Verifier program ID to remove
-     *
-     * Requirements:
-     * - Only callable by contract owner
-     * - Cannot remove the currently active (latest) verifier ID
-     * - ID must exist in the supported set
-     */
-    function removeVerifierId(ZkCoProcessorType _zkCoProcessor, bytes32 _verifierId) external;
-
-    /**
-     * @dev Removes an aggregator program ID from the supported set
-     * @param _zkCoProcessor Type of ZK coprocessor
-     * @param _aggregatorId Aggregator program ID to remove
-     *
-     * Requirements:
-     * - Only callable by contract owner
-     * - Cannot remove the currently active (latest) aggregator ID
-     * - ID must exist in the supported set
-     */
-    function removeAggregatorId(ZkCoProcessorType _zkCoProcessor, bytes32 _aggregatorId) external;
 
     /**
      * @dev Adds a route-specific verifier override
