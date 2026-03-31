@@ -447,25 +447,24 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // The parent game must have resolved.
         if (parentGameStatus == GameStatus.IN_PROGRESS) revert ParentGameNotResolved();
 
-        bool isChallenged = counteredByIntermediateRootIndexPlusOne > 0;
-
         // If the parent game's claim is invalid, blacklisted, or retired, then the current game's claim is invalid.
+        // We don't care about what happens in this game once the parent is invalid.
         if (parentGameStatus == GameStatus.CHALLENGER_WINS) {
             status = GameStatus.CHALLENGER_WINS;
         } else {
-            // Game must be completed with a valid proof.
+            // Game must be completed with a valid proof and enough proofs.
             if (!gameOver()) revert GameNotOver();
-            // If the game is challenged, status is CHALLENGER_WINS.
-            // If the game is not challenged, status is DEFENDER_WINS.
-            status = isChallenged ? GameStatus.CHALLENGER_WINS : GameStatus.DEFENDER_WINS;
+            if (proofCount < PROOF_THRESHOLD) revert NotEnoughProofs();
+
+            // If the game is challenged, reward the challenger.
+            if (counteredByIntermediateRootIndexPlusOne > 0) {
+                status = GameStatus.CHALLENGER_WINS;
+                bondRecipient = proofTypeToProver[ProofType.ZK];
+            } else {
+                status = GameStatus.DEFENDER_WINS;
+            }
         }
 
-        if (proofCount < PROOF_THRESHOLD) revert NotEnoughProofs();
-
-        // Default bond recipient is the creator. We only change if successfully challenged.
-        if (isChallenged) {
-            bondRecipient = proofTypeToProver[ProofType.ZK];
-        }
         // Mark the game as resolved.
         resolvedAt = Timestamp.wrap(uint64(block.timestamp));
         emit Resolved(status);
@@ -526,6 +525,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // This is only in case the ZK proof is nullified, which would lower the proof count.
         // If the ZK is nullified, we allow the remaining TEE proof to resolve.
         // The expected resolution time can no longer be increased as both proof types have been submitted.
+        // The exception is if the ZK proof is nullified, in which case the expected resolution will be
+        // increased by SLOW_FINALIZATION_DELAY from the time of nullification.
         proofCount += 1;
 
         // We purposely increase the resolution to allow for a ZK nullification.
@@ -769,13 +770,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice Decreases the expected resolution timestamp.
     function _decreaseExpectedResolution() internal {
-        uint64 delay;
+        uint64 delay = _getDelay();
 
-        if (proofCount >= 2) {
-            delay = FAST_FINALIZATION_DELAY;
-        } else if (proofCount == 1) {
-            delay = SLOW_FINALIZATION_DELAY;
-        } else {
+        if (delay == type(uint64).max) {
             // If there are no proofs, don't allow the game to resolve.
             expectedResolution = Timestamp.wrap(type(uint64).max);
             return;
@@ -800,13 +797,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     function _increaseExpectedResolution() internal {
-        uint64 delay;
+        uint64 delay = _getDelay();
 
-        if (proofCount >= 2) {
-            delay = FAST_FINALIZATION_DELAY;
-        } else if (proofCount == 1) {
-            delay = SLOW_FINALIZATION_DELAY;
-        } else {
+        if (delay == type(uint64).max) {
             // If there are no proofs, don't allow the game to resolve.
             expectedResolution = Timestamp.wrap(type(uint64).max);
             return;
@@ -816,6 +809,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // as this can only occur if there is an issue with the proof system so
         // we give enough time to resolve the issue and possibly blacklist this game.
         expectedResolution = Timestamp.wrap(uint64(block.timestamp) + delay);
+    }
+
+    function _getDelay() internal view returns (uint64) {
+        if (proofCount >= 2) {
+            return FAST_FINALIZATION_DELAY;
+        } else if (proofCount == 1) {
+            return SLOW_FINALIZATION_DELAY;
+        } else {
+            return type(uint64).max;
+        }
     }
 
     function _verifyProof(
