@@ -98,6 +98,9 @@ contract DeployConfig is Script {
     bytes32 public multiproofConfigHash;
     uint256 public multiproofGameType;
     address public teeProposer;
+    address public teeChallenger;
+    bytes32 public zkRangeHash;
+    bytes32 public zkAggregationHash;
     address public nitroEnclaveVerifier;
     bytes32 public multiproofGenesisOutputRoot;
     uint256 public multiproofGenesisBlockNumber;
@@ -215,7 +218,10 @@ contract DeployConfig is Script {
         teeImageHash = bytes32(_readOr(_json, "$.teeImageHash", 0));
         multiproofConfigHash = bytes32(_readOr(_json, "$.multiproofConfigHash", 0));
         multiproofGameType = _readOr(_json, "$.multiproofGameType", 621);
-        teeProposer = _readOr(_json, "$.teeProposer", finalSystemOwner);
+        teeProposer = stdJson.readAddress(_json, "$.teeProposer");
+        teeChallenger = stdJson.readAddress(_json, "$.teeChallenger");
+        zkRangeHash = stdJson.readBytes32(_json, "$.zkRangeHash");
+        zkAggregationHash = stdJson.readBytes32(_json, "$.zkAggregationHash");
         nitroEnclaveVerifier = _readOr(_json, "$.nitroEnclaveVerifier", address(0));
         multiproofGenesisOutputRoot = bytes32(_readOr(_json, "$.multiproofGenesisOutputRoot", uint256(1)));
         multiproofGenesisBlockNumber = _readOr(_json, "$.multiproofGenesisBlockNumber", 0);
