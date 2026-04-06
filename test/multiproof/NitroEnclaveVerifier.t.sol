@@ -34,6 +34,11 @@ contract NitroEnclaveVerifierTest is Test {
     // Realistic timestamp so timestamp validation tests work correctly
     uint256 internal constant REALISTIC_TIMESTAMP = 1_700_000_000;
 
+    // Expiry timestamps for test certs (well after REALISTIC_TIMESTAMP)
+    uint64 internal constant INTERMEDIATE_CERT_1_EXPIRY = 1_800_000_000; // ~2027
+    uint64 internal constant INTERMEDIATE_CERT_2_EXPIRY = 1_750_000_000; // ~2025
+    uint64 internal constant NEW_LEAF_CERT_EXPIRY = 1_700_100_000; // ~28 hours after REALISTIC_TIMESTAMP
+
     function setUp() public {
         vm.warp(REALISTIC_TIMESTAMP);
 
@@ -45,6 +50,9 @@ contract NitroEnclaveVerifierTest is Test {
         bytes32[] memory trustedCerts = new bytes32[](1);
         trustedCerts[0] = INTERMEDIATE_CERT_1;
 
+        uint64[] memory trustedCertExpiries = new uint64[](1);
+        trustedCertExpiries[0] = INTERMEDIATE_CERT_1_EXPIRY;
+
         ZkCoProcessorConfig memory zkCfg =
             ZkCoProcessorConfig({ verifierId: VERIFIER_ID, aggregatorId: AGGREGATOR_ID, zkVerifier: mockSP1Verifier });
 
@@ -52,6 +60,7 @@ contract NitroEnclaveVerifierTest is Test {
             owner,
             MAX_TIME_DIFF,
             trustedCerts,
+            trustedCertExpiries,
             ROOT_CERT,
             submitter,
             ZkCoProcessorType.Succinct,
@@ -71,16 +80,31 @@ contract NitroEnclaveVerifierTest is Test {
     }
 
     function testConstructorSetsTrustedCerts() public view {
-        assertTrue(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1));
-        assertFalse(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_2));
+        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), INTERMEDIATE_CERT_1_EXPIRY);
+        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_2), 0);
     }
 
     function testConstructorRevertsIfZeroMaxTimeDiff() public {
         bytes32[] memory certs = new bytes32[](0);
+        uint64[] memory expiries = new uint64[](0);
         ZkCoProcessorConfig memory zkCfg =
             ZkCoProcessorConfig({ verifierId: bytes32(0), aggregatorId: bytes32(0), zkVerifier: address(0) });
         vm.expectRevert(NitroEnclaveVerifier.ZeroMaxTimeDiff.selector);
-        new NitroEnclaveVerifier(owner, 0, certs, bytes32(0), submitter, ZkCoProcessorType.Succinct, zkCfg, bytes32(0));
+        new NitroEnclaveVerifier(
+            owner, 0, certs, expiries, bytes32(0), submitter, ZkCoProcessorType.Succinct, zkCfg, bytes32(0)
+        );
+    }
+
+    function testConstructorRevertsIfCertExpiriesLengthMismatch() public {
+        bytes32[] memory certs = new bytes32[](1);
+        certs[0] = INTERMEDIATE_CERT_1;
+        uint64[] memory expiries = new uint64[](0); // mismatched length
+        ZkCoProcessorConfig memory zkCfg =
+            ZkCoProcessorConfig({ verifierId: bytes32(0), aggregatorId: bytes32(0), zkVerifier: address(0) });
+        vm.expectRevert(abi.encodeWithSelector(NitroEnclaveVerifier.CertExpiriesLengthMismatch.selector, 1, 0));
+        new NitroEnclaveVerifier(
+            owner, MAX_TIME_DIFF, certs, expiries, bytes32(0), submitter, ZkCoProcessorType.Succinct, zkCfg, bytes32(0)
+        );
     }
 
     // ============ setRootCert Tests ============
@@ -165,9 +189,9 @@ contract NitroEnclaveVerifierTest is Test {
     // ============ revokeCert Tests ============
 
     function testRevokeCert() public {
-        assertTrue(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1));
+        assertGt(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
         verifier.revokeCert(INTERMEDIATE_CERT_1);
-        assertFalse(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1));
+        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
     }
 
     function testRevokeCertRevertsIfNotTrusted() public {
@@ -536,7 +560,7 @@ contract NitroEnclaveVerifierTest is Test {
         _setUpRiscZeroConfig();
 
         bytes32 newCert = keccak256("new-leaf-cert");
-        assertFalse(verifier.trustedIntermediateCerts(newCert));
+        assertEq(verifier.trustedIntermediateCerts(newCert), 0);
 
         VerifierJournal memory journal = _createSuccessJournal();
         // Add a new cert beyond the trusted prefix that will get cached
@@ -545,6 +569,13 @@ contract NitroEnclaveVerifierTest is Test {
         certs[1] = INTERMEDIATE_CERT_1;
         certs[2] = newCert;
         journal.certs = certs;
+
+        uint64[] memory expiries = new uint64[](3);
+        expiries[0] = INTERMEDIATE_CERT_1_EXPIRY + 100_000_000; // root expiry (doesn't matter for caching)
+        expiries[1] = INTERMEDIATE_CERT_1_EXPIRY;
+        expiries[2] = NEW_LEAF_CERT_EXPIRY;
+        journal.certExpiries = expiries;
+
         journal.trustedCertsPrefixLen = 2; // only root + 1 intermediate are pre-trusted
 
         bytes memory output = abi.encode(journal);
@@ -555,7 +586,7 @@ contract NitroEnclaveVerifierTest is Test {
         vm.prank(submitter);
         verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
 
-        assertTrue(verifier.trustedIntermediateCerts(newCert));
+        assertEq(verifier.trustedIntermediateCerts(newCert), NEW_LEAF_CERT_EXPIRY);
     }
 
     function testVerifyJournalPassesThroughFailedResult() public {
@@ -704,6 +735,98 @@ contract NitroEnclaveVerifierTest is Test {
         assertEq(uint8(result.result), uint8(VerificationResult.IntermediateCertsNotTrusted));
     }
 
+    // ============ Expiry-Aware Caching Tests ============
+
+    function testExpiredCachedCertFailsVerification() public {
+        _setUpRiscZeroConfig();
+
+        // Warp past the intermediate cert's expiry
+        vm.warp(INTERMEDIATE_CERT_1_EXPIRY + 1);
+
+        VerifierJournal memory journal = _createSuccessJournal();
+        // Update timestamp to be valid at the new block.timestamp
+        journal.timestamp = uint64(block.timestamp - 1) * 1000;
+        bytes memory output = abi.encode(journal);
+        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+
+        vm.prank(submitter);
+        VerifierJournal memory result = verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+
+        assertEq(uint8(result.result), uint8(VerificationResult.IntermediateCertsNotTrusted));
+    }
+
+    function testNonExpiredCachedCertPassesVerification() public {
+        _setUpRiscZeroConfig();
+
+        // Warp to just before the intermediate cert's expiry
+        vm.warp(INTERMEDIATE_CERT_1_EXPIRY - 1);
+
+        VerifierJournal memory journal = _createSuccessJournal();
+        journal.timestamp = uint64(block.timestamp - 1) * 1000;
+        bytes memory output = abi.encode(journal);
+        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+
+        vm.prank(submitter);
+        VerifierJournal memory result = verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+
+        assertEq(uint8(result.result), uint8(VerificationResult.Success));
+    }
+
+    function testCheckTrustedIntermediateCertsStopsAtExpiredCert() public {
+        // Warp past the intermediate cert's expiry
+        vm.warp(INTERMEDIATE_CERT_1_EXPIRY + 1);
+
+        bytes32[][] memory reportCerts = new bytes32[][](1);
+        reportCerts[0] = new bytes32[](2);
+        reportCerts[0][0] = ROOT_CERT;
+        reportCerts[0][1] = INTERMEDIATE_CERT_1; // expired
+
+        uint8[] memory results = verifier.checkTrustedIntermediateCerts(reportCerts);
+        assertEq(results[0], 1); // only root counted, expired intermediate skipped
+    }
+
+    function testCacheNewCertStoresCorrectExpiry() public {
+        _setUpRiscZeroConfig();
+
+        bytes32 newCert = keccak256("brand-new-cert");
+        uint64 newCertExpiry = uint64(REALISTIC_TIMESTAMP + 86_400); // 1 day from now
+
+        VerifierJournal memory journal = _createSuccessJournal();
+        bytes32[] memory certs = new bytes32[](3);
+        certs[0] = ROOT_CERT;
+        certs[1] = INTERMEDIATE_CERT_1;
+        certs[2] = newCert;
+        journal.certs = certs;
+
+        uint64[] memory expiries = new uint64[](3);
+        expiries[0] = INTERMEDIATE_CERT_1_EXPIRY + 100_000_000;
+        expiries[1] = INTERMEDIATE_CERT_1_EXPIRY;
+        expiries[2] = newCertExpiry;
+        journal.certExpiries = expiries;
+
+        journal.trustedCertsPrefixLen = 2;
+
+        bytes memory output = abi.encode(journal);
+        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+
+        vm.prank(submitter);
+        verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+
+        assertEq(verifier.trustedIntermediateCerts(newCert), newCertExpiry);
+    }
+
+    function testRevokeCertSetsExpiryToZero() public {
+        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), INTERMEDIATE_CERT_1_EXPIRY);
+        verifier.revokeCert(INTERMEDIATE_CERT_1);
+        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
+    }
+
     // ============ Helpers ============
 
     function _setUpRiscZeroConfig() internal {
@@ -724,6 +847,10 @@ contract NitroEnclaveVerifierTest is Test {
         certs[0] = ROOT_CERT;
         certs[1] = INTERMEDIATE_CERT_1;
 
+        uint64[] memory expiries = new uint64[](2);
+        expiries[0] = INTERMEDIATE_CERT_1_EXPIRY + 100_000_000; // root expiry (far future)
+        expiries[1] = INTERMEDIATE_CERT_1_EXPIRY;
+
         Pcr[] memory pcrs = new Pcr[](0);
 
         return VerifierJournal({
@@ -731,6 +858,7 @@ contract NitroEnclaveVerifierTest is Test {
             trustedCertsPrefixLen: 2,
             timestamp: uint64(block.timestamp - 1) * 1000,
             certs: certs,
+            certExpiries: expiries,
             userData: "",
             nonce: "",
             publicKey: "",

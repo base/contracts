@@ -125,8 +125,9 @@ contract DeployRiscZeroStack is Script {
             verifierId: nitroVerifierId, aggregatorId: bytes32(0), zkVerifier: risc0VerifierRouter
         });
 
-        // Start with an empty trusted certs array; certs will be auto-cached on first valid proof.
+        // Start with empty trusted certs and expiries arrays; certs will be auto-cached on first valid proof.
         bytes32[] memory trustedCerts = new bytes32[](0);
+        uint64[] memory trustedCertExpiries = new uint64[](0);
 
         // Use owner as placeholder proofSubmitter; must be updated to TEEProverRegistry
         // address after deployment via setProofSubmitter().
@@ -134,6 +135,7 @@ contract DeployRiscZeroStack is Script {
             owner,
             NITRO_MAX_TIME_DIFF,
             trustedCerts,
+            trustedCertExpiries,
             nitroRootCert,
             owner,
             ZkCoProcessorType.RiscZero,

@@ -236,11 +236,11 @@
     "sourceCodeHash": "0x032f11e23c188b939ba6cbdc446271b0caad2f4da00535b164a3489291162762"
   },
   "src/multiproof/tee/NitroEnclaveVerifier.sol:NitroEnclaveVerifier": {
-    "initCodeHash": "0x8cae758a4b1005bf2904e376fff49c2fb44e8d9d7bef1a33e18a85ee23d540a7",
-    "sourceCodeHash": "0x78d6c704d56ae8de255be71f5cc94e73e0bea1abd5b7e6dfcb4132174f89202b"
+    "initCodeHash": "0xe8461d6fb25f137008828be635b1a60c26fed28caa54440330dddd69a72546df",
+    "sourceCodeHash": "0xb0ca967580b5e3626786d6e503c7ef7cf737d474f14fc32f1d398e608a58109f"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0x0ed3443601cd3b08c016dbe4a743fb6f1c1800d211e2edd739e588ed455783b1",
+    "initCodeHash": "0xfaec22f48eeef0f4ee0575b0e91028a1330fbf6faf52c2fce0f68b500a023970",
     "sourceCodeHash": "0xf1ec1f02f540da659a204b26acf986fdce7d7d63bba67a87923f52453fb92ccb"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {

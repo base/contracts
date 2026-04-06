@@ -52,8 +52,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Configuration mapping for each supported ZK coprocessor type
     mapping(ZkCoProcessorType => ZkCoProcessorConfig) public zkConfig;
 
-    /// @dev Mapping of trusted intermediate certificate hashes (excludes root certificate)
-    mapping(bytes32 => bool) public trustedIntermediateCerts;
+    /// @dev Mapping of trusted intermediate certificate hashes to their notAfter timestamps in seconds (0 = not cached)
+    mapping(bytes32 => uint64) public trustedIntermediateCerts;
 
     /// @dev Maximum allowed time difference in seconds for attestation timestamp validation
     uint64 public maxTimeDiff;
@@ -143,11 +143,15 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Event emitted when the maximum time difference is updated
     event MaxTimeDiffUpdated(uint64 newMaxTimeDiff);
 
+    /// @dev Thrown when initializeTrustedCerts and initializeTrustedCertExpiries have different lengths
+    error CertExpiriesLengthMismatch(uint256 certsLen, uint256 expiriesLen);
+
     /**
      * @dev Initializes the contract with owner, time tolerance and initial trusted certificates
      * @param owner Address to be set as the contract owner
      * @param initialMaxTimeDiff Maximum time difference in seconds for timestamp validation
      * @param initializeTrustedCerts Array of initial trusted intermediate certificate hashes
+     * @param initializeTrustedCertExpiries Array of notAfter timestamps (seconds) for each initial cert
      * @param initialRootCert Hash of the AWS Nitro Enclave root certificate
      * @param initialProofSubmitter Address that is authorized to submit proofs
      * @param zkCoProcessor Type of ZK coprocessor to configure (RiscZero or Succinct)
@@ -158,6 +162,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         address owner,
         uint64 initialMaxTimeDiff,
         bytes32[] memory initializeTrustedCerts,
+        uint64[] memory initializeTrustedCertExpiries,
         bytes32 initialRootCert,
         address initialProofSubmitter,
         ZkCoProcessorType zkCoProcessor,
@@ -165,9 +170,12 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         bytes32 verifierProofId
     ) {
         if (initialMaxTimeDiff == 0) revert ZeroMaxTimeDiff();
+        if (initializeTrustedCerts.length != initializeTrustedCertExpiries.length) {
+            revert CertExpiriesLengthMismatch(initializeTrustedCerts.length, initializeTrustedCertExpiries.length);
+        }
         maxTimeDiff = initialMaxTimeDiff;
         for (uint256 i = 0; i < initializeTrustedCerts.length; i++) {
-            trustedIntermediateCerts[initializeTrustedCerts[i]] = true;
+            trustedIntermediateCerts[initializeTrustedCerts[i]] = initializeTrustedCertExpiries[i];
         }
         _initializeOwner(owner);
         _setRootCert(initialRootCert);
@@ -239,7 +247,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
                 revert RootCertMismatch(rootCertHash, certs[0]);
             }
             for (uint256 j = 1; j < certs.length; j++) {
-                if (!trustedIntermediateCerts[certs[j]]) {
+                uint64 expiry = trustedIntermediateCerts[certs[j]];
+                if (expiry == 0 || block.timestamp > expiry) {
                     break;
                 }
                 trustedCertPrefixLen += 1;
@@ -319,7 +328,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      * without affecting the root certificate or other trusted certificates.
      */
     function revokeCert(bytes32 certHash) external onlyOwner {
-        if (!trustedIntermediateCerts[certHash]) {
+        if (trustedIntermediateCerts[certHash] == 0) {
             revert CertificateNotFound(certHash);
         }
         delete trustedIntermediateCerts[certHash];
@@ -536,7 +545,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     function _cacheNewCert(VerifierJournal memory journal) internal {
         for (uint256 i = journal.trustedCertsPrefixLen; i < journal.certs.length; i++) {
             bytes32 certHash = journal.certs[i];
-            trustedIntermediateCerts[certHash] = true;
+            trustedIntermediateCerts[certHash] = journal.certExpiries[i];
         }
     }
 
@@ -574,7 +583,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
                 }
                 continue;
             }
-            if (!trustedIntermediateCerts[certHash]) {
+            uint64 expiry = trustedIntermediateCerts[certHash];
+            if (expiry == 0 || block.timestamp > expiry) {
                 journal.result = VerificationResult.IntermediateCertsNotTrusted;
                 return journal;
             }
@@ -652,8 +662,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.1.0
+    /// @custom:semver 0.2.0
     function version() public pure virtual returns (string memory) {
-        return "0.1.0";
+        return "0.2.0";
     }
 }
