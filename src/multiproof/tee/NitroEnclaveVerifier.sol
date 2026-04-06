@@ -248,7 +248,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
             }
             for (uint256 j = 1; j < certs.length; j++) {
                 uint64 expiry = trustedIntermediateCerts[certs[j]];
-                if (expiry == 0 || block.timestamp > expiry) {
+                if (block.timestamp > expiry) {
                     break;
                 }
                 trustedCertPrefixLen += 1;
@@ -584,7 +584,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
                 continue;
             }
             uint64 expiry = trustedIntermediateCerts[certHash];
-            if (expiry == 0 || block.timestamp > expiry) {
+            if (block.timestamp > expiry) {
                 journal.result = VerificationResult.IntermediateCertsNotTrusted;
                 return journal;
             }
