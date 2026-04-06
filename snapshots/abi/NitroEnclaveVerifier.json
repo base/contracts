@@ -32,6 +32,11 @@
         "type": "address"
       },
       {
+        "internalType": "address",
+        "name": "initialRevoker",
+        "type": "address"
+      },
+      {
         "internalType": "enum ZkCoProcessorType",
         "name": "zkCoProcessor",
         "type": "uint8"
@@ -418,6 +423,19 @@
   },
   {
     "inputs": [],
+    "name": "revoker",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "rootCert",
     "outputs": [
       {
@@ -451,6 +469,19 @@
       }
     ],
     "name": "setProofSubmitter",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newRevoker",
+        "type": "address"
+      }
+    ],
+    "name": "setRevoker",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -885,6 +916,19 @@
     "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newRevoker",
+        "type": "address"
+      }
+    ],
+    "name": "RevokerUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": false,
         "internalType": "bytes32",
         "name": "newRootCert",
@@ -1008,6 +1052,11 @@
   {
     "inputs": [],
     "name": "AlreadyInitialized",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "CallerNotOwnerOrRevoker",
     "type": "error"
   },
   {

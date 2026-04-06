@@ -19,6 +19,7 @@ contract NitroEnclaveVerifierTest is Test {
 
     address public owner;
     address public submitter;
+    address public revokerAddr;
     address public mockRiscZeroVerifier;
     address public mockSP1Verifier;
 
@@ -44,6 +45,7 @@ contract NitroEnclaveVerifierTest is Test {
 
         owner = address(this);
         submitter = makeAddr("submitter");
+        revokerAddr = makeAddr("revoker");
         mockRiscZeroVerifier = makeAddr("mock-riscZero-verifier");
         mockSP1Verifier = makeAddr("mock-sp1-verifier");
 
@@ -63,6 +65,7 @@ contract NitroEnclaveVerifierTest is Test {
             trustedCertExpiries,
             ROOT_CERT,
             submitter,
+            revokerAddr,
             ZkCoProcessorType.Succinct,
             zkCfg,
             VERIFIER_PROOF_ID
@@ -91,7 +94,7 @@ contract NitroEnclaveVerifierTest is Test {
             ZkCoProcessorConfig({ verifierId: bytes32(0), aggregatorId: bytes32(0), zkVerifier: address(0) });
         vm.expectRevert(NitroEnclaveVerifier.ZeroMaxTimeDiff.selector);
         new NitroEnclaveVerifier(
-            owner, 0, certs, expiries, bytes32(0), submitter, ZkCoProcessorType.Succinct, zkCfg, bytes32(0)
+            owner, 0, certs, expiries, bytes32(0), submitter, address(0), ZkCoProcessorType.Succinct, zkCfg, bytes32(0)
         );
     }
 
@@ -103,7 +106,16 @@ contract NitroEnclaveVerifierTest is Test {
             ZkCoProcessorConfig({ verifierId: bytes32(0), aggregatorId: bytes32(0), zkVerifier: address(0) });
         vm.expectRevert(abi.encodeWithSelector(NitroEnclaveVerifier.CertExpiriesLengthMismatch.selector, 1, 0));
         new NitroEnclaveVerifier(
-            owner, MAX_TIME_DIFF, certs, expiries, bytes32(0), submitter, ZkCoProcessorType.Succinct, zkCfg, bytes32(0)
+            owner,
+            MAX_TIME_DIFF,
+            certs,
+            expiries,
+            bytes32(0),
+            submitter,
+            address(0),
+            ZkCoProcessorType.Succinct,
+            zkCfg,
+            bytes32(0)
         );
     }
 
@@ -200,10 +212,84 @@ contract NitroEnclaveVerifierTest is Test {
         verifier.revokeCert(unknown);
     }
 
-    function testRevokeCertRevertsIfNotOwner() public {
+    function testRevokeCertRevertsIfNotOwnerOrRevoker() public {
+        vm.prank(submitter);
+        vm.expectRevert(NitroEnclaveVerifier.CallerNotOwnerOrRevoker.selector);
+        verifier.revokeCert(INTERMEDIATE_CERT_1);
+    }
+
+    // ============ Revoker Role Tests ============
+
+    function testConstructorSetsRevoker() public view {
+        assertEq(verifier.revoker(), revokerAddr);
+    }
+
+    function testConstructorAcceptsZeroRevoker() public {
+        bytes32[] memory certs = new bytes32[](0);
+        uint64[] memory expiries = new uint64[](0);
+        ZkCoProcessorConfig memory zkCfg =
+            ZkCoProcessorConfig({ verifierId: VERIFIER_ID, aggregatorId: AGGREGATOR_ID, zkVerifier: mockSP1Verifier });
+        NitroEnclaveVerifier v = new NitroEnclaveVerifier(
+            owner,
+            MAX_TIME_DIFF,
+            certs,
+            expiries,
+            ROOT_CERT,
+            submitter,
+            address(0),
+            ZkCoProcessorType.Succinct,
+            zkCfg,
+            VERIFIER_PROOF_ID
+        );
+        assertEq(v.revoker(), address(0));
+    }
+
+    function testRevokerCanRevokeCert() public {
+        assertGt(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
+        vm.prank(revokerAddr);
+        verifier.revokeCert(INTERMEDIATE_CERT_1);
+        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
+    }
+
+    function testOwnerCanStillRevokeCert() public {
+        assertGt(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
+        verifier.revokeCert(INTERMEDIATE_CERT_1);
+        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
+    }
+
+    function testSetRevoker() public {
+        address newRevoker = makeAddr("new-revoker");
+        verifier.setRevoker(newRevoker);
+        assertEq(verifier.revoker(), newRevoker);
+    }
+
+    function testSetRevokerToZeroDisablesRole() public {
+        verifier.setRevoker(address(0));
+        assertEq(verifier.revoker(), address(0));
+
+        // Now revoker (zero address) can't call revokeCert
+        vm.prank(revokerAddr);
+        vm.expectRevert(NitroEnclaveVerifier.CallerNotOwnerOrRevoker.selector);
+        verifier.revokeCert(INTERMEDIATE_CERT_1);
+    }
+
+    function testSetRevokerEmitsEvent() public {
+        address newRevoker = makeAddr("new-revoker");
+        vm.expectEmit(true, false, false, false);
+        emit NitroEnclaveVerifier.RevokerUpdated(newRevoker);
+        verifier.setRevoker(newRevoker);
+    }
+
+    function testSetRevokerRevertsIfNotOwner() public {
         vm.prank(submitter);
         vm.expectRevert();
-        verifier.revokeCert(INTERMEDIATE_CERT_1);
+        verifier.setRevoker(makeAddr("anyone"));
+    }
+
+    function testSetRevokerRevertsIfCalledByRevoker() public {
+        vm.prank(revokerAddr);
+        vm.expectRevert();
+        verifier.setRevoker(makeAddr("anyone"));
     }
 
     // ============ updateVerifierId Tests ============

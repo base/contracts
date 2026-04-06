@@ -161,6 +161,12 @@ interface INitroEnclaveVerifier {
     function proofSubmitter() external view returns (address);
 
     /**
+     * @dev Returns the address authorized to revoke intermediate certificates
+     * @return Address of the revoker (address(0) if disabled)
+     */
+    function revoker() external view returns (address);
+
+    /**
      * @dev Retrieves the configuration for a specific coprocessor
      * @param _zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
      * @return ZkCoProcessorConfig Configuration parameters including program IDs and verifier address
@@ -228,6 +234,15 @@ interface INitroEnclaveVerifier {
     function setProofSubmitter(address _proofSubmitter) external;
 
     /**
+     * @dev Updates the revoker address
+     * @param _newRevoker New revoker address (can be address(0) to disable the revoker role)
+     *
+     * Requirements:
+     * - Only callable by contract owner
+     */
+    function setRevoker(address _newRevoker) external;
+
+    /**
      * @dev Configures the zero-knowledge verification parameters for a specific coprocessor
      * @param _zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
      * @param _config Configuration parameters including program IDs and verifier address
@@ -249,7 +264,7 @@ interface INitroEnclaveVerifier {
      * @param _certHash Hash of the certificate to revoke
      *
      * Requirements:
-     * - Only callable by contract owner
+     * - Only callable by contract owner or revoker
      * - Certificate must exist in the trusted set
      */
     function revokeCert(bytes32 _certHash) external;
