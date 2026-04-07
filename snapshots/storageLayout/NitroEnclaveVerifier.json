@@ -7,45 +7,52 @@
     "type": "address"
   },
   {
+    "bytes": "20",
+    "label": "revoker",
+    "offset": 0,
+    "slot": "1",
+    "type": "address"
+  },
+  {
     "bytes": "32",
     "label": "zkConfig",
     "offset": 0,
-    "slot": "1",
+    "slot": "2",
     "type": "mapping(enum ZkCoProcessorType => struct ZkCoProcessorConfig)"
   },
   {
     "bytes": "32",
     "label": "trustedIntermediateCerts",
     "offset": 0,
-    "slot": "2",
+    "slot": "3",
     "type": "mapping(bytes32 => uint64)"
   },
   {
     "bytes": "8",
     "label": "maxTimeDiff",
     "offset": 0,
-    "slot": "3",
+    "slot": "4",
     "type": "uint64"
   },
   {
     "bytes": "32",
     "label": "rootCert",
     "offset": 0,
-    "slot": "4",
+    "slot": "5",
     "type": "bytes32"
   },
   {
     "bytes": "32",
     "label": "_zkVerifierRoutes",
     "offset": 0,
-    "slot": "5",
+    "slot": "6",
     "type": "mapping(enum ZkCoProcessorType => mapping(bytes4 => address))"
   },
   {
     "bytes": "32",
     "label": "_verifierProofIds",
     "offset": 0,
-    "slot": "6",
+    "slot": "7",
     "type": "mapping(enum ZkCoProcessorType => bytes32)"
   }
 ]
