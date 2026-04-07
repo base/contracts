@@ -61,6 +61,8 @@ struct VerifierJournal {
     uint64 timestamp;
     // Array of certificate hashes in the chain (root to leaf)
     bytes32[] certs;
+    // Certificate notAfter timestamps in seconds (one per cert, matching certs[] order)
+    uint64[] certExpiries;
     // User-defined data embedded in the attestation
     bytes userData;
     // Cryptographic nonce used for replay protection

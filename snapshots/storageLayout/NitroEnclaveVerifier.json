@@ -18,7 +18,7 @@
     "label": "trustedIntermediateCerts",
     "offset": 0,
     "slot": "2",
-    "type": "mapping(bytes32 => bool)"
+    "type": "mapping(bytes32 => uint64)"
   },
   {
     "bytes": "8",

@@ -17,6 +17,11 @@
         "type": "bytes32[]"
       },
       {
+        "internalType": "uint64[]",
+        "name": "initializeTrustedCertExpiries",
+        "type": "uint64[]"
+      },
+      {
         "internalType": "bytes32",
         "name": "initialRootCert",
         "type": "bytes32"
@@ -126,6 +131,11 @@
             "internalType": "bytes32[]",
             "name": "certs",
             "type": "bytes32[]"
+          },
+          {
+            "internalType": "uint64[]",
+            "name": "certExpiries",
+            "type": "uint64[]"
           },
           {
             "internalType": "bytes",
@@ -522,9 +532,9 @@
     "name": "trustedIntermediateCerts",
     "outputs": [
       {
-        "internalType": "bool",
+        "internalType": "uint64",
         "name": "",
-        "type": "bool"
+        "type": "uint64"
       }
     ],
     "stateMutability": "view",
@@ -612,6 +622,11 @@
             "internalType": "bytes32[]",
             "name": "certs",
             "type": "bytes32[]"
+          },
+          {
+            "internalType": "uint64[]",
+            "name": "certExpiries",
+            "type": "uint64[]"
           },
           {
             "internalType": "bytes",
@@ -998,6 +1013,22 @@
   {
     "inputs": [],
     "name": "CallerNotProofSubmitter",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "certsLen",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "expiriesLen",
+        "type": "uint256"
+      }
+    ],
+    "name": "CertExpiriesLengthMismatch",
     "type": "error"
   },
   {
