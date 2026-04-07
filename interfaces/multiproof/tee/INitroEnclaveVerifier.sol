@@ -109,8 +109,13 @@ struct Pcr {
 /**
  * @dev Enumeration of possible attestation verification results
  * Indicates the outcome of the verification process
+ *
+ * Note: Unknown is intentionally placed at index 0 so that uninitialized enum
+ * variables default to a failure state rather than Success (fail-closed).
  */
 enum VerificationResult {
+    // Default/uninitialized value — treated as a verification failure
+    Unknown,
     // Attestation successfully verified
     Success,
     // Root certificate is not in the trusted set
