@@ -131,6 +131,7 @@ contract DeployRiscZeroStack is Script {
 
         // Use owner as placeholder proofSubmitter; must be updated to TEEProverRegistry
         // address after deployment via setProofSubmitter().
+        // Revoker starts as address(0); must be set via setRevoker() after deployment.
         NitroEnclaveVerifier nev = new NitroEnclaveVerifier(
             owner,
             NITRO_MAX_TIME_DIFF,
@@ -138,6 +139,7 @@ contract DeployRiscZeroStack is Script {
             trustedCertExpiries,
             nitroRootCert,
             owner,
+            address(0),
             ZkCoProcessorType.RiscZero,
             zkConfig,
             bytes32(0)

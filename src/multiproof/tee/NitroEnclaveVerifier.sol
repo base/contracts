@@ -49,6 +49,9 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Address that can submit proofs
     address public proofSubmitter;
 
+    /// @dev Address authorized to revoke intermediate certificates (in addition to owner)
+    address public revoker;
+
     /// @dev Configuration mapping for each supported ZK coprocessor type
     mapping(ZkCoProcessorType => ZkCoProcessorConfig) public zkConfig;
 
@@ -108,6 +111,9 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Thrown when a zero address is provided for the verifier
     error InvalidVerifierAddress();
 
+    /// @dev Thrown when caller is neither the owner nor the revoker
+    error CallerNotOwnerOrRevoker();
+
     // ============ Events ============
 
     /// @dev Emitted when a new verifier program ID is added/updated
@@ -143,8 +149,17 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Event emitted when the maximum time difference is updated
     event MaxTimeDiffUpdated(uint64 newMaxTimeDiff);
 
+    /// @dev Event emitted when the revoker address is updated
+    event RevokerUpdated(address indexed newRevoker);
+
     /// @dev Thrown when initializeTrustedCerts and initializeTrustedCertExpiries have different lengths
     error CertExpiriesLengthMismatch(uint256 certsLen, uint256 expiriesLen);
+
+    /// @dev Restricts access to the owner or the revoker
+    modifier onlyOwnerOrRevoker() {
+        if (msg.sender != owner() && msg.sender != revoker) revert CallerNotOwnerOrRevoker();
+        _;
+    }
 
     /**
      * @dev Initializes the contract with owner, time tolerance and initial trusted certificates
@@ -154,6 +169,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      * @param initializeTrustedCertExpiries Array of notAfter timestamps (seconds) for each initial cert
      * @param initialRootCert Hash of the AWS Nitro Enclave root certificate
      * @param initialProofSubmitter Address that is authorized to submit proofs
+     * @param initialRevoker Address authorized to revoke intermediate certificates (can be address(0) to disable)
      * @param zkCoProcessor Type of ZK coprocessor to configure (RiscZero or Succinct)
      * @param config Configuration parameters for the ZK coprocessor
      * @param verifierProofId The verifierProofId corresponding to the verifierId in config
@@ -165,6 +181,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         uint64[] memory initializeTrustedCertExpiries,
         bytes32 initialRootCert,
         address initialProofSubmitter,
+        address initialRevoker,
         ZkCoProcessorType zkCoProcessor,
         ZkCoProcessorConfig memory config,
         bytes32 verifierProofId
@@ -180,6 +197,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         _initializeOwner(owner);
         _setRootCert(initialRootCert);
         _setProofSubmitter(initialProofSubmitter);
+        revoker = initialRevoker;
         _setZkConfiguration(zkCoProcessor, config, verifierProofId);
     }
 
@@ -321,13 +339,13 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      * @param certHash Hash of the certificate to revoke
      *
      * Requirements:
-     * - Only callable by contract owner
+     * - Only callable by contract owner or revoker
      * - Certificate must exist in the trusted intermediate certificates set
      *
-     * This function allows the owner to revoke compromised intermediate certificates
+     * This function allows the owner or revoker to revoke compromised intermediate certificates
      * without affecting the root certificate or other trusted certificates.
      */
-    function revokeCert(bytes32 certHash) external onlyOwner {
+    function revokeCert(bytes32 certHash) external onlyOwnerOrRevoker {
         if (trustedIntermediateCerts[certHash] == 0) {
             revert CertificateNotFound(certHash);
         }
@@ -422,6 +440,18 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      */
     function setProofSubmitter(address submitter) external onlyOwner {
         _setProofSubmitter(submitter);
+    }
+
+    /**
+     * @dev Updates the revoker address
+     * @param newRevoker New revoker address (can be address(0) to disable the revoker role)
+     *
+     * Requirements:
+     * - Only callable by contract owner
+     */
+    function setRevoker(address newRevoker) external onlyOwner {
+        revoker = newRevoker;
+        emit RevokerUpdated(newRevoker);
     }
 
     // ============ Verification Functions ============
@@ -662,8 +692,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.2.0
+    /// @custom:semver 0.3.0
     function version() public pure virtual returns (string memory) {
-        return "0.2.0";
+        return "0.3.0";
     }
 }
