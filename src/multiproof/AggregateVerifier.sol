@@ -932,7 +932,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Returns the status of the parent game.
-    /// @dev If the parent game address is `address(ANCHOR_STATE_REGISTRY)`, then the parent game's status is considered as `DEFENDER_WINS`.
+    /// @dev If the parent game address is `address(ANCHOR_STATE_REGISTRY)`, then the parent game's status is considered
+    /// as `DEFENDER_WINS`.
     function _getParentGameStatus() internal view returns (GameStatus) {
         if (parentAddress() != address(ANCHOR_STATE_REGISTRY)) {
             IDisputeGame parentGame = IDisputeGame(parentAddress());
