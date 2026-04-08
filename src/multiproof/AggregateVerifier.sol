@@ -300,7 +300,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         INTERMEDIATE_BLOCK_INTERVAL = intermediateBlockInterval;
         PROOF_THRESHOLD = proofThreshold;
 
-        INITIALIZE_CALLDATA_SIZE = 0x7E + 0x20 * intermediateOutputRootsCount();
+        INITIALIZE_CALLDATA_SIZE = 0x8E + 0x20 * intermediateOutputRootsCount();
     }
 
     /// @notice Initializes the contract.
@@ -317,13 +317,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // in the factory, but are not used by the game, which would allow for multiple dispute games for the same
         // output proposal to be created.
         //
-        // Expected length: 0x7E
+        // Expected length: 0x8E + 0x20 * intermediateOutputRootsCount()
         // - 0x04 selector
         // - 0x14 creator address
         // - 0x20 root claim
         // - 0x20 l1 head
         // - 0x20 extraData (l2BlockNumber)
-        // - 0x04 extraData (parentIndex)
+        // - 0x14 extraData (parent game address)
         // - 0x20 x (BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL) extraData (intermediate roots)
         // - 0x02 CWIA bytes
 
@@ -347,10 +347,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             );
         }
 
-        // The first game is initialized with a parent index of uint32.max.
-        if (parentIndex() != type(uint32).max) {
+        // The first game is initialized with a parent address of the AnchorStateRegistry.
+        if (parentAddress() != address(ANCHOR_STATE_REGISTRY)) {
             // For subsequent games, get the parent game's information.
-            (,, IDisputeGame parentGame) = DISPUTE_GAME_FACTORY.gameAtIndex(parentIndex());
+            IDisputeGame parentGame = IDisputeGame(parentAddress());
 
             // Parent game must be respected, not blacklisted, not retired, and not challenged.
             if (!_isValidGame(parentGame)) revert InvalidParentGame();
@@ -713,24 +713,24 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The intermediate output roots of the game.
     function intermediateOutputRoots() public view returns (bytes memory) {
-        return _getArgBytes(0x78, 0x20 * intermediateOutputRootsCount());
+        return _getArgBytes(0x88, 0x20 * intermediateOutputRootsCount());
     }
 
     /// @notice The intermediate output root at the given index.
     /// @param index The index of the intermediate output root.
     function intermediateOutputRoot(uint256 index) public view returns (bytes32) {
         if (index >= intermediateOutputRootsCount()) revert InvalidIntermediateRootIndex();
-        return _getArgBytes32(0x78 + 0x20 * index);
+        return _getArgBytes32(0x88 + 0x20 * index);
     }
 
     /// @notice Getter for the extra data.
     function extraData() public view returns (bytes memory) {
         // The extra data starts at the second word within the cwia calldata and
-        // is 36 + 32 x intermediateRootsCount() bytes long.
+        // is 52 + 32 x intermediateRootsCount() bytes long.
         // 32 bytes are for the l2BlockNumber
-        // 4 bytes are for the parentIndex
+        // 20 bytes are for the parent address
         // 32 bytes are for each intermediate root
-        return _getArgBytes(0x54, 0x24 + 0x20 * intermediateOutputRootsCount());
+        return _getArgBytes(0x54, 0x34 + 0x20 * intermediateOutputRootsCount());
     }
 
     /// @notice Getter for the creator of the dispute game.
@@ -754,9 +754,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         return _getArgUint256(0x54);
     }
 
-    /// @notice The parent index of the game.
-    function parentIndex() public pure returns (uint32) {
-        return _getArgUint32(0x74);
+    /// @notice The parent UUID of the game.
+    function parentAddress() public pure returns (address) {
+        return _getArgAddress(0x74);
     }
 
     function _proofVerifiedUpdate(ProofType proofType, address proposer) internal {
@@ -932,17 +932,17 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Returns the status of the parent game.
-    /// @dev If the parent game index is `uint32.max`, then the parent game's status is considered as `DEFENDER_WINS`.
+    /// @dev If the parent game address is `address(ANCHOR_STATE_REGISTRY)`, then the parent game's status is considered as `DEFENDER_WINS`.
     function _getParentGameStatus() internal view returns (GameStatus) {
-        if (parentIndex() != type(uint32).max) {
-            (,, IDisputeGame parentGame) = DISPUTE_GAME_FACTORY.gameAtIndex(parentIndex());
+        if (parentAddress() != address(ANCHOR_STATE_REGISTRY)) {
+            IDisputeGame parentGame = IDisputeGame(parentAddress());
             if (ANCHOR_STATE_REGISTRY.isGameBlacklisted(parentGame) || ANCHOR_STATE_REGISTRY.isGameRetired(parentGame))
             {
                 return GameStatus.CHALLENGER_WINS;
             }
             return parentGame.status();
         }
-        // If this is the first dispute game (i.e. parent game index is `uint32.max`), then the
+        // If this is the first dispute game (i.e. parent game address is `address(ANCHOR_STATE_REGISTRY)`), then the
         // parent game's status is considered as `DEFENDER_WINS`.
         return GameStatus.DEFENDER_WINS;
     }

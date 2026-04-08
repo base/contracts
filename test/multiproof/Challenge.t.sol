@@ -19,8 +19,9 @@ contract ChallengeTest is BaseTest {
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee")));
         bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
 
-        AggregateVerifier game =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, teeProof);
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim1, currentL2BlockNumber, address(anchorStateRegistry), teeProof
+        );
 
         // Challenge game with ZK proof
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk")));
@@ -55,8 +56,9 @@ contract ChallengeTest is BaseTest {
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk1")));
         bytes memory zkProof1 = _generateProof("zk-proof-1", AggregateVerifier.ProofType.ZK);
 
-        AggregateVerifier game1 =
-            _createAggregateVerifierGame(ZK_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, zkProof1);
+        AggregateVerifier game1 = _createAggregateVerifierGame(
+            ZK_PROVER, rootClaim1, currentL2BlockNumber, address(anchorStateRegistry), zkProof1
+        );
 
         // Challenge game with ZK proof
         bytes memory zkProof2 = _generateProof("zk-proof-2", AggregateVerifier.ProofType.ZK);
@@ -73,8 +75,9 @@ contract ChallengeTest is BaseTest {
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee1")));
         bytes memory teeProof1 = _generateProof("tee-proof-1", AggregateVerifier.ProofType.TEE);
 
-        AggregateVerifier game1 =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, teeProof1);
+        AggregateVerifier game1 = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim1, currentL2BlockNumber, address(anchorStateRegistry), teeProof1
+        );
 
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
         bytes memory teeProof2 = _generateProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
@@ -89,8 +92,9 @@ contract ChallengeTest is BaseTest {
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee")));
         bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
 
-        AggregateVerifier game1 =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, teeProof);
+        AggregateVerifier game1 = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim1, currentL2BlockNumber, address(anchorStateRegistry), teeProof
+        );
 
         // Resolve game1
         vm.warp(block.timestamp + 7 days + 1);
@@ -111,10 +115,10 @@ contract ChallengeTest is BaseTest {
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee")));
         bytes memory parentProof = _generateProof("parent-proof", AggregateVerifier.ProofType.TEE);
 
-        AggregateVerifier parentGame =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, parentProof);
+        AggregateVerifier parentGame = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim1, currentL2BlockNumber, address(anchorStateRegistry), parentProof
+        );
 
-        uint256 parentGameIndex = factory.gameCount() - 1;
         currentL2BlockNumber += BLOCK_INTERVAL;
 
         // create child game
@@ -122,8 +126,7 @@ contract ChallengeTest is BaseTest {
         bytes memory childProof = _generateProof("child-proof", AggregateVerifier.ProofType.TEE);
 
         AggregateVerifier childGame =
-        // forge-lint: disable-next-line(unsafe-typecast)
-        _createAggregateVerifierGame(TEE_PROVER, rootClaim2, currentL2BlockNumber, uint32(parentGameIndex), childProof);
+            _createAggregateVerifierGame(TEE_PROVER, rootClaim2, currentL2BlockNumber, address(parentGame), childProof);
 
         // blacklist parent game
         anchorStateRegistry.blacklistDisputeGame(IDisputeGame(address(parentGame)));
@@ -141,8 +144,9 @@ contract ChallengeTest is BaseTest {
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee")));
         bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
 
-        AggregateVerifier game =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, type(uint32).max, proof);
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
+        );
 
         // blacklist game
         anchorStateRegistry.blacklistDisputeGame(IDisputeGame(address(game)));
@@ -161,8 +165,9 @@ contract ChallengeTest is BaseTest {
         Claim rootClaim1 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee1")));
         bytes memory teeProof1 = _generateProof("tee-proof-1", AggregateVerifier.ProofType.TEE);
 
-        AggregateVerifier game =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, teeProof1);
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim1, currentL2BlockNumber, address(anchorStateRegistry), teeProof1
+        );
 
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
         bytes memory teeProof2 = _generateProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
@@ -186,8 +191,9 @@ contract ChallengeTest is BaseTest {
         bytes memory zkProof1 = _generateProof("zk-proof-1", AggregateVerifier.ProofType.ZK);
 
         // create game with both proofs
-        AggregateVerifier game =
-            _createAggregateVerifierGame(ZK_PROVER, rootClaim1, currentL2BlockNumber, type(uint32).max, teeProof);
+        AggregateVerifier game = _createAggregateVerifierGame(
+            ZK_PROVER, rootClaim1, currentL2BlockNumber, address(anchorStateRegistry), teeProof
+        );
         game.verifyProposalProof(zkProof1);
 
         // nullify ZK proof

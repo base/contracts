@@ -623,12 +623,12 @@
   },
   {
     "inputs": [],
-    "name": "parentIndex",
+    "name": "parentAddress",
     "outputs": [
       {
-        "internalType": "uint32",
+        "internalType": "address",
         "name": "",
-        "type": "uint32"
+        "type": "address"
       }
     ],
     "stateMutability": "pure",
