@@ -171,7 +171,7 @@ contract Drippie is AssetReceiver {
     /// @param _name Drip to check.
     /// @return True if the drip is executable, reverts otherwise.
     function executable(string calldata _name) public view returns (bool) {
-        DripState storage state = drips[_name];
+        DripState memory state = drips[_name];
 
         // Only allow active drips to be executed, an obvious security measure.
         require(state.status == DripStatus.ACTIVE, "Drippie: selected drip does not exist or is not currently active");
