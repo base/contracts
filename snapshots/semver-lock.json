@@ -233,7 +233,7 @@
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0x7b0764d9a89a1e79129c2a25851b7e44e6392eddb08b4993fce25d6a9bffc223",
-    "sourceCodeHash": "0x6143f6fb08070cd3bc0a09b874f516ebc7b6666b4f71601fa6108ba586e1e3c1"
+    "sourceCodeHash": "0x22e1947a7b289be69137262a8e76083e05987b86fc768932a3e5d7c658e07082"
   },
   "src/multiproof/tee/NitroEnclaveVerifier.sol:NitroEnclaveVerifier": {
     "initCodeHash": "0x4210e4b415f18d50ec4b2d76f216af08f5943cf9a930262a8189c32e3b9ea49c",
