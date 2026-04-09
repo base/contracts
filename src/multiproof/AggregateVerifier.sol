@@ -948,7 +948,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         return GameStatus.DEFENDER_WINS;
     }
 
-    /// @notice Checks if the game is respected, not blacklisted, and not retired.
+    /// @notice Checks if the game is proper, respected, not blacklisted, not retired, and not challenged.
     /// @param game The game to check.
     function _isValidGame(IDisputeGame game) internal view returns (bool) {
         return ANCHOR_STATE_REGISTRY.isGameProper(game) && ANCHOR_STATE_REGISTRY.isGameRespected(game)
