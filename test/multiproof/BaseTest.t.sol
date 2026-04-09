@@ -149,7 +149,7 @@ contract BaseTest is Test {
         address creator,
         Claim rootClaim,
         uint256 l2BlockNumber,
-        uint32 parentIndex,
+        address parentAddress,
         bytes memory proof
     )
         internal
@@ -157,7 +157,7 @@ contract BaseTest is Test {
     {
         bytes memory intermediateRoots =
             abi.encodePacked(_generateIntermediateRootsExceptLast(l2BlockNumber), rootClaim.raw());
-        bytes memory extraData = abi.encodePacked(uint256(l2BlockNumber), uint32(parentIndex), intermediateRoots);
+        bytes memory extraData = abi.encodePacked(uint256(l2BlockNumber), parentAddress, intermediateRoots);
 
         vm.deal(creator, INIT_BOND);
         vm.prank(creator);
