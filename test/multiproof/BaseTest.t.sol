@@ -24,7 +24,10 @@ import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 import { MockSystemConfig } from "src/multiproof/mocks/MockSystemConfig.sol";
 import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
 
+import { LibClone } from "@solady/utils/LibClone.sol";
+
 contract BaseTest is Test {
+    using LibClone for address;
     // Constants
     GameType public constant AGGREGATE_VERIFIER_GAME_TYPE = GameType.wrap(621);
     uint256 public constant L2_CHAIN_ID = 8453;
@@ -168,6 +171,30 @@ contract BaseTest is Test {
                 )
             )
         );
+    }
+
+    /// @notice Clones the `AggregateVerifier` implementation with the same CWIA layout as `DisputeGameFactory`,
+    ///         initializes it, but does not register the game in the factory (no `_finalizeGameCreation`).
+    function _deployAggregateVerifierCloneWithoutFactoryRegistration(
+        address creator,
+        Claim rootClaim,
+        uint256 l2BlockNumber,
+        address parentAddress,
+        bytes memory proof
+    )
+        internal
+        returns (AggregateVerifier game)
+    {
+        IDisputeGame impl = factory.gameImpls(AGGREGATE_VERIFIER_GAME_TYPE);
+        bytes memory intermediateRoots =
+            abi.encodePacked(_generateIntermediateRootsExceptLast(l2BlockNumber), rootClaim.raw());
+        bytes memory extraData = abi.encodePacked(uint256(l2BlockNumber), parentAddress, intermediateRoots);
+        bytes32 l1Head = blockhash(block.number - 1);
+        address clone = address(impl).clone(abi.encodePacked(creator, rootClaim, l1Head, extraData));
+        vm.deal(creator, INIT_BOND);
+        vm.prank(creator);
+        AggregateVerifier(payable(clone)).initializeWithInitData{ value: INIT_BOND }(proof);
+        return AggregateVerifier(payable(clone));
     }
 
     function _provideProof(AggregateVerifier game, address prover, bytes memory proofBytes) internal {

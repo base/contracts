@@ -231,6 +231,35 @@ contract AggregateVerifierTest is BaseTest {
         _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), zkProof);
     }
 
+    /// @notice Reverts when the parent is not factory-registered: `_isValidGame` requires
+    ///         `AnchorStateRegistry.isGameRegistered`, which checks `DisputeGameFactory.games(...) == parent`.
+    /// @dev Parent is a real `AggregateVerifier` clone initialized like a factory game, but deployed without
+    ///      `_finalizeGameCreation`, so the factory UUID mapping has no entry.
+    function testInitializeFailsIfParentGameNotFactoryRegistered() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+
+        Claim parentRootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "parent")));
+        AggregateVerifier unregisteredParent = _deployAggregateVerifierCloneWithoutFactoryRegistration(
+            TEE_PROVER,
+            parentRootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _generateProof("parent-tee", AggregateVerifier.ProofType.TEE)
+        );
+
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        Claim childRootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "child")));
+
+        vm.expectRevert(AggregateVerifier.InvalidParentGame.selector);
+        _createAggregateVerifierGame(
+            TEE_PROVER,
+            childRootClaim,
+            currentL2BlockNumber,
+            address(unregisteredParent),
+            _generateProof("child-tee", AggregateVerifier.ProofType.TEE)
+        );
+    }
+
     function testVerifyFailsWithL1OriginInFuture() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
         // Use a future block number

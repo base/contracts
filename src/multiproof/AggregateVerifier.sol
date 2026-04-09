@@ -352,7 +352,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             // For subsequent games, get the parent game's information.
             IDisputeGame parentGame = IDisputeGame(parentAddress());
 
-            // Parent game must be respected, not blacklisted, not retired, and not challenged.
+            // Parent game must be registered, respected, not blacklisted, not retired, and not challenged.
             if (!_isValidGame(parentGame)) revert InvalidParentGame();
 
             startingOutputRoot = Proposal({
@@ -948,11 +948,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         return GameStatus.DEFENDER_WINS;
     }
 
-    /// @notice Checks if the game is respected, not blacklisted, and not retired.
+    /// @notice Checks if the game is registered, respected, not blacklisted, not retired, and not challenged.
     /// @param game The game to check.
     function _isValidGame(IDisputeGame game) internal view returns (bool) {
-        return ANCHOR_STATE_REGISTRY.isGameRespected(game) && !ANCHOR_STATE_REGISTRY.isGameBlacklisted(game)
-            && !ANCHOR_STATE_REGISTRY.isGameRetired(game) && (game.status() != GameStatus.CHALLENGER_WINS);
+        return ANCHOR_STATE_REGISTRY.isGameRegistered(game) && ANCHOR_STATE_REGISTRY.isGameRespected(game)
+            && !ANCHOR_STATE_REGISTRY.isGameBlacklisted(game) && !ANCHOR_STATE_REGISTRY.isGameRetired(game)
+            && (game.status() != GameStatus.CHALLENGER_WINS);
     }
 
     /// @notice Verifies that the claimed L1 origin hash matches the actual blockhash.
