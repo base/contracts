@@ -352,7 +352,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             // For subsequent games, get the parent game's information.
             IDisputeGame parentGame = IDisputeGame(parentAddress());
 
-            // Parent game must be propoer, respected, not blacklisted, not retired, and not challenged.
+            // Parent game must be proper, respected, not blacklisted, not retired, and not challenged.
             if (!_isValidGame(parentGame)) revert InvalidParentGame();
 
             startingOutputRoot = Proposal({
