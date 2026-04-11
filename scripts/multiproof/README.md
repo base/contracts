@@ -121,3 +121,84 @@ The deployer address (`finalSystemOwner`) is the owner of `DevTEEProverRegistry`
 ## Path 2: WithNitro (Dev — Real Attestation)
 
 > **TODO:** Add deployment and registration guide for `DeployDevWithNitro.s.sol`.
+
+---
+
+## Pre-Seeding Games (Post-Deployment)
+
+After deploying via either path, you can pre-seed the `DisputeGameFactory` with a chain of `AggregateVerifier` games. This is useful for testing forward traversal at proposer restart — the proposer can walk the linked list of games to find where to resume.
+
+Games are created using `ProofType.ZK` with the `MockVerifier` (deployed by both WithNitro and NoNitro), which auto-accepts any proof. The output roots themselves are real values fetched from an L2 archive node.
+
+### Step 1: Set the anchor state
+
+Pick an anchor block far enough behind the L2 tip to cover all the games you want to create. Each game covers `BLOCK_INTERVAL` (600) L2 blocks, so for 500 games you need 300,000 blocks of headroom.
+
+```bash
+# Calculate an anchor block 300,000 blocks behind the L2 tip
+ANCHOR_BLOCK=$(( $(cast block-number --rpc-url $L2_RPC_URL) - 300000 ))
+
+# Get the real output root at that block
+OUTPUT_ROOT=$(cast rpc optimism_outputAtBlock $(printf "0x%x" $ANCHOR_BLOCK) \
+  --rpc-url $L2_RPC_URL | jq -r '.outputRoot')
+
+# Set it on the MockAnchorStateRegistry (no access control — any caller works)
+cast send $ANCHOR_STATE_REGISTRY_ADDRESS \
+  "setAnchorState(bytes32,uint256)" $OUTPUT_ROOT $ANCHOR_BLOCK \
+  --rpc-url $L1_RPC_URL --private-key $PRIVATE_KEY
+```
+
+### Step 2: Generate real output roots
+
+Fetch the real L2 output roots for every intermediate block across all games. This queries `optimism_outputAtBlock` on the L2 archive node (10,000 queries for 500 games, parallelized).
+
+```bash
+./scripts/multiproof/generate-roots.sh $ANCHOR_BLOCK $L2_RPC_URL 500
+```
+
+Arguments: `<anchor_block> <l2_rpc_url> [game_count] [parallelism] [output_file]`
+
+Defaults: `game_count=500`, `parallelism=20`, `output_file=roots.json`.
+
+### Step 3: Move roots file for Foundry access
+
+Foundry's filesystem sandbox only allows reads from paths listed in `foundry.toml` `fs_permissions`. The `deployments/` directory already has read-write access, so move the file there:
+
+```bash
+mv roots.json deployments/roots.json
+```
+
+### Step 4: Run the seeding script
+
+Create all games on-chain. Each game is chained to the previous one (game 0's parent is the `AnchorStateRegistry`, game N's parent is game N-1). The account running this needs enough ETH for bonds and gas (500 games at 0.00001 ETH bond = 0.005 ETH + gas).
+
+```bash
+ROOTS_FILE=./deployments/roots.json \
+FACTORY_ADDRESS=$FACTORY_ADDRESS \
+ANCHOR_STATE_REGISTRY_ADDRESS=$ANCHOR_STATE_REGISTRY_ADDRESS \
+forge script scripts/multiproof/SeedGames.s.sol \
+  --rpc-url $L1_RPC_URL --broadcast --private-key $PRIVATE_KEY
+```
+
+> **Note:** Use `--private-key` instead of `--ledger` to avoid manually confirming 500 transactions on a hardware wallet.
+
+Optional env vars:
+
+| Variable | Default | Description |
+|---|---|---|
+| `GAME_COUNT` | 500 | Number of games to create |
+| `ROOTS_FILE` | `roots.json` | Path to the output roots JSON |
+
+### Step 5: Verify on-chain
+
+```bash
+# Check total game count
+cast call $FACTORY_ADDRESS "gameCount()(uint256)" --rpc-url $L1_RPC_URL
+
+# Check first game's parent is the AnchorStateRegistry
+FIRST_GAME=$(cast call $FACTORY_ADDRESS \
+  "gameAtIndex(uint256)(uint32,uint64,address)" 0 --rpc-url $L1_RPC_URL | tail -1)
+cast call $FIRST_GAME "parentAddress()(address)" --rpc-url $L1_RPC_URL
+```
+
+Output metadata is saved to `deployments/<chainId>-seeded-games.json`.
