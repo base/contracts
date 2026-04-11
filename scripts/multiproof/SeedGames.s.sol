@@ -68,7 +68,8 @@ contract SeedGames is Script {
     bytes32[] internal allRoots;
 
     function run() external {
-        // ── Configuration ──────────────────────────────────────────────
+        // ── Configuration
+        // ──────────────────────────────────────────────
         address factoryAddr = vm.envAddress("FACTORY_ADDRESS");
         address asrAddr = vm.envAddress("ANCHOR_STATE_REGISTRY_ADDRESS");
         uint256 gameCount = vm.envOr("GAME_COUNT", uint256(500));
@@ -84,7 +85,8 @@ contract SeedGames is Script {
         l1OriginHash = blockhash(block.number - 1);
         l1OriginNumber = block.number - 1;
 
-        // ── Load real output roots ─────────────────────────────────────
+        // ── Load real output roots
+        // ─────────────────────────────────────
         string memory rootsJson = vm.readFile(rootsPath);
         allRoots = abi.decode(vm.parseJson(rootsJson, ".roots"), (bytes32[]));
 
@@ -100,7 +102,8 @@ contract SeedGames is Script {
             )
         );
 
-        // ── Summary ────────────────────────────────────────────────────
+        // ── Summary
+        // ────────────────────────────────────────────────────
         console.log("=== Seeding Multiproof Games ===");
         console.log("Factory:", factoryAddr);
         console.log("AnchorStateRegistry:", asrAddr);
@@ -111,14 +114,16 @@ contract SeedGames is Script {
         console.log("Anchor block:", anchorBlock);
         console.log("Total ETH required:", initBond * gameCount);
 
-        // ── Create chained games ───────────────────────────────────────
+        // ── Create chained games
+        // ───────────────────────────────────────
         vm.startBroadcast();
 
         (address firstGame, address lastGame) = _createGames(asrAddr, gameCount);
 
         vm.stopBroadcast();
 
-        // ── Output ─────────────────────────────────────────────────────
+        // ── Output
+        // ─────────────────────────────────────────────────────
         uint256 l2Start = anchorBlock + BLOCK_INTERVAL;
         uint256 l2End = anchorBlock + BLOCK_INTERVAL * gameCount;
 
