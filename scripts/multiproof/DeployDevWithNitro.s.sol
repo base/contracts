@@ -66,10 +66,10 @@ import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 /// @dev Uses real TEEProverRegistry which requires registerSigner() with valid attestation.
 ///      NitroEnclaveVerifier must be pre-deployed via DeployRiscZeroStack.s.sol.
 contract DeployDevWithNitro is Script {
-    uint256 public constant BLOCK_INTERVAL = 100;
-    uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 10;
+    uint256 public constant BLOCK_INTERVAL = 600;
+    uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
     uint256 public constant PROOF_THRESHOLD = 1;
-    uint256 public constant INIT_BOND = 0.001 ether;
+    uint256 public constant INIT_BOND = 0.00001 ether;
 
     DeployConfig public constant cfg =
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
