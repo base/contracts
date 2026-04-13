@@ -862,6 +862,38 @@ contract NitroEnclaveVerifierTest is Test {
         assertEq(uint8(result.result), uint8(VerificationResult.Success));
     }
 
+    // Untrusted chain certs (past trustedCertsPrefixLen): expired journal notAfter => InvalidTimestamp
+    function testVerifyJournalInvalidTimestampExpiredUntrustedCertInChain() public {
+        _setUpRiscZeroConfig();
+
+        bytes32 expiredLeaf = keccak256("expired-untrusted-leaf");
+
+        VerifierJournal memory journal = _createSuccessJournal();
+        bytes32[] memory certs = new bytes32[](3);
+        certs[0] = ROOT_CERT;
+        certs[1] = INTERMEDIATE_CERT_1;
+        certs[2] = expiredLeaf;
+        journal.certs = certs;
+
+        uint64[] memory expiries = new uint64[](3);
+        expiries[0] = INTERMEDIATE_CERT_1_EXPIRY + 100_000_000;
+        expiries[1] = INTERMEDIATE_CERT_1_EXPIRY;
+        expiries[2] = uint64(block.timestamp - 1);
+        journal.certExpiries = expiries;
+        journal.trustedCertsPrefixLen = 2;
+
+        bytes memory output = abi.encode(journal);
+        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+
+        vm.prank(submitter);
+        VerifierJournal memory result = verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+
+        assertEq(uint8(result.result), uint8(VerificationResult.InvalidTimestamp));
+        assertEq(verifier.trustedIntermediateCerts(expiredLeaf), 0);
+    }
+
     function testCheckTrustedIntermediateCertsStopsAtExpiredCert() public {
         // Warp past the intermediate cert's expiry
         vm.warp(INTERMEDIATE_CERT_1_EXPIRY + 1);
