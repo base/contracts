@@ -189,7 +189,7 @@
   },
   "src/dispute/DisputeGameFactory.sol:DisputeGameFactory": {
     "initCodeHash": "0x17bd83cfb6911f7f7f74880249e6bf4e2b2884aed611f6fec8b589d5083f22d1",
-    "sourceCodeHash": "0xe69202a3d153c38bdd9bc2bb9c4802c4ac65c29d5c35f3b874082e64459564ee"
+    "sourceCodeHash": "0xdfe41bd45662e5febde7ae15e87fad232064e22249d083a7dbfd60bee0868394"
   },
   "src/dispute/FaultDisputeGame.sol:FaultDisputeGame": {
     "initCodeHash": "0xe7d3c982532946d196d7efadb9e2576c76b8f9e0d1f885ac36977d6f3fb72a65",
