@@ -319,9 +319,6 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      * - verifierId: Program ID for single attestation verification
      * - aggregatorId: Program ID for batch/aggregated verification
      * - zkVerifier: Address of the deployed ZK verifier contract
-     *
-     * Note: Program IDs are automatically added to the supported version sets
-     * The verifierProofId is stored in a separate mapping (verifierId => verifierProofId)
      */
     function setZkConfiguration(
         ZkCoProcessorType zkCoProcessor,
