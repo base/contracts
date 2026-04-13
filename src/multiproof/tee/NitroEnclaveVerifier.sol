@@ -619,6 +619,14 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
                 return journal;
             }
         }
+        // Check any remaining certificates in the chain that are not yet trusted
+        for (uint256 i = journal.trustedCertsPrefixLen; i < journal.certs.length; i++) {
+            uint64 expiry = journal.certExpiries[i];
+            if (block.timestamp > expiry) {
+                journal.result = VerificationResult.InvalidTimestamp;
+                return journal;
+            }
+        }
         uint64 timestamp = journal.timestamp / 1000;
         if (timestamp + maxTimeDiff <= block.timestamp || timestamp >= block.timestamp) {
             journal.result = VerificationResult.InvalidTimestamp;
