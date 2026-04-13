@@ -341,6 +341,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      *
      * This function allows the owner or revoker to revoke compromised intermediate certificates
      * without affecting the root certificate or other trusted certificates.
+     *
+     * Note: A revoked cert can be trusted again by reproving it.
      */
     function revokeCert(bytes32 certHash) external onlyOwnerOrRevoker {
         if (trustedIntermediateCerts[certHash] == 0) {
