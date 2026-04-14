@@ -324,7 +324,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // - 0x20 l1 head (CWIA data offset: 0x34)
         // - 0x20 extraData (l2BlockNumber) (CWIA data offset: 0x54)
         // - 0x14 extraData (parent game address) (CWIA data offset: 0x74)
-        // - 0x20 x (BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL) extraData (intermediate roots) (CWIA data offset: 0x88)
+        // - 0x20 x (BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL) extraData (intermediate roots) (CWIA data offset:
+        //   0x88)
         // - 0x02 CWIA bytes
 
         // - 0x20 proof length location
