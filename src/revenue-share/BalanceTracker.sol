@@ -95,7 +95,7 @@ contract BalanceTracker is ReentrancyGuardUpgradeable {
         uint256[] memory targetBalances_
     )
         external
-        reinitializer(2)
+        reinitializer(3)
     {
         uint256 systemAddressesLength = systemAddresses_.length;
         require(systemAddressesLength > 0, "BalanceTracker: systemAddresses cannot have a length of zero");
