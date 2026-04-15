@@ -24,9 +24,6 @@ enum ZkCoProcessorType {
 /**
  * @dev Configuration parameters for a specific zero-knowledge coprocessor
  * Contains all necessary identifiers and addresses for ZK proof verification
- *
- * Note: This struct stores the "latest" (active) program identifiers.
- * Multiple versions can be supported simultaneously via the version management functions.
  */
 struct ZkCoProcessorConfig {
     // Latest program ID for single attestation verification
@@ -138,7 +135,6 @@ enum VerificationResult {
  * Key features:
  * - Single and batch attestation verification
  * - Support for multiple ZK proving systems
- * - Multi-version program support for seamless upgrades
  * - Route-based verifier configuration
  * - Certificate chain management and revocation
  * - Timestamp validation with configurable tolerance

@@ -319,12 +319,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         //
         // Expected length: 0x8E + 0x20 * intermediateOutputRootsCount()
         // - 0x04 selector
-        // - 0x14 creator address
-        // - 0x20 root claim
-        // - 0x20 l1 head
-        // - 0x20 extraData (l2BlockNumber)
-        // - 0x14 extraData (parent game address)
-        // - 0x20 x (BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL) extraData (intermediate roots)
+        // - 0x14 creator address (CWIA data offset: 0x00)
+        // - 0x20 root claim (CWIA data offset: 0x14)
+        // - 0x20 l1 head (CWIA data offset: 0x34)
+        // - 0x20 extraData (l2BlockNumber) (CWIA data offset: 0x54)
+        // - 0x14 extraData (parent game address) (CWIA data offset: 0x74)
+        // - 0x20 x (BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL) extraData (intermediate roots) (CWIA data offset:
+        //   0x88)
         // - 0x02 CWIA bytes
 
         // - 0x20 proof length location

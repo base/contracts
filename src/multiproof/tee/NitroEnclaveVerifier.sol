@@ -319,9 +319,6 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      * - verifierId: Program ID for single attestation verification
      * - aggregatorId: Program ID for batch/aggregated verification
      * - zkVerifier: Address of the deployed ZK verifier contract
-     *
-     * Note: Program IDs are automatically added to the supported version sets
-     * The verifierProofId is stored in a separate mapping (verifierId => verifierProofId)
      */
     function setZkConfiguration(
         ZkCoProcessorType zkCoProcessor,
@@ -344,6 +341,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      *
      * This function allows the owner or revoker to revoke compromised intermediate certificates
      * without affecting the root certificate or other trusted certificates.
+     *
+     * Note: A revoked cert can be trusted again by reproving it.
      */
     function revokeCert(bytes32 certHash) external onlyOwnerOrRevoker {
         if (trustedIntermediateCerts[certHash] == 0) {
@@ -616,6 +615,14 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
             uint64 expiry = trustedIntermediateCerts[certHash];
             if (block.timestamp > expiry) {
                 journal.result = VerificationResult.IntermediateCertsNotTrusted;
+                return journal;
+            }
+        }
+        // Check any remaining certificates in the chain that are not yet trusted
+        for (uint256 i = journal.trustedCertsPrefixLen; i < journal.certs.length; i++) {
+            uint64 expiry = journal.certExpiries[i];
+            if (block.timestamp > expiry) {
+                journal.result = VerificationResult.InvalidTimestamp;
                 return journal;
             }
         }
