@@ -184,9 +184,6 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
         // Compute the unique identifier for the dispute game.
         Hash uuid = getGameUUID(_gameType, _rootClaim, _extraData);
 
-        // If a dispute game with the same UUID already exists, revert.
-        if (GameId.unwrap(_disputeGames[uuid]) != bytes32(0)) revert GameAlreadyExists(uuid);
-
         // Pack the game ID.
         GameId id = LibGameId.pack(_gameType, Timestamp.wrap(uint64(block.timestamp)), address(proxy_));
 
@@ -213,6 +210,13 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
         // If the required initialization bond is not met, revert.
         if (msg.value != initBonds[_gameType]) revert IncorrectBondAmount();
 
+        // Compute the unique identifier for the dispute game. This serves as
+        // the CREATE2 salt for deterministic proxy deployment.
+        Hash uuid = getGameUUID(_gameType, _rootClaim, _extraData);
+
+        // If a dispute game with the same UUID already exists, revert.
+        if (GameId.unwrap(_disputeGames[uuid]) != bytes32(0)) revert GameAlreadyExists(uuid);
+
         // Get the hash of the parent block.
         bytes32 parentHash = blockhash(block.number - 1);
 
@@ -230,7 +234,12 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
             // │ [52, 84)             │ Parent block hash at creation time  │
             // │ [84, 84 + n)         │ Extra data (opaque)                 │
             // └──────────────────────┴─────────────────────────────────────┘
-            proxy_ = IDisputeGame(address(impl).clone(abi.encodePacked(msg.sender, _rootClaim, parentHash, _extraData)));
+            proxy_ = IDisputeGame(
+                address(impl)
+                    .cloneDeterministic(
+                        abi.encodePacked(msg.sender, _rootClaim, parentHash, _extraData), Hash.unwrap(uuid)
+                    )
+            );
         } else {
             // Clone the implementation contract and initialize it with the given parameters.
             //
@@ -247,7 +256,10 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
             // └──────────────────────┴─────────────────────────────────────┘
             proxy_ = IDisputeGame(
                 address(impl)
-                    .clone(abi.encodePacked(msg.sender, _rootClaim, parentHash, _gameType, _extraData, implArgs))
+                    .cloneDeterministic(
+                        abi.encodePacked(msg.sender, _rootClaim, parentHash, _gameType, _extraData, implArgs),
+                        Hash.unwrap(uuid)
+                    )
             );
         }
     }
