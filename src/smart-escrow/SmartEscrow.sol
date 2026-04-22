@@ -319,8 +319,12 @@ contract SmartEscrow is AccessControlDefaultAdminRules {
     function _vestingSchedule(uint256 timestamp) internal view returns (uint256) {
         if (timestamp < cliffStart) {
             return 0;
-        } else if (timestamp > end) {
-            return OP_TOKEN.balanceOf({ account: address(this) }) + released;
+        } else if (timestamp >= end) {
+            // Return the total number of tokens that were ever vested, computed from
+            // the schedule parameters, so the value is stable regardless of how many
+            // tokens have already been released and transferred out of this contract.
+            uint256 totalVestingEvents = (end - start) / vestingPeriod;
+            return initialTokens + totalVestingEvents * vestingEventTokens;
         } else {
             return initialTokens + ((timestamp - start) / vestingPeriod) * vestingEventTokens;
         }

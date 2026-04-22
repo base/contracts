@@ -43,7 +43,7 @@ contract Recovery is UUPSUpgradeable {
     function withdrawETH(address[] calldata targets, uint256[] calldata amounts) public onlyOwner {
         for (uint256 i = 0; i < targets.length; i++) {
             (bool success,) = targets[i].call{ value: amounts[i] }("");
-            if (!success) continue;
+            require(success, "Recovery: ETH transfer failed");
         }
     }
 }
