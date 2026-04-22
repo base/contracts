@@ -39,7 +39,13 @@ If CI still rejects it (Foundry version mismatch), update your local Foundry fir
 foundryup
 just semver-lock
 ```
+## Contract Addresses
 
+| Contract | Network | Address |
+|----------|---------|---------|
+| BaseFeeVault | Base Mainnet | `0x4200000000000000000000000000000000000019` |
+| L1FeeVault | Base Mainnet | `0x420000000000000000000000000000000000001a` |
+| SequencerFeeVault | Base Mainnet | `0x4200000000000000000000000000000000000011` |
 ### setup and testing
 
 - If you don't have foundry installed, run `make install-foundry`.
