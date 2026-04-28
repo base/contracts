@@ -4,29 +4,19 @@
 
 In line with our strategy of being the safest way for users to access crypto:
 
-+ Coinbase is extending our [best-in-industry][1] million-dollar [HackerOne bug bounty program][2]
-to cover the Base network, the Base bridge contracts, and Base infrastructure.
++ Coinbase extended our [best-in-industry](https://www.coinbase.com/blog/celebrating-10-years-of-our-bug-bounty-program) million-dollar [HackerOne bug bounty program](https://hackerone.com/coinbase?type=team) to cover the Base network and Base infrastructure.
 
-+ Coinbase's bug bounty program runs alongside Optimism's existing [Immunefi Bedrock bounty program][4]
-to support the open source [Bedrock][5] OP Stack framework.
++ Coinbase has launched a 5 million-dollar [Cantina bug bounty program](https://cantina.xyz/code/55316f42-3c5e-4746-9bd0-0f18dcbc344b) to cover all deployed smart contracts for Base, and those used as part of Coinbase products and services.
 
 ## Reporting vulnerabilities
 
-All potential vulnerability reports can be submitted via the [HackerOne][6]
-platform.
+All potential vulnerability reports can be submitted via the following platforms:
 
-The HackerOne platform allows us to have a centralized and single reporting
-source for us to deliver optimized SLA's and results. All reports submitted to
-the platform are triaged around the clock by our team of Coinbase engineers
-with domain knowledge, assuring the best quality of review.
+1. [**HackerOne**](https://hackerone.com/coinbase): For offchain components and services.
+   For more information on reporting vulnerabilities and our HackerOne bug bounty program, view our [security program policies](https://hackerone.com/coinbase?view_policy=true).
 
-For more information on reporting vulnerabilities and our HackerOne bug bounty
-program, view our [security program policies][7].
+2. [**Cantina**](https://cantina.xyz/bounties/55316f42-3c5e-4746-9bd0-0f18dcbc344b): For deployed smart contracts.
+   For more information on what smart contracts are considered within the scope of the Cantina bug bounty program, view our [Tier 0](https://cantina.xyz/code/55316f42-3c5e-4746-9bd0-0f18dcbc344b/overview?overviewTab=1&assetGroup=0) and [Tier 1](https://cantina.xyz/code/55316f42-3c5e-4746-9bd0-0f18dcbc344b/overview?overviewTab=1&assetGroup=1) scope guides.
 
-[1]: https://www.coinbase.com/blog/celebrating-10-years-of-our-bug-bounty-program
-[2]: https://hackerone.com/coinbase?type=team 
-[3]: https://stack.optimism.io/
-[4]: https://immunefi.com/bounty/optimism/
-[5]: https://stack.optimism.io/docs/releases/bedrock/
-[6]: https://hackerone.com/coinbase
-[7]: https://hackerone.com/coinbase?view_policy=true
+
+For all other security related inquiries, please reach out to [security@coinbase.com](mailto:security@coinbase.com).
