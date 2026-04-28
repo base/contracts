@@ -290,7 +290,6 @@ contract Deploy is Deployer {
                 l2ChainID: cfg.l2ChainID(),
                 multiproofBlockInterval: cfg.multiproofBlockInterval(),
                 multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
-                multiproofProofThreshold: cfg.multiproofProofThreshold(),
                 protocolVersionsProxy: IProtocolVersions(artifacts.mustGetAddress("ProtocolVersionsProxy")),
                 superchainConfigProxy: superchainConfigProxy,
                 superchainProxyAdmin: superchainProxyAdmin,

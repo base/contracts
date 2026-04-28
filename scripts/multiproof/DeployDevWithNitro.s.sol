@@ -68,7 +68,6 @@ import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 contract DeployDevWithNitro is Script {
     uint256 public constant BLOCK_INTERVAL = 600;
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
-    uint256 public constant PROOF_THRESHOLD = 1;
     uint256 public constant INIT_BOND = 0.00001 ether;
 
     DeployConfig public constant cfg =
@@ -178,8 +177,7 @@ contract DeployDevWithNitro is Script {
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainID(),
                 BLOCK_INTERVAL,
-                INTERMEDIATE_BLOCK_INTERVAL,
-                PROOF_THRESHOLD
+                INTERMEDIATE_BLOCK_INTERVAL
             )
         );
 
