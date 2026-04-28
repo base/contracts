@@ -448,6 +448,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             status = GameStatus.CHALLENGER_WINS;
         } else {
             // Game must be completed with a valid proof and enough proofs.
+            if (_updateProofCount()) {
+                return status;
+            }
             if (!gameOver()) revert GameNotOver();
             if (proofCount < PROOF_THRESHOLD) revert NotEnoughProofs();
 
@@ -586,9 +589,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         // Nullify the verifier to prevent further proof verification.
         if (proofType == ProofType.ZK) {
-            // Delete the challenged intermediate root if one existed.
-            delete counteredByIntermediateRootIndexPlusOne;
-
             IVerifier(ZK_VERIFIER).nullify();
         } else if (proofType == ProofType.TEE) {
             IVerifier(TEE_VERIFIER).nullify();
@@ -781,6 +781,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @dev Should only occur if challenged or nullified.
     function _proofRefutedUpdate(ProofType proofType) internal {
         delete proofTypeToProver[proofType];
+        // A ZK challenge is recorded in `counteredByIntermediateRootIndexPlusOne`; dropping the ZK proof clears it.
+        if (proofType == ProofType.ZK) {
+            delete counteredByIntermediateRootIndexPlusOne;
+        }
 
         // Should not be possible, but just in case.
         if (proofCount == 0) revert NotEnoughProofs();
@@ -804,6 +808,19 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // as this can only occur if there is an issue with the proof system so
         // we give enough time to resolve the issue and possibly blacklist this game.
         expectedResolution = Timestamp.wrap(uint64(block.timestamp) + delay);
+    }
+
+    /// @notice Updates the proof count and returns true if a proof was nullified.
+    function _updateProofCount() internal returns (bool) {
+        if (proofTypeToProver[ProofType.TEE] != address(0) && TEE_VERIFIER.nullified()) {
+            _proofRefutedUpdate(ProofType.TEE);
+            return true;
+        }
+        if (proofTypeToProver[ProofType.ZK] != address(0) && ZK_VERIFIER.nullified()) {
+            _proofRefutedUpdate(ProofType.ZK);
+            return true;
+        }
+        return false;
     }
 
     function _getDelay() internal view returns (uint64) {
