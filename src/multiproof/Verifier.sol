@@ -35,11 +35,13 @@ abstract contract Verifier is IVerifier {
 
     /// @notice Nullifies the verifier to prevent further proof verification.
     /// @dev Should only occur if a soundness issue is found.
-    /// @dev Should only be callable by a proper dispute game.
+    /// @dev Should only be callable by a registered, respected, not blacklisted, not retired dispute game.
     function nullify() external override {
         if (
-            !ANCHOR_STATE_REGISTRY.isGameProper(IDisputeGame(msg.sender))
+            !ANCHOR_STATE_REGISTRY.isGameRegistered(IDisputeGame(msg.sender))
                 || !ANCHOR_STATE_REGISTRY.isGameRespected(IDisputeGame(msg.sender))
+                || ANCHOR_STATE_REGISTRY.isGameBlacklisted(IDisputeGame(msg.sender))
+                || ANCHOR_STATE_REGISTRY.isGameRetired(IDisputeGame(msg.sender))
         ) revert NotProperGame();
         nullified = true;
 
