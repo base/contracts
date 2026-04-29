@@ -40,13 +40,13 @@ Ensure `finalSystemOwner` is set to the address you will deploy from (i.e. the a
 
 Other relevant fields:
 
-| Field | Description |
-|---|---|
-| `teeProposer` | Address to be registered as the TEE proposer |
-| `teeImageHash` | PCR0 hash used when registering the dev signer (use `bytes32(0x01...01)` for dev) |
-| `multiproofGameType` | Game type ID for the dispute game |
-| `multiproofGenesisOutputRoot` | Initial anchor output root |
-| `multiproofGenesisBlockNumber` | Initial anchor L2 block number |
+| Field                          | Description                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------- |
+| `teeProposer`                  | Address to be registered as the TEE proposer                                      |
+| `teeImageHash`                 | PCR0 hash used when registering the dev signer (use `bytes32(0x01...01)` for dev) |
+| `multiproofGameType`           | Game type ID for the dispute game                                                 |
+| `multiproofGenesisOutputRoot`  | Initial anchor output root                                                        |
+| `multiproofGenesisBlockNumber` | Initial anchor L2 block number                                                    |
 
 ### Step 2: Deploy contracts
 
@@ -124,6 +124,47 @@ The deployer address (`finalSystemOwner`) is the owner of `DevTEEProverRegistry`
 
 ---
 
+## Path 3: TDX (Production-Path PoC)
+
+The TDX path follows the same split as Nitro: expensive attestation verification happens off-chain in a ZK guest,
+and Solidity verifies the proof plus the on-chain acceptance policy before registering the signer.
+
+| Contract               | Purpose                                                                                                                                                                                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TDXVerifier`          | Verifies a RISC Zero or SP1 proof whose public values are an ABI-encoded `TDXVerifierJournal`, then checks trusted Intel root, TCB status policy, collateral expiry, quote freshness, signer derivation, and `REPORTDATA` public-key binding. |
+| `TDXTEEProverRegistry` | Extends `TEEProverRegistry` with `registerTDXSigner(bytes output, ZkCoProcessorType zkCoprocessor, bytes proofBytes)`, storing the signer address and TDX image hash in the same registry fields used by `TEEVerifier`.                       |
+
+The ZK verifier guest is expected to perform the full Intel DCAP verification path:
+
+```text
+TD Quote signature
+PCK certificate chain
+TCB info signing chain and TCB status
+QE identity signing chain
+CRLs/revocation state
+TDREPORT field extraction
+```
+
+The Solidity verifier then enforces local policy over the proven journal. The PoC maps TDX measurements into the existing multiproof `TEE_IMAGE_HASH` field as:
+
+```text
+keccak256(MRTD || RTMR0 || RTMR1 || RTMR2 || RTMR3)
+```
+
+The attested public key must be supplied as an uncompressed 65-byte secp256k1 public key:
+
+```text
+0x04 || x || y
+```
+
+The quote's TDREPORT `REPORTDATA` must put `keccak256(x || y)` in the first 32 bytes. The last 32 bytes are returned by the verifier as app-specific binding data and emitted by the registry.
+
+`TEEVerifier` is still the proposal-proof verifier. TDX only changes signer registration: once a TDX signer is registered, proposal proofs use the existing `proposer + signature` proof bytes and the same `signerImageHash` check as Nitro.
+
+> **PoC boundary:** this repo now contains the production-shaped Solidity path and policy checks. The remaining off-chain piece is the actual RISC Zero/SP1 TDX DCAP guest that emits `TDXVerifierJournal` after verifying Intel collateral.
+
+---
+
 ## Pre-Seeding Games (Post-Deployment)
 
 After deploying via either path, you can pre-seed the `DisputeGameFactory` with a chain of `AggregateVerifier` games. This is useful for testing forward traversal at proposer restart — the proposer can walk the linked list of games to find where to resume.
@@ -184,9 +225,9 @@ forge script scripts/multiproof/SeedGames.s.sol \
 
 Optional env vars:
 
-| Variable | Default | Description |
-|---|---|---|
-| `GAME_COUNT` | 500 | Number of games to create |
+| Variable     | Default      | Description                   |
+| ------------ | ------------ | ----------------------------- |
+| `GAME_COUNT` | 500          | Number of games to create     |
 | `ROOTS_FILE` | `roots.json` | Path to the output roots JSON |
 
 ### Step 5: Verify on-chain

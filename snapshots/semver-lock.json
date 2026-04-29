@@ -239,6 +239,14 @@
     "initCodeHash": "0x100364f9b0c63a61538386ba91e73dcffba22d3f6dfe8efdbbf5ff347b6fce47",
     "sourceCodeHash": "0xed5d92ee1f32f2fde5e89ba278f3142c8113c774f6ce7bd831781a8abe7bddf3"
   },
+  "src/multiproof/tee/TDXTEEProverRegistry.sol:TDXTEEProverRegistry": {
+    "initCodeHash": "0x266f220204f2c62f341b700bdb1e9bbda8c6489ced1e14d17b4ffe7dd33b1d8b",
+    "sourceCodeHash": "0x90bf694159e3f47e8f42aeaaa856947bb493acd5f64bf14fe277718dc62b4463"
+  },
+  "src/multiproof/tee/TDXVerifier.sol:TDXVerifier": {
+    "initCodeHash": "0x0f511b2f67bd82ff976935ca0a178c3fa9d9cf9b89c6e67b3fd7f1006f5e5147",
+    "sourceCodeHash": "0x7cdf2abefaefa3126960103aa810699973c1c47147114f8a92e63c427b9b1656"
+  },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
     "initCodeHash": "0xfd1942e1c2f59b0aa72b33d698a948a53b6e4cf1040106f173fb5d89f63f57b0",
     "sourceCodeHash": "0xf1ec1f02f540da659a204b26acf986fdce7d7d63bba67a87923f52453fb92ccb"

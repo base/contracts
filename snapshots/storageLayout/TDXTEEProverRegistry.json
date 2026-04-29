@@ -1,0 +1,79 @@
+[
+  {
+    "bytes": "1",
+    "label": "_initialized",
+    "offset": 0,
+    "slot": "0",
+    "type": "uint8"
+  },
+  {
+    "bytes": "1",
+    "label": "_initializing",
+    "offset": 1,
+    "slot": "0",
+    "type": "bool"
+  },
+  {
+    "bytes": "1600",
+    "label": "__gap",
+    "offset": 0,
+    "slot": "1",
+    "type": "uint256[50]"
+  },
+  {
+    "bytes": "20",
+    "label": "_owner",
+    "offset": 0,
+    "slot": "51",
+    "type": "address"
+  },
+  {
+    "bytes": "20",
+    "label": "_manager",
+    "offset": 0,
+    "slot": "52",
+    "type": "address"
+  },
+  {
+    "bytes": "1536",
+    "label": "__gap",
+    "offset": 0,
+    "slot": "53",
+    "type": "uint256[48]"
+  },
+  {
+    "bytes": "4",
+    "label": "gameType",
+    "offset": 0,
+    "slot": "101",
+    "type": "GameType"
+  },
+  {
+    "bytes": "32",
+    "label": "isRegisteredSigner",
+    "offset": 0,
+    "slot": "102",
+    "type": "mapping(address => bool)"
+  },
+  {
+    "bytes": "32",
+    "label": "signerImageHash",
+    "offset": 0,
+    "slot": "103",
+    "type": "mapping(address => bytes32)"
+  },
+  {
+    "bytes": "32",
+    "label": "isValidProposer",
+    "offset": 0,
+    "slot": "104",
+    "type": "mapping(address => bool)"
+  },
+  {
+    "bytes": "32",
+    "label": "_registeredSigners",
+    "offset": 0,
+    "slot": "105",
+    "type": "struct EnumerableSetLib.AddressSet"
+  }
+]
