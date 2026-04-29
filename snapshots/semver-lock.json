@@ -232,24 +232,24 @@
     "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0x54168f8e087c104e6bcc532d2d323327205a14b4ad3597d14d6cadcc1924543b",
-    "sourceCodeHash": "0x36342bdca5dd7c41f408216377b4b0e1a6d076df6396c77a6350d5d67e499ebe"
+    "initCodeHash": "0x10bb6a60f21de103d1da9ff310a38f571c53a8113d04a029087648debf3f0341",
+    "sourceCodeHash": "0xcd4c508223b9b461ec230bde03c1630fe68cd00b82ee84c39b93d9f3c0d71d37"
   },
   "src/multiproof/tee/NitroEnclaveVerifier.sol:NitroEnclaveVerifier": {
     "initCodeHash": "0x100364f9b0c63a61538386ba91e73dcffba22d3f6dfe8efdbbf5ff347b6fce47",
-    "sourceCodeHash": "0xed5d92ee1f32f2fde5e89ba278f3142c8113c774f6ce7bd831781a8abe7bddf3"
+    "sourceCodeHash": "0xbedb66738a0ab18600b2ed21de51d552a210c4cc71b2c971440e325791dc3ce7"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0xfd1942e1c2f59b0aa72b33d698a948a53b6e4cf1040106f173fb5d89f63f57b0",
+    "initCodeHash": "0x3f6f21ba92d6ec5c0c2763e0ab88a460514d4701f06c4dfa2dcc9f8c0de8dd45",
     "sourceCodeHash": "0xf1ec1f02f540da659a204b26acf986fdce7d7d63bba67a87923f52453fb92ccb"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
-    "initCodeHash": "0x9f65f2d6e2c43512594f7a08fc0ea475d06f48d230690c3c85cc85dee3a9679a",
+    "initCodeHash": "0x655576cc21cc5c603d55fb4dd2a2f0ef57b11deeaabd3e539b0a70a5f7e2c9af",
     "sourceCodeHash": "0xd5e01b4f4e69313e56e51f2f46b7bbe699ef8dc24b8a6385b8ebac4162e05353"
   },
   "src/multiproof/zk/ZKVerifier.sol:ZkVerifier": {
-    "initCodeHash": "0xb50364a38af3ef7dbfab9a84210d08c5f61105638326e6a442828dfa5afc924d",
-    "sourceCodeHash": "0x0ffc935dbd768b4aad6c35e2d6826c556191cc5e8f20737045d1bc196b13e19f"
+    "initCodeHash": "0xcdc5bd5fa8ffad76358b8f34a53b8c0cb36540176c31f82d52546373d0bd5245",
+    "sourceCodeHash": "0xdb3774707dc5fa59c32636ab896eba284bb6466568bd04583d9767112857d405"
   },
   "src/revenue-share/FeeDisburser.sol:FeeDisburser": {
     "initCodeHash": "0x1278027e3756e2989e80c0a7b513e221a5fe0d3dbd9ded108375a29b2c1f3d57",
