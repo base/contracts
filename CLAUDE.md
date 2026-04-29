@@ -11,6 +11,7 @@ Base contracts repository — an Optimism Bedrock-based L2 blockchain. Contains 
 All commands use `just` (justfile) unless noted. The Makefile handles initial setup only.
 
 ### Setup
+
 ```bash
 make install-foundry    # Install Foundry toolchain
 make deps               # Install all Solidity dependencies (forge install + manual clones)
@@ -18,6 +19,7 @@ just build-go-ffi       # Build the Go FFI tool (required before running tests)
 ```
 
 ### Building
+
 ```bash
 just build              # Production build (runs lint-fix first, optimizer_runs=999999)
 just build-dev          # Fast dev build (FOUNDRY_PROFILE=lite, no optimization)
@@ -25,6 +27,7 @@ just build-source       # Build src/ only (skip tests and scripts)
 ```
 
 ### Testing
+
 ```bash
 just test               # Run all tests (builds go-ffi first)
 just test-dev           # Fast dev tests (lite profile, 8 fuzz runs)
@@ -37,14 +40,17 @@ just coverage           # Coverage report
 ```
 
 ### Linting & Formatting
+
 ```bash
 just lint               # Format + check (forge fmt)
 just lint-check         # Check only (no auto-fix)
 forge fmt               # Direct format command
 ```
+
 Line length: 120 chars. Multiline function headers: all params on separate lines.
 
 ### Pre-PR Workflow
+
 ```bash
 just pre-pr             # Full workflow: build-dev, lint, build-source, all checks
 just pre-pr --clean     # Same but cleans build artifacts first
@@ -52,6 +58,7 @@ just check              # Run all validation checks without building
 ```
 
 ### Snapshots & Semver
+
 ```bash
 just snapshots          # Regenerate ABI/storage snapshots and semver-lock
 just snapshots-check    # Verify snapshots are up to date
@@ -60,6 +67,7 @@ just snapshots-check    # Verify snapshots are up to date
 ## Architecture
 
 ### Contract Structure (src/)
+
 - **L1/**: Ethereum mainnet contracts — `OPContractsManager.sol` (central upgrade manager), `OptimismPortal2.sol` (proof finalization), `SystemConfig.sol`, `SuperchainConfig.sol`
 - **L2/**: L2 contracts — `L1Block.sol`, `L2StandardBridge.sol`, `CrossL2Inbox.sol`, `SuperchainERC20.sol`
 - **dispute/**: Fault proof game contracts with v1, v2, and zk variants
@@ -71,9 +79,11 @@ just snapshots-check    # Verify snapshots are up to date
 - **governance/**, **recovery/**, **revenue-share/**, **smart-escrow/**: Domain-specific contracts
 
 ### Interfaces (interfaces/)
+
 Separate directory for contract interfaces, mirroring the src/ structure. Go checks (`scripts/checks/interfaces`) validate that interfaces match their implementations.
 
 ### Test Structure (test/)
+
 - Mirrors `src/` directory layout
 - `CommonTest.t.sol`: Base test class with standard accounts (alice, bob, admin, deployer)
 - `test/setup/Setup.sol`: Full system deployment setup using `Deploy.s.sol`
@@ -84,6 +94,7 @@ Separate directory for contract interfaces, mirroring the src/ structure. Go che
 - FFI enabled: tests can call external programs via `scripts/go-ffi/`
 
 ### Deployment (scripts/)
+
 - `scripts/deploy/Deploy.s.sol`: Main deployment script
 - Input/Output pattern (`BaseDeployIO.sol`): Modular deployment composition
 - `deploy-config/`: JSON configs per network (mainnet.json, sepolia.json, hardhat.json)
