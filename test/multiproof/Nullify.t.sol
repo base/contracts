@@ -169,4 +169,125 @@ contract NullifyTest is BaseTest {
         assertEq(game1.gameCreator().balance, balanceBefore + INIT_BOND);
         assertEq(delayedWETH.balanceOf(address(game1)), 0);
     }
+
+    /// @notice `resolve` runs `_updateProofCount`; when the shared TEE verifier was nullified by another game,
+    ///         refutation persists and `resolve` returns early `IN_PROGRESS` (no `Resolved` event) instead of
+    /// reverting. @dev All clones share the same `MockVerifier` TEE instance; `Verifier.nullify` requires a proper
+    /// factory game.
+    function testResolveEarlyReturnWhenSharedTeeVerifierNullifiedByAnotherGame() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+
+        Claim rootClaimA = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "game-a")));
+        bytes memory teeProofA = _generateProof("tee-proof-a", AggregateVerifier.ProofType.TEE);
+        AggregateVerifier gameA = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaimA, currentL2BlockNumber, address(anchorStateRegistry), teeProofA
+        );
+
+        currentL2BlockNumber += BLOCK_INTERVAL;
+
+        Claim rootClaimB = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "game-b")));
+        bytes memory teeProofB = _generateProof("tee-proof-b", AggregateVerifier.ProofType.TEE);
+        AggregateVerifier gameB =
+            _createAggregateVerifierGame(TEE_PROVER, rootClaimB, currentL2BlockNumber, address(gameA), teeProofB);
+
+        vm.warp(block.timestamp + 7 days);
+        assertTrue(gameA.gameOver());
+        assertEq(gameA.proofCount(), 1);
+
+        Claim rootClaimNullify = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "nullify-b")));
+        bytes memory teeProofNullify = _generateProof("tee-nullify-b", AggregateVerifier.ProofType.TEE);
+        uint256 lastIntermediateIdx = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1;
+        gameB.nullify(teeProofNullify, lastIntermediateIdx, rootClaimNullify.raw());
+
+        assertTrue(teeVerifier.nullified());
+        assertEq(gameA.proofCount(), 1);
+
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
+        assertEq(gameA.proofCount(), 0);
+        assertEq(gameA.expectedResolution().raw(), type(uint64).max);
+
+        vm.expectRevert(AggregateVerifier.GameNotOver.selector);
+        gameA.resolve();
+    }
+
+    /// @notice Same as `testResolveEarlyReturnWhenSharedTeeVerifierNullifiedByAnotherGame` but for the shared ZK
+    /// verifier.
+    function testResolveEarlyReturnWhenSharedZkVerifierNullifiedByAnotherGame() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+
+        Claim rootClaimA = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk-game-a")));
+        bytes memory zkProofA = _generateProof("zk-proof-a", AggregateVerifier.ProofType.ZK);
+        AggregateVerifier gameA = _createAggregateVerifierGame(
+            ZK_PROVER, rootClaimA, currentL2BlockNumber, address(anchorStateRegistry), zkProofA
+        );
+
+        currentL2BlockNumber += BLOCK_INTERVAL;
+
+        Claim rootClaimB = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk-game-b")));
+        bytes memory zkProofB = _generateProof("zk-proof-b", AggregateVerifier.ProofType.ZK);
+        AggregateVerifier gameB =
+            _createAggregateVerifierGame(ZK_PROVER, rootClaimB, currentL2BlockNumber, address(gameA), zkProofB);
+
+        vm.warp(block.timestamp + 7 days);
+        assertTrue(gameA.gameOver());
+        assertEq(gameA.proofCount(), 1);
+
+        Claim rootClaimNullify = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk-nullify-b")));
+        bytes memory zkProofNullify = _generateProof("zk-nullify-b", AggregateVerifier.ProofType.ZK);
+        uint256 lastIntermediateIdx = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1;
+        gameB.nullify(zkProofNullify, lastIntermediateIdx, rootClaimNullify.raw());
+
+        assertTrue(zkVerifier.nullified());
+        assertEq(gameA.proofCount(), 1);
+
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
+        assertEq(gameA.proofCount(), 0);
+        assertEq(gameA.expectedResolution().raw(), type(uint64).max);
+
+        vm.expectRevert(AggregateVerifier.GameNotOver.selector);
+        gameA.resolve();
+    }
+
+    /// @notice With TEE + ZK, the fast window is 1 day. Another game nullifies the shared ZK verifier; the first
+    ///         `resolve` persists the ZK refutation and returns `IN_PROGRESS`. After `SLOW_FINALIZATION_DELAY`
+    ///         (7 days) from that moment, a second `resolve` finalizes with only the TEE proof.
+    function testTwoProofsResolveDelayedAfterExternalVerifierNullify() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+
+        Claim rootClaimA = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "dual-a")));
+        bytes memory teeProofA = _generateProof("tee-dual-a", AggregateVerifier.ProofType.TEE);
+        AggregateVerifier gameA = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaimA, currentL2BlockNumber, address(anchorStateRegistry), teeProofA
+        );
+
+        bytes memory zkProofA = _generateProof("zk-dual-a", AggregateVerifier.ProofType.ZK);
+        vm.prank(ZK_PROVER);
+        gameA.verifyProposalProof(zkProofA);
+
+        assertEq(gameA.proofCount(), 2);
+        assertEq(gameA.expectedResolution().raw(), block.timestamp + 1 days);
+
+        vm.warp(block.timestamp + 1 days);
+        assertTrue(gameA.gameOver());
+
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        Claim rootClaimB = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "dual-b")));
+        bytes memory zkProofB = _generateProof("zk-dual-b", AggregateVerifier.ProofType.ZK);
+        AggregateVerifier gameB =
+            _createAggregateVerifierGame(ZK_PROVER, rootClaimB, currentL2BlockNumber, address(gameA), zkProofB);
+
+        Claim rootClaimNullify = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "dual-nullify-b")));
+        bytes memory zkProofNullify = _generateProof("zk-nullify-dual", AggregateVerifier.ProofType.ZK);
+        uint256 lastIntermediateIdx = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1;
+        gameB.nullify(zkProofNullify, lastIntermediateIdx, rootClaimNullify.raw());
+        assertTrue(zkVerifier.nullified());
+
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
+        assertEq(gameA.proofCount(), 1);
+        assertEq(gameA.expectedResolution().raw(), block.timestamp + 7 days);
+
+        vm.warp(block.timestamp + 7 days);
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.DEFENDER_WINS));
+        assertEq(uint8(gameA.status()), uint8(GameStatus.DEFENDER_WINS));
+    }
 }

@@ -375,8 +375,7 @@ contract AggregateVerifierTest is BaseTest {
             CONFIG_HASH,
             L2_CHAIN_ID,
             0,
-            INTERMEDIATE_BLOCK_INTERVAL,
-            PROOF_THRESHOLD
+            INTERMEDIATE_BLOCK_INTERVAL
         );
 
         // Case 2: INTERMEDIATE_BLOCK_INTERVAL is 0
@@ -392,8 +391,7 @@ contract AggregateVerifierTest is BaseTest {
             CONFIG_HASH,
             L2_CHAIN_ID,
             BLOCK_INTERVAL,
-            0,
-            PROOF_THRESHOLD
+            0
         );
 
         // Case 3: BLOCK_INTERVAL is not divisible by INTERMEDIATE_BLOCK_INTERVAL
@@ -409,44 +407,7 @@ contract AggregateVerifierTest is BaseTest {
             CONFIG_HASH,
             L2_CHAIN_ID,
             3,
-            2,
-            PROOF_THRESHOLD
-        );
-    }
-
-    function testDeployWithInvalidProofThreshold() public {
-        // Case 1: PROOF_THRESHOLD is 0
-        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidProofThreshold.selector));
-        new AggregateVerifier(
-            AGGREGATE_VERIFIER_GAME_TYPE,
-            IAnchorStateRegistry(address(anchorStateRegistry)),
-            IDelayedWETH(payable(address(delayedWETH))),
-            IVerifier(address(teeVerifier)),
-            IVerifier(address(zkVerifier)),
-            TEE_IMAGE_HASH,
-            AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
-            CONFIG_HASH,
-            L2_CHAIN_ID,
-            BLOCK_INTERVAL,
-            INTERMEDIATE_BLOCK_INTERVAL,
-            0
-        );
-
-        // Case 2: PROOF_THRESHOLD is > 2
-        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidProofThreshold.selector));
-        new AggregateVerifier(
-            AGGREGATE_VERIFIER_GAME_TYPE,
-            IAnchorStateRegistry(address(anchorStateRegistry)),
-            IDelayedWETH(payable(address(delayedWETH))),
-            IVerifier(address(teeVerifier)),
-            IVerifier(address(zkVerifier)),
-            TEE_IMAGE_HASH,
-            AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
-            CONFIG_HASH,
-            L2_CHAIN_ID,
-            BLOCK_INTERVAL,
-            INTERMEDIATE_BLOCK_INTERVAL,
-            3
+            2
         );
     }
 }
