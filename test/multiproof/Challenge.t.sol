@@ -256,4 +256,54 @@ contract ChallengeTest is BaseTest {
         assertEq(TEE_PROVER.balance, balanceBefore + INIT_BOND);
         assertEq(delayedWETH.balanceOf(address(gameA)), 0);
     }
+
+    /// @notice Game A is created with TEE and challenged with ZK. Another game nullifies the shared TEE verifier.
+    ///         The first `resolve` persists the TEE refutation; after `SLOW_FINALIZATION_DELAY`, A finalizes as
+    ///         challenger wins and the bond goes to the ZK challenger.
+    function testChallengeWinsWhenSharedTeeVerifierNullifiedByOtherGame() public {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+
+        Claim rootClaimA = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee-challenge-tee-null")));
+        bytes memory teeProofA = _generateProof("tee-proof-a", AggregateVerifier.ProofType.TEE);
+        AggregateVerifier gameA = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaimA, currentL2BlockNumber, address(anchorStateRegistry), teeProofA
+        );
+
+        Claim rootChallenge = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk-challenge")));
+        bytes memory zkChallenge = _generateProof("zk-challenge", AggregateVerifier.ProofType.ZK);
+        vm.prank(ZK_PROVER);
+        gameA.challenge(zkChallenge, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootChallenge.raw());
+
+        assertEq(gameA.proofCount(), 2);
+        assertGt(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
+
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        Claim rootClaimB = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee-only-b")));
+        bytes memory teeProofB = _generateProof("tee-init-b", AggregateVerifier.ProofType.TEE);
+        AggregateVerifier gameB =
+            _createAggregateVerifierGame(TEE_PROVER, rootClaimB, currentL2BlockNumber, address(gameA), teeProofB);
+
+        Claim rootNullifyB = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee-nullify-b")));
+        bytes memory teeNullifyB = _generateProof("tee-nullify-b", AggregateVerifier.ProofType.TEE);
+        uint256 lastIdx = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1;
+        gameB.nullify(teeNullifyB, lastIdx, rootNullifyB.raw());
+        assertTrue(teeVerifier.nullified());
+
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
+        assertEq(gameA.proofCount(), 1);
+        assertGt(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
+        assertEq(address(gameA.teeProver()), address(0));
+        assertEq(gameA.zkProver(), ZK_PROVER);
+
+        vm.warp(block.timestamp + 7 days);
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.CHALLENGER_WINS));
+        assertEq(gameA.bondRecipient(), ZK_PROVER);
+
+        uint256 balanceBefore = ZK_PROVER.balance;
+        gameA.claimCredit();
+        vm.warp(block.timestamp + DELAYED_WETH_DELAY);
+        gameA.claimCredit();
+        assertEq(ZK_PROVER.balance, balanceBefore + INIT_BOND);
+        assertEq(delayedWETH.balanceOf(address(gameA)), 0);
+    }
 }
