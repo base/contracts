@@ -184,7 +184,6 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             8453, // l2ChainID
             100, // multiproofBlockInterval
             10, // multiproofIntermediateBlockInterval
-            1, // multiproofProofThreshold
             superchainConfigProxy,
             protocolVersionsProxy,
             superchainProxyAdmin,
@@ -414,7 +413,6 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             8453, // l2ChainID
             100, // multiproofBlockInterval
             10, // multiproofIntermediateBlockInterval
-            1, // multiproofProofThreshold
             superchainConfigProxy,
             protocolVersionsProxy,
             superchainProxyAdmin,

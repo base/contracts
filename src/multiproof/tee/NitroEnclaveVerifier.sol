@@ -591,8 +591,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      * 5. Caches newly discovered certificates for future use
      *
      * The timestamp validation converts milliseconds to seconds and checks:
-     * - Attestation is not too old (timestamp + maxTimeDiff >= block.timestamp)
-     * - Attestation is not from the future (timestamp <= block.timestamp)
+     * - Attestation is not too old (timestamp + maxTimeDiff > block.timestamp)
+     * - Attestation is not from the future (timestamp < block.timestamp)
+     * Note that due to truncating timestamp from milliseconds, to seconds,
+     * some valid attestations may be rejected. However, this ensures all invalid
+     * timestamps are rejected.
      */
     function _verifyJournal(VerifierJournal memory journal) internal returns (VerifierJournal memory) {
         if (journal.result != VerificationResult.Success) {

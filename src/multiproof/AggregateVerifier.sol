@@ -62,6 +62,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The maximum number of blocks that EIP-2935 can look back (~8192).
     uint256 public constant EIP2935_WINDOW = 8191;
+
+    /// @notice The minimum number of proofs required to resolve the game.
+    uint256 public constant PROOF_THRESHOLD = 1;
     ////////////////////////////////////////////////////////////////
     //                         Immutables                         //
     ////////////////////////////////////////////////////////////////
@@ -108,9 +111,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The game type ID.
     GameType internal immutable GAME_TYPE;
-
-    /// @notice The minimum number of proofs required to resolve the game.
-    uint256 public immutable PROOF_THRESHOLD;
 
     ////////////////////////////////////////////////////////////////
     //                         State Vars                         //
@@ -261,7 +261,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param l2ChainId The chain ID of the L2 network.
     /// @param blockInterval The block interval.
     /// @param intermediateBlockInterval The intermediate block interval.
-    /// @param proofThreshold The minimum number of proofs required to resolve the game.
     constructor(
         GameType gameType_,
         IAnchorStateRegistry anchorStateRegistry_,
@@ -273,16 +272,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 configHash,
         uint256 l2ChainId,
         uint256 blockInterval,
-        uint256 intermediateBlockInterval,
-        uint256 proofThreshold
+        uint256 intermediateBlockInterval
     ) {
         // Block interval and intermediate block interval must be positive and divisible.
         if (blockInterval == 0 || intermediateBlockInterval == 0 || blockInterval % intermediateBlockInterval != 0) {
             revert InvalidBlockInterval(blockInterval, intermediateBlockInterval);
         }
-
-        // Proof threshold must be between 1 and 2.
-        if (proofThreshold != 1 && proofThreshold != 2) revert InvalidProofThreshold();
 
         // Set up initial game state.
         GAME_TYPE = gameType_;
@@ -298,7 +293,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         L2_CHAIN_ID = l2ChainId;
         BLOCK_INTERVAL = blockInterval;
         INTERMEDIATE_BLOCK_INTERVAL = intermediateBlockInterval;
-        PROOF_THRESHOLD = proofThreshold;
 
         INITIALIZE_CALLDATA_SIZE = 0x8E + 0x20 * intermediateOutputRootsCount();
     }
@@ -454,6 +448,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             status = GameStatus.CHALLENGER_WINS;
         } else {
             // Game must be completed with a valid proof and enough proofs.
+            if (_updateProofCount()) {
+                return status;
+            }
             if (!gameOver()) revert GameNotOver();
             if (proofCount < PROOF_THRESHOLD) revert NotEnoughProofs();
 
@@ -592,9 +589,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         // Nullify the verifier to prevent further proof verification.
         if (proofType == ProofType.ZK) {
-            // Delete the challenged intermediate root if one existed.
-            delete counteredByIntermediateRootIndexPlusOne;
-
             IVerifier(ZK_VERIFIER).nullify();
         } else if (proofType == ProofType.TEE) {
             IVerifier(TEE_VERIFIER).nullify();
@@ -787,6 +781,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @dev Should only occur if challenged or nullified.
     function _proofRefutedUpdate(ProofType proofType) internal {
         delete proofTypeToProver[proofType];
+        // A ZK challenge is recorded in `counteredByIntermediateRootIndexPlusOne`; dropping the ZK proof clears it.
+        if (proofType == ProofType.ZK) {
+            delete counteredByIntermediateRootIndexPlusOne;
+        }
 
         // Should not be possible, but just in case.
         if (proofCount == 0) revert NotEnoughProofs();
@@ -810,6 +808,19 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // as this can only occur if there is an issue with the proof system so
         // we give enough time to resolve the issue and possibly blacklist this game.
         expectedResolution = Timestamp.wrap(uint64(block.timestamp) + delay);
+    }
+
+    /// @notice Updates the proof count and returns true if a proof was nullified.
+    function _updateProofCount() internal returns (bool) {
+        if (proofTypeToProver[ProofType.TEE] != address(0) && TEE_VERIFIER.nullified()) {
+            _proofRefutedUpdate(ProofType.TEE);
+            return true;
+        }
+        if (proofTypeToProver[ProofType.ZK] != address(0) && ZK_VERIFIER.nullified()) {
+            _proofRefutedUpdate(ProofType.ZK);
+            return true;
+        }
+        return false;
     }
 
     function _getDelay() internal view returns (uint64) {

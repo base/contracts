@@ -71,7 +71,6 @@ contract DeployImplementations is Script {
         uint256 l2ChainID;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
-        uint256 multiproofProofThreshold;
         // Outputs from DeploySuperchain.s.sol.
         ISuperchainConfig superchainConfigProxy;
         IProtocolVersions protocolVersionsProxy;
@@ -691,8 +690,7 @@ contract DeployImplementations is Script {
                     _input.multiproofConfigHash,
                     _input.l2ChainID,
                     _input.multiproofBlockInterval,
-                    _input.multiproofIntermediateBlockInterval,
-                    _input.multiproofProofThreshold
+                    _input.multiproofIntermediateBlockInterval
                 )
             )
         );

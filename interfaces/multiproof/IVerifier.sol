@@ -13,4 +13,7 @@ interface IVerifier {
     /// @dev Should only occur if a soundness issue is found.
     /// @dev Should only be callable by a proper dispute game.
     function nullify() external;
+
+    /// @notice Whether this verifier has been nullified.
+    function nullified() external view returns (bool);
 }

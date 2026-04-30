@@ -77,7 +77,6 @@
   "multiproofGenesisBlockNumber": 37223829,
   "multiproofBlockInterval": 600,
   "multiproofIntermediateBlockInterval": 30,
-  "multiproofProofThreshold": 1,
   "risc0VerifierRouter": "0xb121b667dd2cf27f95f9f5107137696f56f188f6",
   "risc0SetBuilderImageId": "0x70909b25db0db00f1d4b4016aeb876f53568a3e5a8e6397cb562d79947a02cc9"
 }
