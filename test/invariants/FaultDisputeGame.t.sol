@@ -11,7 +11,7 @@ import "src/dispute/lib/Types.sol";
 import "src/dispute/lib/Errors.sol";
 
 // Interfaces
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 
 contract FaultDisputeGame_Solvency_Invariant is BaseFaultDisputeGame_TestInit {
     Claim internal constant ROOT_CLAIM = Claim.wrap(bytes32(uint256(10)));
@@ -96,12 +96,12 @@ contract FaultDisputeGame_Solvency_Invariant is BaseFaultDisputeGame_TestInit {
 }
 
 contract RandomClaimActor is StdUtils {
-    IFaultDisputeGame internal immutable GAME;
+    IFaultDisputeGameV2 internal immutable GAME;
     Vm internal immutable VM;
 
     uint256 public totalBonded;
 
-    constructor(IFaultDisputeGame _gameProxy, Vm _vm) {
+    constructor(IFaultDisputeGameV2 _gameProxy, Vm _vm) {
         GAME = _gameProxy;
         VM = _vm;
     }

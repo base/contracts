@@ -59,8 +59,8 @@ import { IWETH98 } from "interfaces/universal/IWETH98.sol";
 import { IGovernanceToken } from "interfaces/governance/IGovernanceToken.sol";
 import { ILegacyMessagePasser } from "interfaces/legacy/ILegacyMessagePasser.sol";
 import { ISuperchainTokenBridge } from "interfaces/L2/ISuperchainTokenBridge.sol";
-import { IPermissionedDisputeGame } from "interfaces/dispute/IPermissionedDisputeGame.sol";
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 import { ICrossL2Inbox } from "interfaces/L2/ICrossL2Inbox.sol";
 import { ILiquidityController } from "interfaces/L2/ILiquidityController.sol";
 import { INativeAssetLiquidity } from "interfaces/L2/INativeAssetLiquidity.sol";
@@ -104,9 +104,9 @@ abstract contract Setup is FeatureFlags {
     // L1 contracts - dispute
     IDisputeGameFactory disputeGameFactory;
     IAnchorStateRegistry anchorStateRegistry;
-    IFaultDisputeGame faultDisputeGame;
+    IFaultDisputeGameV2 faultDisputeGame;
     IDelayedWETH delayedWeth;
-    IPermissionedDisputeGame permissionedDisputeGame;
+    IPermissionedDisputeGameV2 permissionedDisputeGame;
     IDelayedWETH delayedWETHPermissionedGameProxy;
 
     // L1 contracts - core

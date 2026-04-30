@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import { Script } from "forge-std/Script.sol";
 
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { BaseDeployIO } from "scripts/deploy/BaseDeployIO.sol";
 import { GameType } from "src/dispute/lib/Types.sol";
@@ -12,7 +12,7 @@ import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.so
 contract SetDisputeGameImplInput is BaseDeployIO {
     IDisputeGameFactory internal _factory;
     IAnchorStateRegistry internal _anchorStateRegistry;
-    IFaultDisputeGame internal _impl;
+    IFaultDisputeGameV2 internal _impl;
     uint32 internal _gameType;
     bytes internal _gameArgs;
 
@@ -22,7 +22,7 @@ contract SetDisputeGameImplInput is BaseDeployIO {
 
         if (_sel == this.factory.selector) _factory = IDisputeGameFactory(_addr);
         else if (_sel == this.anchorStateRegistry.selector) _anchorStateRegistry = IAnchorStateRegistry(_addr);
-        else if (_sel == this.impl.selector) _impl = IFaultDisputeGame(_addr);
+        else if (_sel == this.impl.selector) _impl = IFaultDisputeGameV2(_addr);
         else revert("SetDisputeGameImplInput: unknown selector");
     }
 
@@ -46,7 +46,7 @@ contract SetDisputeGameImplInput is BaseDeployIO {
         return _anchorStateRegistry;
     }
 
-    function impl() public view returns (IFaultDisputeGame) {
+    function impl() public view returns (IFaultDisputeGameV2) {
         require(address(_impl) != address(0), "SetDisputeGameImplInput: not set");
         return _impl;
     }
@@ -66,7 +66,7 @@ contract SetDisputeGameImpl is Script {
         GameType gameType = GameType.wrap(_input.gameType());
         require(address(factory.gameImpls(gameType)) == address(0), "SDGI-10");
 
-        IFaultDisputeGame impl = _input.impl();
+        IFaultDisputeGameV2 impl = _input.impl();
         IAnchorStateRegistry anchorStateRegistry = _input.anchorStateRegistry();
         bytes memory gameArgs = _input.gameArgs();
 

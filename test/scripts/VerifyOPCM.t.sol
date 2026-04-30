@@ -103,9 +103,6 @@ contract VerifyOPCM_Run_Test is VerifyOPCM_TestInit {
                 if (_isDisputeGameV2ContractRef(ref)) {
                     continue;
                 }
-                if (_isSuperDisputeGameContractRef(ref)) {
-                    continue;
-                }
 
                 harness.runSingle(ref.name, ref.addr, true);
             }
@@ -145,20 +142,11 @@ contract VerifyOPCM_Run_Test is VerifyOPCM_TestInit {
         // Grab the list of implementations.
         VerifyOPCM.OpcmContractRef[] memory refs = harness.getOpcmContractRefs(opcm, "implementations", false);
 
-        // Check if V2 dispute games feature is enabled
-        bytes32 bitmap = opcm.devFeatureBitmap();
-        bool superGamesEnabled = DevFeatures.isDevFeatureEnabled(bitmap, DevFeatures.OPTIMISM_PORTAL_INTEROP);
-
         // Change 256 bytes at random.
         for (uint256 i = 0; i < 255; i++) {
             // Pick a random implementation to change.
             uint256 randomImplIndex = vm.randomUint(0, refs.length - 1);
             VerifyOPCM.OpcmContractRef memory ref = refs[randomImplIndex];
-
-            // Skip super dispute games when feature disabled
-            if (_isSuperDisputeGameContractRef(ref) && !superGamesEnabled) {
-                continue;
-            }
 
             // Get the code for the implementation.
             bytes memory implCode = ref.addr.code;
@@ -214,20 +202,11 @@ contract VerifyOPCM_Run_Test is VerifyOPCM_TestInit {
         // Grab the list of implementations.
         VerifyOPCM.OpcmContractRef[] memory refs = harness.getOpcmContractRefs(opcm, "implementations", false);
 
-        // Check if V2 dispute games feature is enabled
-        bytes32 bitmap = opcm.devFeatureBitmap();
-        bool superGamesEnabled = DevFeatures.isDevFeatureEnabled(bitmap, DevFeatures.OPTIMISM_PORTAL_INTEROP);
-
         // Change 256 bytes at random.
         for (uint8 i = 0; i < 255; i++) {
             // Pick a random implementation to change.
             uint256 randomImplIndex = vm.randomUint(0, refs.length - 1);
             VerifyOPCM.OpcmContractRef memory ref = refs[randomImplIndex];
-
-            // Skip super dispute games when feature disabled
-            if (_isSuperDisputeGameContractRef(ref) && !superGamesEnabled) {
-                continue;
-            }
 
             // Get the code for the implementation.
             bytes memory implCode = ref.addr.code;
@@ -381,10 +360,6 @@ contract VerifyOPCM_Run_Test is VerifyOPCM_TestInit {
 
     function _isDisputeGameV2ContractRef(VerifyOPCM.OpcmContractRef memory ref) internal pure returns (bool) {
         return LibString.eq(ref.name, "FaultDisputeGameV2") || LibString.eq(ref.name, "PermissionedDisputeGameV2");
-    }
-
-    function _isSuperDisputeGameContractRef(VerifyOPCM.OpcmContractRef memory ref) internal pure returns (bool) {
-        return LibString.eq(ref.name, "SuperFaultDisputeGame") || LibString.eq(ref.name, "SuperPermissionedDisputeGame");
     }
 
     /// @notice Utility function to mock the first OPCM component's contractsContainer address.

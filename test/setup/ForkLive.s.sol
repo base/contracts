@@ -22,7 +22,7 @@ import { LibGameArgs } from "src/dispute/lib/LibGameArgs.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
@@ -178,8 +178,8 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
 
         // The PermissionedDisputeGame and PermissionedDelayedWETHProxy are not listed in the registry for OP, so we
         // look it up onchain
-        IFaultDisputeGame permissionedDisputeGame =
-            IFaultDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON)));
+        IFaultDisputeGameV2 permissionedDisputeGame =
+            IFaultDisputeGameV2(address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON)));
         artifacts.save("PermissionedDisputeGame", address(permissionedDisputeGame));
         artifacts.save("PermissionedDelayedWETHProxy", address(permissionedDisputeGame.weth()));
 

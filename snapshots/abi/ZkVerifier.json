@@ -1,0 +1,134 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "contract ISP1Verifier",
+        "name": "sp1Verifier",
+        "type": "address"
+      },
+      {
+        "internalType": "contract IAnchorStateRegistry",
+        "name": "anchorStateRegistry",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "ANCHOR_STATE_REGISTRY",
+    "outputs": [
+      {
+        "internalType": "contract IAnchorStateRegistry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "SP1_VERIFIER",
+    "outputs": [
+      {
+        "internalType": "contract ISP1Verifier",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nullified",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nullify",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes",
+        "name": "proofBytes",
+        "type": "bytes"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "imageId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "journal",
+        "type": "bytes32"
+      }
+    ],
+    "name": "verify",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "version",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "contract IDisputeGame",
+        "name": "game",
+        "type": "address"
+      }
+    ],
+    "name": "VerifierNullified",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "NotProperGame",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "Nullified",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "SP1VerificationFailed",
+    "type": "error"
+  }
+]

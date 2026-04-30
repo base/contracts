@@ -13,7 +13,7 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IBigStepper } from "interfaces/dispute/IBigStepper.sol";
 import { GameType, Duration, Claim } from "src/dispute/lib/Types.sol";
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 
 /// @title AddGameType
 contract AddGameType is Script {
@@ -50,7 +50,7 @@ contract AddGameType is Script {
 
     struct Output {
         IDelayedWETH delayedWETHProxy;
-        IFaultDisputeGame faultDisputeGameProxy;
+        IFaultDisputeGameV2 faultDisputeGameProxy;
     }
 
     function run(Input memory _agi) public returns (Output memory) {

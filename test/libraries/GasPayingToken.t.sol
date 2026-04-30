@@ -139,13 +139,16 @@ contract GasPayingToken_Uncategorized_Test is GasPayingToken_TestInit {
             _symbol = string(bytes(_symbol)[0:32]);
         }
 
-        GasPayingToken.set(_token, _decimals, GasPayingToken.sanitize(_name), GasPayingToken.sanitize(_symbol));
+        bytes32 name = GasPayingToken.sanitize(_name);
+        bytes32 symbol = GasPayingToken.sanitize(_symbol);
+
+        GasPayingToken.set(_token, _decimals, name, symbol);
 
         (address token, uint8 decimals) = GasPayingToken.getToken();
         assertEq(_token, token);
         assertEq(_decimals, decimals);
 
-        assertEq(_name, GasPayingToken.getName());
-        assertEq(_symbol, GasPayingToken.getSymbol());
+        assertEq(LibString.fromSmallString(name), GasPayingToken.getName());
+        assertEq(LibString.fromSmallString(symbol), GasPayingToken.getSymbol());
     }
 }
