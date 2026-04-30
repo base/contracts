@@ -157,7 +157,8 @@ contract OPContractsManager_Upgrade_Harness is CommonTest, DisputeGames {
 
         delayedWETHPermissionedGameProxy =
             IDelayedWETH(payable(artifacts.mustGetAddress("PermissionedDelayedWETHProxy")));
-        permissionedDisputeGame = IPermissionedDisputeGameV2(address(artifacts.mustGetAddress("PermissionedDisputeGame")));
+        permissionedDisputeGame =
+            IPermissionedDisputeGameV2(address(artifacts.mustGetAddress("PermissionedDisputeGame")));
         IDisputeGameFactory dgf = IDisputeGameFactory(address(artifacts.mustGetAddress("DisputeGameFactoryProxy")));
         faultDisputeGame = IFaultDisputeGameV2(address(dgf.gameImpls(GameTypes.CANNON)));
         delayedWeth = faultDisputeGame.weth();

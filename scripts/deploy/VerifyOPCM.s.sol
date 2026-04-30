@@ -179,8 +179,7 @@ contract VerifyOPCM is Script {
         // Rather than requiring an opcm input parameter, just pass in an empty reference
         // as we really only need this for features that are in development.
         _verifyOpcmContractRef(
-            OpcmContractRef({ field: _name, name: _name, addr: _addr, blueprint: false }),
-            _skipConstructorVerification
+            OpcmContractRef({ field: _name, name: _name, addr: _addr, blueprint: false }), _skipConstructorVerification
         );
     }
 

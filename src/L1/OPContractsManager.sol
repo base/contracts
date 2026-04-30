@@ -252,13 +252,7 @@ abstract contract OPContractsManagerBase {
     }
 
     /// @notice Retrieves the Anchor State Registry for a given v2 game
-    function getAnchorStateRegistryFromGame(
-        IDisputeGame _disputeGame
-    )
-        internal
-        view
-        returns (IAnchorStateRegistry)
-    {
+    function getAnchorStateRegistryFromGame(IDisputeGame _disputeGame) internal view returns (IAnchorStateRegistry) {
         return IFaultDisputeGameV2(address(_disputeGame)).anchorStateRegistry();
     }
 
@@ -838,9 +832,7 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
             _l2ChainId: _l2ChainId,
             _disputeGame: permissionedDisputeGame,
             _newDelayedWeth: getWETH(dgf, permissionedDisputeGame, GameTypes.PERMISSIONED_CANNON),
-            _newAnchorStateRegistryProxy: getAnchorStateRegistryFromGame(
-                permissionedDisputeGame
-            ),
+            _newAnchorStateRegistryProxy: getAnchorStateRegistryFromGame(permissionedDisputeGame),
             _opChainConfig: _opChainConfig
         });
 
@@ -871,9 +863,7 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
                     _newAbsolutePrestate: _opChainConfig.cannonKonaPrestate,
                     // CANNON and CANNON_KONA use the same weth and asr proxy addresses
                     _newDelayedWeth: getWETH(dgf, permissionlessDisputeGame, GameTypes.CANNON),
-                    _newAnchorStateRegistryProxy: getAnchorStateRegistryFromGame(
-                        permissionlessDisputeGame
-                    ),
+                    _newAnchorStateRegistryProxy: getAnchorStateRegistryFromGame(permissionlessDisputeGame),
                     _gameType: GameTypes.CANNON_KONA,
                     _disputeGameFactory: disputeGameFactory
                 });
