@@ -125,10 +125,5 @@
     "inputs": [],
     "name": "Nullified",
     "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "SP1VerificationFailed",
-    "type": "error"
   }
 ]

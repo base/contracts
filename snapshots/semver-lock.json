@@ -228,8 +228,8 @@
     "sourceCodeHash": "0xd5e01b4f4e69313e56e51f2f46b7bbe699ef8dc24b8a6385b8ebac4162e05353"
   },
   "src/multiproof/zk/ZKVerifier.sol:ZkVerifier": {
-    "initCodeHash": "0xb50364a38af3ef7dbfab9a84210d08c5f61105638326e6a442828dfa5afc924d",
-    "sourceCodeHash": "0xdca3c639992baf85e72b91468fe0e57f2a71accb2bc8a6fc8d284ce426f725dc"
+    "initCodeHash": "0xcdc5bd5fa8ffad76358b8f34a53b8c0cb36540176c31f82d52546373d0bd5245",
+    "sourceCodeHash": "0xb2bb27fb51ad3746b0b99367d8193a58445fc2663b240b830bad199801042f66"
   },
   "src/revenue-share/FeeDisburser.sol:FeeDisburser": {
     "initCodeHash": "0x1278027e3756e2989e80c0a7b513e221a5fe0d3dbd9ded108375a29b2c1f3d57",
