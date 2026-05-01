@@ -30,7 +30,6 @@ import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IDataAvailabilityChallenge } from "interfaces/L1/IDataAvailabilityChallenge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
@@ -123,7 +122,6 @@ abstract contract Setup is FeatureFlags {
     IOptimismMintableERC20Factory l1OptimismMintableERC20Factory;
     IProtocolVersions protocolVersions;
     ISuperchainConfig superchainConfig;
-    IDataAvailabilityChallenge dataAvailabilityChallenge;
     IOPContractsManager opcm;
     IBigStepper mips;
 
@@ -298,11 +296,6 @@ abstract contract Setup is FeatureFlags {
         mips = IBigStepper(artifacts.mustGetAddress("MipsSingleton"));
         aggregateVerifier = IVerifier(artifacts.mustGetAddress("AggregateVerifier"));
         teeProverRegistry = TEEProverRegistry(artifacts.mustGetAddress("TEEProverRegistry"));
-
-        if (deploy.cfg().useAltDA()) {
-            dataAvailabilityChallenge =
-                IDataAvailabilityChallenge(artifacts.mustGetAddress("DataAvailabilityChallengeProxy"));
-        }
 
         console.log("Setup: registered L1 deployments");
 
