@@ -79,9 +79,6 @@ library Predeploys {
     /// @notice Address of the EAS predeploy.
     address internal constant EAS = 0x4200000000000000000000000000000000000021;
 
-    /// @notice Address of the GovernanceToken predeploy.
-    address internal constant GOVERNANCE_TOKEN = 0x4200000000000000000000000000000000000042;
-
     /// @custom:legacy
     /// @notice Address of the LegacyERC20ETH predeploy. Deprecated. Balances are migrated to the
     ///         state trie as of the Bedrock upgrade. Contract has been locked and write functions
@@ -145,7 +142,6 @@ library Predeploys {
         if (_addr == OPERATOR_FEE_VAULT) return "OperatorFeeVault";
         if (_addr == SCHEMA_REGISTRY) return "SchemaRegistry";
         if (_addr == EAS) return "EAS";
-        if (_addr == GOVERNANCE_TOKEN) return "GovernanceToken";
         if (_addr == LEGACY_ERC20_ETH) return "LegacyERC20ETH";
         if (_addr == CROSS_L2_INBOX) return "CrossL2Inbox";
         if (_addr == L2_TO_L2_CROSS_DOMAIN_MESSENGER) return "L2ToL2CrossDomainMessenger";
@@ -162,7 +158,7 @@ library Predeploys {
 
     /// @notice Returns true if the predeploy is not proxied.
     function notProxied(address _addr) internal pure returns (bool) {
-        return _addr == GOVERNANCE_TOKEN || _addr == WETH;
+        return _addr == WETH;
     }
 
     /// @notice Returns true if the address is a defined predeploy that is embedded into new OP-Stack chains.
@@ -182,7 +178,7 @@ library Predeploys {
             || _addr == L2_ERC721_BRIDGE || _addr == L1_BLOCK_ATTRIBUTES || _addr == L2_TO_L1_MESSAGE_PASSER
             || _addr == OPTIMISM_MINTABLE_ERC721_FACTORY || _addr == PROXY_ADMIN || _addr == BASE_FEE_VAULT
             || _addr == L1_FEE_VAULT || _addr == OPERATOR_FEE_VAULT || _addr == SCHEMA_REGISTRY || _addr == EAS
-            || _addr == GOVERNANCE_TOKEN || _addr == FEE_SPLITTER
+            || _addr == FEE_SPLITTER
             || (_fork >= uint256(Fork.INTEROP) && _enableCrossL2Inbox && _addr == CROSS_L2_INBOX)
             || (_fork >= uint256(Fork.INTEROP) && _addr == L2_TO_L2_CROSS_DOMAIN_MESSENGER)
             || (_isCustomGasToken && _addr == LIQUIDITY_CONTROLLER)

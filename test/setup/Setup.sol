@@ -145,7 +145,6 @@ abstract contract Setup is FeatureFlags {
     IOperatorFeeVault operatorFeeVault = IOperatorFeeVault(payable(Predeploys.OPERATOR_FEE_VAULT));
     IGasPriceOracle gasPriceOracle = IGasPriceOracle(Predeploys.GAS_PRICE_ORACLE);
     IL1Block l1Block = IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES);
-    IGovernanceToken governanceToken = IGovernanceToken(Predeploys.GOVERNANCE_TOKEN);
     ILegacyMessagePasser legacyMessagePasser = ILegacyMessagePasser(Predeploys.LEGACY_MESSAGE_PASSER);
     IWETH98 weth = IWETH98(payable(Predeploys.WETH));
     ISuperchainETHBridge superchainETHBridge = ISuperchainETHBridge(payable(Predeploys.SUPERCHAIN_ETH_BRIDGE));
@@ -364,12 +363,6 @@ abstract contract Setup is FeatureFlags {
             l1Withdrawer = IL1Withdrawer(superchainRevSharesCalculator.shareRecipient());
         }
 
-        // Set the governance token's owner to be the final system owner
-        address finalSystemOwner = deploy.cfg().finalSystemOwner();
-        vm.startPrank(governanceToken.owner());
-        governanceToken.transferOwnership(finalSystemOwner);
-        vm.stopPrank();
-
         // L2 predeploys
         labelPredeploy(Predeploys.L2_STANDARD_BRIDGE);
         labelPredeploy(Predeploys.L2_CROSS_DOMAIN_MESSENGER);
@@ -383,7 +376,6 @@ abstract contract Setup is FeatureFlags {
         labelPredeploy(Predeploys.L1_BLOCK_ATTRIBUTES);
         labelPredeploy(Predeploys.GAS_PRICE_ORACLE);
         labelPredeploy(Predeploys.LEGACY_MESSAGE_PASSER);
-        labelPredeploy(Predeploys.GOVERNANCE_TOKEN);
         labelPredeploy(Predeploys.EAS);
         labelPredeploy(Predeploys.SCHEMA_REGISTRY);
         labelPredeploy(Predeploys.WETH);

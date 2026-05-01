@@ -52,8 +52,7 @@ abstract contract Predeploys_TestInit is CommonTest {
 
     /// @notice Returns true if the predeploy uses immutables.
     function _usesImmutables(address _addr) internal pure returns (bool) {
-        return _addr == Predeploys.OPTIMISM_MINTABLE_ERC721_FACTORY || _addr == Predeploys.EAS
-            || _addr == Predeploys.GOVERNANCE_TOKEN;
+        return _addr == Predeploys.OPTIMISM_MINTABLE_ERC721_FACTORY || _addr == Predeploys.EAS;
     }
 
     /// @notice Internal test function for predeploys validation across different forks.

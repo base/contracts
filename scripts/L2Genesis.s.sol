@@ -256,7 +256,6 @@ contract L2Genesis is Script {
         // 1C,1D,1E,1F: not used.
         setSchemaRegistry(); // 20
         setEAS(); // 21
-        setGovernanceToken(_input); // 42: OP (not behind a proxy)
         setFeeSplitter(_input); // 2B: FeeSplitter
         if (_input.fork >= uint256(Fork.INTEROP)) {
             if (_input.deployCrossL2Inbox) {
@@ -444,33 +443,6 @@ contract L2Genesis is Script {
             _minWithdrawalAmount: _input.operatorFeeVaultMinimumWithdrawalAmount,
             _withdrawalNetwork: Types.WithdrawalNetwork(_input.operatorFeeVaultWithdrawalNetwork)
         });
-    }
-
-    /// @notice This predeploy is following the safety invariant #2.
-    function setGovernanceToken(Input memory _input) internal {
-        if (!_input.enableGovernance) {
-            return;
-        }
-
-        IGovernanceToken token = IGovernanceToken(
-            DeployUtils.create1({
-                _name: "GovernanceToken",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IGovernanceToken.__constructor__, ()))
-            })
-        );
-        vm.etch(Predeploys.GOVERNANCE_TOKEN, address(token).code);
-
-        bytes32 _nameSlot = hex"0000000000000000000000000000000000000000000000000000000000000003";
-        bytes32 _symbolSlot = hex"0000000000000000000000000000000000000000000000000000000000000004";
-        bytes32 _ownerSlot = hex"000000000000000000000000000000000000000000000000000000000000000a";
-
-        vm.store(Predeploys.GOVERNANCE_TOKEN, _nameSlot, vm.load(address(token), _nameSlot));
-        vm.store(Predeploys.GOVERNANCE_TOKEN, _symbolSlot, vm.load(address(token), _symbolSlot));
-        vm.store(Predeploys.GOVERNANCE_TOKEN, _ownerSlot, bytes32(uint256(uint160(_input.governanceTokenOwner))));
-
-        /// Reset so its not included state dump
-        vm.etch(address(token), "");
-        vm.resetNonce(address(token));
     }
 
     /// @notice This predeploy is following the safety invariant #1.

@@ -75,7 +75,6 @@ abstract contract L2Genesis_TestInit is Test {
         }
 
         assertGt(Predeploys.WETH.code.length, 0);
-        assertGt(Predeploys.GOVERNANCE_TOKEN.code.length, 0);
     }
 
     function testVaultsWithoutRevenueShare() internal view {
@@ -146,18 +145,6 @@ abstract contract L2Genesis_TestInit is Test {
         assertEq(operatorFeeVault.minWithdrawalAmount(), 0);
         assertEq(uint8(operatorFeeVault.WITHDRAWAL_NETWORK()), uint8(Types.WithdrawalNetwork.L2));
         assertEq(uint8(operatorFeeVault.withdrawalNetwork()), uint8(Types.WithdrawalNetwork.L2));
-    }
-
-    function testGovernance() internal view {
-        IGovernanceToken token = IGovernanceToken(payable(Predeploys.GOVERNANCE_TOKEN));
-
-        // Verify owner (existing check)
-        assertEq(token.owner(), input.governanceTokenOwner);
-
-        // Verify name and symbol to catch storage shifting issues
-        // These should match the values hardcoded in GovernanceToken constructor
-        assertEq(token.name(), "Optimism", "GovernanceToken name should be 'Optimism'");
-        assertEq(token.symbol(), "OP", "GovernanceToken symbol should be 'OP'");
     }
 
     function testFactories() internal view {
@@ -263,7 +250,6 @@ contract L2Genesis_Run_Test is L2Genesis_TestInit {
         testProxyAdmin();
         testPredeploys();
         testVaultsWithRevenueShare();
-        testGovernance();
         testFactories();
         testForks();
         testFeeSplitter();
@@ -276,7 +262,6 @@ contract L2Genesis_Run_Test is L2Genesis_TestInit {
         testProxyAdmin();
         testPredeploys();
         testVaultsWithoutRevenueShare();
-        testGovernance();
         testFactories();
         testForks();
 
@@ -388,7 +373,6 @@ contract L2Genesis_Run_Test is L2Genesis_TestInit {
         testProxyAdmin();
         testPredeploys();
         testVaultsWithoutRevenueShare();
-        testGovernance();
         testFactories();
         testForks();
         testCGT();
