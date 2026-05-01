@@ -1,15 +1,7 @@
 {
-  "src/L1/DataAvailabilityChallenge.sol:DataAvailabilityChallenge": {
-    "initCodeHash": "0xacbae98cc7c0f7ecbf36dc44bbf7cb0a011e6e6b781e28b9dbf947e31482b30d",
-    "sourceCodeHash": "0xdddaf874cd201558e34f0ed78db38a58d798188f974646b0cad8ce9910f99037"
-  },
   "src/L1/ETHLockbox.sol:ETHLockbox": {
     "initCodeHash": "0x65db3aa3c2e3221065752f66016fa02b66688a01cc5c3066533b27fe620619c8",
     "sourceCodeHash": "0x6c9d3e2dee44c234d59ab93b6564536dfd807f1c4a02a82d5393bc53cb15b8b7"
-  },
-  "src/L1/FeesDepositor.sol:FeesDepositor": {
-    "initCodeHash": "0xe52c51805cfd55967d037173159f18aaf4344e32e5c8ad41f8d5d0025b1d36a8",
-    "sourceCodeHash": "0xe5f2b1915a201c0b8a107f168f5b9bc8aec8e8e95f938082e42ba5b5c8ebbd11"
   },
   "src/L1/L1CrossDomainMessenger.sol:L1CrossDomainMessenger": {
     "initCodeHash": "0x3dc659aafb03bd357f92abfc6794af89ee0ddd5212364551637422bf8d0b00f9",
