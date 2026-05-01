@@ -90,7 +90,7 @@
             "type": "address"
           },
           {
-            "internalType": "contract IFaultDisputeGame",
+            "internalType": "contract IFaultDisputeGameV2",
             "name": "faultDisputeGame",
             "type": "address"
           }
@@ -285,16 +285,6 @@
           {
             "internalType": "address",
             "name": "permissionedDisputeGameV2Impl",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "superFaultDisputeGameImpl",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "superPermissionedDisputeGameImpl",
             "type": "address"
           }
         ],

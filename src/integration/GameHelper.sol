@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { IDisputeGameFactory } from "../../interfaces/dispute/IDisputeGameFactory.sol";
-import { IFaultDisputeGame } from "../../interfaces/dispute/IFaultDisputeGame.sol";
+import { IFaultDisputeGameV2 } from "../../interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 
 // Libraries
 import { Claim, Position, GameType } from "src/dispute/lib/Types.sol";
@@ -20,7 +20,7 @@ contract GameHelper {
     /// @notice Performs the specified set of moves in the supplied dispute game.
     /// @param _game the game to perform moves in.
     /// @param _moves the moves to perform.
-    function performMoves(IFaultDisputeGame _game, Move[] calldata _moves) public payable {
+    function performMoves(IFaultDisputeGameV2 _game, Move[] calldata _moves) public payable {
         uint256 movesLen = _moves.length;
         for (uint256 i = 0; i < movesLen; i++) {
             Move memory move = _moves[i];
@@ -50,7 +50,7 @@ contract GameHelper {
     {
         uint256 initBond = _dgf.initBonds(_gameType);
         gameAddr_ = address(_dgf.create{ value: initBond }(_gameType, _rootClaim, _extraData));
-        IFaultDisputeGame game = IFaultDisputeGame(gameAddr_);
+        IFaultDisputeGameV2 game = IFaultDisputeGameV2(gameAddr_);
         performMoves(game, _moves);
     }
 

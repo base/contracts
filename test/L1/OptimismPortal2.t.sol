@@ -28,7 +28,7 @@ import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
 import { IOptimismPortalInterop } from "interfaces/L1/IOptimismPortalInterop.sol";
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
@@ -38,7 +38,7 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
     address depositor;
 
     Types.WithdrawalTransaction _defaultTx;
-    IFaultDisputeGame game;
+    IFaultDisputeGameV2 game;
     uint256 _proposedGameIndex;
     uint256 _proposedBlockNumber;
     bytes32 _stateRoot;
@@ -105,7 +105,7 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
         vm.warp(anchorStateRegistry.retirementTimestamp() + 1);
 
         respectedGameType = optimismPortal2.respectedGameType();
-        game = IFaultDisputeGame(
+        game = IFaultDisputeGameV2(
             payable(address(
                     disputeGameFactory.create{ value: disputeGameFactory.initBonds(respectedGameType) }(
                         respectedGameType, Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber)
@@ -1469,7 +1469,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
             latestBlockhash: bytes32(uint256(0))
         });
 
-        IFaultDisputeGame game_noData = IFaultDisputeGame(
+        IFaultDisputeGameV2 game_noData = IFaultDisputeGameV2(
             payable(address(
                     disputeGameFactory.create{ value: disputeGameFactory.initBonds(respectedGameType) }(
                         respectedGameType, Claim.wrap(_outputRoot_noData), abi.encode(_proposedBlockNumber)

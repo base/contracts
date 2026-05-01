@@ -8,7 +8,7 @@ import { CommonBase } from "forge-std/Base.sol";
 import "src/dispute/lib/Types.sol";
 
 // Interfaces
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 
 /// @title GameSolver
 /// @notice The `GameSolver` contract is a contract that can produce an array of available
@@ -17,7 +17,7 @@ import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
 ///         it suggests.
 abstract contract GameSolver is CommonBase {
     /// @notice The `FaultDisputeGame` proxy that the `GameSolver` will be solving.
-    IFaultDisputeGame public immutable GAME;
+    IFaultDisputeGameV2 public immutable GAME;
     /// @notice The split depth of the game
     uint256 internal immutable SPLIT_DEPTH;
     /// @notice The max depth of the game
@@ -57,7 +57,7 @@ abstract contract GameSolver is CommonBase {
     }
 
     constructor(
-        IFaultDisputeGame _gameProxy,
+        IFaultDisputeGameV2 _gameProxy,
         uint256[] memory _l2Outputs,
         bytes memory _trace,
         bytes memory _preStateData
@@ -91,7 +91,7 @@ contract HonestGameSolver is GameSolver {
     }
 
     constructor(
-        IFaultDisputeGame _gameProxy,
+        IFaultDisputeGameV2 _gameProxy,
         uint256[] memory _l2Outputs,
         bytes memory _trace,
         bytes memory _preStateData
@@ -119,7 +119,7 @@ contract HonestGameSolver is GameSolver {
         uint256 numMoves = 0;
         for (uint256 i = processedBuf; i < numClaims; i++) {
             // Grab the observed claim.
-            IFaultDisputeGame.ClaimData memory observed = getClaimData(i);
+            IFaultDisputeGameV2.ClaimData memory observed = getClaimData(i);
 
             // Determine the direction of the next move to be taken.
             (Direction moveDirection, Position movePos) = determineDirection(observed);
@@ -152,7 +152,7 @@ contract HonestGameSolver is GameSolver {
     ////////////////////////////////////////////////////////////////
 
     /// @dev Helper function to determine the direction of the next move to be taken.
-    function determineDirection(IFaultDisputeGame.ClaimData memory _claimData)
+    function determineDirection(IFaultDisputeGameV2.ClaimData memory _claimData)
         internal
         view
         returns (Direction direction_, Position movePos_)
@@ -225,7 +225,7 @@ contract HonestGameSolver is GameSolver {
         move_ = Move({
             kind: isAttack ? MoveKind.Attack : MoveKind.Defend,
             value: bond,
-            data: abi.encodeCall(IFaultDisputeGame.move, (disputed, _challengeIndex, claimAt(_movePos), isAttack))
+            data: abi.encodeCall(IFaultDisputeGameV2.move, (disputed, _challengeIndex, claimAt(_movePos), isAttack))
         });
     }
 
@@ -265,7 +265,7 @@ contract HonestGameSolver is GameSolver {
         move_ = Move({
             kind: MoveKind.Step,
             value: 0,
-            data: abi.encodeCall(IFaultDisputeGame.step, (_challengeIndex, isAttack, preStateTrace, hex""))
+            data: abi.encodeCall(IFaultDisputeGameV2.step, (_challengeIndex, isAttack, preStateTrace, hex""))
         });
     }
 
@@ -275,7 +275,7 @@ contract HonestGameSolver is GameSolver {
 
     /// @dev Helper function to get the `ClaimData` struct at a given index in the `GAME` contract's
     ///      `claimData` array.
-    function getClaimData(uint256 _claimIndex) internal view returns (IFaultDisputeGame.ClaimData memory claimData_) {
+    function getClaimData(uint256 _claimIndex) internal view returns (IFaultDisputeGameV2.ClaimData memory claimData_) {
         // thanks, solc
         (
             uint32 parentIndex,
@@ -286,7 +286,7 @@ contract HonestGameSolver is GameSolver {
             Position position,
             Clock clock
         ) = GAME.claimData(_claimIndex);
-        claimData_ = IFaultDisputeGame.ClaimData({
+        claimData_ = IFaultDisputeGameV2.ClaimData({
             parentIndex: parentIndex,
             counteredBy: countered,
             claimant: claimant,
@@ -368,10 +368,10 @@ abstract contract DisputeActor {
 ///         that this actor *can* be dishonest if the trace is faulty, but it will always follow
 ///         the rules of the honest actor.
 contract HonestDisputeActor is DisputeActor {
-    IFaultDisputeGame public immutable GAME;
+    IFaultDisputeGameV2 public immutable GAME;
 
     constructor(
-        IFaultDisputeGame _gameProxy,
+        IFaultDisputeGameV2 _gameProxy,
         uint256[] memory _l2Outputs,
         bytes memory _trace,
         bytes memory _preStateData

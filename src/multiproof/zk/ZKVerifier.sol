@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { ISP1Verifier } from "src/dispute/zk/ISP1Verifier.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { ISP1Verifier } from "./ISP1Verifier.sol";
 import { Verifier } from "../Verifier.sol";
 
 /// @title ZkVerifier

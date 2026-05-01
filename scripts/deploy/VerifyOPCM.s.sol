@@ -120,10 +120,6 @@ contract VerifyOPCM is Script {
         fieldNameOverrides["permissionlessDisputeGame2"] = "FaultDisputeGame";
         fieldNameOverrides["permissionedDisputeGame1"] = "PermissionedDisputeGame";
         fieldNameOverrides["permissionedDisputeGame2"] = "PermissionedDisputeGame";
-        fieldNameOverrides["superPermissionlessDisputeGame1"] = "SuperFaultDisputeGame";
-        fieldNameOverrides["superPermissionlessDisputeGame2"] = "SuperFaultDisputeGame";
-        fieldNameOverrides["superPermissionedDisputeGame1"] = "SuperPermissionedDisputeGame";
-        fieldNameOverrides["superPermissionedDisputeGame2"] = "SuperPermissionedDisputeGame";
         fieldNameOverrides["opcmGameTypeAdder"] = "OPContractsManagerGameTypeAdder";
         fieldNameOverrides["opcmDeployer"] = "OPContractsManagerDeployer";
         fieldNameOverrides["opcmUpgrader"] = "OPContractsManagerUpgrader";
@@ -182,11 +178,8 @@ contract VerifyOPCM is Script {
         // This function is used as part of the release checklist to verify new contracts.
         // Rather than requiring an opcm input parameter, just pass in an empty reference
         // as we really only need this for features that are in development.
-        IOPContractsManager emptyOpcm = IOPContractsManager(address(0));
         _verifyOpcmContractRef(
-            emptyOpcm,
-            OpcmContractRef({ field: _name, name: _name, addr: _addr, blueprint: false }),
-            _skipConstructorVerification
+            OpcmContractRef({ field: _name, name: _name, addr: _addr, blueprint: false }), _skipConstructorVerification
         );
     }
 
@@ -221,7 +214,7 @@ contract VerifyOPCM is Script {
         // Verify each reference.
         bool success = true;
         for (uint256 i = 0; i < refs.length; i++) {
-            success = _verifyOpcmContractRef(opcm, refs[i], _skipConstructorVerification) && success;
+            success = _verifyOpcmContractRef(refs[i], _skipConstructorVerification) && success;
         }
 
         // Final Result
@@ -389,12 +382,10 @@ contract VerifyOPCM is Script {
     }
 
     /// @notice Verifies a single OPCM contract reference (implementation or bytecode).
-    /// @param _opcm The OPCM contract that contains the target contract reference.
     /// @param _target The target contract reference to verify.
     /// @param _skipConstructorVerification Whether to skip constructor verification.
     /// @return True if the contract reference is verified, false otherwise.
     function _verifyOpcmContractRef(
-        IOPContractsManager _opcm,
         OpcmContractRef memory _target,
         bool _skipConstructorVerification
     )
@@ -412,20 +403,6 @@ contract VerifyOPCM is Script {
         // Build the expected path to the artifact file.
         string memory artifactPath = _buildArtifactPath(_target.name);
         console.log(string.concat("  Expected Runtime Artifact: ", artifactPath));
-
-        // Check if this is a Super dispute game that should be skipped
-        if (_isSuperDisputeGameImplementation(_target.name)) {
-            if (!_isSuperDisputeGamesEnabled(_opcm)) {
-                if (_target.addr == address(0)) {
-                    console.log("[SKIP] Super game not deployed (feature disabled)");
-                    return true; // Consider this "verified" when feature is off
-                } else {
-                    console.log("[FAIL] ERROR: Super game deployed but feature disabled");
-                    success = false;
-                }
-            }
-            // If feature is enabled, continue with normal verification
-        }
 
         // Load artifact information (bytecode, immutable refs) for detailed comparison
         ArtifactInfo memory artifact = _loadArtifactInfo(artifactPath);
@@ -538,14 +515,6 @@ contract VerifyOPCM is Script {
         return
             LibString.eq(_contractName, "FaultDisputeGameV2")
                 || LibString.eq(_contractName, "PermissionedDisputeGameV2");
-    }
-
-    /// @notice Checks if a contract is a Super dispute game implementation.
-    /// @param _contractName The name to check.
-    /// @return True if this is a V2 dispute game.
-    function _isSuperDisputeGameImplementation(string memory _contractName) internal pure returns (bool) {
-        return LibString.eq(_contractName, "SuperFaultDisputeGame")
-            || LibString.eq(_contractName, "SuperPermissionedDisputeGame");
     }
 
     /// @notice Verifies that the immutable variables in the OPCM contract match expected values.

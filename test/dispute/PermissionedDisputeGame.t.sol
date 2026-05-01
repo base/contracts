@@ -10,8 +10,8 @@ import "src/dispute/lib/Types.sol";
 import "src/dispute/lib/Errors.sol";
 
 // Interfaces
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
-import { IPermissionedDisputeGame } from "interfaces/dispute/IPermissionedDisputeGame.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
 
 /// @title PermissionedDisputeGame_TestInit
 /// @notice Reusable test initialization for `PermissionedDisputeGame` tests.
@@ -27,9 +27,9 @@ abstract contract PermissionedDisputeGame_TestInit is DisputeGameFactory_TestIni
     uint256 internal initBond;
 
     /// @notice The implementation of the game.
-    IPermissionedDisputeGame internal gameImpl;
+    IPermissionedDisputeGameV2 internal gameImpl;
     /// @notice The `Clone` proxy of the game.
-    IPermissionedDisputeGame internal gameProxy;
+    IPermissionedDisputeGameV2 internal gameProxy;
 
     /// @notice The extra data passed to the game for initialization.
     bytes internal extraData;
@@ -63,7 +63,7 @@ abstract contract PermissionedDisputeGame_TestInit is DisputeGameFactory_TestIni
         extraData = abi.encode(_l2BlockNumber);
 
         (address _impl, AlphabetVM _vm,) = setupPermissionedDisputeGame(_absolutePrestate, PROPOSER, CHALLENGER);
-        gameImpl = IPermissionedDisputeGame(_impl);
+        gameImpl = IPermissionedDisputeGameV2(_impl);
 
         // Create a new game.
         initBond = disputeGameFactory.initBonds(GAME_TYPE);
@@ -73,7 +73,7 @@ abstract contract PermissionedDisputeGame_TestInit is DisputeGameFactory_TestIni
             abi.encode(_rootClaim, 0)
         );
         vm.prank(PROPOSER, PROPOSER);
-        gameProxy = IPermissionedDisputeGame(
+        gameProxy = IPermissionedDisputeGameV2(
             payable(address(disputeGameFactory.create{ value: initBond }(GAME_TYPE, _rootClaim, extraData)))
         );
 
@@ -276,8 +276,8 @@ contract PermissionedDisputeGame_Initialize_Test is PermissionedDisputeGame_Test
 
         Claim claim = _dummyClaim();
         vm.prank(PROPOSER, PROPOSER);
-        vm.expectRevert(IFaultDisputeGame.BadExtraData.selector);
-        gameProxy = IPermissionedDisputeGame(
+        vm.expectRevert(IFaultDisputeGameV2.BadExtraData.selector);
+        gameProxy = IPermissionedDisputeGameV2(
             payable(address(disputeGameFactory.create{ value: initBond }(GAME_TYPE, claim, _extraData)))
         );
     }
@@ -300,8 +300,8 @@ contract PermissionedDisputeGame_Initialize_Test is PermissionedDisputeGame_Test
 
         Claim claim = _dummyClaim();
         vm.prank(PROPOSER, PROPOSER);
-        vm.expectRevert(IFaultDisputeGame.BadExtraData.selector);
-        gameProxy = IPermissionedDisputeGame(
+        vm.expectRevert(IFaultDisputeGameV2.BadExtraData.selector);
+        gameProxy = IPermissionedDisputeGameV2(
             payable(address(
                     disputeGameFactory.create{ value: initBond }(GAME_TYPE, claim, abi.encode(validL2BlockNumber))
                 ))
@@ -323,8 +323,8 @@ contract PermissionedDisputeGame_Initialize_Test is PermissionedDisputeGame_Test
 
         Claim claim = _dummyClaim();
         vm.prank(PROPOSER, PROPOSER);
-        vm.expectRevert(IFaultDisputeGame.BadExtraData.selector);
-        gameProxy = IPermissionedDisputeGame(
+        vm.expectRevert(IFaultDisputeGameV2.BadExtraData.selector);
+        gameProxy = IPermissionedDisputeGameV2(
             payable(address(
                     disputeGameFactory.create{ value: initBond }(GAME_TYPE, claim, abi.encode(validL2BlockNumber))
                 ))

@@ -37,8 +37,6 @@ contract ReadImplementationAddresses is Script {
         address preimageOracleSingleton;
         address faultDisputeGameV2;
         address permissionedDisputeGameV2;
-        address superFaultDisputeGame;
-        address superPermissionedDisputeGame;
         address opcmDeployer;
         address opcmUpgrader;
         address opcmGameTypeAdder;
@@ -75,8 +73,6 @@ contract ReadImplementationAddresses is Script {
         output_.optimismPortalInterop = impls.optimismPortalInteropImpl;
         output_.faultDisputeGameV2 = impls.faultDisputeGameV2Impl;
         output_.permissionedDisputeGameV2 = impls.permissionedDisputeGameV2Impl;
-        output_.superFaultDisputeGame = impls.superFaultDisputeGameImpl;
-        output_.superPermissionedDisputeGame = impls.superPermissionedDisputeGameImpl;
 
         // Get L1CrossDomainMessenger from AddressManager
         IAddressManager am = IAddressManager(_input.addressManager);

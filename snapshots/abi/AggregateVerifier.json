@@ -67,11 +67,6 @@
         "internalType": "uint256",
         "name": "intermediateBlockInterval",
         "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "proofThreshold",
-        "type": "uint256"
       }
     ],
     "stateMutability": "nonpayable",

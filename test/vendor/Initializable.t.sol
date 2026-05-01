@@ -392,16 +392,13 @@ contract Initializer_Test is CommonTest {
         // Periphery contracts don't get deployed as part of the standard deployment script.
         excludes[j++] = "src/periphery/*";
         // TODO: Deployment script is currently "broken" in the sense that it doesn't properly
-        //       label the FaultDisputeGame, PermissionedDisputeGame, SuperFaultDisputeGame, and
-        // SuperPermissionedDisputeGame
+        //       label the FaultDisputeGame, PermissionedDisputeGame
         //       contracts and instead simply deploys them anonymously. Means that functions like "getInitializedSlot"
         //       don't work properly. Remove these exclusions once the deployment script is fixed.
         excludes[j++] = "src/dispute/FaultDisputeGame.sol";
         excludes[j++] = "src/dispute/v2/FaultDisputeGameV2.sol";
         excludes[j++] = "src/dispute/v2/PermissionedDisputeGameV2.sol";
-        excludes[j++] = "src/dispute/SuperFaultDisputeGame.sol";
         excludes[j++] = "src/dispute/PermissionedDisputeGame.sol";
-        excludes[j++] = "src/dispute/SuperPermissionedDisputeGame.sol";
         excludes[j++] = "src/dispute/zk/OPSuccinctFaultDisputeGame.sol";
         // TODO: Eventually remove this exclusion. Same reason as above dispute contracts.
         excludes[j++] = "src/L1/OPContractsManager.sol";
