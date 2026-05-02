@@ -219,8 +219,6 @@ contract L2Genesis is Script {
     ///      LEGACY_ERC20_ETH and L1_MESSAGE_SENDER are deprecated and are not set.
     function setPredeployImplementations(Input memory _input) internal {
         setLegacyMessagePasser(); // 0
-        // 01: legacy, not used in OP-Stack
-        setDeployerWhitelist(); // 2
         // 3,4,5: legacy, not used in OP-Stack.
         setWETH(); // 6: WETH (not behind a proxy)
         setL2CrossDomainMessenger(_input.l1CrossDomainMessengerProxy); // 7
@@ -339,11 +337,6 @@ contract L2Genesis is Script {
     /// @notice This predeploy is following the safety invariant #1.
     function setGasPriceOracle() internal {
         _setImplementationCode(Predeploys.GAS_PRICE_ORACLE);
-    }
-
-    /// @notice This predeploy is following the safety invariant #1.
-    function setDeployerWhitelist() internal {
-        _setImplementationCode(Predeploys.DEPLOYER_WHITELIST);
     }
 
     /// @notice This predeploy is following the safety invariant #1.

@@ -115,10 +115,6 @@
     "initCodeHash": "0x9896fd04e9a3f9fe4f1d6e93eb298b37a6bfa33424aa705e68cc58d0ba7f3f90",
     "sourceCodeHash": "0xc0ff6e93b6e2b9111c11e81b5df8948ab71d02b9d2c4dfda982fcb615519f1f7"
   },
-  "src/legacy/DeployerWhitelist.sol:DeployerWhitelist": {
-    "initCodeHash": "0x2e0ef4c341367eb59cc6c25190c64eff441d3fe130189da91d4d126f6bdbc9b5",
-    "sourceCodeHash": "0x99fb495ee1339f399d9e14cc56e4b3b128c67778ad9ca7bad1efbb49eda2ec4c"
-  },
   "src/legacy/L1BlockNumber.sol:L1BlockNumber": {
     "initCodeHash": "0x7549dcb63799c5f30b405c6f0c1264f55659e812ccab68bf1b36e8707f4ee198",
     "sourceCodeHash": "0xf4b4cae7cc81a93d192ce8c54a7b543327458d53f3aaababacea843825bf3e1c"

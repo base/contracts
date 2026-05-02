@@ -98,8 +98,6 @@ contract Artifacts {
             return payable(Predeploys.GAS_PRICE_ORACLE);
         } else if (digest == keccak256(bytes("L1MessageSender"))) {
             return payable(Predeploys.L1_MESSAGE_SENDER);
-        } else if (digest == keccak256(bytes("DeployerWhitelist"))) {
-            return payable(Predeploys.DEPLOYER_WHITELIST);
         } else if (digest == keccak256(bytes("WETH"))) {
             return payable(Predeploys.WETH);
         } else if (digest == keccak256(bytes("LegacyERC20ETH"))) {
