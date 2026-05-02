@@ -95,6 +95,5 @@ contracts = [
     "TransactionBuilder",                       # Transaction builder helper library in TimelockGuard test file
     "Constants_Test",                           # Invalid naming pattern - doesn't specify function or Uncategorized
     "LivenessModule2_TestUtils",                # Test utils library in LivenessModule2 test file
-    "L1Block_SetCustomGasToken_Test",           # Custom gas token tests hosted in the L1Block test file
     "OPContractsManagerV2_Upgrade_TestInit",    # Test initialization contract with non-standard naming pattern (4 parts instead of 3)
 ]

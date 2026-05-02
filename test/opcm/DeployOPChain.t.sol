@@ -54,7 +54,6 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
     Duration disputeClockExtension = Duration.wrap(3 hours);
     Duration disputeMaxClockDuration = Duration.wrap(3.5 days);
     IOPContractsManager opcm;
-    bool useCustomGasToken = false;
 
     event Deployed(uint256 indexed l2ChainId, address indexed deployer, bytes deployOutput);
 
@@ -127,8 +126,7 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
             disputeMaxClockDuration: disputeMaxClockDuration,
             allowCustomDisputeParameters: false,
             operatorFeeScalar: 0,
-            operatorFeeConstant: 0,
-            useCustomGasToken: useCustomGasToken
+            operatorFeeConstant: 0
         });
     }
 }
@@ -157,10 +155,10 @@ contract DeployOPChain_Test is DeployOPChain_TestBase {
         assertEq(Claim.unwrap(pdg.absolutePrestate()), bytes32(0), "PDG absolutePrestate");
 
         // Custom gas token feature should reflect input
-        assertEq(doo.systemConfigProxy.isCustomGasToken(), useCustomGasToken, "SystemConfig isCustomGasToken");
+        assertEq(doo.systemConfigProxy.isCustomGasToken(), false, "SystemConfig isCustomGasToken");
         assertEq(
             doo.systemConfigProxy.isFeatureEnabled(Features.CUSTOM_GAS_TOKEN),
-            useCustomGasToken,
+            false,
             "SystemConfig CUSTOM_GAS_TOKEN feature"
         );
     }
@@ -175,7 +173,6 @@ contract DeployOPChain_Test is DeployOPChain_TestBase {
         deployOPChainInput.basefeeScalar = uint32(uint256(hash(_seed, 6)));
         deployOPChainInput.blobBaseFeeScalar = uint32(uint256(hash(_seed, 7)));
         deployOPChainInput.l2ChainId = uint256(hash(_seed, 8));
-        deployOPChainInput.useCustomGasToken = uint256(hash(_seed, 9)) % 2 == 1;
 
         DeployOPChain.Output memory doo = deployOPChain.run(deployOPChainInput);
 
@@ -200,30 +197,6 @@ contract DeployOPChain_Test is DeployOPChain_TestBase {
         assertEq(Duration.unwrap(pdg.maxClockDuration()), 302400, "3300");
         assertEq(pdg.splitDepth(), 30, "3400");
         assertEq(pdg.maxGameDepth(), 73, "3500");
-
-        // Verify custom gas token feature is set as seeded
-        assertEq(
-            doo.systemConfigProxy.isCustomGasToken(),
-            deployOPChainInput.useCustomGasToken,
-            "SystemConfig isCustomGasToken (fuzz)"
-        );
-        assertEq(
-            doo.systemConfigProxy.isFeatureEnabled(Features.CUSTOM_GAS_TOKEN),
-            deployOPChainInput.useCustomGasToken,
-            "SystemConfig CUSTOM_GAS_TOKEN feature (fuzz)"
-        );
-    }
-
-    function test_customGasToken_enabled_succeeds() public {
-        deployOPChainInput.useCustomGasToken = true;
-        DeployOPChain.Output memory doo = deployOPChain.run(deployOPChainInput);
-
-        assertEq(doo.systemConfigProxy.isCustomGasToken(), true, "SystemConfig isCustomGasToken should be true");
-        assertEq(
-            doo.systemConfigProxy.isFeatureEnabled(Features.CUSTOM_GAS_TOKEN),
-            true,
-            "SystemConfig CUSTOM_GAS_TOKEN feature should be true"
-        );
     }
 
     function getPermissionedDisputeGame(DeployOPChain.Output memory doo)

@@ -35,7 +35,6 @@ abstract contract CommonTest is Test, Setup, Events {
 
     bool useInteropOverride;
     bool useRevenueShareOverride;
-    bool useCustomGasToken;
 
     /// @dev This value is only used in forked tests. During forked tests, the default is to perform the upgrade before
     ///      running the tests.
@@ -75,11 +74,6 @@ abstract contract CommonTest is Test, Setup, Events {
             deploy.cfg().setUseInterop(true);
         }
         if (useRevenueShareOverride) {
-            // Revenue share is not supported when custom gas token is enabled
-            if (Config.sysFeatureCustomGasToken()) {
-                vm.skip(true);
-            }
-
             console.log("CommonTest: enabling revenue share");
             deploy.cfg().setUseRevenueShare(true);
             deploy.cfg().setChainFeesRecipient(chainFeesRecipient);
@@ -87,17 +81,6 @@ abstract contract CommonTest is Test, Setup, Events {
         }
         if (useUpgradedFork) {
             deploy.cfg().setUseUpgradedFork(true);
-        }
-        if (Config.sysFeatureCustomGasToken()) {
-            console.log("CommonTest: enabling custom gas token");
-            deploy.cfg().setUseCustomGasToken(true);
-            deploy.cfg().setGasPayingTokenName("Custom Gas Token");
-            deploy.cfg().setGasPayingTokenSymbol("CGT");
-            deploy.cfg().setNativeAssetLiquidityAmount(type(uint248).max);
-            deploy.cfg().setBaseFeeVaultWithdrawalNetwork(1);
-            deploy.cfg().setL1FeeVaultWithdrawalNetwork(1);
-            deploy.cfg().setSequencerFeeVaultWithdrawalNetwork(1);
-            deploy.cfg().setOperatorFeeVaultWithdrawalNetwork(1);
         }
 
         if (isForkTest()) {

@@ -15,8 +15,6 @@ import { IOptimismMintableERC721Factory } from "interfaces/L2/IOptimismMintableE
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IGasPriceOracle } from "interfaces/L2/IGasPriceOracle.sol";
 import { IFeeVault } from "interfaces/L2/IFeeVault.sol";
-import { ILiquidityController } from "interfaces/L2/ILiquidityController.sol";
-import { INativeAssetLiquidity } from "interfaces/L2/INativeAssetLiquidity.sol";
 import { Types } from "src/libraries/Types.sol";
 
 /// @title L2Genesis_TestInit
@@ -60,7 +58,7 @@ abstract contract L2Genesis_TestInit is Test {
             assertEq(Predeploys.PROXY_ADMIN, EIP1967Helper.getAdmin(addr));
 
             // If it's not a supported predeploy, skip next checks.
-            if (!Predeploys.isSupportedPredeploy(addr, input.useCustomGasToken)) {
+            if (!Predeploys.isSupportedPredeploy(addr)) {
                 continue;
             }
 
@@ -126,22 +124,6 @@ abstract contract L2Genesis_TestInit is Test {
         assertEq(gasPriceOracle.isFjord(), true);
         assertEq(gasPriceOracle.isIsthmus(), true);
     }
-
-    function testCGT() internal view {
-        // Test LiquidityController deployment
-        ILiquidityController controller = ILiquidityController(Predeploys.LIQUIDITY_CONTROLLER);
-        assertEq(controller.owner(), input.liquidityControllerOwner);
-        assertEq(controller.gasPayingTokenName(), input.gasPayingTokenName);
-        assertEq(controller.gasPayingTokenSymbol(), input.gasPayingTokenSymbol);
-
-        // Test NativeAssetLiquidity deployment and funding
-        INativeAssetLiquidity liquidity = INativeAssetLiquidity(Predeploys.NATIVE_ASSET_LIQUIDITY);
-        assertEq(address(liquidity).balance, type(uint248).max);
-
-        // Verify predeploys have code
-        assertGt(Predeploys.LIQUIDITY_CONTROLLER.code.length, 0);
-        assertGt(Predeploys.NATIVE_ASSET_LIQUIDITY.code.length, 0);
-    }
 }
 
 /// @title L2Genesis_Run_Test
@@ -173,14 +155,8 @@ contract L2Genesis_Run_Test is L2Genesis_TestInit {
             fork: uint256(LATEST_FORK),
             enableGovernance: true,
             fundDevAccounts: true,
-            useRevenueShare: true,
             chainFeesRecipient: address(0x000000000000000000000000000000000000000b),
-            l1FeesDepositor: address(0x000000000000000000000000000000000000000C),
-            useCustomGasToken: false,
-            gasPayingTokenName: "",
-            gasPayingTokenSymbol: "",
-            nativeAssetLiquidityAmount: type(uint248).max,
-            liquidityControllerOwner: address(0x000000000000000000000000000000000000000d)
+            l1FeesDepositor: address(0x000000000000000000000000000000000000000C)
         });
     }
 
@@ -191,67 +167,5 @@ contract L2Genesis_Run_Test is L2Genesis_TestInit {
         testPredeploys();
         testFactories();
         testForks();
-    }
-
-    /// @notice Helper function to configure input for CGT enabled tests.
-    function _setInputCGTEnabled() internal {
-        input.useCustomGasToken = true;
-        input.gasPayingTokenName = "Custom Gas Token";
-        input.gasPayingTokenSymbol = "CGT";
-        input.useRevenueShare = false;
-    }
-
-    /// @notice Tests that the run function succeeds when CGT is enabled.
-    /// @dev Tests that LiquidityController and NativeAssetLiquidity are deployed.
-    function test_run_cgt_succeeds() external {
-        _setInputCGTEnabled();
-        genesis.run(input);
-
-        testProxyAdmin();
-        testPredeploys();
-        testVaultsWithoutRevenueShare();
-        testFactories();
-        testForks();
-        testCGT();
-    }
-
-    /// @notice Tests that the run function reverts when CGT is enabled and sequencerFeeVault withdrawal network is L1.
-    function test_cgt_sequencerVault_reverts() external {
-        _setInputCGTEnabled();
-        input.sequencerFeeVaultWithdrawalNetwork = 0;
-        vm.expectRevert("FeeVault: withdrawalNetwork type cannot be L1 when custom gas token is enabled");
-        genesis.run(input);
-    }
-
-    /// @notice Tests that the run function reverts when CGT is enabled and baseFeeVault withdrawal network is L1.
-    function test_cgt_baseFeeVault_reverts() external {
-        _setInputCGTEnabled();
-        input.baseFeeVaultWithdrawalNetwork = 0;
-        vm.expectRevert("FeeVault: withdrawalNetwork type cannot be L1 when custom gas token is enabled");
-        genesis.run(input);
-    }
-
-    /// @notice Tests that the run function reverts when CGT is enabled and l1FeeVault withdrawal network is L1.
-    function test_cgt_l1FeeVault_reverts() external {
-        _setInputCGTEnabled();
-        input.l1FeeVaultWithdrawalNetwork = 0;
-        vm.expectRevert("FeeVault: withdrawalNetwork type cannot be L1 when custom gas token is enabled");
-        genesis.run(input);
-    }
-
-    /// @notice Tests that the run function reverts when nativeAssetLiquidityAmount exceeds type(uint248).max.
-    function test_cgt_liquidityAmount_reverts() external {
-        _setInputCGTEnabled();
-        input.nativeAssetLiquidityAmount = uint256(type(uint248).max) + 1;
-        vm.expectRevert("L2Genesis: native asset liquidity amount must be less than or equal to type(uint248).max");
-        genesis.run(input);
-    }
-
-    /// @notice Tests that enabling both CGT and revenue share reverts.
-    function test_cgt_revenueShare_reverts() external {
-        _setInputCGTEnabled();
-        input.useRevenueShare = true;
-        vm.expectRevert("FeeVault: custom gas token and revenue share cannot be enabled together");
-        genesis.run(input);
     }
 }

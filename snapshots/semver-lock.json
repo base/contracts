@@ -16,8 +16,8 @@
     "sourceCodeHash": "0xf45435ba73c89393d8441aab7dfe46070ba4fed3e2ddfc4ff247c6ac7703cdc9"
   },
   "src/L1/OPContractsManager.sol:OPContractsManager": {
-    "initCodeHash": "0x79699e5355551010e3f67329f6d0b3b360cb5a75eaaaaa915df8db39426a25fe",
-    "sourceCodeHash": "0x609a0ca12b45933242a3049b7ba730a670fa89d18d633f32a09df0c539085a9c"
+    "initCodeHash": "0xf554e50e4e03ab2a05d550fb927e92752662cc533a8c4c84dd1d788c6f496cdf",
+    "sourceCodeHash": "0xf4eb858b9bf57f59dc0e64674c48238a8fc8442313e60ce9ff6f1b2e3e1bbfa2"
   },
   "src/L1/OPContractsManagerStandardValidator.sol:OPContractsManagerStandardValidator": {
     "initCodeHash": "0x61227f43a0bcdfd5542f182d50ce5d82f80e0144345f65bf3b8f5582858afdbb",
@@ -47,10 +47,6 @@
     "initCodeHash": "0xa6dd2668435fc510161fb2085e2fd77ef0cd6735d3e96a3f839b10c064f00317",
     "sourceCodeHash": "0x6551be49dcb0e2a80e9c1042e7964dc41f70bcb08f9ceefd0c0156de9c14cf2d"
   },
-  "src/L2/L1BlockCGT.sol:L1BlockCGT": {
-    "initCodeHash": "0x98094c7af5b4a370cdf5cb5f1501f4c4e7f51e38379c9791a865f34232a75d37",
-    "sourceCodeHash": "0x97b84b125df97ca4ad6fb1bd5c05998115970f37e71d7bccb5b902144fb8f8de"
-  },
   "src/L2/L1FeeVault.sol:L1FeeVault": {
     "initCodeHash": "0x838bbd7f381e84e21887f72bd1da605bfc4588b3c39aed96cbce67c09335b3ee",
     "sourceCodeHash": "0x34186bcab29963237b4e0d7575b0a1cff7caf42ccdb55d4b2b2c767db3279189"
@@ -70,18 +66,6 @@
   "src/L2/L2ToL1MessagePasser.sol:L2ToL1MessagePasser": {
     "initCodeHash": "0xe30675ea6623cd7390dd2cd1e9a523c92c66956dfab86d06e318eb410cd1989b",
     "sourceCodeHash": "0xdc7bd63134eeab163a635950f2afd16b59f40f9cf1306f2ed33ad661cc7b4962"
-  },
-  "src/L2/L2ToL1MessagePasserCGT.sol:L2ToL1MessagePasserCGT": {
-    "initCodeHash": "0xf36eab44c41249b4d8ea95a21b70f1eae55b1a555384870c2f4ca306fa9121b6",
-    "sourceCodeHash": "0xec1736e67134e22ad9ceb0b8b6c116fd169637aa6729c05d9f0f4b02547aaac0"
-  },
-  "src/L2/LiquidityController.sol:LiquidityController": {
-    "initCodeHash": "0xe492fe75e3c0a8a80ede7b50271263c42a2c7616a101861e892dba76f9771e34",
-    "sourceCodeHash": "0xef9cf289b4bf63808b6822fc2c588fe516abbbfb90479553e7d54d43de344e50"
-  },
-  "src/L2/NativeAssetLiquidity.sol:NativeAssetLiquidity": {
-    "initCodeHash": "0x04b176e5d484e54173a5644c833117c5fd9f055dce8678be9ec4cf07c0f01f00",
-    "sourceCodeHash": "0x79289174e875ead5a6290df9af1951d6c0ff0dc6809601e1c7a80110ceb8e945"
   },
   "src/L2/OperatorFeeVault.sol:OperatorFeeVault": {
     "initCodeHash": "0x2ebab6af089a714df25888a4dea81dadcb1fb57146be84d2e079041a9396a810",
