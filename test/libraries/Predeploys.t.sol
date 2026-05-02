@@ -70,8 +70,7 @@ abstract contract Predeploys_TestInit is CommonTest {
                 continue;
             }
 
-            bool isPredeploy =
-                Predeploys.isSupportedPredeploy(addr, _isCustomGasToken);
+            bool isPredeploy = Predeploys.isSupportedPredeploy(addr, _isCustomGasToken);
 
             bytes memory code = addr.code;
             if (isPredeploy) assertTrue(code.length > 0);

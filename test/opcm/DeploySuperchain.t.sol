@@ -22,22 +22,12 @@ contract DeploySuperchain_Test is Test {
         return keccak256(abi.encode(_seed, _i));
     }
 
-    function testFuzz_run_memory_succeeds(
-        address _superchainProxyAdminOwner,
-        address _guardian,
-        bool _paused
-    )
-        public
-    {
+    function testFuzz_run_memory_succeeds(address _superchainProxyAdminOwner, address _guardian, bool _paused) public {
         vm.assume(_superchainProxyAdminOwner != address(0));
         vm.assume(_guardian != address(0));
 
-        DeploySuperchain.Input memory dsi = DeploySuperchain.Input(
-            _guardian,
-            address(0),
-            _superchainProxyAdminOwner,
-            _paused
-        );
+        DeploySuperchain.Input memory dsi =
+            DeploySuperchain.Input(_guardian, address(0), _superchainProxyAdminOwner, _paused);
 
         // Run the deployment script.
         DeploySuperchain.Output memory dso = deploySuperchain.run(dsi);
@@ -84,11 +74,6 @@ contract DeploySuperchain_Test is Test {
     }
 
     function defaultInput() internal view returns (DeploySuperchain.Input memory input_) {
-        input_ = DeploySuperchain.Input(
-            defaultGuardian,
-            address(0),
-            defaultProxyAdminOwner,
-            defaultPaused
-        );
+        input_ = DeploySuperchain.Input(defaultGuardian, address(0), defaultProxyAdminOwner, defaultPaused);
     }
 }
