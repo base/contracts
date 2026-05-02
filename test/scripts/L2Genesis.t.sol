@@ -63,7 +63,7 @@ abstract contract L2Genesis_TestInit is Test {
             assertEq(Predeploys.PROXY_ADMIN, EIP1967Helper.getAdmin(addr));
 
             // If it's not a supported predeploy, skip next checks.
-            if (!Predeploys.isSupportedPredeploy(addr, uint256(LATEST_FORK), true, input.useCustomGasToken)) {
+            if (!Predeploys.isSupportedPredeploy(addr, input.useCustomGasToken)) {
                 continue;
             }
 
@@ -229,7 +229,6 @@ contract L2Genesis_Run_Test is L2Genesis_TestInit {
             operatorFeeVaultWithdrawalNetwork: 1,
             governanceTokenOwner: address(0x0000000000000000000000000000000000000009),
             fork: uint256(LATEST_FORK),
-            deployCrossL2Inbox: true,
             enableGovernance: true,
             fundDevAccounts: true,
             useRevenueShare: true,

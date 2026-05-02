@@ -38,27 +38,22 @@ import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 import { IBigStepper } from "interfaces/dispute/IBigStepper.sol";
 import { IL2CrossDomainMessenger } from "interfaces/L2/IL2CrossDomainMessenger.sol";
-import { IL2StandardBridgeInterop } from "interfaces/L2/IL2StandardBridgeInterop.sol";
+import { IL2StandardBridge } from "interfaces/L2/IL2StandardBridge.sol";
 import { IL2ToL1MessagePasser } from "interfaces/L2/IL2ToL1MessagePasser.sol";
 import { IL2ERC721Bridge } from "interfaces/L2/IL2ERC721Bridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
-import { IOptimismSuperchainERC20Factory } from "interfaces/L2/IOptimismSuperchainERC20Factory.sol";
 import { IBaseFeeVault } from "interfaces/L2/IBaseFeeVault.sol";
 import { ISequencerFeeVault } from "interfaces/L2/ISequencerFeeVault.sol";
 import { IL1FeeVault } from "interfaces/L2/IL1FeeVault.sol";
 import { IOperatorFeeVault } from "interfaces/L2/IOperatorFeeVault.sol";
 import { IGasPriceOracle } from "interfaces/L2/IGasPriceOracle.sol";
 import { IL1Block } from "interfaces/L2/IL1Block.sol";
-import { ISuperchainETHBridge } from "interfaces/L2/ISuperchainETHBridge.sol";
-import { IETHLiquidity } from "interfaces/L2/IETHLiquidity.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IWETH98 } from "interfaces/universal/IWETH98.sol";
 import { ILegacyMessagePasser } from "interfaces/legacy/ILegacyMessagePasser.sol";
-import { ISuperchainTokenBridge } from "interfaces/L2/ISuperchainTokenBridge.sol";
 import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
 import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
-import { ICrossL2Inbox } from "interfaces/L2/ICrossL2Inbox.sol";
 import { ILiquidityController } from "interfaces/L2/ILiquidityController.sol";
 import { INativeAssetLiquidity } from "interfaces/L2/INativeAssetLiquidity.sol";
 import { IFeeSplitter } from "interfaces/L2/IFeeSplitter.sol";
@@ -124,10 +119,9 @@ abstract contract Setup is FeatureFlags {
     IBigStepper mips;
 
     // L2 contracts
-    ICrossL2Inbox crossL2Inbox = ICrossL2Inbox(payable(Predeploys.CROSS_L2_INBOX));
     IL2CrossDomainMessenger l2CrossDomainMessenger =
         IL2CrossDomainMessenger(payable(Predeploys.L2_CROSS_DOMAIN_MESSENGER));
-    IL2StandardBridgeInterop l2StandardBridge = IL2StandardBridgeInterop(payable(Predeploys.L2_STANDARD_BRIDGE));
+    IL2StandardBridge l2StandardBridge = IL2StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE));
     IL2ToL1MessagePasser l2ToL1MessagePasser = IL2ToL1MessagePasser(payable(Predeploys.L2_TO_L1_MESSAGE_PASSER));
     IOptimismMintableERC20Factory l2OptimismMintableERC20Factory =
         IOptimismMintableERC20Factory(Predeploys.OPTIMISM_MINTABLE_ERC20_FACTORY);
@@ -142,11 +136,6 @@ abstract contract Setup is FeatureFlags {
     IL1Block l1Block = IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES);
     ILegacyMessagePasser legacyMessagePasser = ILegacyMessagePasser(Predeploys.LEGACY_MESSAGE_PASSER);
     IWETH98 weth = IWETH98(payable(Predeploys.WETH));
-    ISuperchainETHBridge superchainETHBridge = ISuperchainETHBridge(payable(Predeploys.SUPERCHAIN_ETH_BRIDGE));
-    IETHLiquidity ethLiquidity = IETHLiquidity(Predeploys.ETH_LIQUIDITY);
-    ISuperchainTokenBridge superchainTokenBridge = ISuperchainTokenBridge(Predeploys.SUPERCHAIN_TOKEN_BRIDGE);
-    IOptimismSuperchainERC20Factory l2OptimismSuperchainERC20Factory =
-        IOptimismSuperchainERC20Factory(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_FACTORY);
     ILiquidityController liquidityController = ILiquidityController(Predeploys.LIQUIDITY_CONTROLLER);
     INativeAssetLiquidity nativeAssetLiquidity = INativeAssetLiquidity(Predeploys.NATIVE_ASSET_LIQUIDITY);
     IFeeSplitter feeSplitter = IFeeSplitter(payable(Predeploys.FEE_SPLITTER));
@@ -330,7 +319,6 @@ abstract contract Setup is FeatureFlags {
                 operatorFeeVaultWithdrawalNetwork: deploy.cfg().operatorFeeVaultWithdrawalNetwork(),
                 governanceTokenOwner: deploy.cfg().governanceTokenOwner(),
                 fork: uint256(l2Fork),
-                deployCrossL2Inbox: deploy.cfg().useInterop(),
                 enableGovernance: deploy.cfg().enableGovernance(),
                 fundDevAccounts: deploy.cfg().fundDevAccounts(),
                 useRevenueShare: deploy.cfg().useRevenueShare(),
@@ -367,11 +355,6 @@ abstract contract Setup is FeatureFlags {
         labelPredeploy(Predeploys.EAS);
         labelPredeploy(Predeploys.SCHEMA_REGISTRY);
         labelPredeploy(Predeploys.WETH);
-        labelPredeploy(Predeploys.SUPERCHAIN_ETH_BRIDGE);
-        labelPredeploy(Predeploys.ETH_LIQUIDITY);
-        labelPredeploy(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_FACTORY);
-        labelPredeploy(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_BEACON);
-        labelPredeploy(Predeploys.SUPERCHAIN_TOKEN_BRIDGE);
         labelPredeploy(Predeploys.NATIVE_ASSET_LIQUIDITY);
         labelPredeploy(Predeploys.LIQUIDITY_CONTROLLER);
         labelPredeploy(Predeploys.FEE_SPLITTER);

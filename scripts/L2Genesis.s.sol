@@ -69,7 +69,6 @@ contract L2Genesis is Script {
         uint256 operatorFeeVaultWithdrawalNetwork;
         address governanceTokenOwner;
         uint256 fork;
-        bool deployCrossL2Inbox;
         bool enableGovernance;
         bool fundDevAccounts;
         bool useRevenueShare;
@@ -220,7 +219,7 @@ contract L2Genesis is Script {
             vm.etch(addr, code);
             EIP1967Helper.setAdmin(addr, Predeploys.PROXY_ADMIN);
 
-            if (Predeploys.isSupportedPredeploy(addr, _input.fork, _input.deployCrossL2Inbox, _input.useCustomGasToken))
+            if (Predeploys.isSupportedPredeploy(addr, _input.useCustomGasToken))
             {
                 address implementation = Predeploys.predeployToCodeNamespace(addr);
                 EIP1967Helper.setImplementation(addr, implementation);
@@ -256,12 +255,6 @@ contract L2Genesis is Script {
         setSchemaRegistry(); // 20
         setEAS(); // 21
         setFeeSplitter(_input); // 2B: FeeSplitter
-        if (_input.fork >= uint256(Fork.INTEROP)) {
-            if (_input.deployCrossL2Inbox) {
-                setCrossL2Inbox(); // 22
-            }
-            setL2ToL2CrossDomainMessenger(); // 23
-        }
         if (_input.useCustomGasToken) {
             setLiquidityController(_input); // 29
             setNativeAssetLiquidity(_input); // 2A
@@ -467,52 +460,6 @@ contract L2Genesis is Script {
         /// Reset so its not included state dump
         vm.etch(address(eas), "");
         vm.resetNonce(address(eas));
-    }
-
-    /// @notice This predeploy is following the safety invariant #1.
-    ///         This contract has no initializer.
-    function setCrossL2Inbox() internal {
-        _setImplementationCode(Predeploys.CROSS_L2_INBOX);
-    }
-
-    /// @notice This predeploy is following the safety invariant #1.
-    ///         This contract has no initializer.
-    function setL2ToL2CrossDomainMessenger() internal {
-        _setImplementationCode(Predeploys.L2_TO_L2_CROSS_DOMAIN_MESSENGER);
-    }
-
-    /// @notice This predeploy is following the safety invariant #1.
-    ///         This contract has no initializer.
-    function setETHLiquidity() internal {
-        _setImplementationCode(Predeploys.ETH_LIQUIDITY);
-        vm.deal(Predeploys.ETH_LIQUIDITY, type(uint248).max);
-    }
-
-    /// @notice This predeploy is following the safety invariant #1.
-    ///         This contract has no initializer.
-    function setSuperchainETHBridge() internal {
-        _setImplementationCode(Predeploys.SUPERCHAIN_ETH_BRIDGE);
-    }
-
-    /// @notice This predeploy is following the safety invariant #1.
-    ///         This contract has no initializer.
-    function setOptimismSuperchainERC20Factory() internal {
-        _setImplementationCode(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_FACTORY);
-    }
-
-    /// @notice This predeploy is following the safety invariant #1.
-    ///         This contract has no initializer.
-    function setOptimismSuperchainERC20Beacon() internal {
-        address superchainERC20Impl = Predeploys.OPTIMISM_SUPERCHAIN_ERC20;
-        vm.etch(superchainERC20Impl, vm.getDeployedCode("OptimismSuperchainERC20.sol:OptimismSuperchainERC20"));
-
-        _setImplementationCode(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_BEACON);
-    }
-
-    /// @notice This predeploy is following the safety invariant #1.
-    ///         This contract has no initializer.
-    function setSuperchainTokenBridge() internal {
-        _setImplementationCode(Predeploys.SUPERCHAIN_TOKEN_BRIDGE);
     }
 
     /// @notice This predeploy is following the safety invariant #1.
