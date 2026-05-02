@@ -12,7 +12,6 @@ import { DelegateCaller } from "test/mocks/Callers.sol";
 // Scripts
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Deploy } from "scripts/deploy/Deploy.s.sol";
-import { VerifyOPCM } from "scripts/deploy/VerifyOPCM.s.sol";
 import { DeployOPChain } from "scripts/deploy/DeployOPChain.s.sol";
 
 // Libraries
@@ -29,7 +28,6 @@ import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.so
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
 import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
@@ -69,8 +67,7 @@ contract OPContractsManager_Harness is OPContractsManager {
         OPContractsManagerUpgrader _opcmUpgrader,
         OPContractsManagerInteropMigrator _opcmInteropMigrator,
         OPContractsManagerStandardValidator _opcmStandardValidator,
-        ISuperchainConfig _superchainConfig,
-        IProtocolVersions _protocolVersions
+        ISuperchainConfig _superchainConfig
     )
         OPContractsManager(
             _opcmGameTypeAdder,
@@ -78,8 +75,7 @@ contract OPContractsManager_Harness is OPContractsManager {
             _opcmUpgrader,
             _opcmInteropMigrator,
             _opcmStandardValidator,
-            _superchainConfig,
-            _protocolVersions
+            _superchainConfig
         )
     { }
 
@@ -441,12 +437,6 @@ abstract contract OPContractsManager_TestInit is CommonTest, DisputeGames {
         vm.deal(address(chainDeployOutput2.ethLockboxProxy), 100 ether);
     }
 
-    /// @notice Sets up the environment variables for the VerifyOPCM test.
-    function setupEnvVars() public {
-        vm.setEnv("EXPECTED_SUPERCHAIN_CONFIG", vm.toString(address(opcm.superchainConfig())));
-        vm.setEnv("EXPECTED_PROTOCOL_VERSIONS", vm.toString(address(opcm.protocolVersions())));
-    }
-
     /// @notice Helper function to deploy a new set of L1 contracts via OPCM.
     /// @param _l2ChainId The L2 chain ID to deploy the contracts for.
     /// @return The deployed contracts.
@@ -536,14 +526,11 @@ contract OPContractsManager_ChainIdToBatchInboxAddress_Test is Test, FeatureFlag
 
     function setUp() public {
         ISuperchainConfig superchainConfigProxy = ISuperchainConfig(makeAddr("superchainConfig"));
-        IProtocolVersions protocolVersionsProxy = IProtocolVersions(makeAddr("protocolVersions"));
         IProxyAdmin superchainProxyAdmin = IProxyAdmin(makeAddr("superchainProxyAdmin"));
         OPContractsManager.Blueprints memory emptyBlueprints;
         OPContractsManager.Implementations memory emptyImpls;
         vm.etch(address(superchainConfigProxy), hex"01");
-        vm.etch(address(protocolVersionsProxy), hex"01");
 
-        resolveFeaturesFromEnv();
         OPContractsManagerContractsContainer container =
             new OPContractsManagerContractsContainer(emptyBlueprints, emptyImpls, devFeatureBitmap);
 
@@ -561,8 +548,7 @@ contract OPContractsManager_ChainIdToBatchInboxAddress_Test is Test, FeatureFlag
             _opcmStandardValidator: new OPContractsManagerStandardValidator(
                 opcmImplementations, superchainConfigProxy, address(superchainProxyAdmin), challenger, 100, bytes32(0)
             ),
-            _superchainConfig: superchainConfigProxy,
-            _protocolVersions: protocolVersionsProxy
+            _superchainConfig: superchainConfigProxy
         });
     }
 
@@ -807,28 +793,6 @@ contract OPContractsManager_AddGameType_Test is OPContractsManager_TestInit {
 
         // L2 chain ID call should not revert because this is not a Super game.
         assertNotEq(notPDG.l2ChainId(), 0, "l2ChainId should not be zero");
-    }
-
-    /// @notice Tests that addGameType will revert if the game type is cannon-kona and the dev feature is not enabled
-    function test_addGameType_superCannonKonaGameType_succeeds() public {
-        skipIfDevFeatureDisabled(DevFeatures.OPTIMISM_PORTAL_INTEROP);
-        // Create the input for the cannon-kona game type.
-        IOPContractsManager.AddGameInput memory input = newGameInputFactory(GameTypes.SUPER_CANNON_KONA);
-
-        // Run the addGameType call.
-        IOPContractsManager.AddGameOutput memory output = addGameType(input);
-        assertValidGameType(input, output);
-
-        // Grab the new game type.
-        IPermissionedDisputeGameV2 notPDG = IPermissionedDisputeGameV2(address(output.faultDisputeGame));
-
-        // Proposer should fail, this is a permissionless game.
-        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
-        notPDG.proposer();
-
-        // Super games don't have the l2ChainId function.
-        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
-        notPDG.l2ChainId();
     }
 }
 
@@ -1121,23 +1085,6 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
         runCurrentUpgrade(upgrader);
     }
 
-    function test_verifyOpcmCorrectness_succeeds() public {
-        skipIfCoverage(); // Coverage changes bytecode and breaks the verification script.
-
-        // Set up environment variables with the actual OPCM addresses for tests that need themqq
-        vm.setEnv("EXPECTED_SUPERCHAIN_CONFIG", vm.toString(address(opcm.superchainConfig())));
-        vm.setEnv("EXPECTED_PROTOCOL_VERSIONS", vm.toString(address(opcm.protocolVersions())));
-
-        // Run the upgrade test and checks
-        runCurrentUpgrade(upgrader);
-
-        // Run the verification script without etherscan verification. Hard to run with etherscan
-        // verification in these tests, can do it but means we add even more dependencies to the
-        // test environment.
-        VerifyOPCM verify = new VerifyOPCM();
-        verify.run(address(opcm), true);
-    }
-
     function test_upgrade_duplicateL2ChainId_succeeds() public {
         // Deploy a new OPChain with the same L2 chain ID as the current OPChain
         Deploy deploy = Deploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
@@ -1418,12 +1365,6 @@ contract OPContractsManager_Migrate_Test is OPContractsManager_TestInit {
     Claim cannonKonaPrestate2 = Claim.wrap(bytes32(hex"DEADBEEF"));
     Claim emptyPrestate = Claim.wrap(bytes32(0));
 
-    /// @notice Function requires interop portal.
-    function setUp() public override {
-        super.setUp();
-        skipIfDevFeatureDisabled(DevFeatures.OPTIMISM_PORTAL_INTEROP);
-    }
-
     /// @notice Helper function to create the default migration input.
     function _getDefaultInput() internal view returns (IOPContractsManagerInteropMigrator.MigrateInput memory) {
         IOPContractsManagerInteropMigrator.GameParameters memory gameParameters =
@@ -1599,38 +1540,6 @@ contract OPContractsManager_Migrate_Test is OPContractsManager_TestInit {
         }
     }
 
-    /// @notice Tests that the migration function succeeds when requesting to use the
-    ///         permissionless game.
-    function test_migrate_withPermissionlessGame_succeeds() public {
-        IOPContractsManagerInteropMigrator.MigrateInput memory input = _getDefaultInput();
-        (IAnchorStateRegistry asr, IDisputeGameFactory dgf) = _runMigrationAndStandardChecks(input);
-
-        // Check the respected game type
-        assertEq(asr.respectedGameType().raw(), GameTypes.SUPER_CANNON.raw(), "Super Cannon game type mismatch");
-
-        // Check initial bonds
-        assertEq(
-            dgf.initBonds(GameTypes.SUPER_CANNON), input.gameParameters.initBond, "Super Cannon init bond mismatch"
-        );
-        assertEq(
-            dgf.initBonds(GameTypes.SUPER_PERMISSIONED_CANNON),
-            input.gameParameters.initBond,
-            "Super Permissioned Cannon init bond mismatch"
-        );
-        assertEq(
-            dgf.initBonds(GameTypes.SUPER_CANNON_KONA),
-            input.gameParameters.initBond,
-            "Super CannonKona init bond mismatch"
-        );
-
-        // Check game configuration
-        _validateSuperGameImplParams(input, dgf, GameTypes.SUPER_PERMISSIONED_CANNON, "SUPER_PERMISSIONED_CANNON");
-        _validateSuperGameImplParams(input, dgf, GameTypes.SUPER_CANNON, "SUPER_CANNON");
-        _validateSuperGameImplParams(input, dgf, GameTypes.SUPER_CANNON_KONA, "SUPER_CANNON_KONA");
-
-        _runPostMigrateSmokeTests(input);
-    }
-
     /// @notice Tests that permissionless migration reverts when cannon prestates are empty.
     function test_migrate_permissionlessWithEmptyCannonPrestate_reverts() public {
         IOPContractsManagerInteropMigrator.MigrateInput memory input = _getDefaultInput();
@@ -1639,66 +1548,6 @@ contract OPContractsManager_Migrate_Test is OPContractsManager_TestInit {
 
         // Execute the migration.
         _doMigration(input, IOPContractsManager.PrestateNotSet.selector);
-    }
-
-    /// @notice Tests that the permissionless migration succeeds when cannonKona prestates are empty.
-    function test_migrate_permissionlessWithEmptyCannonKonaPrestate_succeeds() public {
-        IOPContractsManagerInteropMigrator.MigrateInput memory input = _getDefaultInput();
-        input.opChainConfigs[0].cannonKonaPrestate = emptyPrestate;
-        input.opChainConfigs[1].cannonKonaPrestate = emptyPrestate;
-        (IAnchorStateRegistry asr, IDisputeGameFactory dgf) = _runMigrationAndStandardChecks(input);
-
-        // Check the respected game type
-        assertEq(asr.respectedGameType().raw(), GameTypes.SUPER_CANNON.raw(), "Super Cannon game type mismatch");
-
-        // Check initial bonds
-        assertEq(
-            dgf.initBonds(GameTypes.SUPER_CANNON), input.gameParameters.initBond, "Super Cannon init bond mismatch"
-        );
-        assertEq(
-            dgf.initBonds(GameTypes.SUPER_PERMISSIONED_CANNON),
-            input.gameParameters.initBond,
-            "Super Permissioned Cannon init bond mismatch"
-        );
-        assertEq(dgf.initBonds(GameTypes.SUPER_CANNON_KONA), uint256(0), "Super CannonKona init bond should be zero");
-
-        // Check game configuration
-        _validateSuperGameImplParams(input, dgf, GameTypes.SUPER_PERMISSIONED_CANNON, "SUPER_PERMISSIONED_CANNON");
-        _validateSuperGameImplParams(input, dgf, GameTypes.SUPER_CANNON, "SUPER_CANNON");
-        _assertGameIsEmpty(dgf, GameTypes.SUPER_CANNON_KONA, "SUPER_CANNON_KONA");
-
-        _runPostMigrateSmokeTests(input);
-    }
-
-    /// @notice Tests that the migration function succeeds when requesting to not use the
-    ///         permissioned game (no permissioned game is deployed).
-    function test_migrate_withoutPermissionlessGame_succeeds() public {
-        IOPContractsManagerInteropMigrator.MigrateInput memory input = _getDefaultInput();
-        input.usePermissionlessGame = false;
-        (IAnchorStateRegistry asr, IDisputeGameFactory dgf) = _runMigrationAndStandardChecks(input);
-
-        // Check the respected game type
-        assertEq(
-            asr.respectedGameType().raw(),
-            GameTypes.SUPER_PERMISSIONED_CANNON.raw(),
-            "Super Permissioned Cannon game type mismatch"
-        );
-
-        // Check intial bonds
-        assertEq(
-            dgf.initBonds(GameTypes.SUPER_PERMISSIONED_CANNON),
-            input.gameParameters.initBond,
-            "Super Permissioned Cannon init bond mismatch"
-        );
-        assertEq(dgf.initBonds(GameTypes.SUPER_CANNON), 0, "Super Cannon init bond mismatch");
-        assertEq(dgf.initBonds(GameTypes.SUPER_CANNON_KONA), 0, "Super CannonKona init bond mismatch");
-
-        // Check game configuration
-        _validateSuperGameImplParams(input, dgf, GameTypes.SUPER_PERMISSIONED_CANNON, "SUPER_PERMISSIONED_CANNON");
-        _assertGameIsEmpty(dgf, GameTypes.SUPER_CANNON, "SUPER_CANNON");
-        _assertGameIsEmpty(dgf, GameTypes.SUPER_CANNON_KONA, "SUPER_CANNON_KONA");
-
-        _runPostMigrateSmokeTests(input);
     }
 
     /// @notice Tests that permissioned migration reverts when cannon prestates are empty.
@@ -1862,51 +1711,6 @@ contract OPContractsManager_Migrate_Test is OPContractsManager_TestInit {
         _doMigration(
             input, OPContractsManagerInteropMigrator.OPContractsManagerInteropMigrator_AbsolutePrestateMismatch.selector
         );
-    }
-
-    /// @notice Tests that the migration function reverts when the SuperchainConfig addresses are
-    ///         mismatched.
-    function test_migrate_mismatchedSuperchainConfig_reverts() public {
-        IOPContractsManagerInteropMigrator.MigrateInput memory input = _getDefaultInput();
-
-        // Mock out the SuperchainConfig addresses to be different.
-        vm.mockCall(
-            address(chainDeployOutput1.optimismPortalProxy),
-            abi.encodeCall(IOptimismPortal2.superchainConfig, ()),
-            abi.encode(address(1234))
-        );
-        vm.mockCall(
-            address(chainDeployOutput2.optimismPortalProxy),
-            abi.encodeCall(IOptimismPortal2.superchainConfig, ()),
-            abi.encode(address(5678))
-        );
-
-        // Execute the migration.
-        _doMigration(
-            input, OPContractsManagerInteropMigrator.OPContractsManagerInteropMigrator_SuperchainConfigMismatch.selector
-        );
-    }
-
-    function test_migrate_zerosOutCannonKonaGameTypes_succeeds() public {
-        IOPContractsManagerInteropMigrator.MigrateInput memory input = _getDefaultInput();
-
-        // Grab the existing DisputeGameFactory for each chain.
-        IDisputeGameFactory oldDisputeGameFactory1 =
-            IDisputeGameFactory(payable(chainDeployOutput1.systemConfigProxy.disputeGameFactory()));
-        IDisputeGameFactory oldDisputeGameFactory2 =
-            IDisputeGameFactory(payable(chainDeployOutput2.systemConfigProxy.disputeGameFactory()));
-        // Ensure cannon kona games have implementations
-        oldDisputeGameFactory1.setImplementation(GameTypes.CANNON_KONA, IDisputeGame(address(1)));
-        oldDisputeGameFactory2.setImplementation(GameTypes.CANNON_KONA, IDisputeGame(address(1)));
-        oldDisputeGameFactory1.setImplementation(GameTypes.SUPER_CANNON_KONA, IDisputeGame(address(2)));
-        oldDisputeGameFactory2.setImplementation(GameTypes.SUPER_CANNON_KONA, IDisputeGame(address(2)));
-
-        // Execute the migration.
-        _doMigration(input);
-
-        // Assert that the old game implementations are now zeroed out.
-        _assertOldGamesZeroed(oldDisputeGameFactory1);
-        _assertOldGamesZeroed(oldDisputeGameFactory2);
     }
 }
 

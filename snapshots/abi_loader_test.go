@@ -13,7 +13,6 @@ func TestLoadABIs(t *testing.T) {
 		method   func() *abi.ABI
 	}{
 		{"DisputeGameFactory", LoadDisputeGameFactoryABI},
-		{"FaultDisputeGame", LoadFaultDisputeGameABI},
 		{"PreimageOracle", LoadPreimageOracleABI},
 		{"MIPS", LoadMIPSABI},
 		{"DelayedWETH", LoadDelayedWETHABI},

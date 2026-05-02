@@ -30,8 +30,6 @@ src_validation = [
     "test/universal/ExtendedPause.t.sol",  # Tests extended functionality
     "test/vendor/Initializable.t.sol",     # Tests external vendor code
     "test/vendor/InitializableOZv5.t.sol", # Tests external vendor code
-	"test/L2/LegacyFeeSplitter.t.sol",     # Tests legacy fee splitter with updated vaults interface
-	"test/L2/FeeSplitterVaults.t.sol",     # Tests FeeSplitter with vault-specific scenarios using test helper
 	"test/dispute/zk/OptimisticZkGame.t.sol", # Renamed from OPSuccinctFaultDisputeGame - artifacts may reference old name
 ]
 
@@ -54,9 +52,6 @@ contract_name_validation = [
     "test/dispute/v2/FaultDisputeGameV2.t.sol",           # Contains contracts not matching FaultDisputeGameV2 base name
     "test/L1/ResourceMetering.t.sol",                     # Contains contracts not matching ResourceMetering base name
     "test/L1/OPContractsManagerStandardValidator.t.sol",  # Contains contracts not matching OPContractsManagerStandardValidator base name
-    "test/L2/CrossDomainOwnable.t.sol",                   # Contains contracts not matching CrossDomainOwnable base name
-    "test/L2/CrossDomainOwnable2.t.sol",                  # Contains contracts not matching CrossDomainOwnable2 base name
-    "test/L2/CrossDomainOwnable3.t.sol",                  # Contains contracts not matching CrossDomainOwnable3 base name
     "test/L2/GasPriceOracle.t.sol",                       # Contains contracts not matching GasPriceOracle base name
     "test/universal/StandardBridge.t.sol",                # Contains contracts not matching StandardBridge base name
     "test/L1/OPContractsManagerContractsContainer.t.sol", # Contains contracts not matching OPContractsManagerContractsContainer base name

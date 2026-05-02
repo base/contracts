@@ -23,15 +23,11 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
 
     // DeploySuperchain default inputs.
     address superchainProxyAdminOwner = makeAddr("superchainProxyAdminOwner");
-    address protocolVersionsOwner = makeAddr("protocolVersionsOwner");
     address guardian = makeAddr("guardian");
     bool paused = false;
-    bytes32 requiredProtocolVersion = bytes32(uint256(1));
-    bytes32 recommendedProtocolVersion = bytes32(uint256(2));
 
     // DeployImplementations default inputs.
-    // - superchainConfigProxy and protocolVersionsProxy are set during `setUp` since they are
-    //   outputs of DeploySuperchain.
+    // - superchainConfigProxy is set during `setUp` since it's an output of DeploySuperchain.
     uint256 withdrawalDelaySeconds = 100;
     uint256 minProposalSizeBytes = 200;
     uint256 challengePeriodSeconds = 300;
@@ -63,7 +59,6 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
     event Deployed(uint256 indexed l2ChainId, address indexed deployer, bytes deployOutput);
 
     function setUp() public virtual {
-        resolveFeaturesFromEnv();
         deploySuperchain = new DeploySuperchain();
         deployImplementations = new DeployImplementations();
         deployOPChain = new DeployOPChain();
@@ -72,12 +67,9 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
         DeploySuperchain.Output memory dso = deploySuperchain.run(
             DeploySuperchain.Input({
                 superchainProxyAdminOwner: superchainProxyAdminOwner,
-                protocolVersionsOwner: protocolVersionsOwner,
                 guardian: guardian,
                 incidentResponder: address(0),
-                paused: paused,
-                requiredProtocolVersion: requiredProtocolVersion,
-                recommendedProtocolVersion: recommendedProtocolVersion
+                paused: paused
             })
         );
 
@@ -102,7 +94,6 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
                 multiproofBlockInterval: 100,
                 multiproofIntermediateBlockInterval: 10,
                 superchainConfigProxy: dso.superchainConfigProxy,
-                protocolVersionsProxy: dso.protocolVersionsProxy,
                 superchainProxyAdmin: dso.superchainProxyAdmin,
                 l1ProxyAdminOwner: dso.superchainProxyAdmin.owner(),
                 challenger: challenger,

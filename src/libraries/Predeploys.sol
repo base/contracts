@@ -79,48 +79,17 @@ library Predeploys {
     /// @notice Address of the EAS predeploy.
     address internal constant EAS = 0x4200000000000000000000000000000000000021;
 
-    /// @notice Address of the GovernanceToken predeploy.
-    address internal constant GOVERNANCE_TOKEN = 0x4200000000000000000000000000000000000042;
-
     /// @custom:legacy
     /// @notice Address of the LegacyERC20ETH predeploy. Deprecated. Balances are migrated to the
     ///         state trie as of the Bedrock upgrade. Contract has been locked and write functions
     ///         can no longer be accessed.
     address internal constant LEGACY_ERC20_ETH = 0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000;
 
-    /// @notice Address of the CrossL2Inbox predeploy.
-    address internal constant CROSS_L2_INBOX = 0x4200000000000000000000000000000000000022;
-
-    /// @notice Address of the L2ToL2CrossDomainMessenger predeploy.
-    address internal constant L2_TO_L2_CROSS_DOMAIN_MESSENGER = 0x4200000000000000000000000000000000000023;
-
-    /// @notice Address of the SuperchainETHBridge predeploy.
-    address internal constant SUPERCHAIN_ETH_BRIDGE = 0x4200000000000000000000000000000000000024;
-
-    /// @notice Address of the ETHLiquidity predeploy.
-    address internal constant ETH_LIQUIDITY = 0x4200000000000000000000000000000000000025;
-
-    /// @notice Address of the OptimismSuperchainERC20Factory predeploy.
-    address internal constant OPTIMISM_SUPERCHAIN_ERC20_FACTORY = 0x4200000000000000000000000000000000000026;
-
-    /// @notice Address of the OptimismSuperchainERC20Beacon predeploy.
-    address internal constant OPTIMISM_SUPERCHAIN_ERC20_BEACON = 0x4200000000000000000000000000000000000027;
-
-    // TODO: Precalculate the address of the implementation contract
-    /// @notice Arbitrary address of the OptimismSuperchainERC20 implementation contract.
-    address internal constant OPTIMISM_SUPERCHAIN_ERC20 = 0xB9415c6cA93bdC545D4c5177512FCC22EFa38F28;
-
-    /// @notice Address of the SuperchainTokenBridge predeploy.
-    address internal constant SUPERCHAIN_TOKEN_BRIDGE = 0x4200000000000000000000000000000000000028;
-
     /// @notice Address of the NativeAssetLiquidity predeploy.
     address internal constant NATIVE_ASSET_LIQUIDITY = 0x4200000000000000000000000000000000000029;
 
     /// @notice Address of the LiquidityController predeploy.
     address internal constant LIQUIDITY_CONTROLLER = 0x420000000000000000000000000000000000002a;
-
-    /// @notice Address of the FeeSplitter predeploy.
-    address internal constant FEE_SPLITTER = 0x420000000000000000000000000000000000002B;
 
     /// @notice Returns the name of the predeploy at the given address.
     function getName(address _addr) internal pure returns (string memory out_) {
@@ -145,46 +114,25 @@ library Predeploys {
         if (_addr == OPERATOR_FEE_VAULT) return "OperatorFeeVault";
         if (_addr == SCHEMA_REGISTRY) return "SchemaRegistry";
         if (_addr == EAS) return "EAS";
-        if (_addr == GOVERNANCE_TOKEN) return "GovernanceToken";
         if (_addr == LEGACY_ERC20_ETH) return "LegacyERC20ETH";
-        if (_addr == CROSS_L2_INBOX) return "CrossL2Inbox";
-        if (_addr == L2_TO_L2_CROSS_DOMAIN_MESSENGER) return "L2ToL2CrossDomainMessenger";
-        if (_addr == SUPERCHAIN_ETH_BRIDGE) return "SuperchainETHBridge";
-        if (_addr == ETH_LIQUIDITY) return "ETHLiquidity";
-        if (_addr == OPTIMISM_SUPERCHAIN_ERC20_FACTORY) return "OptimismSuperchainERC20Factory";
-        if (_addr == OPTIMISM_SUPERCHAIN_ERC20_BEACON) return "OptimismSuperchainERC20Beacon";
-        if (_addr == SUPERCHAIN_TOKEN_BRIDGE) return "SuperchainTokenBridge";
         if (_addr == LIQUIDITY_CONTROLLER) return "LiquidityController";
         if (_addr == NATIVE_ASSET_LIQUIDITY) return "NativeAssetLiquidity";
-        if (_addr == FEE_SPLITTER) return "FeeSplitter";
         revert("Predeploys: unnamed predeploy");
     }
 
     /// @notice Returns true if the predeploy is not proxied.
     function notProxied(address _addr) internal pure returns (bool) {
-        return _addr == GOVERNANCE_TOKEN || _addr == WETH;
+        return _addr == WETH;
     }
 
     /// @notice Returns true if the address is a defined predeploy that is embedded into new OP-Stack chains.
-    function isSupportedPredeploy(
-        address _addr,
-        uint256 _fork,
-        bool _enableCrossL2Inbox,
-        bool _isCustomGasToken
-    )
-        internal
-        pure
-        returns (bool)
-    {
+    function isSupportedPredeploy(address _addr, bool _isCustomGasToken) internal pure returns (bool) {
         return _addr == LEGACY_MESSAGE_PASSER || _addr == DEPLOYER_WHITELIST || _addr == WETH
             || _addr == L2_CROSS_DOMAIN_MESSENGER || _addr == GAS_PRICE_ORACLE || _addr == L2_STANDARD_BRIDGE
             || _addr == SEQUENCER_FEE_WALLET || _addr == OPTIMISM_MINTABLE_ERC20_FACTORY || _addr == L1_BLOCK_NUMBER
             || _addr == L2_ERC721_BRIDGE || _addr == L1_BLOCK_ATTRIBUTES || _addr == L2_TO_L1_MESSAGE_PASSER
             || _addr == OPTIMISM_MINTABLE_ERC721_FACTORY || _addr == PROXY_ADMIN || _addr == BASE_FEE_VAULT
             || _addr == L1_FEE_VAULT || _addr == OPERATOR_FEE_VAULT || _addr == SCHEMA_REGISTRY || _addr == EAS
-            || _addr == GOVERNANCE_TOKEN || _addr == FEE_SPLITTER
-            || (_fork >= uint256(Fork.INTEROP) && _enableCrossL2Inbox && _addr == CROSS_L2_INBOX)
-            || (_fork >= uint256(Fork.INTEROP) && _addr == L2_TO_L2_CROSS_DOMAIN_MESSENGER)
             || (_isCustomGasToken && _addr == LIQUIDITY_CONTROLLER)
             || (_isCustomGasToken && _addr == NATIVE_ASSET_LIQUIDITY);
     }

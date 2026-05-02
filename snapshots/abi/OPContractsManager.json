@@ -30,11 +30,6 @@
         "internalType": "contract ISuperchainConfig",
         "name": "_superchainConfig",
         "type": "address"
-      },
-      {
-        "internalType": "contract IProtocolVersions",
-        "name": "_protocolVersions",
-        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
@@ -418,22 +413,12 @@
           },
           {
             "internalType": "address",
-            "name": "protocolVersionsImpl",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
             "name": "l1ERC721BridgeImpl",
             "type": "address"
           },
           {
             "internalType": "address",
             "name": "optimismPortalImpl",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "optimismPortalInteropImpl",
             "type": "address"
           },
           {
@@ -678,19 +663,6 @@
     "outputs": [
       {
         "internalType": "contract OPContractsManagerUpgrader",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "protocolVersions",
-    "outputs": [
-      {
-        "internalType": "contract IProtocolVersions",
         "name": "",
         "type": "address"
       }

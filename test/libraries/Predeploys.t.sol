@@ -39,8 +39,7 @@ abstract contract Predeploys_TestInit is CommonTest {
     ///         These contracts have _initialized in the regular storage layout.
     function _isInitializableV4(address _addr) internal pure returns (bool) {
         return _addr == Predeploys.L2_CROSS_DOMAIN_MESSENGER || _addr == Predeploys.L2_STANDARD_BRIDGE
-            || _addr == Predeploys.L2_ERC721_BRIDGE || _addr == Predeploys.OPTIMISM_MINTABLE_ERC20_FACTORY
-            || _addr == Predeploys.FEE_SPLITTER;
+            || _addr == Predeploys.L2_ERC721_BRIDGE || _addr == Predeploys.OPTIMISM_MINTABLE_ERC20_FACTORY;
     }
 
     /// @notice Returns true if the predeploy is initializable and uses OpenZeppelin v5 namespaced storage (EIP-7201).
@@ -52,12 +51,11 @@ abstract contract Predeploys_TestInit is CommonTest {
 
     /// @notice Returns true if the predeploy uses immutables.
     function _usesImmutables(address _addr) internal pure returns (bool) {
-        return _addr == Predeploys.OPTIMISM_MINTABLE_ERC721_FACTORY || _addr == Predeploys.EAS
-            || _addr == Predeploys.GOVERNANCE_TOKEN;
+        return _addr == Predeploys.OPTIMISM_MINTABLE_ERC721_FACTORY || _addr == Predeploys.EAS;
     }
 
     /// @notice Internal test function for predeploys validation across different forks.
-    function _test_predeploys(Fork _fork, bool _enableCrossL2Inbox, bool _isCustomGasToken) internal {
+    function _test_predeploys(bool _isCustomGasToken) internal {
         uint256 count = 2048;
         uint160 prefix = uint160(0x420) << 148;
 
@@ -72,8 +70,7 @@ abstract contract Predeploys_TestInit is CommonTest {
                 continue;
             }
 
-            bool isPredeploy =
-                Predeploys.isSupportedPredeploy(addr, uint256(_fork), _enableCrossL2Inbox, _isCustomGasToken);
+            bool isPredeploy = Predeploys.isSupportedPredeploy(addr, _isCustomGasToken);
 
             bytes memory code = addr.code;
             if (isPredeploy) assertTrue(code.length > 0);
@@ -159,36 +156,13 @@ contract Predeploys_Uncategorized_Test is Predeploys_TestInit {
     /// @notice Tests that the predeploy addresses are set correctly. They have code
     ///         and the proxied accounts have the correct admin.
     function test_predeploys_succeeds() external {
-        _test_predeploys(Fork.ISTHMUS, false, false);
+        _test_predeploys(false);
     }
 
     /// @notice Tests that the predeploy addresses are set correctly. They have code
     ///         and the proxied accounts have the correct admin. Using custom gas token.
     function test_predeploys_customGasToken_succeeds() external {
         skipIfSysFeatureDisabled(Features.CUSTOM_GAS_TOKEN);
-        _test_predeploys(Fork.ISTHMUS, false, true);
-    }
-}
-
-/// @title Predeploys_Interop_Uncategorized_Test
-/// @notice General tests that are not testing any function directly of the `Predeploys` contract
-///         or are testing multiple functions at once, using interop mode.
-contract Predeploys_UncategorizedInterop_Test is Predeploys_TestInit {
-    /// @notice Test setup. Enabling interop to get all predeploys.
-    function setUp() public virtual override {
-        super.enableInterop();
-        super.setUp();
-    }
-
-    /// @notice Tests that the predeploy addresses are set correctly. They have code and the
-    ///         proxied accounts have the correct admin. Using interop with inbox.
-    function test_predeploysWithInbox_succeeds() external {
-        _test_predeploys(Fork.INTEROP, true, false);
-    }
-
-    /// @notice Tests that the predeploy addresses are set correctly. They have code and the
-    ///         proxied accounts have the correct admin. Using interop without inbox.
-    function test_predeploysWithoutInbox_succeeds() external {
-        _test_predeploys(Fork.INTEROP, false, false);
+        _test_predeploys(true);
     }
 }

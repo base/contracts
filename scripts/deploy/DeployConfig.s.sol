@@ -68,12 +68,9 @@ contract DeployConfig is Script {
     uint256 public preimageOracleMinProposalSize;
     uint256 public preimageOracleChallengePeriod;
     uint256 public systemConfigStartBlock;
-    uint256 public requiredProtocolVersion;
-    uint256 public recommendedProtocolVersion;
     uint256 public proofMaturityDelaySeconds;
     uint256 public disputeGameFinalityDelaySeconds;
     uint256 public respectedGameType;
-    bool public useAltDA;
     string public daCommitmentType;
     uint256 public daChallengeWindow;
     uint256 public daResolveWindow;
@@ -179,8 +176,6 @@ contract DeployConfig is Script {
 
         enableGovernance = _readOr(_json, "$.enableGovernance", false);
         systemConfigStartBlock = stdJson.readUint(_json, "$.systemConfigStartBlock");
-        requiredProtocolVersion = stdJson.readUint(_json, "$.requiredProtocolVersion");
-        recommendedProtocolVersion = stdJson.readUint(_json, "$.recommendedProtocolVersion");
 
         proofMaturityDelaySeconds = _readOr(_json, "$.proofMaturityDelaySeconds", 0);
         disputeGameFinalityDelaySeconds = _readOr(_json, "$.disputeGameFinalityDelaySeconds", 0);
@@ -198,7 +193,6 @@ contract DeployConfig is Script {
         preimageOracleMinProposalSize = stdJson.readUint(_json, "$.preimageOracleMinProposalSize");
         preimageOracleChallengePeriod = stdJson.readUint(_json, "$.preimageOracleChallengePeriod");
 
-        useAltDA = _readOr(_json, "$.useAltDA", false);
         daCommitmentType = _readOr(_json, "$.daCommitmentType", "KeccakCommitment");
         daChallengeWindow = _readOr(_json, "$.daChallengeWindow", 1000);
         daResolveWindow = _readOr(_json, "$.daResolveWindow", 1000);
@@ -272,11 +266,6 @@ contract DeployConfig is Script {
             return stdJson.readUint(res, "");
         }
         return uint256(_l2OutputOracleStartingTimestamp);
-    }
-
-    /// @notice Allow the `useAltDA` config to be overridden in testing environments
-    function setUseAltDA(bool _useAltDA) public {
-        useAltDA = _useAltDA;
     }
 
     /// @notice Allow the `useInterop` config to be overridden in testing environments

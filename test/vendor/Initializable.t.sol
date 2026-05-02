@@ -19,9 +19,7 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
-import { ProtocolVersion } from "interfaces/L1/IProtocolVersions.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
-import { IOptimismPortalInterop } from "interfaces/L1/IOptimismPortalInterop.sol";
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 
 /// @title Initializer_Test
@@ -47,7 +45,6 @@ contract Initializer_Test is CommonTest {
     mapping(string => string) nicknames;
 
     function setUp() public override {
-        super.enableAltDA();
         super.setUp();
 
         // Initialize the `contracts` array with the addresses of the contracts to test, the
@@ -106,47 +103,22 @@ contract Initializer_Test is CommonTest {
             })
         );
 
-        if (isDevFeatureEnabled(DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
-            // OptimismPortal2Impl
-            contracts.push(
-                InitializeableContract({
-                    name: "OptimismPortal2Impl",
-                    target: EIP1967Helper.getImplementation(address(optimismPortal2)),
-                    initCalldata: abi.encodeCall(
-                        IOptimismPortalInterop(payable(optimismPortal2)).initialize,
-                        (systemConfig, anchorStateRegistry, ethLockbox)
-                    )
-                })
-            );
-            // OptimismPortal2Proxy
-            contracts.push(
-                InitializeableContract({
-                    name: "OptimismPortal2Proxy",
-                    target: address(optimismPortal2),
-                    initCalldata: abi.encodeCall(
-                        IOptimismPortalInterop(payable(optimismPortal2)).initialize,
-                        (systemConfig, anchorStateRegistry, ethLockbox)
-                    )
-                })
-            );
-        } else {
-            // OptimismPortal2Impl
-            contracts.push(
-                InitializeableContract({
-                    name: "OptimismPortal2Impl",
-                    target: EIP1967Helper.getImplementation(address(optimismPortal2)),
-                    initCalldata: abi.encodeCall(optimismPortal2.initialize, (systemConfig, anchorStateRegistry))
-                })
-            );
-            // OptimismPortal2Proxy
-            contracts.push(
-                InitializeableContract({
-                    name: "OptimismPortal2Proxy",
-                    target: address(optimismPortal2),
-                    initCalldata: abi.encodeCall(optimismPortal2.initialize, (systemConfig, anchorStateRegistry))
-                })
-            );
-        }
+        // OptimismPortal2Impl
+        contracts.push(
+            InitializeableContract({
+                name: "OptimismPortal2Impl",
+                target: EIP1967Helper.getImplementation(address(optimismPortal2)),
+                initCalldata: abi.encodeCall(optimismPortal2.initialize, (systemConfig, anchorStateRegistry))
+            })
+        );
+        // OptimismPortal2Proxy
+        contracts.push(
+            InitializeableContract({
+                name: "OptimismPortal2Proxy",
+                target: address(optimismPortal2),
+                initCalldata: abi.encodeCall(optimismPortal2.initialize, (systemConfig, anchorStateRegistry))
+            })
+        );
 
         // SystemConfigImpl
         contracts.push(
@@ -222,26 +194,6 @@ contract Initializer_Test is CommonTest {
                 )
             })
         );
-        // ProtocolVersionsImpl
-        contracts.push(
-            InitializeableContract({
-                name: "ProtocolVersionsImpl",
-                target: EIP1967Helper.getImplementation(address(protocolVersions)),
-                initCalldata: abi.encodeCall(
-                    protocolVersions.initialize, (address(0), ProtocolVersion.wrap(1), ProtocolVersion.wrap(2))
-                )
-            })
-        );
-        // ProtocolVersionsProxy
-        contracts.push(
-            InitializeableContract({
-                name: "ProtocolVersionsProxy",
-                target: address(protocolVersions),
-                initCalldata: abi.encodeCall(
-                    protocolVersions.initialize, (address(0), ProtocolVersion.wrap(1), ProtocolVersion.wrap(2))
-                )
-            })
-        );
         // L1StandardBridgeImpl
         contracts.push(
             InitializeableContract({
@@ -288,22 +240,6 @@ contract Initializer_Test is CommonTest {
                 name: "OptimismMintableERC20FactoryProxy",
                 target: address(l1OptimismMintableERC20Factory),
                 initCalldata: abi.encodeCall(l1OptimismMintableERC20Factory.initialize, (address(l1StandardBridge)))
-            })
-        );
-        // DataAvailabilityChallengeImpl
-        contracts.push(
-            InitializeableContract({
-                name: "DataAvailabilityChallengeImpl",
-                target: EIP1967Helper.getImplementation(address(dataAvailabilityChallenge)),
-                initCalldata: abi.encodeCall(dataAvailabilityChallenge.initialize, (address(0), 0, 0, 0, 0))
-            })
-        );
-        // DataAvailabilityChallengeProxy
-        contracts.push(
-            InitializeableContract({
-                name: "DataAvailabilityChallengeProxy",
-                target: address(dataAvailabilityChallenge),
-                initCalldata: abi.encodeCall(dataAvailabilityChallenge.initialize, (address(0), 0, 0, 0, 0))
             })
         );
         // AnchorStateRegistry
@@ -387,8 +323,6 @@ contract Initializer_Test is CommonTest {
         // Collect exclusions.
         uint256 j;
         string[] memory excludes = new string[](20);
-        // Contract is currently not being deployed as part of the standard deployment script.
-        excludes[j++] = "src/L2/OptimismSuperchainERC20.sol";
         // Periphery contracts don't get deployed as part of the standard deployment script.
         excludes[j++] = "src/periphery/*";
         // TODO: Deployment script is currently "broken" in the sense that it doesn't properly
@@ -402,11 +336,8 @@ contract Initializer_Test is CommonTest {
         excludes[j++] = "src/dispute/zk/OPSuccinctFaultDisputeGame.sol";
         // TODO: Eventually remove this exclusion. Same reason as above dispute contracts.
         excludes[j++] = "src/L1/OPContractsManager.sol";
-        // TODO: Eventually remove this exclusion. Same reason as above dispute contracts.
-        excludes[j++] = "src/L1/OptimismPortalInterop.sol";
         // L2 contract initialization is tested in Predeploys.t.sol
         excludes[j++] = "src/L2/*";
-        excludes[j++] = "src/L1/FeesDepositor.sol";
         // Contract is not deployed as part of the standard deployment script.
         excludes[j++] = "src/revenue-share/BalanceTracker.sol";
         // Multiproof mocks are not deployed as part of the standard deployment script.

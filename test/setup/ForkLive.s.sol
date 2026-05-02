@@ -65,11 +65,6 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         return Config.forkOpChain();
     }
 
-    function setUp() public override {
-        super.setUp();
-        resolveFeaturesFromEnv();
-    }
-
     /// @dev This function sets up the system to test it as follows:
     ///      1. Check if the SUPERCHAIN_OPS_ALLOCS_PATH environment variable was set from superchain ops.
     ///      2. If set, load the state from the given path.
@@ -129,7 +124,6 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         artifacts.save("L2ChainId", address(uint160(vm.parseTomlUint(opToml, ".chain_id"))));
         // Superchain shared contracts
         saveProxyAndImpl("SuperchainConfig", superchainToml, ".superchain_config_addr");
-        saveProxyAndImpl("ProtocolVersions", superchainToml, ".protocol_versions_addr");
         artifacts.save(
             "OPContractsManager", vm.parseTomlAddress(standardVersionsToml, "$.RELEASE.op_contracts_manager.address")
         );

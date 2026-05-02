@@ -33,7 +33,6 @@ abstract contract CommonTest is Test, Setup, Events {
 
     FFIInterface constant ffi = FFIInterface(address(uint160(uint256(keccak256(abi.encode("optimism.ffi"))))));
 
-    bool useAltDAOverride;
     bool useInteropOverride;
     bool useRevenueShareOverride;
     bool useCustomGasToken;
@@ -72,9 +71,6 @@ abstract contract CommonTest is Test, Setup, Events {
         vm.deal(bob, 10000 ether);
 
         // Override the config after the deploy script initialized the config
-        if (useAltDAOverride) {
-            deploy.cfg().setUseAltDA(true);
-        }
         if (useInteropOverride) {
             deploy.cfg().setUseInterop(true);
         }
@@ -106,7 +102,7 @@ abstract contract CommonTest is Test, Setup, Events {
 
         if (isForkTest()) {
             // Skip any test suite which uses a nonstandard configuration.
-            if (useAltDAOverride || useInteropOverride) {
+            if (useInteropOverride) {
                 vm.skip(true);
             }
         } else {
@@ -215,12 +211,6 @@ abstract contract CommonTest is Test, Setup, Events {
             );
         }
         console.log("CommonTest: enabling", _feature);
-    }
-
-    /// @dev Enables alternative data availability mode for testing
-    function enableAltDA() public {
-        _checkNotDeployed("altda");
-        useAltDAOverride = true;
     }
 
     /// @dev Enables interoperability mode for testing

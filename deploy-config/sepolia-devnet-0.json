@@ -81,8 +81,6 @@
   "respectedGameType": 0,
   "useFaultProofs": true,
   "fundDevAccounts": false,
-  "requiredProtocolVersion": "0x0000000000000000000000000000000000000005000000000000000000000000",
-  "recommendedProtocolVersion": "0x0000000000000000000000000000000000000005000000000000000000000000",
   "useRevenueShare": true,
   "chainFeesRecipient": "0x8c20c40180751d93e939dddee3517ae0d1ebead2",
   "useCustomGasToken": false,
