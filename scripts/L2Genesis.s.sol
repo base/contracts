@@ -27,11 +27,7 @@ import { IGasPriceOracle } from "interfaces/L2/IGasPriceOracle.sol";
 import { IL1Block } from "interfaces/L2/IL1Block.sol";
 import { ILiquidityController } from "interfaces/L2/ILiquidityController.sol";
 import { IL1BlockCGT } from "interfaces/L2/IL1BlockCGT.sol";
-import { IFeeSplitter } from "interfaces/L2/IFeeSplitter.sol";
-import { ISharesCalculator } from "interfaces/L2/ISharesCalculator.sol";
 import { IFeeVault } from "interfaces/L2/IFeeVault.sol";
-import { IL1Withdrawer } from "interfaces/L2/IL1Withdrawer.sol";
-import { ISuperchainRevSharesCalculator } from "interfaces/L2/ISuperchainRevSharesCalculator.sol";
 
 /// @title L2Genesis
 /// @notice Generates the genesis state for the L2 network.
@@ -254,7 +250,6 @@ contract L2Genesis is Script {
         // 1C,1D,1E,1F: not used.
         setSchemaRegistry(); // 20
         setEAS(); // 21
-        setFeeSplitter(_input); // 2B: FeeSplitter
         if (_input.useCustomGasToken) {
             setLiquidityController(_input); // 29
             setNativeAssetLiquidity(_input); // 2A
@@ -516,79 +511,6 @@ contract L2Genesis is Script {
         IGasPriceOracle(Predeploys.GAS_PRICE_ORACLE).setIsthmus();
     }
 
-    /// @notice This predeploy is following the safety invariant #1.
-    function setFeeSplitter(Input memory _input) internal {
-        address revSharesCalculator;
-
-        // Only set the shares calculator if revenue sharing is enabled
-        if (_input.useRevenueShare) {
-            if (_input.chainFeesRecipient == address(0)) revert L2Genesis_ChainFeesRecipientCannotBeZero();
-            if (_input.l1FeesDepositor == address(0)) revert L2Genesis_L1FeesDepositorCannotBeZero();
-
-            // Check that the vaults are properly configured
-            IFeeVault baseFeeVault = IFeeVault(payable(Predeploys.BASE_FEE_VAULT));
-            if (
-                baseFeeVault.recipient() != Predeploys.FEE_SPLITTER
-                    || baseFeeVault.withdrawalNetwork() != Types.WithdrawalNetwork.L2
-            ) revert L2Genesis_MisconfiguredBaseFeeVault();
-
-            IFeeVault l1FeeVault = IFeeVault(payable(Predeploys.L1_FEE_VAULT));
-            if (
-                l1FeeVault.recipient() != Predeploys.FEE_SPLITTER
-                    || l1FeeVault.withdrawalNetwork() != Types.WithdrawalNetwork.L2
-            ) revert L2Genesis_MisconfiguredL1FeeVault();
-
-            IFeeVault sequencerFeeVault = IFeeVault(payable(Predeploys.SEQUENCER_FEE_WALLET));
-            if (
-                sequencerFeeVault.recipient() != Predeploys.FEE_SPLITTER
-                    || sequencerFeeVault.withdrawalNetwork() != Types.WithdrawalNetwork.L2
-            ) revert L2Genesis_MisconfiguredSequencerFeeVault();
-
-            IFeeVault operatorFeeVault = IFeeVault(payable(Predeploys.OPERATOR_FEE_VAULT));
-            if (
-                operatorFeeVault.recipient() != Predeploys.FEE_SPLITTER
-                    || operatorFeeVault.withdrawalNetwork() != Types.WithdrawalNetwork.L2
-            ) revert L2Genesis_MisconfiguredOperatorFeeVault();
-
-            // NOTE: L1Withdrawer and SuperchainRevSharesCalculator use CREATE2 (not vm.etch) because they're not
-            // predeploys (no fixed addresses), and they have constructor arguments.
-
-            // Deploy L1Withdrawer with constructor args
-            bytes32 l1WithdrawerSalt = keccak256("L1Withdrawer");
-            address l1Withdrawer = DeployUtils.create2({
-                _name: "L1Withdrawer.sol:L1Withdrawer",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        IL1Withdrawer.__constructor__,
-                        (MIN_WITHDRAWAL_AMOUNT_THRESHOLD, _input.l1FeesDepositor, WITHDRAWAL_MIN_GAS_LIMIT)
-                    )
-                ),
-                _salt: l1WithdrawerSalt
-            });
-
-            // Deploy SuperchainRevSharesCalculator with constructor args
-            bytes32 calcSalt = keccak256("SuperchainRevSharesCalculator");
-            revSharesCalculator = DeployUtils.create2({
-                _name: "SuperchainRevSharesCalculator.sol:SuperchainRevSharesCalculator",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        ISuperchainRevSharesCalculator.__constructor__,
-                        (payable(l1Withdrawer), payable(_input.chainFeesRecipient))
-                    )
-                ),
-                _salt: calcSalt
-            });
-        }
-
-        // Initialize the implementation with dummy values
-        address impl = _setImplementationCode(Predeploys.FEE_SPLITTER);
-        IFeeSplitter(payable(impl)).initialize(ISharesCalculator(address(0)));
-
-        // Initialize the proxy with the actual values
-        address sharesCalculator = revSharesCalculator;
-        IFeeSplitter(payable(Predeploys.FEE_SPLITTER)).initialize(ISharesCalculator(sharesCalculator));
-    }
-
     function activateJovian() internal {
         vm.prank(IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES).DEPOSITOR_ACCOUNT());
         IGasPriceOracle(Predeploys.GAS_PRICE_ORACLE).setJovian();
@@ -631,15 +553,9 @@ contract L2Genesis is Script {
             revert("FeeVault: custom gas token and revenue share cannot be enabled together");
         }
 
-        if (_useRevenueShare) {
-            recipient = Predeploys.FEE_SPLITTER;
-            network = Types.WithdrawalNetwork.L2;
-            minWithdrawalAmount = 0;
-        } else {
-            recipient = _recipient;
-            network = _withdrawalNetwork;
-            minWithdrawalAmount = _minWithdrawalAmount;
-        }
+        recipient = _recipient;
+        network = _withdrawalNetwork;
+        minWithdrawalAmount = _minWithdrawalAmount;
 
         address impl = _setImplementationCode(_vaultAddr);
 

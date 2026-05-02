@@ -56,9 +56,6 @@ import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedD
 import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 import { ILiquidityController } from "interfaces/L2/ILiquidityController.sol";
 import { INativeAssetLiquidity } from "interfaces/L2/INativeAssetLiquidity.sol";
-import { IFeeSplitter } from "interfaces/L2/IFeeSplitter.sol";
-import { IL1Withdrawer } from "interfaces/L2/IL1Withdrawer.sol";
-import { ISuperchainRevSharesCalculator } from "interfaces/L2/ISuperchainRevSharesCalculator.sol";
 import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 
@@ -138,9 +135,6 @@ abstract contract Setup is FeatureFlags {
     IWETH98 weth = IWETH98(payable(Predeploys.WETH));
     ILiquidityController liquidityController = ILiquidityController(Predeploys.LIQUIDITY_CONTROLLER);
     INativeAssetLiquidity nativeAssetLiquidity = INativeAssetLiquidity(Predeploys.NATIVE_ASSET_LIQUIDITY);
-    IFeeSplitter feeSplitter = IFeeSplitter(payable(Predeploys.FEE_SPLITTER));
-    IL1Withdrawer l1Withdrawer;
-    ISuperchainRevSharesCalculator superchainRevSharesCalculator;
     IVerifier aggregateVerifier;
     TEEProverRegistry teeProverRegistry;
 
@@ -332,13 +326,6 @@ abstract contract Setup is FeatureFlags {
             })
         );
 
-        if (deploy.cfg().useRevenueShare()) {
-            superchainRevSharesCalculator = ISuperchainRevSharesCalculator(
-                address(IFeeSplitter(payable(Predeploys.FEE_SPLITTER)).sharesCalculator())
-            );
-            l1Withdrawer = IL1Withdrawer(superchainRevSharesCalculator.shareRecipient());
-        }
-
         // L2 predeploys
         labelPredeploy(Predeploys.L2_STANDARD_BRIDGE);
         labelPredeploy(Predeploys.L2_CROSS_DOMAIN_MESSENGER);
@@ -357,7 +344,6 @@ abstract contract Setup is FeatureFlags {
         labelPredeploy(Predeploys.WETH);
         labelPredeploy(Predeploys.NATIVE_ASSET_LIQUIDITY);
         labelPredeploy(Predeploys.LIQUIDITY_CONTROLLER);
-        labelPredeploy(Predeploys.FEE_SPLITTER);
 
         // L2 Preinstalls
         labelPreinstall(Preinstalls.MultiCall3);
