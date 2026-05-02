@@ -136,11 +136,6 @@
           },
           {
             "internalType": "address",
-            "name": "optimismPortalInteropImpl",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
             "name": "ethLockboxImpl",
             "type": "address"
           },
@@ -303,32 +298,7 @@
   },
   {
     "inputs": [],
-    "name": "BytesArrayTooLong",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "DeploymentFailed",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "EmptyInitcode",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "IdentityPrecompileCallFailed",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "InvalidGameArgsLength",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NotABlueprint",
     "type": "error"
   },
   {
@@ -364,34 +334,7 @@
   },
   {
     "inputs": [],
-    "name": "ReservedBitsSet",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "SemverComp_InvalidSemverParts",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes",
-        "name": "data",
-        "type": "bytes"
-      }
-    ],
-    "name": "UnexpectedPreambleData",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint8",
-        "name": "version",
-        "type": "uint8"
-      }
-    ],
-    "name": "UnsupportedERCVersion",
     "type": "error"
   }
 ]
