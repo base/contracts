@@ -16,8 +16,8 @@
     "sourceCodeHash": "0xf45435ba73c89393d8441aab7dfe46070ba4fed3e2ddfc4ff247c6ac7703cdc9"
   },
   "src/L1/OPContractsManager.sol:OPContractsManager": {
-    "initCodeHash": "0x10b42d2ff1cd90053002c650ad593632a10338256f2964ee87c0173acd41453b",
-    "sourceCodeHash": "0x4dcb2f70312ef3e9f8165efab61818bbe1e684e69fc4f70cc74f47b91e36983a"
+    "initCodeHash": "0x79699e5355551010e3f67329f6d0b3b360cb5a75eaaaaa915df8db39426a25fe",
+    "sourceCodeHash": "0x609a0ca12b45933242a3049b7ba730a670fa89d18d633f32a09df0c539085a9c"
   },
   "src/L1/OPContractsManagerStandardValidator.sol:OPContractsManagerStandardValidator": {
     "initCodeHash": "0x61227f43a0bcdfd5542f182d50ce5d82f80e0144345f65bf3b8f5582858afdbb",
@@ -26,10 +26,6 @@
   "src/L1/OptimismPortal2.sol:OptimismPortal2": {
     "initCodeHash": "0x2c01bc6c0a55a1a27263224e05c1b28703ff85c61075bae7ab384b3043820ed2",
     "sourceCodeHash": "0x00a679244e56e42297b44b2c03ba8e2482498cd2489e65c51d349633ed8de139"
-  },
-  "src/L1/ProtocolVersions.sol:ProtocolVersions": {
-    "initCodeHash": "0xcb59ad9a5ec2a0831b7f4daa74bdacba82ffa03035dafb499a732c641e017f4e",
-    "sourceCodeHash": "0x3b7b7a1023e6e87ce4680eee3cc4eebefc15b5ec80db3d39e824fbdd521762db"
   },
   "src/L1/SuperchainConfig.sol:SuperchainConfig": {
     "initCodeHash": "0x9b1f3555b499709485d51d5d9665002c0eb1e5eb893be1fb978a30749e894858",

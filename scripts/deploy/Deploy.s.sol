@@ -33,7 +33,6 @@ import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 import { IMIPS64 } from "interfaces/cannon/IMIPS64.sol";
 import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
-import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
@@ -113,7 +112,6 @@ contract Deploy is Deployer {
             ETHLockbox: artifacts.getAddress("ETHLockboxProxy"),
             SystemConfig: artifacts.getAddress("SystemConfigProxy"),
             L1ERC721Bridge: artifacts.getAddress("L1ERC721BridgeProxy"),
-            ProtocolVersions: artifacts.getAddress("ProtocolVersionsProxy"),
             SuperchainConfig: artifacts.getAddress("SuperchainConfigProxy")
         });
     }
@@ -128,24 +126,18 @@ contract Deploy is Deployer {
         _run({ _needsSuperchain: true });
     }
 
-    /// @notice Deploy a new OP Chain using an existing SuperchainConfig and ProtocolVersions
+    /// @notice Deploy a new OP Chain using an existing SuperchainConfig
     /// @param _superchainConfigProxy Address of the existing SuperchainConfig proxy
-    /// @param _protocolVersionsProxy Address of the existing ProtocolVersions proxy
-    function runWithSuperchain(address payable _superchainConfigProxy, address payable _protocolVersionsProxy) public {
+    function runWithSuperchain(address payable _superchainConfigProxy) public {
         require(_superchainConfigProxy != address(0), "Deploy: must specify address for superchain config proxy");
-        require(_protocolVersionsProxy != address(0), "Deploy: must specify address for protocol versions proxy");
 
         vm.chainId(cfg.l1ChainID());
 
-        console.log("Deploying a fresh OP Stack with existing SuperchainConfig and ProtocolVersions");
+        console.log("Deploying a fresh OP Stack with existing SuperchainConfig");
 
         IProxy scProxy = IProxy(_superchainConfigProxy);
         artifacts.save("SuperchainConfigImpl", scProxy.implementation());
         artifacts.save("SuperchainConfigProxy", _superchainConfigProxy);
-
-        IProxy pvProxy = IProxy(_protocolVersionsProxy);
-        artifacts.save("ProtocolVersionsImpl", pvProxy.implementation());
-        artifacts.save("ProtocolVersionsProxy", _protocolVersionsProxy);
 
         _run({ _needsSuperchain: false });
     }
@@ -189,9 +181,8 @@ contract Deploy is Deployer {
     ////////////////////////////////////////////////////////////////
 
     /// @notice Deploy a full system with a new SuperchainConfig
-    ///         The Superchain system has 2 singleton contracts which lie outside of an OP Chain:
+    ///         The Superchain system has 1 singleton contract which lies outside of an OP Chain:
     ///         1. The SuperchainConfig contract
-    ///         2. The ProtocolVersions contract
     function deploySuperchain() public {
         console.log("Setting up Superchain");
         DeploySuperchain ds = new DeploySuperchain();
@@ -203,11 +194,8 @@ contract Deploy is Deployer {
                 incidentResponder: cfg.superchainConfigIncidentResponder(),
                 // TODO: when DeployAuthSystem is done, finalSystemOwner should be replaced with the Foundation Upgrades
                 // Safe
-                protocolVersionsOwner: cfg.finalSystemOwner(),
                 superchainProxyAdminOwner: cfg.finalSystemOwner(),
-                paused: false,
-                recommendedProtocolVersion: bytes32(cfg.recommendedProtocolVersion()),
-                requiredProtocolVersion: bytes32(cfg.requiredProtocolVersion())
+                paused: false
             })
         );
 
@@ -215,17 +203,10 @@ contract Deploy is Deployer {
         artifacts.save("SuperchainProxyAdmin", address(dso.superchainProxyAdmin));
         artifacts.save("SuperchainConfigProxy", address(dso.superchainConfigProxy));
         artifacts.save("SuperchainConfigImpl", address(dso.superchainConfigImpl));
-        artifacts.save("ProtocolVersionsProxy", address(dso.protocolVersionsProxy));
-        artifacts.save("ProtocolVersionsImpl", address(dso.protocolVersionsImpl));
 
-        // First run assertions for the ProtocolVersions and SuperchainConfig proxy contracts.
+        // First run assertions for the SuperchainConfig proxy contract.
         Types.ContractSet memory contracts = _proxies();
-        ChainAssertions.checkProtocolVersions({ _contracts: contracts, _cfg: cfg, _isProxy: true });
         ChainAssertions.checkSuperchainConfig({ _contracts: contracts, _cfg: cfg, _isProxy: true });
-
-        // Then replace the ProtocolVersions proxy with the implementation address and run assertions on it.
-        contracts.ProtocolVersions = artifacts.mustGetAddress("ProtocolVersionsImpl");
-        ChainAssertions.checkProtocolVersions({ _contracts: contracts, _cfg: cfg, _isProxy: false });
 
         // Finally replace the SuperchainConfig proxy with the implementation address and run assertions on it.
         contracts.SuperchainConfig = artifacts.mustGetAddress("SuperchainConfigImpl");
@@ -265,7 +246,6 @@ contract Deploy is Deployer {
                 l2ChainID: cfg.l2ChainID(),
                 multiproofBlockInterval: cfg.multiproofBlockInterval(),
                 multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
-                protocolVersionsProxy: IProtocolVersions(artifacts.mustGetAddress("ProtocolVersionsProxy")),
                 superchainConfigProxy: superchainConfigProxy,
                 superchainProxyAdmin: superchainProxyAdmin,
                 l1ProxyAdminOwner: superchainProxyAdmin.owner(),
