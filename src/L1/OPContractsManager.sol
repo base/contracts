@@ -30,7 +30,6 @@ import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedD
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
-import { IOptimismPortalInterop } from "interfaces/L1/IOptimismPortalInterop.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
@@ -740,48 +739,7 @@ contract OPContractsManagerUpgrader is OPContractsManagerBase {
         IOptimismPortal optimismPortal = IOptimismPortal(payable(_opChainConfig.systemConfigProxy.optimismPortal()));
 
         // Upgrade the OptimismPortal contract.
-        if (isDevFeatureEnabled(DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
-            // This does NOT run in production.
-            // Upgrade the OptimismPortal contract implementation.
-            upgradeTo(proxyAdmin, address(optimismPortal), _impls.optimismPortalInteropImpl);
-
-            // If we don't already have an ETHLockbox, deploy and initialize it.
-            IETHLockbox ethLockbox = optimismPortal.ethLockbox();
-            if (address(ethLockbox) == address(0)) {
-                // Deploy the ETHLockbox proxy.
-                ethLockbox = IETHLockbox(
-                    deployProxy({
-                        _l2ChainId: _l2ChainId,
-                        _proxyAdmin: proxyAdmin,
-                        _saltMixer: reusableSaltMixer(_opChainConfig.systemConfigProxy),
-                        _contractName: "ETHLockbox-U16a"
-                    })
-                );
-
-                // Initialize the ETHLockbox setting the OptimismPortal as an authorized portal.
-                IOptimismPortal[] memory portals = new IOptimismPortal[](1);
-                portals[0] = optimismPortal;
-                upgradeToAndCall(
-                    proxyAdmin,
-                    address(ethLockbox),
-                    _impls.ethLockboxImpl,
-                    abi.encodeCall(IETHLockbox.initialize, (_opChainConfig.systemConfigProxy, portals))
-                );
-
-                // Migrate liquidity from the OptimismPortal to the ETHLockbox.
-                IOptimismPortalInterop(payable(optimismPortal)).migrateLiquidity();
-            }
-
-            // Use the existing AnchorStateRegistry reference.
-            IAnchorStateRegistry anchorStateRegistry = optimismPortal.anchorStateRegistry();
-
-            // Upgrade the OptimismPortal contract first so that the SystemConfig will have
-            // the SuperchainConfig reference required in the ETHLockbox.
-            IOptimismPortalInterop(payable(optimismPortal)).upgrade(anchorStateRegistry, ethLockbox);
-        } else {
-            // This runs in production.
-            upgradeTo(proxyAdmin, address(optimismPortal), _impls.optimismPortalImpl);
-        }
+        upgradeTo(proxyAdmin, address(optimismPortal), _impls.optimismPortalImpl);
 
         // Upgrade the AnchorStateRegistry contract. No upgrade/initializer needed, just updating
         // the implementation to latest.
@@ -1150,28 +1108,11 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
             output.systemConfigProxy.setFeature(Features.CUSTOM_GAS_TOKEN, true);
         }
 
-        // If the interop feature was requested, enable the ETHLockbox feature in the SystemConfig
-        // contract. Only other way to get the ETHLockbox feature as of u16a is to have already had
-        // the ETHLockbox in U16 and then upgrade to U16a.
-        if (isDevFeatureEnabled(DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
-            output.systemConfigProxy.setFeature(Features.ETH_LOCKBOX, true);
-        }
-
         // Initialize the OptimismPortal.
-        if (isDevFeatureEnabled(DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
-            data = encodeOptimismPortalInteropInitializer(output);
-            upgradeToAndCall(
-                output.opChainProxyAdmin,
-                address(output.optimismPortalProxy),
-                implementation.optimismPortalInteropImpl,
-                data
-            );
-        } else {
-            data = encodeOptimismPortalInitializer(output);
-            upgradeToAndCall(
-                output.opChainProxyAdmin, address(output.optimismPortalProxy), implementation.optimismPortalImpl, data
-            );
-        }
+        data = encodeOptimismPortalInitializer(output);
+        upgradeToAndCall(
+            output.opChainProxyAdmin, address(output.optimismPortalProxy), implementation.optimismPortalImpl, data
+        );
 
         // Initialize the ETHLockbox.
         IOptimismPortal[] memory portals = new IOptimismPortal[](1);
@@ -1319,19 +1260,6 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
         returns (bytes memory)
     {
         return abi.encodeCall(IOptimismPortal.initialize, (_output.systemConfigProxy, _output.anchorStateRegistryProxy));
-    }
-
-    /// @notice Helper method for encoding the OptimismPortalInterop initializer data.
-    function encodeOptimismPortalInteropInitializer(OPContractsManager.DeployOutput memory _output)
-        internal
-        view
-        virtual
-        returns (bytes memory)
-    {
-        return abi.encodeCall(
-            IOptimismPortalInterop.initialize,
-            (_output.systemConfigProxy, _output.anchorStateRegistryProxy, _output.ethLockboxProxy)
-        );
     }
 
     /// @notice Helper method for encoding the ETHLockbox initializer data.
@@ -1537,57 +1465,11 @@ contract OPContractsManagerInteropMigrator is OPContractsManagerBase {
             revert OPContractsManager.PrestateNotSet();
         }
 
-        // Grab an array of portals from the configs.
-        IOptimismPortalInterop[] memory portals = new IOptimismPortalInterop[](_input.opChainConfigs.length);
-        for (uint256 i = 0; i < _input.opChainConfigs.length; i++) {
-            portals[i] = IOptimismPortalInterop(payable(_input.opChainConfigs[i].systemConfigProxy.optimismPortal()));
-        }
-
-        // Check that the portals have the same SuperchainConfig.
-        for (uint256 i = 0; i < portals.length; i++) {
-            if (portals[i].superchainConfig() != portals[0].superchainConfig()) {
-                revert OPContractsManagerInteropMigrator_SuperchainConfigMismatch();
-            }
-        }
-
         // NOTE that here and in the rest of this function, we are using the first provided chain's
         // ProxyAdmin contract as the ProxyAdmin for all of the newly shared contracts. This is
         // safe because we already checked that all of the provided chains have the same ProxyAdmin
         // owner and therefore have the same access models.
         address proxyAdminOwner = proxyAdmin.owner();
-
-        // Deploy the new ETHLockbox.
-        // NOTE that here and in the rest of this function we use block.timestamp as a fake chain
-        // id for any new contracts that are deployed. The L2 chain id is not used for anything
-        // except the salt mixer, so making it the same as the block timestamp means that new
-        // contracts will be generated every time this function is called. This is totally fine for
-        // our purposes here, there's no strong need to have deterministic addresses ahead of time.
-        IETHLockbox newEthLockbox = IETHLockbox(
-            deployProxy({
-                _l2ChainId: block.timestamp,
-                _proxyAdmin: proxyAdmin,
-                _saltMixer: reusableSaltMixer(_input.opChainConfigs[0].systemConfigProxy),
-                _contractName: "ETHLockbox-Interop"
-            })
-        );
-
-        // Separate context to avoid stack too deep.
-        {
-            // Lockbox requires standard portal interfaces, need to cast to IOptimismPortal.
-            IOptimismPortal[] memory castedPortals;
-            assembly ("memory-safe") {
-                castedPortals := portals
-            }
-
-            // Initialize the new ETHLockbox.
-            // Note that this authorizes the portals to use the ETHLockbox.
-            upgradeToAndCall(
-                proxyAdmin,
-                address(newEthLockbox),
-                getImplementations().ethLockboxImpl,
-                abi.encodeCall(IETHLockbox.initialize, (portals[0].systemConfig(), castedPortals))
-            );
-        }
 
         // Deploy the new DisputeGameFactory.
         IDisputeGameFactory newDisputeGameFactory = IDisputeGameFactory(
@@ -1607,58 +1489,12 @@ contract OPContractsManagerInteropMigrator is OPContractsManagerBase {
             abi.encodeCall(IDisputeGameFactory.initialize, (proxyAdminOwner))
         );
 
-        // Deploy the new AnchorStateRegistry.
-        IAnchorStateRegistry newAnchorStateRegistry = IAnchorStateRegistry(
-            deployProxy({
-                _l2ChainId: block.timestamp,
-                _proxyAdmin: proxyAdmin,
-                _saltMixer: reusableSaltMixer(_input.opChainConfigs[0].systemConfigProxy),
-                _contractName: "AnchorStateRegistry-Interop"
-            })
-        );
-
         // Select the correct game type based on the input.
         GameType newGameType;
         if (_input.usePermissionlessGame) {
             newGameType = GameTypes.SUPER_CANNON;
         } else {
             newGameType = GameTypes.SUPER_PERMISSIONED_CANNON;
-        }
-
-        // We can use portals[0].systemConfig() as they are members of the same superchain cluster (shared lockbox)
-        // Initialize the new AnchorStateRegistry.
-        upgradeToAndCall(
-            proxyAdmin,
-            address(newAnchorStateRegistry),
-            getImplementations().anchorStateRegistryImpl,
-            abi.encodeCall(
-                IAnchorStateRegistry.initialize,
-                (portals[0].systemConfig(), newDisputeGameFactory, _input.startingAnchorRoot, newGameType)
-            )
-        );
-
-        // Migrate each portal to the new ETHLockbox and AnchorStateRegistry.
-        for (uint256 i = 0; i < portals.length; i++) {
-            // Authorize the existing ETHLockboxes to use the new ETHLockbox.
-            IETHLockbox existingLockbox = IETHLockbox(payable(address(portals[i].ethLockbox())));
-            newEthLockbox.authorizeLockbox(existingLockbox);
-
-            // Migrate the existing ETHLockbox to the new ETHLockbox.
-            existingLockbox.migrateLiquidity(newEthLockbox);
-
-            // Before migrating the portal, clear out any implementations that might exist in the
-            // old DisputeGameFactory proxy. We clear out all potential game types to be safe.
-            IDisputeGameFactory oldDisputeGameFactory =
-                IDisputeGameFactory(payable(address(portals[i].disputeGameFactory())));
-            clearGameImplementation(oldDisputeGameFactory, GameTypes.CANNON);
-            clearGameImplementation(oldDisputeGameFactory, GameTypes.SUPER_CANNON);
-            clearGameImplementation(oldDisputeGameFactory, GameTypes.PERMISSIONED_CANNON);
-            clearGameImplementation(oldDisputeGameFactory, GameTypes.SUPER_PERMISSIONED_CANNON);
-            clearGameImplementation(oldDisputeGameFactory, GameTypes.CANNON_KONA);
-            clearGameImplementation(oldDisputeGameFactory, GameTypes.SUPER_CANNON_KONA);
-
-            // Migrate the portal to the new ETHLockbox and AnchorStateRegistry.
-            portals[i].migrateToSuperRoots(newEthLockbox, newAnchorStateRegistry);
         }
     }
 
@@ -1741,7 +1577,6 @@ contract OPContractsManager is ISemver {
         address protocolVersionsImpl;
         address l1ERC721BridgeImpl;
         address optimismPortalImpl;
-        address optimismPortalInteropImpl;
         address ethLockboxImpl;
         address systemConfigImpl;
         address optimismMintableERC20FactoryImpl;

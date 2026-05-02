@@ -194,7 +194,6 @@ abstract contract Setup is FeatureFlags {
         deploy.setUp();
         forkLive.setUp();
 
-        resolveFeaturesFromEnv();
         deploy.cfg().setDevFeatureBitmap(devFeatureBitmap);
 
         console.log("Setup: L1 setup done!");

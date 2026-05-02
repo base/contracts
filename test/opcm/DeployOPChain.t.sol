@@ -63,7 +63,6 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
     event Deployed(uint256 indexed l2ChainId, address indexed deployer, bytes deployOutput);
 
     function setUp() public virtual {
-        resolveFeaturesFromEnv();
         deploySuperchain = new DeploySuperchain();
         deployImplementations = new DeployImplementations();
         deployOPChain = new DeployOPChain();

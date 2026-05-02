@@ -21,7 +21,6 @@ import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { ProtocolVersion } from "interfaces/L1/IProtocolVersions.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
-import { IOptimismPortalInterop } from "interfaces/L1/IOptimismPortalInterop.sol";
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 
 /// @title Initializer_Test
@@ -105,47 +104,22 @@ contract Initializer_Test is CommonTest {
             })
         );
 
-        if (isDevFeatureEnabled(DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
-            // OptimismPortal2Impl
-            contracts.push(
-                InitializeableContract({
-                    name: "OptimismPortal2Impl",
-                    target: EIP1967Helper.getImplementation(address(optimismPortal2)),
-                    initCalldata: abi.encodeCall(
-                        IOptimismPortalInterop(payable(optimismPortal2)).initialize,
-                        (systemConfig, anchorStateRegistry, ethLockbox)
-                    )
-                })
-            );
-            // OptimismPortal2Proxy
-            contracts.push(
-                InitializeableContract({
-                    name: "OptimismPortal2Proxy",
-                    target: address(optimismPortal2),
-                    initCalldata: abi.encodeCall(
-                        IOptimismPortalInterop(payable(optimismPortal2)).initialize,
-                        (systemConfig, anchorStateRegistry, ethLockbox)
-                    )
-                })
-            );
-        } else {
-            // OptimismPortal2Impl
-            contracts.push(
-                InitializeableContract({
-                    name: "OptimismPortal2Impl",
-                    target: EIP1967Helper.getImplementation(address(optimismPortal2)),
-                    initCalldata: abi.encodeCall(optimismPortal2.initialize, (systemConfig, anchorStateRegistry))
-                })
-            );
-            // OptimismPortal2Proxy
-            contracts.push(
-                InitializeableContract({
-                    name: "OptimismPortal2Proxy",
-                    target: address(optimismPortal2),
-                    initCalldata: abi.encodeCall(optimismPortal2.initialize, (systemConfig, anchorStateRegistry))
-                })
-            );
-        }
+        // OptimismPortal2Impl
+        contracts.push(
+            InitializeableContract({
+                name: "OptimismPortal2Impl",
+                target: EIP1967Helper.getImplementation(address(optimismPortal2)),
+                initCalldata: abi.encodeCall(optimismPortal2.initialize, (systemConfig, anchorStateRegistry))
+            })
+        );
+        // OptimismPortal2Proxy
+        contracts.push(
+            InitializeableContract({
+                name: "OptimismPortal2Proxy",
+                target: address(optimismPortal2),
+                initCalldata: abi.encodeCall(optimismPortal2.initialize, (systemConfig, anchorStateRegistry))
+            })
+        );
 
         // SystemConfigImpl
         contracts.push(
@@ -385,8 +359,6 @@ contract Initializer_Test is CommonTest {
         excludes[j++] = "src/dispute/zk/OPSuccinctFaultDisputeGame.sol";
         // TODO: Eventually remove this exclusion. Same reason as above dispute contracts.
         excludes[j++] = "src/L1/OPContractsManager.sol";
-        // TODO: Eventually remove this exclusion. Same reason as above dispute contracts.
-        excludes[j++] = "src/L1/OptimismPortalInterop.sol";
         // L2 contract initialization is tested in Predeploys.t.sol
         excludes[j++] = "src/L2/*";
         // Contract is not deployed as part of the standard deployment script.

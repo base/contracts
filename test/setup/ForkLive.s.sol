@@ -65,11 +65,6 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         return Config.forkOpChain();
     }
 
-    function setUp() public override {
-        super.setUp();
-        resolveFeaturesFromEnv();
-    }
-
     /// @dev This function sets up the system to test it as follows:
     ///      1. Check if the SUPERCHAIN_OPS_ALLOCS_PATH environment variable was set from superchain ops.
     ///      2. If set, load the state from the given path.
