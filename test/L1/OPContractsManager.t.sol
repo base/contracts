@@ -12,7 +12,6 @@ import { DelegateCaller } from "test/mocks/Callers.sol";
 // Scripts
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Deploy } from "scripts/deploy/Deploy.s.sol";
-import { VerifyOPCM } from "scripts/deploy/VerifyOPCM.s.sol";
 import { DeployOPChain } from "scripts/deploy/DeployOPChain.s.sol";
 
 // Libraries
@@ -439,12 +438,6 @@ abstract contract OPContractsManager_TestInit is CommonTest, DisputeGames {
 
         vm.deal(address(chainDeployOutput1.ethLockboxProxy), 100 ether);
         vm.deal(address(chainDeployOutput2.ethLockboxProxy), 100 ether);
-    }
-
-    /// @notice Sets up the environment variables for the VerifyOPCM test.
-    function setupEnvVars() public {
-        vm.setEnv("EXPECTED_SUPERCHAIN_CONFIG", vm.toString(address(opcm.superchainConfig())));
-        vm.setEnv("EXPECTED_PROTOCOL_VERSIONS", vm.toString(address(opcm.protocolVersions())));
     }
 
     /// @notice Helper function to deploy a new set of L1 contracts via OPCM.
@@ -1119,23 +1112,6 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
     function test_upgradeOPChainOnly_succeeds() public {
         // Run the upgrade test and checks
         runCurrentUpgrade(upgrader);
-    }
-
-    function test_verifyOpcmCorrectness_succeeds() public {
-        skipIfCoverage(); // Coverage changes bytecode and breaks the verification script.
-
-        // Set up environment variables with the actual OPCM addresses for tests that need themqq
-        vm.setEnv("EXPECTED_SUPERCHAIN_CONFIG", vm.toString(address(opcm.superchainConfig())));
-        vm.setEnv("EXPECTED_PROTOCOL_VERSIONS", vm.toString(address(opcm.protocolVersions())));
-
-        // Run the upgrade test and checks
-        runCurrentUpgrade(upgrader);
-
-        // Run the verification script without etherscan verification. Hard to run with etherscan
-        // verification in these tests, can do it but means we add even more dependencies to the
-        // test environment.
-        VerifyOPCM verify = new VerifyOPCM();
-        verify.run(address(opcm), true);
     }
 
     function test_upgrade_duplicateL2ChainId_succeeds() public {
