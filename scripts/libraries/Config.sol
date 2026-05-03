@@ -119,11 +119,6 @@ library Config {
         env_ = vm.envOr("DEPLOY_FILE", string.concat(_sig, "-latest.json"));
     }
 
-    /// @notice Returns the private key that is used to configure drippie.
-    function drippieOwnerPrivateKey() internal view returns (uint256 env_) {
-        env_ = vm.envUint("DRIPPIE_OWNER_PRIVATE_KEY");
-    }
-
     /// @notice Returns the API key for the Etherscan API.
     function etherscanApiKey() internal view returns (string memory env_) {
         env_ = vm.envString("ETHERSCAN_API_KEY");

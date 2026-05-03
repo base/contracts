@@ -41,10 +41,7 @@ var excludeSourceContracts = []string{
 	"CrossDomainMessengerLegacySpacer0", "CrossDomainMessengerLegacySpacer1",
 
 	// Helper contracts
-	"SafeSend", "StorageSetter", "DisputeMonitorHelper",
-
-	// Periphery
-	"TransferOnion", "AssetReceiver", "AdminFaucetAuthModule", "CheckSecrets", "CheckBalanceLow", "CheckTrue", "Drippie", "Transactor", "Faucet",
+	"SafeSend", "StorageSetter",
 
 	// Errors because they should be in their own contracts but are in a shared one
 	"OPContractsManagerDeployer", "OPContractsManagerUpgrader", "OPContractsManagerBase", "OPContractsManagerInteropMigrator", "OPContractsManagerContractsContainer", "OPContractsManagerGameTypeAdder", "OPContractsManagerStandardValidator",
