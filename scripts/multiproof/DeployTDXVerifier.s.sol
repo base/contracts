@@ -29,9 +29,7 @@ import { TDXVerifier } from "src/multiproof/tee/TDXVerifier.sol";
 
 contract DeployTDXVerifier is Script {
     /// @notice Maximum TDX quote age accepted by TDXVerifier.
-    uint64 public constant TDX_MAX_TIME_DIFF = 3600;
-
-    address public tdxVerifier;
+    uint64 internal constant TDX_MAX_TIME_DIFF = 3600;
 
     /// @param owner Owner for TDXVerifier.
     /// @param risc0VerifierRouter Existing RISC Zero verifier router.
@@ -58,13 +56,10 @@ contract DeployTDXVerifier is Script {
         console.log("Intel Root CA Hash:", vm.toString(intelRootCaHash));
         console.log("Max Time Diff:", TDX_MAX_TIME_DIFF);
         console.log("");
-        console.log("NOTE: proofSubmitter is set to owner as a temporary placeholder.");
-        console.log("      DeployDevWithTDX.s.sol updates it to TEEProverRegistry.");
-        console.log("");
 
         vm.startBroadcast();
 
-        tdxVerifier = address(
+        address tdxVerifier = address(
             new TDXVerifier(
                 owner, TDX_MAX_TIME_DIFF, intelRootCaHash, owner, ZkCoProcessorType.RiscZero, zkConfig, allowedStatuses
             )
@@ -76,10 +71,10 @@ contract DeployTDXVerifier is Script {
         console.log("");
         console.log(">>> Use this address as the DeployDevWithTDX.s.sol argument <<<");
 
-        _writeOutput(risc0VerifierRouter, tdxVerifierId, intelRootCaHash);
+        _writeOutput(tdxVerifier, risc0VerifierRouter, tdxVerifierId, intelRootCaHash);
     }
 
-    function _writeOutput(address risc0VerifierRouter, bytes32 tdxVerifierId, bytes32 intelRootCaHash) internal {
+    function _writeOutput(address tdxVerifier, address risc0VerifierRouter, bytes32 tdxVerifierId, bytes32 intelRootCaHash) internal {
         string memory key = "deployment";
         vm.serializeAddress(key, "TDXVerifier", tdxVerifier);
         vm.serializeAddress(key, "RiscZeroVerifierRouter", risc0VerifierRouter);
