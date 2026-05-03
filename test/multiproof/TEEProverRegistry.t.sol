@@ -100,7 +100,7 @@ contract TEEProverRegistryTest is Test {
     function testInitialization() public view {
         assertEq(teeProverRegistry.owner(), owner);
         assertEq(teeProverRegistry.manager(), manager);
-        assertEq(teeProverRegistry.version(), "0.6.0");
+        assertEq(teeProverRegistry.version(), "0.7.0");
     }
 
     function testInitializationWithProposers() public {
@@ -216,6 +216,35 @@ contract TEEProverRegistryTest is Test {
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
 
         assertTrue(teeProverRegistry.isValidSigner(signer));
+        assertEq(uint8(teeProverRegistry.signerTEEType(signer)), uint8(TEEProverRegistry.TEEType.NITRO));
+    }
+
+    function testAddDevTDXSigner() public {
+        address signer = makeAddr("dev-tdx-signer");
+
+        vm.prank(owner);
+        teeProverRegistry.addDevTDXSigner(signer, TEST_IMAGE_HASH);
+
+        assertTrue(teeProverRegistry.isValidSigner(signer));
+        assertEq(uint8(teeProverRegistry.signerTEEType(signer)), uint8(TEEProverRegistry.TEEType.TDX));
+    }
+
+    function testRegisteringSameSignerWithDifferentTEETypeFails() public {
+        address signer = makeAddr("dev-signer");
+
+        vm.prank(owner);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
+
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TEEProverRegistry.SignerTEETypeMismatch.selector,
+                signer,
+                TEEProverRegistry.TEEType.NITRO,
+                TEEProverRegistry.TEEType.TDX
+            )
+        );
+        teeProverRegistry.addDevTDXSigner(signer, TEST_IMAGE_HASH);
     }
 
     // ============ MAX_AGE Tests ============

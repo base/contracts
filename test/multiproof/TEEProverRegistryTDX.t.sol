@@ -88,6 +88,7 @@ contract TEEProverRegistryTDXTest is Test {
 
         assertTrue(registry.isRegisteredSigner(journal.signer));
         assertEq(registry.signerImageHash(journal.signer), IMAGE_HASH);
+        assertEq(uint8(registry.signerTEEType(journal.signer)), uint8(TEEProverRegistry.TEEType.TDX));
         assertTrue(registry.isValidSigner(journal.signer));
     }
 

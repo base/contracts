@@ -96,9 +96,9 @@ This returns a raw byte array representing an uncompressed secp256k1 public key 
 0x0cbe4A965B41DA6B2D5AF4d53c0C16a37d6f9F7D
 ```
 
-### Step 5: Register the dev signer
+### Step 5: Register the dev signers
 
-Call `addDevSigner` on the deployed `DevTEEProverRegistry` with the **signer address** derived in Step 4.
+Call `addDevSigner` for the Nitro signer and `addDevTDXSigner` for the TDX signer on the deployed `DevTEEProverRegistry`.
 
 > **Note:** PCR0 enforcement is handled by `AggregateVerifier` (which bakes `teeImageHash` into the
 > journal the enclave signs). The registry only tracks which signer addresses are valid.
@@ -106,10 +106,19 @@ Call `addDevSigner` on the deployed `DevTEEProverRegistry` with the **signer add
 ```bash
 # Replace:
 #   0x587d... with the TEEProverRegistry address from your deployment output
-#   0x080f... with the signer address derived in Step 4
+#   0x080f... with the Nitro signer address derived in Step 4
 cast send 0x587d410B205449fB889EC4a5b351D375C656d084 \
-  "addDevSigner(address)" \
+  "addDevSigner(address,bytes32)" \
   0x080f42420846c613158D7b4334257C78bE5A9B90 \
+  $TEE_IMAGE_HASH \
+  --rpc-url https://c3-chainproxy-eth-sepolia-full-dev.cbhq.net \
+  --ledger --mnemonic-derivation-path "m/44'/60'/1'/0/0"
+
+# Register a TDX dev signer for the same image hash.
+cast send 0x587d410B205449fB889EC4a5b351D375C656d084 \
+  "addDevTDXSigner(address,bytes32)" \
+  $TDX_SIGNER_ADDRESS \
+  $TEE_IMAGE_HASH \
   --rpc-url https://c3-chainproxy-eth-sepolia-full-dev.cbhq.net \
   --ledger --mnemonic-derivation-path "m/44'/60'/1'/0/0"
 ```
@@ -132,7 +141,7 @@ and Solidity verifies the proof plus the on-chain acceptance policy before regis
 | Contract               | Purpose                                                                                                                                                                                                                                       |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TDXVerifier`          | Verifies a RISC Zero or SP1 proof whose public values are an ABI-encoded `TDXVerifierJournal`, then checks trusted Intel root, TCB status policy, collateral expiry, quote freshness, signer derivation, and `REPORTDATA` public-key binding. |
-| `TEEProverRegistry`    | Registers Nitro signers through `registerSigner(bytes,bytes)` and TDX signers through `registerTDXSigner(bytes,bytes)`, storing both in the same registry fields used by `TEEVerifier`.                                                       |
+| `TEEProverRegistry`    | Registers Nitro signers through `registerSigner(bytes,bytes)` and TDX signers through `registerTDXSigner(bytes,bytes)`, tracking which TEE type each signer came from for `TEEVerifier`.                                                       |
 
 The ZK verifier guest is expected to perform the full Intel DCAP verification path:
 
@@ -159,7 +168,7 @@ The attested public key must be supplied as an uncompressed 65-byte secp256k1 pu
 
 The quote's TDREPORT `REPORTDATA` must put `keccak256(x || y)` in the first 32 bytes. The last 32 bytes are returned by the verifier as app-specific binding data and emitted by the registry.
 
-`TEEVerifier` is still the proposal-proof verifier. TDX only changes signer registration: once a TDX signer is registered, proposal proofs use the existing `proposer + signature` proof bytes and the same `signerImageHash` check as Nitro.
+`TEEVerifier` is still the proposal-proof verifier, but a TEE proposal proof now requires two signatures over the same journal: one from a Nitro-registered signer and one from a TDX-registered signer. The proof bytes are `proposer || signatureA || signatureB`; either signature order is accepted as long as both registered TEE types are present and both signers match the expected `TEE_IMAGE_HASH`.
 
 > **PoC boundary:** this repo now contains the production-shaped Solidity path and policy checks. The remaining off-chain piece is the actual RISC Zero/SP1 TDX DCAP guest that emits `TDXVerifierJournal` after verifying Intel collateral.
 
@@ -204,9 +213,9 @@ The script saves output to `deployments/<chainId>-tdx-verifier.json`.
 
 ### Step 2: Deploy the TDX multiproof test stack
 
-Set `DEPLOY_CONFIG_PATH` to the Sepolia deploy config and pass the `TDXVerifier` address from Step 1. `finalSystemOwner` in the deploy config must be the account broadcasting this transaction because the script updates `TDXVerifier.proofSubmitter` to the deployed `TEEProverRegistry`.
+Set `DEPLOY_CONFIG_PATH` to the Sepolia deploy config and pass the `TDXVerifier` address from Step 1. The deploy config must also contain the `NitroEnclaveVerifier` address, because TEE proposal proofs now require both Nitro and TDX signatures. `finalSystemOwner` in the deploy config must be the account broadcasting this transaction because the script updates `TDXVerifier.proofSubmitter` to the deployed `TEEProverRegistry`.
 
-The TDX registry manager is set to `TDX_REGISTRATION_MANAGER`, allowing that address to call `registerTDXSigner(bytes,bytes)`.
+The TDX registry manager is set to `TDX_REGISTRATION_MANAGER`, allowing that address to call `registerTDXSigner(bytes,bytes)`. Register a Nitro signer through `registerSigner(bytes,bytes)` as well before submitting TEE proposal proofs.
 
 ```bash
 just --justfile scripts/multiproof/justfile deploy-tdx-stack $TDX_VERIFIER
@@ -226,7 +235,18 @@ forge script scripts/multiproof/DeployDevWithTDX.s.sol:DeployDevWithTDX \
 
 The script saves output to `deployments/<chainId>-dev-with-tdx.json`.
 
-### Step 3: Register a TDX signer
+### Step 3: Register Nitro and TDX signers
+
+Register a Nitro signer with a ZK-proven Nitro attestation:
+
+```bash
+cast send $TEE_PROVER_REGISTRY \
+  "registerSigner(bytes,bytes)" \
+  $NITRO_OUTPUT \
+  $NITRO_PROOF_BYTES \
+  --rpc-url $L1_RPC_URL \
+  --private-key $PRIVATE_KEY
+```
 
 Once you have the ABI-encoded `TDXVerifierJournal` output and matching RISC Zero proof bytes from the TDX DCAP guest, register the signer through the TDX-aware registry:
 

@@ -119,6 +119,17 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      }
+    ],
+    "name": "DuplicateSigner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes32",
         "name": "signerImageHash",
         "type": "bytes32"
@@ -162,6 +173,16 @@
       }
     ],
     "name": "InvalidSigner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "MissingNitroSignature",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "MissingTDXSignature",
     "type": "error"
   },
   {

@@ -268,7 +268,7 @@ contract AggregateVerifierTest is BaseTest {
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
 
         bytes memory proofBytes =
-            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, rootClaim.raw());
+            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(130));
 
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.L1OriginInFuture.selector, l1OriginNumber, block.number)
@@ -290,7 +290,7 @@ contract AggregateVerifierTest is BaseTest {
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
 
         bytes memory proofBytes =
-            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, rootClaim.raw());
+            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(130));
 
         vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginTooOld.selector, l1OriginNumber, block.number));
         _createAggregateVerifierGame(
@@ -326,7 +326,7 @@ contract AggregateVerifierTest is BaseTest {
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
 
         bytes memory proofBytes =
-            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, rootClaim.raw());
+            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(130));
 
         _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proofBytes
@@ -352,7 +352,7 @@ contract AggregateVerifierTest is BaseTest {
         );
 
         bytes memory proofBytes =
-            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), expectedHash, l1OriginNumber, rootClaim.raw());
+            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), expectedHash, l1OriginNumber, new bytes(130));
 
         _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proofBytes

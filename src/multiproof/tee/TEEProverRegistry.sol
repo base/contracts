@@ -24,9 +24,15 @@ import { GameType } from "src/dispute/lib/Types.sol";
 ///      Registration is PCR0-agnostic: any enclave with a valid attestation can register,
 ///      enabling pre-registration before hardforks. PCR0 enforcement happens at proof-submission
 ///      time in TEEVerifier, which checks signerImageHash against the AggregateVerifier's
-///      TEE_IMAGE_HASH.
+///      TEE_IMAGE_HASH and requires one Nitro signer plus one TDX signer.
 contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     using EnumerableSetLib for EnumerableSetLib.AddressSet;
+    enum TEEType {
+        NONE,
+        NITRO,
+        TDX
+    }
+
     /// @notice Maximum age of an attestation document (60 minutes), in seconds.
     uint256 public constant MAX_AGE = 60 minutes;
 
@@ -67,6 +73,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     ///      Enables O(1) on-chain enumeration via `getRegisteredSigners()`.
     EnumerableSetLib.AddressSet internal _registeredSigners;
 
+    /// @notice Mapping of signer address to the attestation type used to register it.
+    mapping(address => TEEType) public signerTEEType;
+
     /// @notice Emitted when a signer is registered.
     event SignerRegistered(address indexed signer);
 
@@ -105,6 +114,12 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
     /// @notice Thrown when the TDX verifier is not configured.
     error TDXVerifierNotSet();
+
+    /// @notice Thrown when attempting to register a signer with no TEE type.
+    error InvalidTEEType();
+
+    /// @notice Thrown when a signer is already registered under another TEE type.
+    error SignerTEETypeMismatch(address signer, TEEType existingTEEType, TEEType newTEEType);
 
     constructor(INitroEnclaveVerifier nitroVerifier, ITDXVerifier tdxVerifier, IDisputeGameFactory factory) {
         if (address(factory) == address(0)) revert DisputeGameFactoryNotSet();
@@ -180,7 +195,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         }
         address enclaveAddress = address(uint160(uint256(publicKeyHash)));
 
-        _registerSigner(enclaveAddress, pcr0Hash);
+        _registerSigner(enclaveAddress, pcr0Hash, TEEType.NITRO);
     }
 
     /// @notice Registers a signer using a ZK proof of Intel TDX DCAP quote verification.
@@ -189,7 +204,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     function registerTDXSigner(bytes calldata output, bytes calldata proofBytes) external onlyOwnerOrManager {
         TDXVerifierJournal memory journal = TDX_VERIFIER.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
 
-        _registerSigner(journal.signer, journal.imageHash);
+        _registerSigner(journal.signer, journal.imageHash, TEEType.TDX);
 
         emit TDXSignerRegistered(journal.signer, journal.imageHash, journal.reportDataSuffix);
     }
@@ -199,6 +214,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     function deregisterSigner(address signer) external onlyOwnerOrManager {
         delete isRegisteredSigner[signer];
         delete signerImageHash[signer];
+        delete signerTEEType[signer];
         _registeredSigners.remove(signer);
         emit SignerDeregistered(signer);
     }
@@ -254,15 +270,22 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.6.0
+    /// @custom:semver 0.7.0
     function version() public pure virtual returns (string memory) {
-        return "0.6.0";
+        return "0.7.0";
     }
 
     /// @dev Registers a signer and stores the image hash enforced by TEEVerifier at proof-submission time.
-    function _registerSigner(address signer, bytes32 imageHash) internal {
+    function _registerSigner(address signer, bytes32 imageHash, TEEType teeType) internal {
+        if (teeType == TEEType.NONE) revert InvalidTEEType();
+        TEEType existingTEEType = signerTEEType[signer];
+        if (existingTEEType != TEEType.NONE && existingTEEType != teeType) {
+            revert SignerTEETypeMismatch(signer, existingTEEType, teeType);
+        }
+
         isRegisteredSigner[signer] = true;
         signerImageHash[signer] = imageHash;
+        signerTEEType[signer] = teeType;
         _registeredSigners.add(signer);
         emit SignerRegistered(signer);
     }

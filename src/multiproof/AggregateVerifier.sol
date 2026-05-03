@@ -65,6 +65,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The minimum number of proofs required to resolve the game.
     uint256 public constant PROOF_THRESHOLD = 1;
+
+    /// @notice TEE proof payload size: nitro signature(65) + tdx signature(65).
+    uint256 internal constant TEE_PROOF_BYTES_LENGTH = 130;
     ////////////////////////////////////////////////////////////////
     //                         Immutables                         //
     ////////////////////////////////////////////////////////////////
@@ -877,7 +880,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Verifies a TEE proof for the current game.
-    /// @param proofBytes The proof: signature(65).
+    /// @param proofBytes The proof: nitro signature(65) + tdx signature(65).
     function _verifyTeeProof(
         bytes calldata proofBytes,
         address proposer,
@@ -891,6 +894,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         internal
         view
     {
+        if (proofBytes.length != TEE_PROOF_BYTES_LENGTH) revert InvalidProof();
+
         bytes32 journal = keccak256(
             abi.encodePacked(
                 proposer,
@@ -1036,8 +1041,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.1.0
+    /// @custom:semver 0.2.0
     function version() public pure virtual returns (string memory) {
-        return "0.1.0";
+        return "0.2.0";
     }
 }

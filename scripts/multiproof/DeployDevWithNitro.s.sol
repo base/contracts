@@ -212,9 +212,12 @@ contract DeployDevWithNitro is Script {
         console.log("  TEE Image Hash:", vm.toString(cfg.teeImageHash()));
         console.log("  Config Hash:", vm.toString(cfg.multiproofConfigHash()));
         console.log("========================================");
-        console.log("\n>>> NEXT STEP: Register signer with ZK attestation proof <<<");
+        console.log("\n>>> NEXT STEP: Register one Nitro signer and one TDX signer <<<");
         console.log("\n  cast send", teeProverRegistryProxy);
-        console.log('    "registerSigner(bytes,bytes)" <ZK_OUTPUT> <ZK_PROOF_BYTES>');
+        console.log('    "registerSigner(bytes,bytes)" <NITRO_OUTPUT> <NITRO_PROOF_BYTES>');
+        console.log("    --private-key <OWNER_OR_MANAGER_KEY> --rpc-url <RPC>");
+        console.log("\n  cast send", teeProverRegistryProxy);
+        console.log('    "registerTDXSigner(bytes,bytes)" <TDX_OUTPUT> <TDX_PROOF_BYTES>');
         console.log("    --private-key <OWNER_OR_MANAGER_KEY> --rpc-url <RPC>");
         console.log("\n========================================\n");
     }

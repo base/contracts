@@ -49,6 +49,7 @@ contract DeployDevWithTDX is Script {
     DeployConfig public constant cfg =
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
 
+    address public nitroEnclaveVerifierAddr;
     address public tdxVerifierAddr;
     address public tdxRegistrationManager;
     address public teeProverRegistryProxy;
@@ -61,6 +62,7 @@ contract DeployDevWithTDX is Script {
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
         cfg.read(Config.deployConfigPath());
+        nitroEnclaveVerifierAddr = cfg.nitroEnclaveVerifier();
     }
 
     function run(address tdxVerifier) public {
@@ -69,6 +71,7 @@ contract DeployDevWithTDX is Script {
 
     function run(address tdxVerifier, address registrationManager) public {
         require(tdxVerifier != address(0), "tdxVerifier must be non-zero");
+        require(nitroEnclaveVerifierAddr != address(0), "nitroEnclaveVerifier must be set in config");
         require(registrationManager != address(0), "registrationManager must be non-zero");
         tdxVerifierAddr = tdxVerifier;
         tdxRegistrationManager = registrationManager;
@@ -81,6 +84,7 @@ contract DeployDevWithTDX is Script {
         console.log("TEE Proposer:", cfg.teeProposer());
         console.log("TEE Challenger:", cfg.teeChallenger());
         console.log("Game Type:", cfg.multiproofGameType());
+        console.log("NitroEnclaveVerifier:", nitroEnclaveVerifierAddr);
         console.log("TDXVerifier:", tdxVerifierAddr);
         console.log("TDX Registration Manager:", tdxRegistrationManager);
         console.log("");
@@ -102,7 +106,7 @@ contract DeployDevWithTDX is Script {
         address owner = cfg.finalSystemOwner();
         address registryImpl = address(
             new TEEProverRegistry(
-                INitroEnclaveVerifier(address(0)),
+                INitroEnclaveVerifier(nitroEnclaveVerifierAddr),
                 ITDXVerifier(tdxVerifierAddr),
                 IDisputeGameFactory(disputeGameFactory)
             )
@@ -178,6 +182,7 @@ contract DeployDevWithTDX is Script {
         console.log("      DEV DEPLOYMENT COMPLETE (TDX)");
         console.log("========================================");
         console.log("\nTDX Contracts:");
+        console.log("  NitroEnclaveVerifier:", nitroEnclaveVerifierAddr);
         console.log("  TDXVerifier:", tdxVerifierAddr);
         console.log("  TEEProverRegistry:", teeProverRegistryProxy);
         console.log("  TDX Registration Manager:", tdxRegistrationManager);
@@ -192,7 +197,10 @@ contract DeployDevWithTDX is Script {
         console.log("  TEE Image Hash:", vm.toString(cfg.teeImageHash()));
         console.log("  Config Hash:", vm.toString(cfg.multiproofConfigHash()));
         console.log("========================================");
-        console.log("\n>>> NEXT STEP: Register TDX signer with a ZK-proven TDX journal <<<");
+        console.log("\n>>> NEXT STEP: Register one Nitro signer and one TDX signer <<<");
+        console.log("\n  cast send", teeProverRegistryProxy);
+        console.log('    "registerSigner(bytes,bytes)" <NITRO_OUTPUT> <NITRO_PROOF_BYTES>');
+        console.log("    --private-key <OWNER_OR_MANAGER_KEY> --rpc-url <RPC>");
         console.log("\n  cast send", teeProverRegistryProxy);
         console.log('    "registerTDXSigner(bytes,bytes)" <TDX_OUTPUT> <PROOF_BYTES>');
         console.log("    --private-key <OWNER_OR_MANAGER_KEY> --rpc-url <RPC>");
@@ -201,6 +209,7 @@ contract DeployDevWithTDX is Script {
 
     function _writeOutput() internal {
         string memory key = "deployment";
+        vm.serializeAddress(key, "NitroEnclaveVerifier", nitroEnclaveVerifierAddr);
         vm.serializeAddress(key, "TDXVerifier", tdxVerifierAddr);
         vm.serializeAddress(key, "TDXRegistrationManager", tdxRegistrationManager);
         vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);

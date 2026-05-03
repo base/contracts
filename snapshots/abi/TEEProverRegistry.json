@@ -339,6 +339,25 @@
     "inputs": [
       {
         "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "signerTEEType",
+    "outputs": [
+      {
+        "internalType": "enum TEEProverRegistry.TEEType",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "newManager",
         "type": "address"
       }
@@ -540,7 +559,33 @@
   },
   {
     "inputs": [],
+    "name": "InvalidTEEType",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "PCR0NotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "enum TEEProverRegistry.TEEType",
+        "name": "existingTEEType",
+        "type": "uint8"
+      },
+      {
+        "internalType": "enum TEEProverRegistry.TEEType",
+        "name": "newTEEType",
+        "type": "uint8"
+      }
+    ],
+    "name": "SignerTEETypeMismatch",
     "type": "error"
   },
   {

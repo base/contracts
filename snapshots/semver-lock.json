@@ -144,8 +144,12 @@
     "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
   },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0x10bb6a60f21de103d1da9ff310a38f571c53a8113d04a029087648debf3f0341",
-    "sourceCodeHash": "0xcd4c508223b9b461ec230bde03c1630fe68cd00b82ee84c39b93d9f3c0d71d37"
+    "initCodeHash": "0xea8f199813975e1307fa964b70e30832cf5ea1e848ffa78368cc565cc9e919d1",
+    "sourceCodeHash": "0x9a48d272dd19ccd6df51999dcb6117308aea712f6d3731bdcc8b8d02b867c348"
+  },
+  "src/multiproof/AggregateVerifier.sol:AggregateVerifier:dispute": {
+    "initCodeHash": "0xa92e0ce6d4dddea92719bad6f1e964c3abf838ec892a12fc16c4a5b9fbfb9af1",
+    "sourceCodeHash": "0x9a48d272dd19ccd6df51999dcb6117308aea712f6d3731bdcc8b8d02b867c348"
   },
   "src/multiproof/tee/NitroEnclaveVerifier.sol:NitroEnclaveVerifier": {
     "initCodeHash": "0x100364f9b0c63a61538386ba91e73dcffba22d3f6dfe8efdbbf5ff347b6fce47",
@@ -156,12 +160,16 @@
     "sourceCodeHash": "0x7cdf2abefaefa3126960103aa810699973c1c47147114f8a92e63c427b9b1656"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0xf050a9503675e4351de148eb311d3446f04d59bd2083710617e045dd8b64bb26",
-    "sourceCodeHash": "0x64e7860f2b0d3b07aff5e1da82928a88ea4da94bf2fcb93a342f0f02844ece73"
+    "initCodeHash": "0xf96d42f3dc474f4f8d29af0e7fbb59b13035a61bc53903ddd14814ae0b3f2f73",
+    "sourceCodeHash": "0x12bf06d225633d1983746ea06e72469388a3db63fd7d8a10144b4267f13f0b5d"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
-    "initCodeHash": "0x655576cc21cc5c603d55fb4dd2a2f0ef57b11deeaabd3e539b0a70a5f7e2c9af",
-    "sourceCodeHash": "0xd5e01b4f4e69313e56e51f2f46b7bbe699ef8dc24b8a6385b8ebac4162e05353"
+    "initCodeHash": "0x37883165bb1924631d830772a811f172059f529fd44ff34694d2511ff52c29c9",
+    "sourceCodeHash": "0x549df133a04af10305dcc5e70818ac49ac47546c79c957151184f9a21223d6c1"
+  },
+  "src/multiproof/tee/TEEVerifier.sol:TEEVerifier:dispute": {
+    "initCodeHash": "0x37883165bb1924631d830772a811f172059f529fd44ff34694d2511ff52c29c9",
+    "sourceCodeHash": "0x549df133a04af10305dcc5e70818ac49ac47546c79c957151184f9a21223d6c1"
   },
   "src/multiproof/zk/ZKVerifier.sol:ZkVerifier": {
     "initCodeHash": "0xcdc5bd5fa8ffad76358b8f34a53b8c0cb36540176c31f82d52546373d0bd5245",

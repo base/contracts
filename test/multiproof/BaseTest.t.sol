@@ -218,10 +218,33 @@ contract BaseTest is Test {
         bytes32 l1OriginHash = blockhash(block.number - 1);
         // Use the previous block number as l1OriginNumber
         uint256 l1OriginNumber = block.number - 1;
-        // Add some padding/signature data (65 bytes minimum for a signature)
-        bytes memory signature = abi.encodePacked(salt, bytes32(0), bytes32(0), uint8(27));
+        return abi.encodePacked(uint8(proofType), l1OriginHash, l1OriginNumber, _generateProofBody(salt, proofType));
+    }
 
-        return abi.encodePacked(uint8(proofType), l1OriginHash, l1OriginNumber, signature);
+    function _generateProposalProof(
+        bytes memory salt,
+        AggregateVerifier.ProofType proofType
+    )
+        internal
+        pure
+        returns (bytes memory)
+    {
+        return abi.encodePacked(uint8(proofType), _generateProofBody(salt, proofType));
+    }
+
+    function _generateProofBody(
+        bytes memory salt,
+        AggregateVerifier.ProofType proofType
+    )
+        internal
+        pure
+        returns (bytes memory)
+    {
+        if (proofType == AggregateVerifier.ProofType.TEE) {
+            bytes32 saltHash = keccak256(salt);
+            return abi.encodePacked(saltHash, bytes32(0), uint8(27), saltHash, bytes32(uint256(1)), uint8(28));
+        }
+        return abi.encodePacked(salt, bytes32(0), bytes32(0), uint8(27));
     }
 
     function _generateIntermediateRootsExceptLast(uint256 l2BlockNumber) internal pure returns (bytes memory) {
