@@ -21,7 +21,6 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { GameType, Duration, Hash, Claim } from "src/dispute/lib/LibUDT.sol";
 import { Proposal, GameTypes } from "src/dispute/lib/Types.sol";
 import { LibGameArgs } from "src/dispute/lib/LibGameArgs.sol";
-import { DevFeatures } from "src/libraries/DevFeatures.sol";
 
 // Interfaces
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
@@ -37,7 +36,6 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import {
     IOPContractsManager,
     IOPContractsManagerGameTypeAdder,
-    IOPContractsManagerInteropMigrator,
     IOPContractsManagerUpgrader,
     IOPContractsManagerStandardValidator
 } from "interfaces/L1/IOPContractsManager.sol";
@@ -51,7 +49,6 @@ import {
     OPContractsManagerDeployer,
     OPContractsManagerUpgrader,
     OPContractsManagerContractsContainer,
-    OPContractsManagerInteropMigrator,
     OPContractsManagerStandardValidator
 } from "src/L1/OPContractsManager.sol";
 import { DisputeGames } from "../setup/DisputeGames.sol";
@@ -65,18 +62,10 @@ contract OPContractsManager_Harness is OPContractsManager {
         OPContractsManagerGameTypeAdder _opcmGameTypeAdder,
         OPContractsManagerDeployer _opcmDeployer,
         OPContractsManagerUpgrader _opcmUpgrader,
-        OPContractsManagerInteropMigrator _opcmInteropMigrator,
         OPContractsManagerStandardValidator _opcmStandardValidator,
         ISuperchainConfig _superchainConfig
     )
-        OPContractsManager(
-            _opcmGameTypeAdder,
-            _opcmDeployer,
-            _opcmUpgrader,
-            _opcmInteropMigrator,
-            _opcmStandardValidator,
-            _superchainConfig
-        )
+        OPContractsManager(_opcmGameTypeAdder, _opcmDeployer, _opcmUpgrader, _opcmStandardValidator, _superchainConfig)
     { }
 
     function chainIdToBatchInboxAddress_exposed(uint256 l2ChainId) public view returns (address) {
@@ -469,8 +458,7 @@ abstract contract OPContractsManager_TestInit is CommonTest, DisputeGames {
                 disputeMaxGameDepth: 73,
                 disputeSplitDepth: 30,
                 disputeClockExtension: Duration.wrap(10800),
-                disputeMaxClockDuration: Duration.wrap(302400),
-                useCustomGasToken: false
+                disputeMaxClockDuration: Duration.wrap(302400)
             })
         );
     }
@@ -544,7 +532,6 @@ contract OPContractsManager_ChainIdToBatchInboxAddress_Test is Test, FeatureFlag
             _opcmGameTypeAdder: new OPContractsManagerGameTypeAdder(container),
             _opcmDeployer: new OPContractsManagerDeployer(container),
             _opcmUpgrader: new OPContractsManagerUpgrader(container),
-            _opcmInteropMigrator: new OPContractsManagerInteropMigrator(container),
             _opcmStandardValidator: new OPContractsManagerStandardValidator(
                 opcmImplementations, superchainConfigProxy, address(superchainProxyAdmin), challenger, 100, bytes32(0)
             ),
@@ -1356,364 +1343,6 @@ contract OPContractsManager_UpgradeSuperchainConfig_Test is OPContractsManager_U
     }
 }
 
-/// @title OPContractsManager_Migrate_Test
-/// @notice Tests the `migrate` function of the `OPContractsManager` contract.
-contract OPContractsManager_Migrate_Test is OPContractsManager_TestInit {
-    Claim cannonPrestate1 = Claim.wrap(bytes32(hex"ABBA"));
-    Claim cannonPrestate2 = Claim.wrap(bytes32(hex"DEAD"));
-    Claim cannonKonaPrestate1 = Claim.wrap(bytes32(hex"ABBACADABA"));
-    Claim cannonKonaPrestate2 = Claim.wrap(bytes32(hex"DEADBEEF"));
-    Claim emptyPrestate = Claim.wrap(bytes32(0));
-
-    /// @notice Helper function to create the default migration input.
-    function _getDefaultInput() internal view returns (IOPContractsManagerInteropMigrator.MigrateInput memory) {
-        IOPContractsManagerInteropMigrator.GameParameters memory gameParameters =
-            IOPContractsManagerInteropMigrator.GameParameters({
-                proposer: address(1234),
-                challenger: address(5678),
-                maxGameDepth: 73,
-                splitDepth: 30,
-                initBond: 1 ether,
-                clockExtension: Duration.wrap(10800),
-                maxClockDuration: Duration.wrap(302400)
-            });
-
-        IOPContractsManager.OpChainConfig[] memory opChainConfigs = new IOPContractsManager.OpChainConfig[](2);
-        opChainConfigs[0] = IOPContractsManager.OpChainConfig(
-            chainDeployOutput1.systemConfigProxy, cannonPrestate1, cannonKonaPrestate1
-        );
-        opChainConfigs[1] = IOPContractsManager.OpChainConfig(
-            chainDeployOutput2.systemConfigProxy, cannonPrestate1, cannonKonaPrestate1
-        );
-
-        return IOPContractsManagerInteropMigrator.MigrateInput({
-            usePermissionlessGame: true,
-            startingAnchorRoot: Proposal({ root: Hash.wrap(bytes32(hex"ABBA")), l2SequenceNumber: 1234 }),
-            gameParameters: gameParameters,
-            opChainConfigs: opChainConfigs
-        });
-    }
-
-    /// @notice Helper function to execute a migration.
-    /// @param _input The input to the migration function.
-    function _doMigration(IOPContractsManagerInteropMigrator.MigrateInput memory _input) internal {
-        _doMigration(_input, bytes4(0));
-    }
-
-    /// @notice Helper function to execute a migration with a revert selector.
-    /// @param _input The input to the migration function.
-    /// @param _revertSelector The selector of the revert to expect.
-    function _doMigration(
-        IOPContractsManagerInteropMigrator.MigrateInput memory _input,
-        bytes4 _revertSelector
-    )
-        internal
-    {
-        // Set the proxy admin owner to be a delegate caller.
-        address proxyAdminOwner = chainDeployOutput1.opChainProxyAdmin.owner();
-        vm.etch(address(proxyAdminOwner), vm.getDeployedCode("test/mocks/Callers.sol:DelegateCaller"));
-
-        // Execute a delegatecall to the OPCM migration function.
-        // Check gas usage of the migration function.
-        uint256 gasBefore = gasleft();
-        if (_revertSelector != bytes4(0)) {
-            vm.expectRevert(_revertSelector);
-        }
-        DelegateCaller(proxyAdminOwner).dcForward(address(opcm), abi.encodeCall(IOPContractsManager.migrate, (_input)));
-        uint256 gasAfter = gasleft();
-
-        // Make sure the gas usage is less than 20 million so we can definitely fit in a block.
-        assertLt(gasBefore - gasAfter, 20_000_000, "Gas usage too high");
-    }
-
-    /// @notice Helper function to assert that the old game implementations are now zeroed out.
-    ///         We need a separate helper to avoid stack too deep errors.
-    /// @param _disputeGameFactory The dispute game factory to check.
-    function _assertOldGamesZeroed(IDisputeGameFactory _disputeGameFactory) internal view {
-        // Assert that the old game implementations are now zeroed out.
-        _assertGameIsEmpty(_disputeGameFactory, GameTypes.CANNON, "CANNON");
-        _assertGameIsEmpty(_disputeGameFactory, GameTypes.SUPER_CANNON, "SUPER_CANNON");
-        _assertGameIsEmpty(_disputeGameFactory, GameTypes.PERMISSIONED_CANNON, "PERMISSIONED_CANNON");
-        _assertGameIsEmpty(_disputeGameFactory, GameTypes.SUPER_PERMISSIONED_CANNON, "SUPER_PERMISSIONED_CANNON");
-        // Only explicitly zeroed out if feature is enabled. Otherwise left unchanged (which may still be 0).
-        _assertGameIsEmpty(_disputeGameFactory, GameTypes.CANNON_KONA, "CANNON_KONA");
-        _assertGameIsEmpty(_disputeGameFactory, GameTypes.SUPER_CANNON_KONA, "SUPER_CANNON_KONA");
-    }
-
-    function _assertGameIsEmpty(IDisputeGameFactory _dgf, GameType _gameType, string memory _label) internal view {
-        assertEq(
-            address(_dgf.gameImpls(_gameType)),
-            address(0),
-            string.concat("Game type set when it should not be: ", _label)
-        );
-        assertEq(_dgf.gameArgs(_gameType), hex"", string.concat("Game args should be empty: ", _label));
-    }
-
-    /// @notice Runs some tests after opcm.migrate
-    function _runPostMigrateSmokeTests(IOPContractsManagerInteropMigrator.MigrateInput memory _input) internal {
-        IDisputeGameFactory dgf = IDisputeGameFactory(chainDeployOutput1.systemConfigProxy.disputeGameFactory());
-        IAnchorStateRegistry anchorStateRegistry =
-            IOptimismPortal2(payable(chainDeployOutput1.systemConfigProxy.optimismPortal())).anchorStateRegistry();
-        address proposer = _input.gameParameters.proposer;
-
-        (, uint256 l2SequenceNumberAnchor) = anchorStateRegistry.getAnchorRoot();
-        uint256 l2SequenceNumber = l2SequenceNumberAnchor + 1;
-        GameType[] memory gameTypes = _getPostMigrateExpectedGameTypes(_input);
-
-        address permissionlessWeth;
-        for (uint256 i = 0; i < gameTypes.length; i++) {
-            LibGameArgs.GameArgs memory gameArgs = LibGameArgs.decode(dgf.gameArgs(gameTypes[i]));
-            if (permissionlessWeth == address(0) && !isGamePermissioned(gameTypes[i])) {
-                // Remember the first permissionless weth we encounter
-                permissionlessWeth = gameArgs.weth;
-            }
-
-            assertEq(gameArgs.vm, opcm.implementations().mipsImpl, "gameArgs vm mismatch");
-            assertEq(gameArgs.anchorStateRegistry, address(anchorStateRegistry), "gameArgs asr mismatch");
-            assertEq(gameArgs.l2ChainId, 0, "gameArgs non-zero l2ChainId");
-            if (gameTypes[i].raw() == GameTypes.SUPER_CANNON_KONA.raw()) {
-                assertEq(gameArgs.absolutePrestate, cannonKonaPrestate1.raw(), "gameArgs prestate mismatch");
-            } else {
-                assertEq(gameArgs.absolutePrestate, cannonPrestate1.raw(), "gameArgs prestate mismatch");
-            }
-            if (!isGamePermissioned(gameTypes[i])) {
-                // All permissionless FDG games should share the same weth contract
-                assertEq(gameArgs.weth, permissionlessWeth, "gameArgs weth mismatch");
-            }
-
-            Claim rootClaim = Claim.wrap(bytes32(uint256(1)));
-            uint256 bondAmount = dgf.initBonds(gameTypes[i]);
-            vm.deal(address(proposer), bondAmount);
-            vm.prank(proposer, proposer);
-            IPermissionedDisputeGameV2 game = IPermissionedDisputeGameV2(
-                address(dgf.create{ value: bondAmount }(gameTypes[i], rootClaim, abi.encode(l2SequenceNumber)))
-            );
-
-            assertEq(game.gameType().raw(), gameTypes[i].raw(), "Super Cannon game type not set properly");
-            assertEq(
-                game.maxClockDuration().raw(),
-                _input.gameParameters.maxClockDuration.raw(),
-                "max clock duration mismatch"
-            );
-            assertEq(
-                game.clockExtension().raw(), _input.gameParameters.clockExtension.raw(), "max clock duration mismatch"
-            );
-            assertEq(game.maxGameDepth(), _input.gameParameters.maxGameDepth, "max game depth mismatch");
-            assertEq(game.splitDepth(), _input.gameParameters.splitDepth, "split depth mismatch");
-            assertEq(game.l2SequenceNumber(), l2SequenceNumber, "sequence number mismatch");
-            assertEq(game.gameCreator(), proposer, "game creator mismatch");
-            assertEq(game.l1Head().raw(), blockhash(block.number - 1), "l1 head mismatch");
-
-            // check game args
-            assertEq(game.absolutePrestate().raw(), gameArgs.absolutePrestate, "prestate mismatch");
-            assertEq(address(game.vm()), gameArgs.vm, "vm mismatch");
-            assertEq(address(game.anchorStateRegistry()), gameArgs.anchorStateRegistry, "prestate mismatch");
-            assertEq(address(game.weth()), gameArgs.weth, "weth mismatch");
-            if (gameTypes[i].raw() == GameTypes.SUPER_PERMISSIONED_CANNON.raw()) {
-                assertEq(game.proposer(), gameArgs.proposer, "proposer mismatch");
-                assertEq(game.challenger(), gameArgs.challenger, "challenger mismatch");
-            }
-        }
-    }
-
-    function _getPostMigrateExpectedGameTypes(IOPContractsManagerInteropMigrator.MigrateInput memory _input)
-        internal
-        pure
-        returns (GameType[] memory gameTypes_)
-    {
-        uint256 gameCount = 1;
-        bytes32 cannonKonaPrestate = _input.opChainConfigs[0].cannonKonaPrestate.raw();
-        if (_input.usePermissionlessGame) {
-            gameCount += 1;
-            if (cannonKonaPrestate != bytes32(0)) {
-                gameCount += 1;
-            }
-        }
-
-        gameTypes_ = new GameType[](gameCount);
-        gameTypes_[0] = GameTypes.SUPER_PERMISSIONED_CANNON;
-        if (_input.usePermissionlessGame) {
-            gameTypes_[1] = GameTypes.SUPER_CANNON;
-            if (cannonKonaPrestate != bytes32(0)) {
-                gameTypes_[2] = GameTypes.SUPER_CANNON_KONA;
-            }
-        }
-    }
-
-    /// @notice Tests that permissionless migration reverts when cannon prestates are empty.
-    function test_migrate_permissionlessWithEmptyCannonPrestate_reverts() public {
-        IOPContractsManagerInteropMigrator.MigrateInput memory input = _getDefaultInput();
-        input.opChainConfigs[0].cannonPrestate = emptyPrestate;
-        input.opChainConfigs[1].cannonPrestate = emptyPrestate;
-
-        // Execute the migration.
-        _doMigration(input, IOPContractsManager.PrestateNotSet.selector);
-    }
-
-    /// @notice Tests that permissioned migration reverts when cannon prestates are empty.
-    function test_migrate_permissionedWithEmptyCannonPrestate_reverts() public {
-        IOPContractsManagerInteropMigrator.MigrateInput memory input = _getDefaultInput();
-        input.usePermissionlessGame = false;
-        input.opChainConfigs[0].cannonPrestate = emptyPrestate;
-        input.opChainConfigs[1].cannonPrestate = emptyPrestate;
-
-        // Execute the migration.
-        _doMigration(input, IOPContractsManager.PrestateNotSet.selector);
-    }
-
-    function _runMigrationAndStandardChecks(IOPContractsManagerInteropMigrator.MigrateInput memory input)
-        internal
-        returns (IAnchorStateRegistry asr_, IDisputeGameFactory dgf_)
-    {
-        // Separate context to avoid stack too deep errors.
-        {
-            // Grab the existing DisputeGameFactory for each chain.
-            IDisputeGameFactory oldDisputeGameFactory1 =
-                IDisputeGameFactory(payable(chainDeployOutput1.systemConfigProxy.disputeGameFactory()));
-            IDisputeGameFactory oldDisputeGameFactory2 =
-                IDisputeGameFactory(payable(chainDeployOutput2.systemConfigProxy.disputeGameFactory()));
-
-            // Execute the migration.
-            _doMigration(input);
-
-            // Assert that the old game implementations are now zeroed out.
-            _assertOldGamesZeroed(oldDisputeGameFactory1);
-            _assertOldGamesZeroed(oldDisputeGameFactory2);
-        }
-
-        // Grab the two OptimismPortal addresses.
-        IOptimismPortal2 optimismPortal1 =
-            IOptimismPortal2(payable(chainDeployOutput1.systemConfigProxy.optimismPortal()));
-        IOptimismPortal2 optimismPortal2 =
-            IOptimismPortal2(payable(chainDeployOutput2.systemConfigProxy.optimismPortal()));
-
-        // Grab the AnchorStateRegistry from the OptimismPortal for both chains, confirm same.
-        assertEq(
-            address(optimismPortal1.anchorStateRegistry()),
-            address(optimismPortal2.anchorStateRegistry()),
-            "AnchorStateRegistry mismatch"
-        );
-
-        // Extract the AnchorStateRegistry now that we know it's the same on both chains.
-        asr_ = optimismPortal1.anchorStateRegistry();
-
-        // Check that the starting anchor root is the same as the input.
-        (Hash root, uint256 l2SequenceNumber) = asr_.getAnchorRoot();
-        assertEq(root.raw(), input.startingAnchorRoot.root.raw(), "Starting anchor root mismatch");
-        assertEq(
-            l2SequenceNumber,
-            input.startingAnchorRoot.l2SequenceNumber,
-            "Starting anchor root L2 sequence number mismatch"
-        );
-
-        // Grab the DisputeGameFactory from the SystemConfig for both chains, confirm same.
-        assertEq(
-            chainDeployOutput1.systemConfigProxy.disputeGameFactory(),
-            chainDeployOutput2.systemConfigProxy.disputeGameFactory(),
-            "DisputeGameFactory mismatch"
-        );
-
-        // Extract the DisputeGameFactory now that we know it's the same on both chains.
-        dgf_ = IDisputeGameFactory(chainDeployOutput1.systemConfigProxy.disputeGameFactory());
-
-        // Grab the ETHLockbox from the OptimismPortal for both chains, confirm same.
-        assertEq(address(optimismPortal1.ethLockbox()), address(optimismPortal2.ethLockbox()), "ETHLockbox mismatch");
-
-        // Extract the ETHLockbox now that we know it's the same on both chains.
-        IETHLockbox ethLockbox = optimismPortal1.ethLockbox();
-
-        // Check that the ETHLockbox was migrated correctly.
-        assertGt(address(ethLockbox).balance, 0, "ETHLockbox balance is zero");
-        assertTrue(ethLockbox.authorizedPortals(optimismPortal1), "ETHLockbox does not have portal 1 authorized");
-        assertTrue(ethLockbox.authorizedPortals(optimismPortal2), "ETHLockbox does not have portal 2 authorized");
-    }
-
-    function _validateSuperGameImplParams(
-        IOPContractsManagerInteropMigrator.MigrateInput memory _input,
-        IDisputeGameFactory _dgf,
-        GameType _gameType,
-        string memory _label
-    )
-        internal
-        view
-    {
-        IDisputeGame dgImpl = _dgf.gameImpls(_gameType);
-        IFaultDisputeGameV2 superImpl = IFaultDisputeGameV2(address(dgImpl));
-        assertEq(
-            superImpl.maxGameDepth(),
-            _input.gameParameters.maxGameDepth,
-            string.concat("MaxGameDepth mismatch: ", _label)
-        );
-        assertEq(
-            superImpl.splitDepth(), _input.gameParameters.splitDepth, string.concat("SplitDepth mismatch: ", _label)
-        );
-        assertEq(
-            superImpl.clockExtension().raw(),
-            _input.gameParameters.clockExtension.raw(),
-            string.concat("ClockExtension mismatch: ", _label)
-        );
-        assertEq(
-            superImpl.maxClockDuration().raw(),
-            _input.gameParameters.maxClockDuration.raw(),
-            string.concat("MaxClockDuration mismatch: ", _label)
-        );
-    }
-
-    /// @notice Tests that the migration function reverts when the ProxyAdmin owners are
-    ///         mismatched.
-    function test_migrate_mismatchedProxyAdminOwners_reverts() public {
-        IOPContractsManagerInteropMigrator.MigrateInput memory input = _getDefaultInput();
-
-        // Mock out the owners of the ProxyAdmins to be different.
-        vm.mockCall(
-            address(input.opChainConfigs[0].systemConfigProxy.proxyAdmin()),
-            abi.encodeCall(IProxyAdmin.owner, ()),
-            abi.encode(address(1234))
-        );
-        vm.mockCall(
-            address(input.opChainConfigs[1].systemConfigProxy.proxyAdmin()),
-            abi.encodeCall(IProxyAdmin.owner, ()),
-            abi.encode(address(5678))
-        );
-
-        // Execute the migration.
-        _doMigration(
-            input, OPContractsManagerInteropMigrator.OPContractsManagerInteropMigrator_ProxyAdminOwnerMismatch.selector
-        );
-    }
-
-    /// @notice Tests that the migration function reverts when the absolute prestates are
-    ///         mismatched.
-    function test_migrate_mismatchedCannonPrestates_reverts() public {
-        IOPContractsManagerInteropMigrator.MigrateInput memory input = _getDefaultInput();
-
-        // Set the prestates to be different.
-        input.opChainConfigs[0].cannonPrestate = cannonPrestate1;
-        input.opChainConfigs[1].cannonPrestate = cannonPrestate2;
-
-        // Execute the migration.
-        _doMigration(
-            input, OPContractsManagerInteropMigrator.OPContractsManagerInteropMigrator_AbsolutePrestateMismatch.selector
-        );
-    }
-
-    /// @notice Tests that the migration function reverts when the absolute prestates are
-    ///         mismatched.
-    function test_migrate_mismatchedKonaPrestates_reverts() public {
-        IOPContractsManagerInteropMigrator.MigrateInput memory input = _getDefaultInput();
-
-        // Set the prestates to be different.
-        input.opChainConfigs[0].cannonKonaPrestate = cannonKonaPrestate1;
-        input.opChainConfigs[1].cannonKonaPrestate = cannonKonaPrestate2;
-
-        // Execute the migration.
-        // We should revert if there is a mismatch and cannonaKona is enabled
-        _doMigration(
-            input, OPContractsManagerInteropMigrator.OPContractsManagerInteropMigrator_AbsolutePrestateMismatch.selector
-        );
-    }
-}
-
 /// @title OPContractsManager_Deploy_Test
 /// @notice Tests the `deploy` function of the `OPContractsManager` contract.
 /// @dev Unlike other test suites, we intentionally do not inherit from CommonTest or Setup. This
@@ -1752,8 +1381,7 @@ contract OPContractsManager_Deploy_Test is DeployOPChain_TestBase, DisputeGames 
             disputeMaxGameDepth: _doi.disputeMaxGameDepth,
             disputeSplitDepth: _doi.disputeSplitDepth,
             disputeClockExtension: _doi.disputeClockExtension,
-            disputeMaxClockDuration: _doi.disputeMaxClockDuration,
-            useCustomGasToken: _doi.useCustomGasToken
+            disputeMaxClockDuration: _doi.disputeMaxClockDuration
         });
     }
 
@@ -1781,7 +1409,6 @@ contract OPContractsManager_Deploy_Test is DeployOPChain_TestBase, DisputeGames 
 
     /// @notice Test that deploy sets the permissioned dispute game implementation
     function test_deployPermissioned_succeeds() public {
-        // Sanity-check setup is consistent with devFeatures flag
         IOPContractsManager.Implementations memory impls = opcm.implementations();
         address pdgImpl = address(impls.permissionedDisputeGameV2Impl);
         address fdgImpl = address(impls.faultDisputeGameV2Impl);

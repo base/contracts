@@ -157,11 +157,6 @@ contract Deploy is Deployer {
             deploySuperchain();
         }
 
-        // Override useCustomGasToken config if system feature flag is set
-        if (Config.sysFeatureCustomGasToken()) {
-            cfg.setUseCustomGasToken(true);
-        }
-
         deployImplementations({ _isInterop: cfg.useInterop() });
 
         // Deploy Current OPChain Contracts
@@ -408,8 +403,7 @@ contract Deploy is Deployer {
             disputeMaxGameDepth: cfg.faultGameMaxDepth(),
             disputeSplitDepth: cfg.faultGameSplitDepth(),
             disputeClockExtension: Duration.wrap(uint64(cfg.faultGameClockExtension())),
-            disputeMaxClockDuration: Duration.wrap(uint64(cfg.faultGameMaxClockDuration())),
-            useCustomGasToken: cfg.useCustomGasToken()
+            disputeMaxClockDuration: Duration.wrap(uint64(cfg.faultGameMaxClockDuration()))
         });
     }
 }

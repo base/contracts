@@ -10,9 +10,6 @@ import { Hashing } from "src/libraries/Hashing.sol";
 import { Features } from "src/libraries/Features.sol";
 import { SemverComp } from "src/libraries/SemverComp.sol";
 
-// Interfaces
-import { IL2ToL1MessagePasserCGT } from "interfaces/L2/IL2ToL1MessagePasserCGT.sol";
-
 /// @title L2ToL1MessagePasser_Version_Test
 /// @notice Tests the `version` function of the `L2ToL1MessagePasser` contract.
 contract L2ToL1MessagePasser_Version_Test is CommonTest {
@@ -181,25 +178,6 @@ contract L2ToL1MessagePasser_InitiateWithdrawal_Test is CommonTest {
         assertEq(l2ToL1MessagePasser.sentMessages(withdrawalHash), true);
         // the nonce increments
         assertEq(nonce + 1, l2ToL1MessagePasser.messageNonce());
-    }
-
-    /// @notice Tests that `initiateWithdrawal` fails when called with value and custom gas token
-    ///         is enabled.
-    function testFuzz_initiateWithdrawal_withValueAndCustomGasToken_fails(
-        address _randomAddress,
-        uint256 _value
-    )
-        external
-    {
-        skipIfSysFeatureDisabled(Features.CUSTOM_GAS_TOKEN);
-        // Set initial state
-        _value = bound(_value, 1, type(uint256).max);
-        vm.deal(_randomAddress, _value);
-
-        // Expect revert with NotAllowedOnCGTMode
-        vm.prank(_randomAddress);
-        vm.expectRevert(IL2ToL1MessagePasserCGT.L2ToL1MessagePasserCGT_NotAllowedOnCGTMode.selector);
-        l2ToL1MessagePasser.initiateWithdrawal{ value: _value }({ _target: address(0), _gasLimit: 1, _data: "" });
     }
 }
 

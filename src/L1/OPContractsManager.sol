@@ -12,7 +12,6 @@ import { Claim, Duration, GameType, GameTypes, Proposal } from "src/dispute/lib/
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { SemverComp } from "src/libraries/SemverComp.sol";
 import { Features } from "src/libraries/Features.sol";
-import { DevFeatures } from "src/libraries/DevFeatures.sol";
 import { LibGameArgs } from "src/dispute/lib/LibGameArgs.sol";
 
 // Interfaces
@@ -80,16 +79,6 @@ contract OPContractsManagerContractsContainer {
         return implementation;
     }
 
-    /// @notice Returns the status of a development feature. Note that this function does not check
-    ///         that the input feature represents a single feature and the bitwise AND operation
-    ///         allows for multiple features to be enabled at once. Users should generally check
-    ///         for only a single feature at a time.
-    /// @param _feature The feature to check.
-    /// @return True if the feature is enabled, false otherwise.
-    function isDevFeatureEnabled(bytes32 _feature) public view returns (bool) {
-        return DevFeatures.isDevFeatureEnabled(devFeatureBitmap, _feature);
-    }
-
     /// @notice Returns true if the contract is running in a testing environment. Checks that the
     ///         code for the address 0xbeefcafe is not zero, which is an address that should never
     ///         have any code in production environments but can be made to have code in tests.
@@ -139,16 +128,6 @@ abstract contract OPContractsManagerBase {
     /// @notice Retrieves the development feature bitmap stored in this OPCM contract
     function devFeatureBitmap() public view returns (bytes32) {
         return contractsContainer.devFeatureBitmap();
-    }
-
-    /// @notice Retrieves the status of a development feature. Note that this function does not check
-    ///         that the input feature represents a single feature and the bitwise AND operation
-    ///         allows for multiple features to be enabled at once. Users should generally check
-    ///         for only a single feature at a time.
-    /// @param _feature The feature to check.
-    /// @return True if the feature is enabled, false otherwise.
-    function isDevFeatureEnabled(bytes32 _feature) public view returns (bool) {
-        return contractsContainer.isDevFeatureEnabled(_feature);
     }
 
     /// @notice Maps an L2 chain ID to an L1 batch inbox address as defined by the standard
@@ -1101,12 +1080,6 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
             output.opChainProxyAdmin, address(output.systemConfigProxy), implementation.systemConfigImpl, data
         );
 
-        // If the custom gas token feature was requested, enable the custom gas token feature in the SystemConfig
-        // contract.
-        if (_input.useCustomGasToken) {
-            output.systemConfigProxy.setFeature(Features.CUSTOM_GAS_TOKEN, true);
-        }
-
         // Initialize the OptimismPortal.
         data = encodeOptimismPortalInitializer(output);
         upgradeToAndCall(
@@ -1392,116 +1365,6 @@ contract OPContractsManagerDeployer is OPContractsManagerBase {
     }
 }
 
-/// @title OPContractsManagerInteropMigrator
-/// @notice This contract is used to migrate one or more OP Stack chains to use the Super Root dispute
-///         games and shared dispute game contracts.
-contract OPContractsManagerInteropMigrator is OPContractsManagerBase {
-    /// @notice Thrown when the ProxyAdmin owner of one or more of the provided OP Stack chains
-    ///         being migrated does not match the ProxyAdmin owner of the first provided chain.
-    error OPContractsManagerInteropMigrator_ProxyAdminOwnerMismatch();
-
-    /// @notice Thrown when the SuperchainConfig of one or more of the provided OP Stack chains
-    ///         being migrated does not match the SuperchainConfig of the first provided chain.
-    error OPContractsManagerInteropMigrator_SuperchainConfigMismatch();
-
-    /// @notice Thrown when the absolute prestate of one or more of the provided OP Stack chains
-    ///         being migrated does not match the absolute prestate of the first provided chain.
-    error OPContractsManagerInteropMigrator_AbsolutePrestateMismatch();
-
-    /// @notice Parameters for creating the new Super Root dispute games that must be provided by
-    ///         the caller. Other parameters are selected automatically.
-    struct GameParameters {
-        address proposer;
-        address challenger;
-        uint256 maxGameDepth;
-        uint256 splitDepth;
-        uint256 initBond;
-        Duration clockExtension;
-        Duration maxClockDuration;
-    }
-
-    /// @notice Input parameters for the migration.
-    struct MigrateInput {
-        bool usePermissionlessGame;
-        Proposal startingAnchorRoot;
-        GameParameters gameParameters;
-        OPContractsManager.OpChainConfig[] opChainConfigs;
-    }
-
-    /// @param _contractsContainer Container of blueprints and implementations.
-    constructor(OPContractsManagerContractsContainer _contractsContainer)
-        OPContractsManagerBase(_contractsContainer)
-    { }
-
-    /// @notice Migrates one or more OP Stack chains to use the Super Root dispute games and shared
-    ///         dispute game contracts.
-    /// @dev WARNING: This is a one-way operation. You cannot easily undo this operation without a
-    ///      smart contract upgrade. Do not call this function unless you are 100% confident that
-    ///      you know what you're doing and that you are prepared to fully execute this migration.
-    /// @param _input The input parameters for the migration.
-    function migrate(MigrateInput calldata _input) public virtual {
-        // Get the proxyAdmin from the first system config.
-        IProxyAdmin proxyAdmin = _input.opChainConfigs[0].systemConfigProxy.proxyAdmin();
-
-        // Check that all of the configs have the same proxy admin owner and prestates.
-        for (uint256 i = 0; i < _input.opChainConfigs.length; i++) {
-            // Different chains might actually have different ProxyAdmin contracts, but it's fine
-            // as long as the owner of all of those contracts is the same.
-            if (_input.opChainConfigs[i].systemConfigProxy.proxyAdmin().owner() != proxyAdmin.owner()) {
-                revert OPContractsManagerInteropMigrator_ProxyAdminOwnerMismatch();
-            }
-            if (_input.opChainConfigs[i].cannonPrestate.raw() != _input.opChainConfigs[0].cannonPrestate.raw()) {
-                revert OPContractsManagerInteropMigrator_AbsolutePrestateMismatch();
-            }
-            if (_input.opChainConfigs[i].cannonKonaPrestate.raw() != _input.opChainConfigs[0].cannonKonaPrestate.raw())
-            {
-                revert OPContractsManagerInteropMigrator_AbsolutePrestateMismatch();
-            }
-        }
-
-        // Check that cannon prestate is non-empty
-        if (_input.opChainConfigs[0].cannonPrestate.raw() == bytes32(0)) {
-            revert OPContractsManager.PrestateNotSet();
-        }
-
-        // NOTE that here and in the rest of this function, we are using the first provided chain's
-        // ProxyAdmin contract as the ProxyAdmin for all of the newly shared contracts. This is
-        // safe because we already checked that all of the provided chains have the same ProxyAdmin
-        // owner and therefore have the same access models.
-        address proxyAdminOwner = proxyAdmin.owner();
-
-        // Deploy the new DisputeGameFactory.
-        IDisputeGameFactory newDisputeGameFactory = IDisputeGameFactory(
-            deployProxy({
-                _l2ChainId: block.timestamp,
-                _proxyAdmin: proxyAdmin,
-                _saltMixer: reusableSaltMixer(_input.opChainConfigs[0].systemConfigProxy),
-                _contractName: "DisputeGameFactory-Interop"
-            })
-        );
-
-        // Initialize the new DisputeGameFactory.
-        upgradeToAndCall(
-            proxyAdmin,
-            address(newDisputeGameFactory),
-            getImplementations().disputeGameFactoryImpl,
-            abi.encodeCall(IDisputeGameFactory.initialize, (proxyAdminOwner))
-        );
-
-        // Select the correct game type based on the input.
-        GameType newGameType;
-        if (_input.usePermissionlessGame) {
-            newGameType = GameTypes.SUPER_CANNON;
-        } else {
-            newGameType = GameTypes.SUPER_PERMISSIONED_CANNON;
-        }
-    }
-
-    function clearGameImplementation(IDisputeGameFactory _dgf, GameType _gameType) internal {
-        _dgf.setImplementation(_gameType, IDisputeGame(address(0)), hex"");
-    }
-}
-
 contract OPContractsManager is ISemver {
     // -------- Structs --------
 
@@ -1533,8 +1396,6 @@ contract OPContractsManager is ISemver {
         uint256 disputeSplitDepth;
         Duration disputeClockExtension;
         Duration disputeMaxClockDuration;
-        // Whether to use the custom gas token.
-        bool useCustomGasToken;
     }
 
     /// @notice The full set of outputs from deploying a new OP Stack chain.
@@ -1635,8 +1496,6 @@ contract OPContractsManager is ISemver {
 
     OPContractsManagerUpgrader public immutable opcmUpgrader;
 
-    OPContractsManagerInteropMigrator public immutable opcmInteropMigrator;
-
     OPContractsManagerStandardValidator public immutable opcmStandardValidator;
 
     /// @notice Address of the SuperchainConfig contract shared by all chains.
@@ -1696,7 +1555,6 @@ contract OPContractsManager is ISemver {
         OPContractsManagerGameTypeAdder _opcmGameTypeAdder,
         OPContractsManagerDeployer _opcmDeployer,
         OPContractsManagerUpgrader _opcmUpgrader,
-        OPContractsManagerInteropMigrator _opcmInteropMigrator,
         OPContractsManagerStandardValidator _opcmStandardValidator,
         ISuperchainConfig _superchainConfig
     ) {
@@ -1704,12 +1562,10 @@ contract OPContractsManager is ISemver {
         _opcmDeployer.assertValidContractAddress(address(_opcmGameTypeAdder));
         _opcmDeployer.assertValidContractAddress(address(_opcmDeployer));
         _opcmDeployer.assertValidContractAddress(address(_opcmUpgrader));
-        _opcmDeployer.assertValidContractAddress(address(_opcmInteropMigrator));
         _opcmDeployer.assertValidContractAddress(address(_opcmStandardValidator));
         opcmGameTypeAdder = _opcmGameTypeAdder;
         opcmDeployer = _opcmDeployer;
         opcmUpgrader = _opcmUpgrader;
-        opcmInteropMigrator = _opcmInteropMigrator;
         opcmStandardValidator = _opcmStandardValidator;
         superchainConfig = _superchainConfig;
         thisOPCM = this;
@@ -1818,15 +1674,6 @@ contract OPContractsManager is ISemver {
         _performDelegateCall(address(opcmGameTypeAdder), data);
     }
 
-    /// @notice Migrates the Optimism contracts to the latest version.
-    /// @param _input Input parameters for the migration.
-    function migrate(OPContractsManagerInteropMigrator.MigrateInput calldata _input) external virtual {
-        if (address(this) == address(thisOPCM)) revert OnlyDelegatecall();
-
-        bytes memory data = abi.encodeCall(OPContractsManagerInteropMigrator.migrate, (_input));
-        _performDelegateCall(address(opcmInteropMigrator), data);
-    }
-
     /// @notice Maps an L2 chain ID to an L1 batch inbox address as defined by the standard
     /// configuration's convention. This convention is `versionByte || keccak256(bytes32(chainId))[:19]`,
     /// where || denotes concatenation`, versionByte is 0x00, and chainId is a uint256.
@@ -1849,16 +1696,6 @@ contract OPContractsManager is ISemver {
     /// @return The development feature bitmap.
     function devFeatureBitmap() public view returns (bytes32) {
         return opcmDeployer.devFeatureBitmap();
-    }
-
-    /// @notice Returns the status of a development feature. Note that this function does not check
-    ///         that the input feature represents a single feature and the bitwise AND operation
-    ///         allows for multiple features to be enabled at once. Users should generally check
-    ///         for only a single feature at a time.
-    /// @param _feature The feature to check.
-    /// @return True if the feature is enabled, false otherwise.
-    function isDevFeatureEnabled(bytes32 _feature) public view returns (bool) {
-        return opcmDeployer.isDevFeatureEnabled(_feature);
     }
 
     /// @notice Helper function to perform a delegatecall to a target contract

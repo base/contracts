@@ -195,11 +195,6 @@
             "internalType": "Duration",
             "name": "disputeMaxClockDuration",
             "type": "uint64"
-          },
-          {
-            "internalType": "bool",
-            "name": "useCustomGasToken",
-            "type": "bool"
           }
         ],
         "internalType": "struct OPContractsManager.DeployInput",
@@ -398,25 +393,6 @@
         "internalType": "struct OPContractsManager.Implementations",
         "name": "",
         "type": "tuple"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "_feature",
-        "type": "bytes32"
-      }
-    ],
-    "name": "isDevFeatureEnabled",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
       }
     ],
     "stateMutability": "view",
