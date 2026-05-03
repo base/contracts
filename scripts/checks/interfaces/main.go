@@ -31,7 +31,7 @@ var excludeContracts = []string{
 	"IOPContractsManagerLegacyUpgrade",
 
 	// TODO: Interfaces that need to be fixed
-	"IInitializable", "IOptimismMintableERC20", "ILegacyMintableERC20",
+	"IInitializable", "IOptimismMintableERC20",
 	"KontrolCheatsBase", "IResolvedDelegateProxy",
 }
 

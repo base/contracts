@@ -129,10 +129,6 @@ contract Predeploys_PredeployToCodeNamespace_Test is Predeploys_TestInit {
     /// @notice Tests that predeployToCodeNamespace correctly computes namespace addresses.
     function test_predeployToCodeNamespace_works() external pure {
         assertEq(
-            address(0xc0D3C0d3C0d3C0D3c0d3C0d3c0D3C0d3c0d30000),
-            Predeploys.predeployToCodeNamespace(Predeploys.LEGACY_MESSAGE_PASSER)
-        );
-        assertEq(
             address(0xc0d3C0d3C0d3c0D3C0D3C0d3C0d3C0D3C0D3000f),
             Predeploys.predeployToCodeNamespace(Predeploys.GAS_PRICE_ORACLE)
         );

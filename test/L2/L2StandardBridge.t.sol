@@ -354,13 +354,6 @@ contract L2StandardBridge_Withdraw_Test is L2StandardBridge_TestInit {
         assertEq(L2Token.balanceOf(alice), 0);
     }
 
-    function test_withdrawLegacyERC20_succeeds() external {
-        _preBridgeERC20({ _isLegacy: true, _l2Token: address(LegacyL2Token) });
-        l2StandardBridge.withdraw(address(LegacyL2Token), 100, 1000, hex"");
-
-        assertEq(L2Token.balanceOf(alice), 0);
-    }
-
     function test_withdraw_notEOA_reverts() external {
         // This contract has 100 L2Token
         deal(address(L2Token), address(this), 100, true);
@@ -415,13 +408,6 @@ contract L2StandardBridge_Uncategorized_Test is L2StandardBridge_TestInit {
         vm.expectRevert("StandardBridge: wrong remote token for Optimism Mintable ERC20 local token");
         vm.prank(alice, alice);
         l2StandardBridge.bridgeERC20(address(L2Token), address(BadL1Token), 100, 1000, hex"");
-    }
-
-    function test_bridgeLegacyERC20_succeeds() external {
-        _preBridgeERC20({ _isLegacy: false, _l2Token: address(LegacyL2Token) });
-        l2StandardBridge.bridgeERC20(address(LegacyL2Token), address(L1Token), 100, 1000, hex"");
-
-        assertEq(L2Token.balanceOf(alice), 0);
     }
 
     /// @notice Tests that `bridgeERC20To` burns the tokens, emits `WithdrawalInitiated`, and

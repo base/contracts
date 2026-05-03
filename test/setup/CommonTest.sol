@@ -21,7 +21,6 @@ import { console } from "forge-std/console.sol";
 
 // Interfaces
 import { IOptimismMintableERC20Full } from "interfaces/universal/IOptimismMintableERC20Full.sol";
-import { ILegacyMintableERC20Full } from "interfaces/legacy/ILegacyMintableERC20Full.sol";
 
 /// @title CommonTest
 /// @dev An extension to `Test` that sets up the optimism smart contracts.
@@ -49,7 +48,6 @@ abstract contract CommonTest is Test, Setup, Events {
     ERC20 L1Token;
     ERC20 BadL1Token;
     IOptimismMintableERC20Full L2Token;
-    ILegacyMintableERC20Full LegacyL2Token;
     ERC20 NativeL2Token;
     IOptimismMintableERC20Full RemoteL1Token;
 
@@ -115,24 +113,6 @@ abstract contract CommonTest is Test, Setup, Events {
 
     function bridgeInitializerSetUp() public {
         L1Token = new ERC20("Native L1 Token", "L1T");
-
-        LegacyL2Token = ILegacyMintableERC20Full(
-            DeployUtils.create1({
-                _name: "LegacyMintableERC20",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        ILegacyMintableERC20Full.__constructor__,
-                        (
-                            address(l2StandardBridge),
-                            address(L1Token),
-                            string.concat("LegacyL2-", L1Token.name()),
-                            string.concat("LegacyL2-", L1Token.symbol())
-                        )
-                    )
-                )
-            })
-        );
-        vm.label(address(LegacyL2Token), "LegacyMintableERC20");
 
         if (isForkTest()) {
             console.log("CommonTest: fork test detected, skipping L2 setup");

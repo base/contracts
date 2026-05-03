@@ -218,8 +218,6 @@ contract L2Genesis is Script {
     ///      sets the deployed bytecode at their expected predeploy address.
     ///      LEGACY_ERC20_ETH and L1_MESSAGE_SENDER are deprecated and are not set.
     function setPredeployImplementations(Input memory _input) internal {
-        setLegacyMessagePasser(); // 0
-        // 3,4,5: legacy, not used in OP-Stack.
         setWETH(); // 6: WETH (not behind a proxy)
         setL2CrossDomainMessenger(_input.l1CrossDomainMessengerProxy); // 7
         // 8,9,A,B,C,D,E: legacy, not used in OP-Stack.
@@ -227,7 +225,6 @@ contract L2Genesis is Script {
         setL2StandardBridge(_input.l1StandardBridgeProxy); // 10
         setSequencerFeeVault(_input); // 11
         setOptimismMintableERC20Factory(); // 12
-        setL1BlockNumber(); // 13
         setL2ERC721Bridge(_input.l1ERC721BridgeProxy); // 14
         setL1Block(); // 15
         setL2ToL1MessagePasser(); // 16
@@ -344,16 +341,6 @@ contract L2Genesis is Script {
     ///         in the constructor is set manually.
     function setWETH() internal {
         vm.etch(Predeploys.WETH, vm.getDeployedCode("WETH.sol:WETH"));
-    }
-
-    /// @notice This predeploy is following the safety invariant #1.
-    function setL1BlockNumber() internal {
-        _setImplementationCode(Predeploys.L1_BLOCK_NUMBER);
-    }
-
-    /// @notice This predeploy is following the safety invariant #1.
-    function setLegacyMessagePasser() internal {
-        _setImplementationCode(Predeploys.LEGACY_MESSAGE_PASSER);
     }
 
     /// @notice This predeploy is following the safety invariant #2.

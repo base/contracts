@@ -102,10 +102,6 @@ contract Artifacts {
             return payable(Predeploys.WETH);
         } else if (digest == keccak256(bytes("LegacyERC20ETH"))) {
             return payable(Predeploys.LEGACY_ERC20_ETH);
-        } else if (digest == keccak256(bytes("L1BlockNumber"))) {
-            return payable(Predeploys.L1_BLOCK_NUMBER);
-        } else if (digest == keccak256(bytes("LegacyMessagePasser"))) {
-            return payable(Predeploys.LEGACY_MESSAGE_PASSER);
         } else if (digest == keccak256(bytes("ProxyAdmin"))) {
             return payable(Predeploys.PROXY_ADMIN);
         } else if (digest == keccak256(bytes("BaseFeeVault"))) {

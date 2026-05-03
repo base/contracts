@@ -115,14 +115,6 @@
     "initCodeHash": "0x9896fd04e9a3f9fe4f1d6e93eb298b37a6bfa33424aa705e68cc58d0ba7f3f90",
     "sourceCodeHash": "0xc0ff6e93b6e2b9111c11e81b5df8948ab71d02b9d2c4dfda982fcb615519f1f7"
   },
-  "src/legacy/L1BlockNumber.sol:L1BlockNumber": {
-    "initCodeHash": "0x7549dcb63799c5f30b405c6f0c1264f55659e812ccab68bf1b36e8707f4ee198",
-    "sourceCodeHash": "0xf4b4cae7cc81a93d192ce8c54a7b543327458d53f3aaababacea843825bf3e1c"
-  },
-  "src/legacy/LegacyMessagePasser.sol:LegacyMessagePasser": {
-    "initCodeHash": "0x3a82e248129d19764bb975bb79b48a982f077f33bb508480bf8d2ec1c0c9810d",
-    "sourceCodeHash": "0x955bd0c9b47e43219865e4e92abf28d916c96de20cbdf2f94c8ab14d02083759"
-  },
   "src/multiproof/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0x10bb6a60f21de103d1da9ff310a38f571c53a8113d04a029087648debf3f0341",
     "sourceCodeHash": "0xcd4c508223b9b461ec230bde03c1630fe68cd00b82ee84c39b93d9f3c0d71d37"
