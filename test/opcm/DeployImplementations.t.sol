@@ -177,6 +177,7 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
             address(0), // nitroEnclaveVerifier
+            address(1), // tdxVerifier
             8453, // l2ChainID
             100, // multiproofBlockInterval
             10, // multiproofIntermediateBlockInterval
@@ -314,6 +315,11 @@ contract DeployImplementations_Test is Test, FeatureFlags {
         deployImplementations.run(input);
 
         input = defaultInput();
+        input.tdxVerifier = address(0);
+        vm.expectRevert("DeployImplementations: tdxVerifier not set");
+        deployImplementations.run(input);
+
+        input = defaultInput();
         input.superchainConfigProxy = ISuperchainConfig(address(0));
         vm.expectRevert("DeployImplementations: superchainConfigProxy not set");
         deployImplementations.run(input);
@@ -400,6 +406,7 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
             address(0), // nitroEnclaveVerifier
+            address(1), // tdxVerifier
             8453, // l2ChainID
             100, // multiproofBlockInterval
             10, // multiproofIntermediateBlockInterval

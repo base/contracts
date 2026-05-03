@@ -37,6 +37,7 @@ pragma solidity 0.8.15;
  */
 
 import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { ITDXVerifier } from "interfaces/multiproof/tee/ITDXVerifier.sol";
 import { Proxy } from "src/universal/Proxy.sol";
 import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
@@ -74,6 +75,7 @@ contract DeployDevWithNitro is Script {
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
 
     address public nitroEnclaveVerifierAddr;
+    address public tdxVerifierAddr;
     address public teeProverRegistryProxy;
     address public teeVerifier;
     address public disputeGameFactory;
@@ -91,10 +93,12 @@ contract DeployDevWithNitro is Script {
 
         // NitroEnclaveVerifier must be pre-deployed (via DeployRiscZeroStack.s.sol)
         nitroEnclaveVerifierAddr = cfg.nitroEnclaveVerifier();
+        tdxVerifierAddr = cfg.tdxVerifier();
         require(
             nitroEnclaveVerifierAddr != address(0),
             "nitroEnclaveVerifier must be set in config (deploy via DeployRiscZeroStack.s.sol first)"
         );
+        require(tdxVerifierAddr != address(0), "tdxVerifier must be set in config");
 
         console.log("=== Deploying Dev Infrastructure (WITH NITRO) ===");
         console.log("Chain ID:", block.chainid);
@@ -103,6 +107,7 @@ contract DeployDevWithNitro is Script {
         console.log("TEE Challenger:", cfg.teeChallenger());
         console.log("Game Type:", cfg.multiproofGameType());
         console.log("NitroEnclaveVerifier:", nitroEnclaveVerifierAddr);
+        console.log("TDXVerifier:", tdxVerifierAddr);
         console.log("");
         console.log("NOTE: Using REAL TEEProverRegistry - ZK attestation proof REQUIRED.");
 
@@ -122,7 +127,9 @@ contract DeployDevWithNitro is Script {
         address owner = cfg.finalSystemOwner();
         address teeRegistryImpl = address(
             new TEEProverRegistry(
-                INitroEnclaveVerifier(nitroEnclaveVerifierAddr), IDisputeGameFactory(disputeGameFactory)
+                INitroEnclaveVerifier(nitroEnclaveVerifierAddr),
+                ITDXVerifier(tdxVerifierAddr),
+                IDisputeGameFactory(disputeGameFactory)
             )
         );
         address[] memory initialProposers = new address[](2);
@@ -192,6 +199,7 @@ contract DeployDevWithNitro is Script {
         console.log("========================================");
         console.log("\nTEE Contracts:");
         console.log("  NitroEnclaveVerifier:", nitroEnclaveVerifierAddr);
+        console.log("  TDXVerifier:", tdxVerifierAddr);
         console.log("  TEEProverRegistry:", teeProverRegistryProxy);
         console.log("  TEEVerifier:", teeVerifier);
         console.log("\nInfrastructure:");
@@ -216,6 +224,7 @@ contract DeployDevWithNitro is Script {
         vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
         vm.serializeAddress(key, "TEEVerifier", teeVerifier);
         vm.serializeAddress(key, "NitroEnclaveVerifier", nitroEnclaveVerifierAddr);
+        vm.serializeAddress(key, "TDXVerifier", tdxVerifierAddr);
         vm.serializeAddress(key, "DisputeGameFactory", disputeGameFactory);
         vm.serializeAddress(key, "AnchorStateRegistry", address(mockAnchorRegistry));
         vm.serializeAddress(key, "DelayedWETH", mockDelayedWETH);

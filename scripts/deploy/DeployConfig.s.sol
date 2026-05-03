@@ -99,6 +99,7 @@ contract DeployConfig is Script {
     bytes32 public zkRangeHash;
     bytes32 public zkAggregationHash;
     address public nitroEnclaveVerifier;
+    address public tdxVerifier;
     bytes32 public multiproofGenesisOutputRoot;
     uint256 public multiproofGenesisBlockNumber;
     uint256 public multiproofBlockInterval;
@@ -216,6 +217,7 @@ contract DeployConfig is Script {
         zkRangeHash = stdJson.readBytes32(_json, "$.zkRangeHash");
         zkAggregationHash = stdJson.readBytes32(_json, "$.zkAggregationHash");
         nitroEnclaveVerifier = _readOr(_json, "$.nitroEnclaveVerifier", address(0));
+        tdxVerifier = _readOr(_json, "$.tdxVerifier", address(0));
         multiproofGenesisOutputRoot = bytes32(_readOr(_json, "$.multiproofGenesisOutputRoot", uint256(1)));
         multiproofGenesisBlockNumber = _readOr(_json, "$.multiproofGenesisBlockNumber", 0);
         multiproofBlockInterval = _readOr(_json, "$.multiproofBlockInterval", 100);

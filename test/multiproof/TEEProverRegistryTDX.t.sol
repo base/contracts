@@ -15,7 +15,7 @@ import {
 import { ZkCoProcessorConfig, ZkCoProcessorType } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import { GameType } from "src/dispute/lib/Types.sol";
 
-import { TDXTEEProverRegistry } from "src/multiproof/tee/TDXTEEProverRegistry.sol";
+import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 
 /// @notice Mock AggregateVerifier that returns a configurable TEE_IMAGE_HASH.
 contract MockAggregateVerifierForTDXRegistry {
@@ -67,7 +67,7 @@ contract MockTDXVerifierForRegistry is ITDXVerifier {
     }
 }
 
-contract TDXTEEProverRegistryTest is Test {
+contract TEEProverRegistryTDXTest is Test {
     bytes32 internal constant IMAGE_HASH = keccak256("tdx-image");
     bytes32 internal constant REPORT_DATA_SUFFIX = keccak256("multiproof-tdx-poc");
 
@@ -79,7 +79,7 @@ contract TDXTEEProverRegistryTest is Test {
         MockDisputeGameFactoryForTDXRegistry factory = new MockDisputeGameFactoryForTDXRegistry();
         factory.setImpl(0, address(new MockAggregateVerifierForTDXRegistry(IMAGE_HASH)));
 
-        TDXTEEProverRegistry registry = new TDXTEEProverRegistry(
+        TEEProverRegistry registry = new TEEProverRegistry(
             INitroEnclaveVerifier(address(0)), ITDXVerifier(address(verifier)), IDisputeGameFactory(address(factory))
         );
 
@@ -89,6 +89,16 @@ contract TDXTEEProverRegistryTest is Test {
         assertTrue(registry.isRegisteredSigner(journal.signer));
         assertEq(registry.signerImageHash(journal.signer), IMAGE_HASH);
         assertTrue(registry.isValidSigner(journal.signer));
+    }
+
+    function testConstructorRevertsIfTDXVerifierNotSet() public {
+        MockDisputeGameFactoryForTDXRegistry factory = new MockDisputeGameFactoryForTDXRegistry();
+        factory.setImpl(0, address(new MockAggregateVerifierForTDXRegistry(IMAGE_HASH)));
+
+        vm.expectRevert(TEEProverRegistry.TDXVerifierNotSet.selector);
+        new TEEProverRegistry(
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(0)), IDisputeGameFactory(address(factory))
+        );
     }
 
     function _successJournal() internal pure returns (TDXVerifierJournal memory journal) {

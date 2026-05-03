@@ -90,6 +90,7 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
                 multiproofConfigHash: bytes32(0),
                 multiproofGameType: 621,
                 nitroEnclaveVerifier: address(0),
+                tdxVerifier: address(1),
                 l2ChainID: 8453,
                 multiproofBlockInterval: 100,
                 multiproofIntermediateBlockInterval: 10,

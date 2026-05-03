@@ -243,6 +243,7 @@ contract Deploy is Deployer {
                 multiproofConfigHash: cfg.multiproofConfigHash(),
                 multiproofGameType: cfg.multiproofGameType(),
                 nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
+                tdxVerifier: cfg.tdxVerifier(),
                 l2ChainID: cfg.l2ChainID(),
                 multiproofBlockInterval: cfg.multiproofBlockInterval(),
                 multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),

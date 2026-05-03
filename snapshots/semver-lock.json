@@ -151,17 +151,13 @@
     "initCodeHash": "0x100364f9b0c63a61538386ba91e73dcffba22d3f6dfe8efdbbf5ff347b6fce47",
     "sourceCodeHash": "0xbedb66738a0ab18600b2ed21de51d552a210c4cc71b2c971440e325791dc3ce7"
   },
-  "src/multiproof/tee/TDXTEEProverRegistry.sol:TDXTEEProverRegistry": {
-    "initCodeHash": "0x266f220204f2c62f341b700bdb1e9bbda8c6489ced1e14d17b4ffe7dd33b1d8b",
-    "sourceCodeHash": "0x90bf694159e3f47e8f42aeaaa856947bb493acd5f64bf14fe277718dc62b4463"
-  },
   "src/multiproof/tee/TDXVerifier.sol:TDXVerifier": {
     "initCodeHash": "0x0f511b2f67bd82ff976935ca0a178c3fa9d9cf9b89c6e67b3fd7f1006f5e5147",
     "sourceCodeHash": "0x7cdf2abefaefa3126960103aa810699973c1c47147114f8a92e63c427b9b1656"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0xfd1942e1c2f59b0aa72b33d698a948a53b6e4cf1040106f173fb5d89f63f57b0",
-    "sourceCodeHash": "0xf1ec1f02f540da659a204b26acf986fdce7d7d63bba67a87923f52453fb92ccb"
+    "initCodeHash": "0xf050a9503675e4351de148eb311d3446f04d59bd2083710617e045dd8b64bb26",
+    "sourceCodeHash": "0x64e7860f2b0d3b07aff5e1da82928a88ea4da94bf2fcb93a342f0f02844ece73"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0x655576cc21cc5c603d55fb4dd2a2f0ef57b11deeaabd3e539b0a70a5f7e2c9af",

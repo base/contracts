@@ -1,0 +1,84 @@
+set dotenv-load
+
+repo_root := justfile_directory() + "/../.."
+justfile_path := justfile_directory() + "/justfile"
+default_deploy_config := "deploy-config/sepolia.json"
+forge_account := "testnet-admin"
+l1_rpc_url := "https://ethereum-full-sepolia-k8s-dev.cbhq.net"
+
+sepolia_risc0_verifier_router := "0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187"
+sepolia_tdx_verifier_id := "0x1f1bc81fae82605af46a4c9a20f641922b7542befd9219644c7e6c59ccdeccab"
+sepolia_intel_root_ca_hash := "0xa1acc73eb45794fa1734f14d882e91925b6006f79d3bb2460df9d01b333d7009"
+sepolia_tdx_image_hash := "0xa227306080459e4bcf1324b229b344af4469846f9861aa8aff450f35046df9d6"
+sepolia_tdx_signer := "0x6A1f38f20044e8e69EAC755144F14f973e7b8d6E"
+sepolia_tdx_registration_manager := "0x93900CB7eCdB5994352b19DfD8a900Cd4fa437B7"
+
+# List available multiproof deployment recipes.
+default:
+  @just --justfile "{{justfile_path}}" --list
+
+# Deploy the TDXVerifier policy contract.
+#
+# Required env:
+#   L1_RPC_URL
+#
+# Args:
+#   risc0_router       RISC Zero verifier router
+#   tdx_verifier_id    RISC Zero image ID for the TDX DCAP verifier guest
+#   intel_root_ca_hash Trusted Intel root CA hash consumed by the guest
+deploy-tdx-verifier risc0_router=sepolia_risc0_verifier_router tdx_verifier_id=sepolia_tdx_verifier_id intel_root_ca_hash=sepolia_intel_root_ca_hash:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd "{{repo_root}}"
+  owner="$(cast wallet address --account "{{forge_account}}")"
+  echo "Using {{forge_account}} as owner/deployer: $owner"
+  forge script scripts/multiproof/DeployTDXVerifier.s.sol:DeployTDXVerifier \
+    --sig "run(address,address,bytes32,bytes32)" \
+    "$owner" \
+    "{{risc0_router}}" \
+    "{{tdx_verifier_id}}" \
+    "{{intel_root_ca_hash}}" \
+    --rpc-url "{{l1_rpc_url}}" \
+    --broadcast \
+    --account "{{forge_account}}" \
+    --sender "$owner"
+
+# Print the Sepolia TDX constants used by these recipes.
+tdx-sepolia-config:
+  @echo "RISC0_VERIFIER_ROUTER={{sepolia_risc0_verifier_router}}"
+  @echo "TDX_VERIFIER_ID={{sepolia_tdx_verifier_id}}"
+  @echo "INTEL_ROOT_CA_HASH={{sepolia_intel_root_ca_hash}}"
+  @echo "TDX_IMAGE_HASH={{sepolia_tdx_image_hash}}"
+  @echo "TDX_SIGNER={{sepolia_tdx_signer}}"
+  @echo "TDX_REGISTRATION_MANAGER={{sepolia_tdx_registration_manager}}"
+
+# Deploy the TDX multiproof dev/test stack using deploy-config/sepolia.json.
+#
+# Required env:
+#   L1_RPC_URL
+#
+# Args:
+#   tdx_verifier TDXVerifier address from deploy-tdx-verifier
+#   tdx_manager  Manager that can call registerTDXSigner()
+deploy-tdx-stack tdx_verifier tdx_manager=sepolia_tdx_registration_manager deploy_config=default_deploy_config:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd "{{repo_root}}"
+  owner="$(cast wallet address --account "{{forge_account}}")"
+  echo "Using {{forge_account}} as deployer: $owner"
+  DEPLOY_CONFIG_PATH="{{deploy_config}}" \
+  forge script scripts/multiproof/DeployDevWithTDX.s.sol:DeployDevWithTDX \
+    --sig "run(address,address)" \
+    "{{tdx_verifier}}" \
+    "{{tdx_manager}}" \
+    --rpc-url "{{l1_rpc_url}}" \
+    --broadcast \
+    --account "{{forge_account}}" \
+    --sender "$owner"
+
+# Print the two-step Sepolia command template.
+tdx-sepolia-help:
+  @echo 'export L1_RPC_URL=<sepolia-l1-rpc>'
+  @echo 'just deploy-tdx-verifier'
+  @echo 'just deploy-tdx-stack <tdx-verifier> [tdx-manager]'
+  @echo 'just tdx-sepolia-config'

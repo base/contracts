@@ -9,6 +9,7 @@ import {
     Pcr,
     Bytes48
 } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { ITDXVerifier, TDXVerifierJournal } from "interfaces/multiproof/tee/ITDXVerifier.sol";
 import { OwnableManagedUpgradeable } from "lib/op-enclave/contracts/src/OwnableManagedUpgradeable.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { EnumerableSetLib } from "@solady-v0.0.245/utils/EnumerableSetLib.sol";
@@ -16,9 +17,10 @@ import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol"
 import { GameType } from "src/dispute/lib/Types.sol";
 
 /// @title TEEProverRegistry
-/// @notice Manages TEE signer registration via ZK-verified AWS Nitro attestation.
-/// @dev Signers are registered by providing a ZK proof of a valid AWS Nitro attestation document,
-///      verified through an external NitroEnclaveVerifier contract (Risc0).
+/// @notice Manages TEE signer registration via ZK-verified Nitro or TDX attestation.
+/// @dev Nitro signers are registered by providing a ZK proof of a valid AWS Nitro attestation document,
+///      verified through an external NitroEnclaveVerifier contract (Risc0). TDX signers are registered
+///      through the TDXVerifier configured on the implementation.
 ///      Registration is PCR0-agnostic: any enclave with a valid attestation can register,
 ///      enabling pre-registration before hardforks. PCR0 enforcement happens at proof-submission
 ///      time in TEEVerifier, which checks signerImageHash against the AggregateVerifier's
@@ -35,6 +37,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
     /// @notice The external NitroEnclaveVerifier contract used for ZK attestation verification.
     INitroEnclaveVerifier public immutable NITRO_VERIFIER;
+
+    /// @notice The external TDXVerifier contract used for ZK TDX quote verification.
+    ITDXVerifier public immutable TDX_VERIFIER;
 
     /// @notice The DisputeGameFactory used to look up the current AggregateVerifier and its TEE_IMAGE_HASH.
     IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
@@ -64,6 +69,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
     /// @notice Emitted when a signer is registered.
     event SignerRegistered(address indexed signer);
+
+    /// @notice Emitted when a TDX signer is registered.
+    event TDXSignerRegistered(address indexed signer, bytes32 indexed imageHash, bytes32 reportDataSuffix);
 
     /// @notice Emitted when a signer is deregistered.
     event SignerDeregistered(address indexed signer);
@@ -95,9 +103,14 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Thrown when setting a game type whose AggregateVerifier has no TEE_IMAGE_HASH.
     error InvalidGameType();
 
-    constructor(INitroEnclaveVerifier nitroVerifier, IDisputeGameFactory factory) {
+    /// @notice Thrown when the TDX verifier is not configured.
+    error TDXVerifierNotSet();
+
+    constructor(INitroEnclaveVerifier nitroVerifier, ITDXVerifier tdxVerifier, IDisputeGameFactory factory) {
         if (address(factory) == address(0)) revert DisputeGameFactoryNotSet();
+        if (address(tdxVerifier) == address(0)) revert TDXVerifierNotSet();
         NITRO_VERIFIER = nitroVerifier;
+        TDX_VERIFIER = tdxVerifier;
         DISPUTE_GAME_FACTORY = factory;
         initialize({
             initialOwner: address(0xdEaD),
@@ -167,10 +180,18 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         }
         address enclaveAddress = address(uint160(uint256(publicKeyHash)));
 
-        isRegisteredSigner[enclaveAddress] = true;
-        signerImageHash[enclaveAddress] = pcr0Hash;
-        _registeredSigners.add(enclaveAddress);
-        emit SignerRegistered(enclaveAddress);
+        _registerSigner(enclaveAddress, pcr0Hash);
+    }
+
+    /// @notice Registers a signer using a ZK proof of Intel TDX DCAP quote verification.
+    /// @param output ABI-encoded TDXVerifierJournal public values from the ZK verifier guest.
+    /// @param proofBytes ZK proof bytes.
+    function registerTDXSigner(bytes calldata output, bytes calldata proofBytes) external onlyOwnerOrManager {
+        TDXVerifierJournal memory journal = TDX_VERIFIER.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+
+        _registerSigner(journal.signer, journal.imageHash);
+
+        emit TDXSignerRegistered(journal.signer, journal.imageHash, journal.reportDataSuffix);
     }
 
     /// @notice Deregisters a signer.
@@ -233,9 +254,17 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.5.0
+    /// @custom:semver 0.6.0
     function version() public pure virtual returns (string memory) {
-        return "0.5.0";
+        return "0.6.0";
+    }
+
+    /// @dev Registers a signer and stores the image hash enforced by TEEVerifier at proof-submission time.
+    function _registerSigner(address signer, bytes32 imageHash) internal {
+        isRegisteredSigner[signer] = true;
+        signerImageHash[signer] = imageHash;
+        _registeredSigners.add(signer);
+        emit SignerRegistered(signer);
     }
 
     /// @dev Reads TEE_IMAGE_HASH from the AggregateVerifier registered in the factory.

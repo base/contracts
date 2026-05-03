@@ -7,6 +7,7 @@ import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/trans
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { ITDXVerifier } from "interfaces/multiproof/tee/ITDXVerifier.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { GameType } from "src/dispute/lib/Types.sol";
@@ -67,8 +68,9 @@ contract TEEVerifierTest is Test {
         mockFactory.setImpl(TEST_GAME_TYPE, address(mockVerifier));
 
         // Deploy implementation (NitroEnclaveVerifier not needed for dev signer tests)
-        DevTEEProverRegistry impl =
-            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(mockFactory)));
+        DevTEEProverRegistry impl = new DevTEEProverRegistry(
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(address(mockFactory))
+        );
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));

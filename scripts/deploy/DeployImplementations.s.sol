@@ -46,6 +46,7 @@ import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
 import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
 import { GameType } from "src/dispute/lib/Types.sol";
+import { ITDXVerifier } from "interfaces/multiproof/tee/ITDXVerifier.sol";
 
 contract DeployImplementations is Script {
     struct Input {
@@ -66,6 +67,7 @@ contract DeployImplementations is Script {
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
         address nitroEnclaveVerifier;
+        address tdxVerifier;
         uint256 l2ChainID;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
@@ -632,7 +634,9 @@ contract DeployImplementations is Script {
         address teeVerifierImpl;
         {
             TEEProverRegistry scgImpl = new TEEProverRegistry(
-                INitroEnclaveVerifier(_input.nitroEnclaveVerifier), IDisputeGameFactory(address(1))
+                INitroEnclaveVerifier(_input.nitroEnclaveVerifier),
+                ITDXVerifier(_input.tdxVerifier),
+                IDisputeGameFactory(address(1))
             );
             vm.label(address(scgImpl), "TEEProverRegistryImpl");
             _output.teeProverRegistryImpl = scgImpl;
@@ -697,6 +701,7 @@ contract DeployImplementations is Script {
             "DeployImplementations: disputeGameFinalityDelaySeconds not set"
         );
         require(_input.mipsVersion != 0, "DeployImplementations: mipsVersion not set");
+        require(_input.tdxVerifier != address(0), "DeployImplementations: tdxVerifier not set");
         require(
             address(_input.superchainConfigProxy) != address(0), "DeployImplementations: superchainConfigProxy not set"
         );

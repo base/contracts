@@ -7,6 +7,7 @@ import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/trans
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { ITDXVerifier } from "interfaces/multiproof/tee/ITDXVerifier.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { GameType } from "src/dispute/lib/Types.sol";
 
@@ -75,8 +76,9 @@ contract TEEProverRegistryTest is Test {
         mockFactory.setImpl(TEST_GAME_TYPE, address(mockVerifier));
 
         // Deploy implementation (using DevTEEProverRegistry for test flexibility)
-        DevTEEProverRegistry impl =
-            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(mockFactory)));
+        DevTEEProverRegistry impl = new DevTEEProverRegistry(
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(address(mockFactory))
+        );
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));
@@ -98,15 +100,16 @@ contract TEEProverRegistryTest is Test {
     function testInitialization() public view {
         assertEq(teeProverRegistry.owner(), owner);
         assertEq(teeProverRegistry.manager(), manager);
-        assertEq(teeProverRegistry.version(), "0.5.0");
+        assertEq(teeProverRegistry.version(), "0.6.0");
     }
 
     function testInitializationWithProposers() public {
         address proposer1 = makeAddr("proposer1");
         address proposer2 = makeAddr("proposer2");
         address proposer3 = makeAddr("proposer3");
-        DevTEEProverRegistry impl2 =
-            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(1)));
+        DevTEEProverRegistry impl2 = new DevTEEProverRegistry(
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(address(1))
+        );
         ProxyAdmin proxyAdmin2 = new ProxyAdmin(address(this));
         address[] memory proposers = new address[](3);
         proposers[0] = proposer1;

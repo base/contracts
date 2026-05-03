@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { ITDXVerifier } from "interfaces/multiproof/tee/ITDXVerifier.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
-import { EnumerableSetLib } from "@solady-v0.0.245/utils/EnumerableSetLib.sol";
 
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 
@@ -12,13 +12,12 @@ import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 /// @dev This contract adds addDevSigner() which bypasses AWS Nitro attestation verification.
 ///      DO NOT deploy this contract to production networks.
 contract DevTEEProverRegistry is TEEProverRegistry {
-    using EnumerableSetLib for EnumerableSetLib.AddressSet;
-
     constructor(
         INitroEnclaveVerifier nitroVerifier,
+        ITDXVerifier tdxVerifier,
         IDisputeGameFactory factory
     )
-        TEEProverRegistry(nitroVerifier, factory)
+        TEEProverRegistry(nitroVerifier, tdxVerifier, factory)
     { }
 
     /// @notice Registers a signer for testing (bypasses attestation verification).
@@ -28,9 +27,6 @@ contract DevTEEProverRegistry is TEEProverRegistry {
     /// @param signer The address of the signer to register.
     /// @param imageHash The TEE image hash to associate with this signer.
     function addDevSigner(address signer, bytes32 imageHash) external onlyOwner {
-        isRegisteredSigner[signer] = true;
-        signerImageHash[signer] = imageHash;
-        _registeredSigners.add(signer);
-        emit SignerRegistered(signer);
+        _registerSigner(signer, imageHash);
     }
 }

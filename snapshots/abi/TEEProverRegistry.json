@@ -7,6 +7,11 @@
         "type": "address"
       },
       {
+        "internalType": "contract ITDXVerifier",
+        "name": "tdxVerifier",
+        "type": "address"
+      },
+      {
         "internalType": "contract IDisputeGameFactory",
         "name": "factory",
         "type": "address"
@@ -47,6 +52,19 @@
     "outputs": [
       {
         "internalType": "contract INitroEnclaveVerifier",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "TDX_VERIFIER",
+    "outputs": [
+      {
+        "internalType": "contract ITDXVerifier",
         "name": "",
         "type": "address"
       }
@@ -231,6 +249,24 @@
       }
     ],
     "name": "registerSigner",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes",
+        "name": "output",
+        "type": "bytes"
+      },
+      {
+        "internalType": "bytes",
+        "name": "proofBytes",
+        "type": "bytes"
+      }
+    ],
+    "name": "registerTDXSigner",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -448,6 +484,31 @@
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "imageHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "reportDataSuffix",
+        "type": "bytes32"
+      }
+    ],
+    "name": "TDXSignerRegistered",
+    "type": "event"
+  },
+  {
     "inputs": [],
     "name": "AttestationTooOld",
     "type": "error"
@@ -480,6 +541,11 @@
   {
     "inputs": [],
     "name": "PCR0NotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "TDXVerifierNotSet",
     "type": "error"
   }
 ]

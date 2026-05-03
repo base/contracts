@@ -2,57 +2,18 @@
 pragma solidity 0.8.15;
 
 /**
- * @title DeployDevNoNitro
- * @notice Development deployment WITHOUT AWS Nitro attestation validation.
+ * @title DeployDevWithTDX
+ * @notice Development deployment using the TDX signer-registration path.
  *
- * ══════════════════════════════════════════════════════════════════════════════════
- *                              DEPLOYMENT TYPE: DEV (NO NITRO)
- * ══════════════════════════════════════════════════════════════════════════════════
- *
- * This script deploys infrastructure using DevTEEProverRegistry, which BYPASSES
- * AWS Nitro attestation validation. Signers can be registered with a simple call
- * to addDevSigner() without needing a real Nitro enclave or attestation document.
- *
- * USE THIS SCRIPT WHEN:
- * - Running local development or testing
- * - You don't have access to an AWS Nitro enclave
- * - You want to quickly test the prover without attestation overhead
- *
- * DO NOT USE THIS SCRIPT FOR:
- * - Production deployments
- * - Security testing of the attestation flow
- *
- * ─────────────────────────────────────────────────────────────────────────────────
- * SIGNER REGISTRATION (SIMPLIFIED)
- * ─────────────────────────────────────────────────────────────────────────────────
- *
- * After deployment, register a signer with a single call:
- *
- *   cast send $TEE_PROVER_REGISTRY \
- *     "addDevSigner(address,bytes32)" $SIGNER_ADDRESS $TEE_IMAGE_HASH \
- *     --private-key $OWNER_KEY --rpc-url $RPC_URL
- *
- * No attestation, PCR0 registration, or certificate validation required.
- *
- * ─────────────────────────────────────────────────────────────────────────────────
- * COMPARISON WITH DeployDevWithNitro
- * ─────────────────────────────────────────────────────────────────────────────────
- *
- * | Feature                    | DeployDevNoNitro       | DeployDevWithNitro     |
- * |----------------------------|------------------------|------------------------|
- * | TEEProverRegistry          | DevTEEProverRegistry   | TEEProverRegistry      |
- * | Signer registration        | addDevSigner()         | registerSigner()       |
- * | Requires Nitro enclave     | No                     | Yes                    |
- * | Validates attestation (ZK) | No                     | Yes                    |
- * | PCR0 pre-registration      | No                     | Yes                    |
- * | Attestation freshness      | N/A                    | < 60 minutes           |
- *
- * Both scripts use mocks for AnchorStateRegistry, DelayedWETH, and ZK Verifier.
- *
- * ══════════════════════════════════════════════════════════════════════════════════
+ * This deploys the same local multiproof testing infrastructure as the existing
+ * dev scripts, but configures TEEProverRegistry for TDX signer registration. Deploy
+ * TDXVerifier first with DeployTDXVerifier.s.sol and pass its address to run().
+ * The default run(address) entrypoint configures DEFAULT_TDX_REGISTRATION_MANAGER
+ * as the registry manager so it can submit TDX signer registrations.
  */
 
 import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { ITDXVerifier } from "interfaces/multiproof/tee/ITDXVerifier.sol";
 import { Proxy } from "src/universal/Proxy.sol";
 import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
@@ -70,27 +31,26 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
-import { DevTEEProverRegistry } from "src/multiproof/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
-import { ITDXVerifier } from "interfaces/multiproof/tee/ITDXVerifier.sol";
 import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
 
 import { MinimalProxyAdmin } from "./mocks/MinimalProxyAdmin.sol";
 import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";
 import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 
-/// @title DeployDevNoNitro
-/// @notice Development deployment WITHOUT AWS Nitro attestation validation.
-/// @dev Uses DevTEEProverRegistry which allows addDevSigner() to bypass attestation.
-contract DeployDevNoNitro is Script {
-    uint256 public constant BLOCK_INTERVAL = 100;
-    uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 10;
-    uint256 public constant INIT_BOND = 0.001 ether;
+interface IProofSubmitterSetter {
+    function setProofSubmitter(address newProofSubmitter) external;
+}
+
+contract DeployDevWithTDX is Script {
+    uint256 public constant INIT_BOND = 0.00001 ether;
+    address public constant DEFAULT_TDX_REGISTRATION_MANAGER = 0x93900CB7eCdB5994352b19DfD8a900Cd4fa437B7;
 
     DeployConfig public constant cfg =
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
 
     address public tdxVerifierAddr;
+    address public tdxRegistrationManager;
     address public teeProverRegistryProxy;
     address public teeVerifier;
     address public disputeGameFactory;
@@ -101,27 +61,35 @@ contract DeployDevNoNitro is Script {
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
         cfg.read(Config.deployConfigPath());
-        tdxVerifierAddr = cfg.tdxVerifier();
     }
 
-    function run() public {
+    function run(address tdxVerifier) public {
+        run(tdxVerifier, DEFAULT_TDX_REGISTRATION_MANAGER);
+    }
+
+    function run(address tdxVerifier, address registrationManager) public {
+        require(tdxVerifier != address(0), "tdxVerifier must be non-zero");
+        require(registrationManager != address(0), "registrationManager must be non-zero");
+        tdxVerifierAddr = tdxVerifier;
+        tdxRegistrationManager = registrationManager;
+
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
 
-        console.log("=== Deploying Dev Infrastructure (NO NITRO) ===");
+        console.log("=== Deploying Dev Infrastructure (WITH TDX) ===");
         console.log("Chain ID:", block.chainid);
         console.log("Owner:", cfg.finalSystemOwner());
         console.log("TEE Proposer:", cfg.teeProposer());
         console.log("TEE Challenger:", cfg.teeChallenger());
         console.log("Game Type:", cfg.multiproofGameType());
         console.log("TDXVerifier:", tdxVerifierAddr);
+        console.log("TDX Registration Manager:", tdxRegistrationManager);
         console.log("");
-        console.log("NOTE: Using DevTEEProverRegistry - NO attestation required.");
-        require(tdxVerifierAddr != address(0), "tdxVerifier must be set in config");
+        console.log("NOTE: TDXVerifier owner must be the broadcaster/finalSystemOwner.");
 
         vm.startBroadcast();
 
         _deployInfrastructure(gameType);
-        _deployTEEContracts(gameType);
+        _deployTDXContracts(gameType);
         _deployAggregateVerifier(gameType);
 
         vm.stopBroadcast();
@@ -130,24 +98,29 @@ contract DeployDevNoNitro is Script {
         _writeOutput();
     }
 
-    function _deployTEEContracts(GameType gameType) internal {
+    function _deployTDXContracts(GameType gameType) internal {
         address owner = cfg.finalSystemOwner();
-        address teeRegistryImpl = address(
-            new DevTEEProverRegistry(
+        address registryImpl = address(
+            new TEEProverRegistry(
                 INitroEnclaveVerifier(address(0)),
                 ITDXVerifier(tdxVerifierAddr),
                 IDisputeGameFactory(disputeGameFactory)
             )
         );
+
         address[] memory initialProposers = new address[](2);
         initialProposers[0] = cfg.teeProposer();
         initialProposers[1] = cfg.teeChallenger();
-        Proxy teeProxy = new Proxy(msg.sender);
-        teeProxy.upgradeToAndCall(
-            teeRegistryImpl, abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, initialProposers, gameType))
+
+        Proxy registryProxy = new Proxy(msg.sender);
+        registryProxy.upgradeToAndCall(
+            registryImpl,
+            abi.encodeCall(TEEProverRegistry.initialize, (owner, tdxRegistrationManager, initialProposers, gameType))
         );
-        teeProxy.changeAdmin(address(0xdead));
-        teeProverRegistryProxy = address(teeProxy);
+        registryProxy.changeAdmin(address(0xdead));
+        teeProverRegistryProxy = address(registryProxy);
+
+        IProofSubmitterSetter(tdxVerifierAddr).setProofSubmitter(teeProverRegistryProxy);
 
         teeVerifier = address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), mockAnchorRegistry));
     }
@@ -190,8 +163,8 @@ contract DeployDevNoNitro is Script {
                 zkHashes,
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainID(),
-                BLOCK_INTERVAL,
-                INTERMEDIATE_BLOCK_INTERVAL
+                cfg.multiproofBlockInterval(),
+                cfg.multiproofIntermediateBlockInterval()
             )
         );
 
@@ -202,11 +175,12 @@ contract DeployDevNoNitro is Script {
 
     function _printSummary() internal view {
         console.log("\n========================================");
-        console.log("    DEV DEPLOYMENT COMPLETE (NO NITRO)");
+        console.log("      DEV DEPLOYMENT COMPLETE (TDX)");
         console.log("========================================");
-        console.log("\nTEE Contracts:");
-        console.log("  DevTEEProverRegistry:", teeProverRegistryProxy);
+        console.log("\nTDX Contracts:");
         console.log("  TDXVerifier:", tdxVerifierAddr);
+        console.log("  TEEProverRegistry:", teeProverRegistryProxy);
+        console.log("  TDX Registration Manager:", tdxRegistrationManager);
         console.log("  TEEVerifier:", teeVerifier);
         console.log("\nInfrastructure:");
         console.log("  DisputeGameFactory:", disputeGameFactory);
@@ -218,25 +192,25 @@ contract DeployDevNoNitro is Script {
         console.log("  TEE Image Hash:", vm.toString(cfg.teeImageHash()));
         console.log("  Config Hash:", vm.toString(cfg.multiproofConfigHash()));
         console.log("========================================");
-        console.log("\n>>> NEXT STEP - Register dev signer (NO ATTESTATION NEEDED) <<<");
-        console.log("\ncast send", teeProverRegistryProxy);
-        console.log('  "addDevSigner(address,bytes32)" <SIGNER_ADDRESS>');
-        console.log(" ", vm.toString(cfg.teeImageHash()));
-        console.log("  --private-key <OWNER_KEY> --rpc-url <RPC>");
+        console.log("\n>>> NEXT STEP: Register TDX signer with a ZK-proven TDX journal <<<");
+        console.log("\n  cast send", teeProverRegistryProxy);
+        console.log('    "registerTDXSigner(bytes,bytes)" <TDX_OUTPUT> <PROOF_BYTES>');
+        console.log("    --private-key <OWNER_OR_MANAGER_KEY> --rpc-url <RPC>");
         console.log("\n========================================\n");
     }
 
     function _writeOutput() internal {
         string memory key = "deployment";
-        vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
         vm.serializeAddress(key, "TDXVerifier", tdxVerifierAddr);
+        vm.serializeAddress(key, "TDXRegistrationManager", tdxRegistrationManager);
+        vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
         vm.serializeAddress(key, "TEEVerifier", teeVerifier);
         vm.serializeAddress(key, "DisputeGameFactory", disputeGameFactory);
         vm.serializeAddress(key, "AnchorStateRegistry", address(mockAnchorRegistry));
         vm.serializeAddress(key, "DelayedWETH", mockDelayedWETH);
         string memory json = vm.serializeAddress(key, "AggregateVerifier", aggregateVerifier);
 
-        string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-dev-no-nitro.json");
+        string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-dev-with-tdx.json");
         vm.writeJson(json, outPath);
         console.log("Deployment saved to:", outPath);
     }
