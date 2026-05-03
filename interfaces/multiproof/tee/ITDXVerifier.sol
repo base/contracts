@@ -86,4 +86,7 @@ interface ITDXVerifier {
 
     /// @notice Returns whether a TCB status is accepted by verifier policy.
     function allowedTcbStatuses(TDXTcbStatus status) external view returns (bool);
+
+    /// @notice Updates the address authorized to submit verified proofs.
+    function setProofSubmitter(address newProofSubmitter) external;
 }

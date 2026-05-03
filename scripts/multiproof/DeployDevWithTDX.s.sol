@@ -38,10 +38,6 @@ import { MinimalProxyAdmin } from "./mocks/MinimalProxyAdmin.sol";
 import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";
 import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 
-interface IProofSubmitterSetter {
-    function setProofSubmitter(address newProofSubmitter) external;
-}
-
 contract DeployDevWithTDX is Script {
     uint256 public constant INIT_BOND = 0.00001 ether;
     address public constant DEFAULT_TDX_REGISTRATION_MANAGER = 0x93900CB7eCdB5994352b19DfD8a900Cd4fa437B7;
@@ -62,7 +58,6 @@ contract DeployDevWithTDX is Script {
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
         cfg.read(Config.deployConfigPath());
-        nitroEnclaveVerifierAddr = cfg.nitroEnclaveVerifier();
     }
 
     function run(address tdxVerifier) public {
@@ -70,6 +65,7 @@ contract DeployDevWithTDX is Script {
     }
 
     function run(address tdxVerifier, address registrationManager) public {
+        nitroEnclaveVerifierAddr = cfg.nitroEnclaveVerifier();
         require(tdxVerifier != address(0), "tdxVerifier must be non-zero");
         require(nitroEnclaveVerifierAddr != address(0), "nitroEnclaveVerifier must be set in config");
         require(registrationManager != address(0), "registrationManager must be non-zero");
@@ -124,7 +120,7 @@ contract DeployDevWithTDX is Script {
         registryProxy.changeAdmin(address(0xdead));
         teeProverRegistryProxy = address(registryProxy);
 
-        IProofSubmitterSetter(tdxVerifierAddr).setProofSubmitter(teeProverRegistryProxy);
+        ITDXVerifier(tdxVerifierAddr).setProofSubmitter(teeProverRegistryProxy);
 
         teeVerifier = address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), mockAnchorRegistry));
     }
