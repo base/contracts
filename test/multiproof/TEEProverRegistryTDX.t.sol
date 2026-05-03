@@ -65,6 +65,8 @@ contract MockTDXVerifierForRegistry is ITDXVerifier {
     function allowedTcbStatuses(TDXTcbStatus) external pure returns (bool) {
         return true;
     }
+
+    function setProofSubmitter(address) external { }
 }
 
 contract TEEProverRegistryTDXTest is Test {

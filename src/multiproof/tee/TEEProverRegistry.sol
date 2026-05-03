@@ -147,14 +147,8 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @dev Validates that the new game type has an AggregateVerifier with a non-zero TEE_IMAGE_HASH.
     /// @param gameType_ The new game type ID.
     function setGameType(GameType gameType_) external onlyOwner {
-        // Validate the new game type points to a valid AggregateVerifier with a TEE_IMAGE_HASH
-        GameType oldGameType = gameType;
+        if (_getExpectedImageHash(gameType_) == bytes32(0)) revert InvalidGameType();
         gameType = gameType_;
-        bytes32 imageHash = _getExpectedImageHash();
-        if (imageHash == bytes32(0)) {
-            gameType = oldGameType;
-            revert InvalidGameType();
-        }
         emit GameTypeUpdated(gameType_);
     }
 
@@ -179,18 +173,14 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         // the attestation is generated and when it is submitted to this contract.
         if (journal.timestamp / MS_PER_SECOND + MAX_AGE <= block.timestamp) revert AttestationTooOld();
 
-        // Extract the attestation's PCR0 and store it for TEEVerifier to check at
-        // proof-submission time. No comparison against the current TEE_IMAGE_HASH
-        // here — the registry accepts any valid attestation.
         bytes32 pcr0Hash = _extractPCR0Hash(journal.pcrs);
 
-        // The publicKey is encoded in ANSI X9.62 format: 0x04 || x || y (65 bytes).
-        // We skip the first byte (0x04 prefix) when hashing to derive the address.
+        // publicKey is ANSI X9.62 uncompressed: 0x04 || x || y (65 bytes). Skip the prefix and hash
+        // only the 64-byte x||y to derive the signer address.
         bytes memory pubKey = journal.publicKey;
         if (pubKey.length != 65) revert InvalidPublicKey();
         bytes32 publicKeyHash;
         assembly {
-            // Length is hardcoded to 64 to skip the 0x04 prefix and hash only the x and y coordinates
             publicKeyHash := keccak256(add(pubKey, 0x21), 64)
         }
         address enclaveAddress = address(uint160(uint256(publicKeyHash)));
@@ -226,7 +216,8 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @param signer The address to check.
     /// @return True if the signer is registered with the current image hash, false otherwise.
     function isValidSigner(address signer) external view returns (bool) {
-        return isRegisteredSigner[signer] && signerImageHash[signer] == _getExpectedImageHash();
+        if (!isRegisteredSigner[signer]) return false;
+        return signerImageHash[signer] == _getExpectedImageHash(gameType);
     }
 
     /// @notice Returns all currently registered signer addresses.
@@ -240,7 +231,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Returns the expected TEE image hash from the current AggregateVerifier.
     /// @return The TEE_IMAGE_HASH from the AggregateVerifier registered in the factory.
     function getExpectedImageHash() external view returns (bytes32) {
-        return _getExpectedImageHash();
+        return _getExpectedImageHash(gameType);
     }
 
     /// @notice Initializes the contract with owner, manager, proposers, and game type.
@@ -290,9 +281,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         emit SignerRegistered(signer);
     }
 
-    /// @dev Reads TEE_IMAGE_HASH from the AggregateVerifier registered in the factory.
-    function _getExpectedImageHash() internal view returns (bytes32) {
-        address impl = address(DISPUTE_GAME_FACTORY.gameImpls(gameType));
+    /// @dev Reads TEE_IMAGE_HASH from the AggregateVerifier registered in the factory for `gameType_`.
+    function _getExpectedImageHash(GameType gameType_) internal view returns (bytes32) {
+        address impl = address(DISPUTE_GAME_FACTORY.gameImpls(gameType_));
         // AggregateVerifier.TEE_IMAGE_HASH() selector
         (bool success, bytes memory data) = impl.staticcall(abi.encodeWithSignature("TEE_IMAGE_HASH()"));
         if (!success || data.length != 32) revert ImageHashReadFailed();
