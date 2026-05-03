@@ -116,10 +116,7 @@ contract TEEVerifier is Verifier, ISemver {
         if (err != ECDSA.RecoverError.NoError) revert InvalidSignature();
     }
 
-    function _validateSigner(
-        address signer,
-        bytes32 imageId
-    )
+    function _validateSigner(address signer, bytes32 imageId)
         internal
         view
         returns (TEEProverRegistry.TEEType teeType)

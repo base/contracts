@@ -26,15 +26,15 @@ pragma solidity 0.8.15;
  * SIGNER REGISTRATION (SIMPLIFIED)
  * ─────────────────────────────────────────────────────────────────────────────────
  *
-     * After deployment, register one dev Nitro signer and one dev TDX signer:
+ * After deployment, register one dev Nitro signer and one dev TDX signer:
  *
-     *   cast send $TEE_PROVER_REGISTRY \
-     *     "addDevSigner(address,bytes32)" $NITRO_SIGNER_ADDRESS $TEE_IMAGE_HASH \
-     *     --private-key $OWNER_KEY --rpc-url $RPC_URL
-     *
-     *   cast send $TEE_PROVER_REGISTRY \
-     *     "addDevTDXSigner(address,bytes32)" $TDX_SIGNER_ADDRESS $TEE_IMAGE_HASH \
-     *     --private-key $OWNER_KEY --rpc-url $RPC_URL
+ *   cast send $TEE_PROVER_REGISTRY \
+ *     "addDevSigner(address,bytes32)" $NITRO_SIGNER_ADDRESS $TEE_IMAGE_HASH \
+ *     --private-key $OWNER_KEY --rpc-url $RPC_URL
+ *
+ *   cast send $TEE_PROVER_REGISTRY \
+ *     "addDevTDXSigner(address,bytes32)" $TDX_SIGNER_ADDRESS $TEE_IMAGE_HASH \
+ *     --private-key $OWNER_KEY --rpc-url $RPC_URL
  *
  * No attestation, PCR0 registration, or certificate validation required.
  *
