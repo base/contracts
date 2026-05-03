@@ -84,20 +84,20 @@ contract TEEVerifier is Verifier, ISemver {
         if (proofBytes.length != TEE_PROOF_SIZE) revert InvalidProofFormat();
 
         address proposer = address(bytes20(proofBytes[0:20]));
-        bytes calldata firstSignature = proofBytes[20:85];
-        bytes calldata secondSignature = proofBytes[85:150];
-
-        address firstSigner = _recoverSigner(journal, firstSignature);
-        address secondSigner = _recoverSigner(journal, secondSignature);
-
-        if (firstSigner == secondSigner) revert DuplicateSigner(firstSigner);
-
         if (!TEE_PROVER_REGISTRY.isValidProposer(proposer)) {
             revert InvalidProposer(proposer);
         }
 
+        bytes calldata firstSignature = proofBytes[20:20 + SIGNATURE_SIZE];
+        bytes calldata secondSignature = proofBytes[20 + SIGNATURE_SIZE:TEE_PROOF_SIZE];
+
+        address firstSigner = _recoverSigner(journal, firstSignature);
+        address secondSigner = _recoverSigner(journal, secondSignature);
+
         TEEProverRegistry.TEEType firstTEEType = _validateSigner(firstSigner, imageId);
         TEEProverRegistry.TEEType secondTEEType = _validateSigner(secondSigner, imageId);
+
+        if (firstSigner == secondSigner) revert DuplicateSigner(firstSigner);
 
         if (firstTEEType != TEEProverRegistry.TEEType.NITRO && secondTEEType != TEEProverRegistry.TEEType.NITRO) {
             revert MissingNitroSignature();
@@ -121,20 +121,17 @@ contract TEEVerifier is Verifier, ISemver {
         view
         returns (TEEProverRegistry.TEEType teeType)
     {
-        // Check that the signer is registered
-        if (!TEE_PROVER_REGISTRY.isRegisteredSigner(signer)) {
-            revert InvalidSigner(signer);
-        }
+        // A registered signer always has a non-NONE TEE type, so this single read also
+        // serves as the registration check (saves an SLOAD versus calling isRegisteredSigner).
+        teeType = TEE_PROVER_REGISTRY.signerTEEType(signer);
+        if (teeType == TEEProverRegistry.TEEType.NONE) revert InvalidSigner(signer);
 
-        // Check that the signer's registered image hash matches the calling AggregateVerifier's imageId.
-        // This prevents a signer registered under one enclave image from being used in a game
+        // Prevents a signer registered under one enclave image from being used in a game
         // that expects a different image (e.g., after an upgrade or across game types).
         bytes32 registeredImageHash = TEE_PROVER_REGISTRY.signerImageHash(signer);
         if (registeredImageHash != imageId) {
             revert ImageIdMismatch(registeredImageHash, imageId);
         }
-
-        teeType = TEE_PROVER_REGISTRY.signerTEEType(signer);
     }
 
     /// @notice Semantic version.
