@@ -90,7 +90,7 @@
             "type": "address"
           },
           {
-            "internalType": "contract IFaultDisputeGame",
+            "internalType": "contract IFaultDisputeGameV2",
             "name": "faultDisputeGame",
             "type": "address"
           }
@@ -214,22 +214,12 @@
           },
           {
             "internalType": "address",
-            "name": "protocolVersionsImpl",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
             "name": "l1ERC721BridgeImpl",
             "type": "address"
           },
           {
             "internalType": "address",
             "name": "optimismPortalImpl",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "optimismPortalInteropImpl",
             "type": "address"
           },
           {
@@ -285,16 +275,6 @@
           {
             "internalType": "address",
             "name": "permissionedDisputeGameV2Impl",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "superFaultDisputeGameImpl",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "superPermissionedDisputeGameImpl",
             "type": "address"
           }
         ],

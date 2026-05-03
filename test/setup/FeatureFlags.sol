@@ -30,14 +30,6 @@ abstract contract FeatureFlags {
         sysCfg = _sysCfg;
     }
 
-    /// @notice Resolves the development feature bitmap.
-    function resolveFeaturesFromEnv() public {
-        if (Config.devFeatureInterop()) {
-            console.log("Setup: DEV_FEATURE__OPTIMISM_PORTAL_INTEROP is enabled");
-            devFeatureBitmap |= DevFeatures.OPTIMISM_PORTAL_INTEROP;
-        }
-    }
-
     /// @notice Enables a feature.
     /// @param _feature The feature to set.
     function setDevFeatureEnabled(bytes32 _feature) public {

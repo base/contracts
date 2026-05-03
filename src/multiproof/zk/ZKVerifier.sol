@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { ISP1Verifier } from "src/dispute/zk/ISP1Verifier.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { ISP1Verifier } from "./ISP1Verifier.sol";
 import { Verifier } from "../Verifier.sol";
 
 /// @title ZkVerifier
@@ -14,9 +14,6 @@ import { Verifier } from "../Verifier.sol";
 contract ZkVerifier is Verifier {
     /// @notice The SP1 verifier gateway contract.
     ISP1Verifier public immutable SP1_VERIFIER;
-
-    /// @notice Thrown when SP1 proof verification reverts.
-    error SP1VerificationFailed();
 
     /// @param sp1Verifier The deployed SP1 verifier gateway address.
     /// @param anchorStateRegistry The anchor state registry for nullification checks.

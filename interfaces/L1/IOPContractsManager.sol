@@ -12,9 +12,8 @@ import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
-import { IPermissionedDisputeGame } from "interfaces/dispute/IPermissionedDisputeGame.sol";
-import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
@@ -175,8 +174,8 @@ interface IOPContractsManager {
         IOptimismPortal2 optimismPortalProxy;
         IDisputeGameFactory disputeGameFactoryProxy;
         IAnchorStateRegistry anchorStateRegistryProxy;
-        IFaultDisputeGame faultDisputeGame;
-        IPermissionedDisputeGame permissionedDisputeGame;
+        IFaultDisputeGameV2 faultDisputeGame;
+        IPermissionedDisputeGameV2 permissionedDisputeGame;
         IDelayedWETH delayedWETHPermissionedGameProxy;
         IDelayedWETH delayedWETHPermissionlessGameProxy;
     }
@@ -197,10 +196,8 @@ interface IOPContractsManager {
     /// @notice The latest implementation contracts for the OP Stack.
     struct Implementations {
         address superchainConfigImpl;
-        address protocolVersionsImpl;
         address l1ERC721BridgeImpl;
         address optimismPortalImpl;
-        address optimismPortalInteropImpl;
         address ethLockboxImpl;
         address systemConfigImpl;
         address optimismMintableERC20FactoryImpl;
@@ -212,8 +209,6 @@ interface IOPContractsManager {
         address mipsImpl;
         address faultDisputeGameV2Impl;
         address permissionedDisputeGameV2Impl;
-        address superFaultDisputeGameImpl;
-        address superPermissionedDisputeGameImpl;
     }
 
     /// @notice The input required to identify a chain for upgrading.
@@ -247,7 +242,7 @@ interface IOPContractsManager {
 
     struct AddGameOutput {
         IDelayedWETH delayedWETH;
-        IFaultDisputeGame faultDisputeGame;
+        IFaultDisputeGameV2 faultDisputeGame;
     }
 
     // -------- Constants and Variables --------
@@ -256,9 +251,6 @@ interface IOPContractsManager {
 
     /// @notice Address of the SuperchainConfig contract shared by all chains.
     function superchainConfig() external view returns (ISuperchainConfig);
-
-    /// @notice Address of the ProtocolVersions contract shared by all chains.
-    function protocolVersions() external view returns (IProtocolVersions);
 
     // -------- Errors --------
 
@@ -308,8 +300,7 @@ interface IOPContractsManager {
         IOPContractsManagerUpgrader _opcmUpgrader,
         IOPContractsManagerInteropMigrator _opcmInteropMigrator,
         IOPContractsManagerStandardValidator _opcmStandardValidator,
-        ISuperchainConfig _superchainConfig,
-        IProtocolVersions _protocolVersions
+        ISuperchainConfig _superchainConfig
     )
         external;
 

@@ -40,7 +40,6 @@ contract BaseTest is Test {
     uint256 public constant DELAYED_WETH_DELAY = 1 days;
     // Finality delay handled by the AggregateVerifier
     uint256 public constant FINALITY_DELAY = 0 days;
-    uint256 public constant PROOF_THRESHOLD = 1;
 
     uint256 public currentL2BlockNumber = 0;
 
@@ -136,8 +135,7 @@ contract BaseTest is Test {
             CONFIG_HASH,
             L2_CHAIN_ID,
             BLOCK_INTERVAL,
-            INTERMEDIATE_BLOCK_INTERVAL,
-            PROOF_THRESHOLD
+            INTERMEDIATE_BLOCK_INTERVAL
         );
 
         // Set the implementation for the aggregate verifier

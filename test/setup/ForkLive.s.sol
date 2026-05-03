@@ -22,7 +22,7 @@ import { LibGameArgs } from "src/dispute/lib/LibGameArgs.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
@@ -63,11 +63,6 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
     /// @return The OP chain name as a string
     function opChain() internal view returns (string memory) {
         return Config.forkOpChain();
-    }
-
-    function setUp() public override {
-        super.setUp();
-        resolveFeaturesFromEnv();
     }
 
     /// @dev This function sets up the system to test it as follows:
@@ -129,7 +124,6 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         artifacts.save("L2ChainId", address(uint160(vm.parseTomlUint(opToml, ".chain_id"))));
         // Superchain shared contracts
         saveProxyAndImpl("SuperchainConfig", superchainToml, ".superchain_config_addr");
-        saveProxyAndImpl("ProtocolVersions", superchainToml, ".protocol_versions_addr");
         artifacts.save(
             "OPContractsManager", vm.parseTomlAddress(standardVersionsToml, "$.RELEASE.op_contracts_manager.address")
         );
@@ -178,8 +172,8 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
 
         // The PermissionedDisputeGame and PermissionedDelayedWETHProxy are not listed in the registry for OP, so we
         // look it up onchain
-        IFaultDisputeGame permissionedDisputeGame =
-            IFaultDisputeGame(address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON)));
+        IFaultDisputeGameV2 permissionedDisputeGame =
+            IFaultDisputeGameV2(address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON)));
         artifacts.save("PermissionedDisputeGame", address(permissionedDisputeGame));
         artifacts.save("PermissionedDelayedWETHProxy", address(permissionedDisputeGame.weth()));
 

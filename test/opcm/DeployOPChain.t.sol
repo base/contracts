@@ -13,7 +13,7 @@ import { Types } from "scripts/libraries/Types.sol";
 
 import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
 import { Claim, Duration, GameType, GameTypes } from "src/dispute/lib/Types.sol";
-import { IPermissionedDisputeGame } from "interfaces/dispute/IPermissionedDisputeGame.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
 
 contract DeployOPChain_TestBase is Test, FeatureFlags {
     DeploySuperchain deploySuperchain;
@@ -23,15 +23,11 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
 
     // DeploySuperchain default inputs.
     address superchainProxyAdminOwner = makeAddr("superchainProxyAdminOwner");
-    address protocolVersionsOwner = makeAddr("protocolVersionsOwner");
     address guardian = makeAddr("guardian");
     bool paused = false;
-    bytes32 requiredProtocolVersion = bytes32(uint256(1));
-    bytes32 recommendedProtocolVersion = bytes32(uint256(2));
 
     // DeployImplementations default inputs.
-    // - superchainConfigProxy and protocolVersionsProxy are set during `setUp` since they are
-    //   outputs of DeploySuperchain.
+    // - superchainConfigProxy is set during `setUp` since it's an output of DeploySuperchain.
     uint256 withdrawalDelaySeconds = 100;
     uint256 minProposalSizeBytes = 200;
     uint256 challengePeriodSeconds = 300;
@@ -63,7 +59,6 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
     event Deployed(uint256 indexed l2ChainId, address indexed deployer, bytes deployOutput);
 
     function setUp() public virtual {
-        resolveFeaturesFromEnv();
         deploySuperchain = new DeploySuperchain();
         deployImplementations = new DeployImplementations();
         deployOPChain = new DeployOPChain();
@@ -72,12 +67,9 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
         DeploySuperchain.Output memory dso = deploySuperchain.run(
             DeploySuperchain.Input({
                 superchainProxyAdminOwner: superchainProxyAdminOwner,
-                protocolVersionsOwner: protocolVersionsOwner,
                 guardian: guardian,
                 incidentResponder: address(0),
-                paused: paused,
-                requiredProtocolVersion: requiredProtocolVersion,
-                recommendedProtocolVersion: recommendedProtocolVersion
+                paused: paused
             })
         );
 
@@ -101,9 +93,7 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
                 l2ChainID: 8453,
                 multiproofBlockInterval: 100,
                 multiproofIntermediateBlockInterval: 10,
-                multiproofProofThreshold: 1,
                 superchainConfigProxy: dso.superchainConfigProxy,
-                protocolVersionsProxy: dso.protocolVersionsProxy,
                 superchainProxyAdmin: dso.superchainProxyAdmin,
                 l1ProxyAdminOwner: dso.superchainProxyAdmin.owner(),
                 challenger: challenger,
@@ -153,7 +143,7 @@ contract DeployOPChain_Test is DeployOPChain_TestBase {
         // Basic non-zero and code checks are covered inside run->checkOutput.
         // Additonal targeted assertions added below.
 
-        IPermissionedDisputeGame pdg = getPermissionedDisputeGame(doo);
+        IPermissionedDisputeGameV2 pdg = getPermissionedDisputeGame(doo);
         assertEq(pdg.splitDepth(), disputeSplitDepth, "PDG splitDepth");
         assertEq(pdg.maxGameDepth(), disputeMaxGameDepth, "PDG maxGameDepth");
         assertEq(Duration.unwrap(pdg.clockExtension()), Duration.unwrap(disputeClockExtension), "PDG clockExtension");
@@ -202,7 +192,7 @@ contract DeployOPChain_Test is DeployOPChain_TestBase {
         assertEq(actualPDGAddress, expectedPDGAddress, "PDG address should match expected address");
 
         // Check PDG getters
-        IPermissionedDisputeGame pdg = IPermissionedDisputeGame(actualPDGAddress);
+        IPermissionedDisputeGameV2 pdg = IPermissionedDisputeGameV2(actualPDGAddress);
         bytes32 expectedPrestate = bytes32(0);
         assertEq(pdg.l2BlockNumber(), 0, "3000");
         assertEq(Claim.unwrap(pdg.absolutePrestate()), expectedPrestate, "3100");
@@ -239,8 +229,8 @@ contract DeployOPChain_Test is DeployOPChain_TestBase {
     function getPermissionedDisputeGame(DeployOPChain.Output memory doo)
         internal
         view
-        returns (IPermissionedDisputeGame)
+        returns (IPermissionedDisputeGameV2)
     {
-        return IPermissionedDisputeGame(address(doo.disputeGameFactoryProxy.gameImpls(GameTypes.PERMISSIONED_CANNON)));
+        return IPermissionedDisputeGameV2(address(doo.disputeGameFactoryProxy.gameImpls(GameTypes.PERMISSIONED_CANNON)));
     }
 }

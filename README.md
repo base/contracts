@@ -30,11 +30,13 @@ For contract deployment artifacts, see [base-org/contract-deployments](https://g
 ### Fixing semver-lock CI failures
 
 If the `semver-lock` CI check fails, regenerate locally and commit:
+
 ```bash
 just semver-lock
 ```
 
 If CI still rejects it (Foundry version mismatch), update your local Foundry first:
+
 ```bash
 foundryup
 just semver-lock

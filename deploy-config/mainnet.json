@@ -43,8 +43,6 @@
   "eip1559Elasticity": 6,
   "l2GenesisRegolithTimeOffset": "0x0",
   "systemConfigStartBlock": 17422444,
-  "requiredProtocolVersion": "0x0000000000000000000000000000000000000003000000010000000000000000",
-  "recommendedProtocolVersion": "0x0000000000000000000000000000000000000003000000010000000000000000",
   "faultGameAbsolutePrestate": "0x038512e02c4c3f7bdaec27d00edf55b7155e0905301e1a88083e4e0a6764d54c",
   "faultGameMaxDepth": 73,
   "faultGameClockExtension": 10800,

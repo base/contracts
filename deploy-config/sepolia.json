@@ -41,8 +41,6 @@
   "eip1559Elasticity": 6,
   "l2GenesisRegolithTimeOffset": "0x0",
   "systemConfigStartBlock": 4071248,
-  "requiredProtocolVersion": "0x0000000000000000000000000000000000000004000000000000000000000001",
-  "recommendedProtocolVersion": "0x0000000000000000000000000000000000000004000000000000000000000001",
   "fundDevAccounts": false,
   "faultGameAbsolutePrestate": "0x03b7eaa4e3cbce90381921a4b48008f4769871d64f93d113fcadca08ecee503b",
   "faultGameMaxDepth": 73,
@@ -77,7 +75,6 @@
   "multiproofGenesisBlockNumber": 37223829,
   "multiproofBlockInterval": 600,
   "multiproofIntermediateBlockInterval": 30,
-  "multiproofProofThreshold": 1,
   "risc0VerifierRouter": "0xb121b667dd2cf27f95f9f5107137696f56f188f6",
   "risc0SetBuilderImageId": "0x70909b25db0db00f1d4b4016aeb876f53568a3e5a8e6397cb562d79947a02cc9"
 }

@@ -15,7 +15,7 @@ import { LibGameArgs } from "src/dispute/lib/LibGameArgs.sol";
 // Interfaces
 import "../../interfaces/dispute/IDisputeGame.sol";
 import "../../interfaces/dispute/IDisputeGameFactory.sol";
-import { IPermissionedDisputeGame } from "../../interfaces/dispute/IPermissionedDisputeGame.sol";
+import { IPermissionedDisputeGameV2 } from "../../interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
 
 contract DisputeGames is FeatureFlags {
     using ByteUtils for bytes;
@@ -91,7 +91,7 @@ contract DisputeGames is FeatureFlags {
             LibGameArgs.GameArgs memory gameArgs = LibGameArgs.decode(gameArgsData);
             challenger_ = gameArgs.challenger;
         } else {
-            challenger_ = IPermissionedDisputeGame(address(_dgf.gameImpls(gameType))).challenger();
+            challenger_ = IPermissionedDisputeGameV2(address(_dgf.gameImpls(gameType))).challenger();
         }
     }
 
@@ -102,7 +102,7 @@ contract DisputeGames is FeatureFlags {
             LibGameArgs.GameArgs memory gameArgs = LibGameArgs.decode(gameArgsData);
             proposer_ = gameArgs.proposer;
         } else {
-            proposer_ = IPermissionedDisputeGame(address(_dgf.gameImpls(gameType))).proposer();
+            proposer_ = IPermissionedDisputeGameV2(address(_dgf.gameImpls(gameType))).proposer();
         }
     }
 

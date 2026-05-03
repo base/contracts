@@ -68,7 +68,7 @@ import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.so
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
 
 /// @title FaultDisputeGameV2
-/// @notice An implementation of the `IFaultDisputeGame` interface.
+/// @notice An implementation of the `IFaultDisputeGameV2` interface.
 contract FaultDisputeGameV2 is Clone, ISemver {
     ////////////////////////////////////////////////////////////////
     //                         Structs                            //
@@ -343,7 +343,7 @@ contract FaultDisputeGameV2 is Clone, ISemver {
     }
 
     ////////////////////////////////////////////////////////////////
-    //                  `IFaultDisputeGame` impl                  //
+    //                  `IFaultDisputeGameV2` impl                  //
     ////////////////////////////////////////////////////////////////
 
     /// @notice Perform an instruction step via an on-chain fault proof processor.

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { GameType, Hash, Proposal } from "src/dispute/lib/Types.sol";
@@ -14,14 +14,14 @@ interface IAnchorStateRegistry is IProxyAdminOwnedBase {
     error AnchorStateRegistry_Unauthorized();
     error ReinitializableBase_ZeroInitVersion();
 
-    event AnchorUpdated(IFaultDisputeGame indexed game);
+    event AnchorUpdated(IFaultDisputeGameV2 indexed game);
     event DisputeGameBlacklisted(IDisputeGame indexed disputeGame);
     event Initialized(uint8 version);
     event RespectedGameTypeSet(GameType gameType);
     event RetirementTimestampSet(uint256 timestamp);
 
     function initVersion() external view returns (uint8);
-    function anchorGame() external view returns (IFaultDisputeGame);
+    function anchorGame() external view returns (IFaultDisputeGameV2);
     function anchors(GameType) external view returns (Hash, uint256);
     function blacklistDisputeGame(IDisputeGame _disputeGame) external;
     function disputeGameBlacklist(IDisputeGame) external view returns (bool);

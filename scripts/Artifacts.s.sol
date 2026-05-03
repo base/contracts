@@ -84,8 +84,6 @@ contract Artifacts {
             return payable(Predeploys.L2_TO_L1_MESSAGE_PASSER);
         } else if (digest == keccak256(bytes("L2StandardBridge"))) {
             return payable(Predeploys.L2_STANDARD_BRIDGE);
-        } else if (digest == keccak256(bytes("L2StandardBridgeInterop"))) {
-            return payable(Predeploys.L2_STANDARD_BRIDGE);
         } else if (digest == keccak256(bytes("L2ERC721Bridge"))) {
             return payable(Predeploys.L2_ERC721_BRIDGE);
         } else if (digest == keccak256(bytes("SequencerFeeWallet"))) {
@@ -118,20 +116,10 @@ contract Artifacts {
             return payable(Predeploys.L1_FEE_VAULT);
         } else if (digest == keccak256(bytes("OperatorFeeVault"))) {
             return payable(Predeploys.OPERATOR_FEE_VAULT);
-        } else if (digest == keccak256(bytes("GovernanceToken"))) {
-            return payable(Predeploys.GOVERNANCE_TOKEN);
         } else if (digest == keccak256(bytes("SchemaRegistry"))) {
             return payable(Predeploys.SCHEMA_REGISTRY);
         } else if (digest == keccak256(bytes("EAS"))) {
             return payable(Predeploys.EAS);
-        } else if (digest == keccak256(bytes("OptimismSuperchainERC20Factory"))) {
-            return payable(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_FACTORY);
-        } else if (digest == keccak256(bytes("OptimismSuperchainERC20Beacon"))) {
-            return payable(Predeploys.OPTIMISM_SUPERCHAIN_ERC20_BEACON);
-        } else if (digest == keccak256(bytes("SuperchainTokenBridge"))) {
-            return payable(Predeploys.SUPERCHAIN_TOKEN_BRIDGE);
-        } else if (digest == keccak256(bytes("FeeSplitter"))) {
-            return payable(Predeploys.FEE_SPLITTER);
         }
         return payable(address(0));
     }

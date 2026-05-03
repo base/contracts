@@ -22,7 +22,7 @@ import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMin
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
-import { IPermissionedDisputeGame } from "interfaces/dispute/IPermissionedDisputeGame.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
@@ -62,9 +62,6 @@ contract OPContractsManagerStandardValidator is ISemver {
 
     /// @notice The OptimismPortal implementation address.
     address public optimismPortalImpl;
-
-    /// @notice The OptimismPortalInterop implementation address.
-    address public optimismPortalInteropImpl;
 
     /// @notice The ETHLockbox implementation address.
     address public ethLockboxImpl;
@@ -106,7 +103,6 @@ contract OPContractsManagerStandardValidator is ISemver {
     struct Implementations {
         address l1ERC721BridgeImpl;
         address optimismPortalImpl;
-        address optimismPortalInteropImpl;
         address ethLockboxImpl;
         address systemConfigImpl;
         address optimismMintableERC20FactoryImpl;
@@ -181,7 +177,6 @@ contract OPContractsManagerStandardValidator is ISemver {
         // Set implementation addresses from struct
         l1ERC721BridgeImpl = _implementations.l1ERC721BridgeImpl;
         optimismPortalImpl = _implementations.optimismPortalImpl;
-        optimismPortalInteropImpl = _implementations.optimismPortalInteropImpl;
         ethLockboxImpl = _implementations.ethLockboxImpl;
         systemConfigImpl = _implementations.systemConfigImpl;
         optimismMintableERC20FactoryImpl = _implementations.optimismMintableERC20FactoryImpl;
@@ -428,23 +423,12 @@ contract OPContractsManagerStandardValidator is ISemver {
     {
         IOptimismPortal2 _portal = IOptimismPortal2(payable(_sysCfg.optimismPortal()));
 
-        if (DevFeatures.isDevFeatureEnabled(devFeatureBitmap, DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
-            _errors = internalRequire(
-                LibString.eq(getVersion(address(_portal)), string.concat(getVersion(optimismPortalInteropImpl))),
-                "PORTAL-10",
-                _errors
-            );
-            _errors = internalRequire(
-                getProxyImplementation(_admin, address(_portal)) == optimismPortalInteropImpl, "PORTAL-20", _errors
-            );
-        } else {
-            _errors = internalRequire(
-                LibString.eq(getVersion(address(_portal)), getVersion(optimismPortalImpl)), "PORTAL-10", _errors
-            );
-            _errors = internalRequire(
-                getProxyImplementation(_admin, address(_portal)) == optimismPortalImpl, "PORTAL-20", _errors
-            );
-        }
+        _errors = internalRequire(
+            LibString.eq(getVersion(address(_portal)), getVersion(optimismPortalImpl)), "PORTAL-10", _errors
+        );
+        _errors = internalRequire(
+            getProxyImplementation(_admin, address(_portal)) == optimismPortalImpl, "PORTAL-20", _errors
+        );
 
         IDisputeGameFactory _dgf = IDisputeGameFactory(_sysCfg.disputeGameFactory());
         _errors = internalRequire(address(_portal.disputeGameFactory()) == address(_dgf), "PORTAL-30", _errors);
@@ -609,7 +593,7 @@ contract OPContractsManagerStandardValidator is ISemver {
         errors_ = _initialErrors;
         bool isPermissioned = _gameType.raw() == GameTypes.PERMISSIONED_CANNON.raw();
         IDisputeGameFactory _factory = IDisputeGameFactory(_sysCfg.disputeGameFactory());
-        IPermissionedDisputeGame _game = IPermissionedDisputeGame(address(_factory.gameImpls(_gameType)));
+        IPermissionedDisputeGameV2 _game = IPermissionedDisputeGameV2(address(_factory.gameImpls(_gameType)));
 
         if (address(_game) == address(0)) {
             errors_ = internalRequire(false, string.concat(_errorPrefix, "-10"), errors_);
@@ -965,7 +949,7 @@ contract OPContractsManagerStandardValidator is ISemver {
     // @notice Internal function to read all information from a dispute game while supporting both v1 and v2 dispute
     /// games.
     function _decodeDisputeGameImpl(
-        IPermissionedDisputeGame _game,
+        IPermissionedDisputeGameV2 _game,
         bytes memory _gameArgsBytes,
         GameType _gameType
     )

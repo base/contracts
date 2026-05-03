@@ -9,15 +9,12 @@ import { Types } from "scripts/libraries/Types.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
 import { IMIPS64 } from "interfaces/cannon/IMIPS64.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
 import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
-import { ISuperFaultDisputeGame } from "interfaces/dispute/ISuperFaultDisputeGame.sol";
-import { ISuperPermissionedDisputeGame } from "interfaces/dispute/ISuperPermissionedDisputeGame.sol";
 import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
 import { Duration } from "src/dispute/lib/Types.sol";
 import {
@@ -30,7 +27,6 @@ import {
     IOPContractsManagerStandardValidator
 } from "interfaces/L1/IOPContractsManager.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
-import { IOptimismPortalInterop } from "interfaces/L1/IOptimismPortalInterop.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
@@ -73,10 +69,8 @@ contract DeployImplementations is Script {
         uint256 l2ChainID;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
-        uint256 multiproofProofThreshold;
         // Outputs from DeploySuperchain.s.sol.
         ISuperchainConfig superchainConfigProxy;
-        IProtocolVersions protocolVersionsProxy;
         IProxyAdmin superchainProxyAdmin;
         address l1ProxyAdminOwner;
         address challenger;
@@ -94,7 +88,6 @@ contract DeployImplementations is Script {
         IOPContractsManagerStandardValidator opcmStandardValidator;
         IDelayedWETH delayedWETHImpl;
         IOptimismPortal optimismPortalImpl;
-        IOptimismPortalInterop optimismPortalInteropImpl;
         IETHLockbox ethLockboxImpl;
         IPreimageOracle preimageOracleSingleton;
         IMIPS64 mipsSingleton;
@@ -106,11 +99,8 @@ contract DeployImplementations is Script {
         IDisputeGameFactory disputeGameFactoryImpl;
         IAnchorStateRegistry anchorStateRegistryImpl;
         ISuperchainConfig superchainConfigImpl;
-        IProtocolVersions protocolVersionsImpl;
         IFaultDisputeGameV2 faultDisputeGameV2Impl;
         IPermissionedDisputeGameV2 permissionedDisputeGameV2Impl;
-        ISuperFaultDisputeGame superFaultDisputeGameImpl;
-        ISuperPermissionedDisputeGame superPermissionedDisputeGameImpl;
         IVerifier aggregateVerifierImpl;
         TEEProverRegistry teeProverRegistryImpl;
     }
@@ -130,14 +120,12 @@ contract DeployImplementations is Script {
 
         // Deploy the implementations.
         deploySuperchainConfigImpl(_input, output_);
-        deployProtocolVersionsImpl(output_);
         deploySystemConfigImpl(output_);
         deployL1CrossDomainMessengerImpl(output_);
         deployL1ERC721BridgeImpl(output_);
         deployL1StandardBridgeImpl(output_);
         deployOptimismMintableERC20FactoryImpl(output_);
         deployOptimismPortalImpl(_input, output_);
-        deployOptimismPortalInteropImpl(_input, output_);
         deployETHLockboxImpl(output_);
         deployDelayedWETHImpl(_input, output_);
         deployPreimageOracleSingleton(_input, output_);
@@ -147,10 +135,6 @@ contract DeployImplementations is Script {
         deployFaultDisputeGameV2Impl(_input, output_);
         deployPermissionedDisputeGameV2Impl(_input, output_);
         deployAggregateVerifierImpl(_input, output_);
-        if (DevFeatures.isDevFeatureEnabled(_input.devFeatureBitmap, DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
-            deploySuperFaultDisputeGameImpl(_input, output_);
-            deploySuperPermissionedDisputeGameImpl(_input, output_);
-        }
 
         // Deploy the OP Contracts Manager with the new implementations set.
         deployOPContractsManager(_input, output_);
@@ -172,10 +156,8 @@ contract DeployImplementations is Script {
     {
         IOPContractsManager.Implementations memory implementations = IOPContractsManager.Implementations({
             superchainConfigImpl: address(_output.superchainConfigImpl),
-            protocolVersionsImpl: address(_output.protocolVersionsImpl),
             l1ERC721BridgeImpl: address(_output.l1ERC721BridgeImpl),
             optimismPortalImpl: address(_output.optimismPortalImpl),
-            optimismPortalInteropImpl: address(_output.optimismPortalInteropImpl),
             ethLockboxImpl: address(_output.ethLockboxImpl),
             systemConfigImpl: address(_output.systemConfigImpl),
             optimismMintableERC20FactoryImpl: address(_output.optimismMintableERC20FactoryImpl),
@@ -186,9 +168,7 @@ contract DeployImplementations is Script {
             delayedWETHImpl: address(_output.delayedWETHImpl),
             mipsImpl: address(_output.mipsSingleton),
             faultDisputeGameV2Impl: address(_output.faultDisputeGameV2Impl),
-            permissionedDisputeGameV2Impl: address(_output.permissionedDisputeGameV2Impl),
-            superFaultDisputeGameImpl: address(_output.superFaultDisputeGameImpl),
-            superPermissionedDisputeGameImpl: address(_output.superPermissionedDisputeGameImpl)
+            permissionedDisputeGameV2Impl: address(_output.permissionedDisputeGameV2Impl)
         });
 
         deployOPCMBPImplsContainer(_input, _output, _blueprints, implementations);
@@ -232,8 +212,7 @@ contract DeployImplementations is Script {
                     _output.opcmUpgrader,
                     _output.opcmInteropMigrator,
                     _output.opcmStandardValidator,
-                    _input.superchainConfigProxy,
-                    _input.protocolVersionsProxy
+                    _input.superchainConfigProxy
                 )
             )
         );
@@ -278,18 +257,6 @@ contract DeployImplementations is Script {
         );
         vm.label(address(impl), "SuperchainConfigImpl");
         _output.superchainConfigImpl = impl;
-    }
-
-    function deployProtocolVersionsImpl(Output memory _output) private {
-        IProtocolVersions impl = IProtocolVersions(
-            DeployUtils.createDeterministic({
-                _name: "ProtocolVersions",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IProtocolVersions.__constructor__, ())),
-                _salt: _salt
-            })
-        );
-        vm.label(address(impl), "ProtocolVersionsImpl");
-        _output.protocolVersionsImpl = impl;
     }
 
     function deploySystemConfigImpl(Output memory _output) private {
@@ -414,21 +381,6 @@ contract DeployImplementations is Script {
         _output.optimismPortalImpl = impl;
     }
 
-    function deployOptimismPortalInteropImpl(Input memory _input, Output memory _output) private {
-        uint256 proofMaturityDelaySeconds = _input.proofMaturityDelaySeconds;
-        IOptimismPortalInterop impl = IOptimismPortalInterop(
-            DeployUtils.createDeterministic({
-                _name: "OptimismPortalInterop",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(IOptimismPortalInterop.__constructor__, (proofMaturityDelaySeconds))
-                ),
-                _salt: _salt
-            })
-        );
-        vm.label(address(impl), "OptimismPortalInteropImpl");
-        _output.optimismPortalInteropImpl = impl;
-    }
-
     function deployDelayedWETHImpl(Input memory _input, Output memory _output) private {
         uint256 withdrawalDelaySeconds = _input.withdrawalDelaySeconds;
         IDelayedWETH impl = IDelayedWETH(
@@ -549,45 +501,6 @@ contract DeployImplementations is Script {
         _output.permissionedDisputeGameV2Impl = impl;
     }
 
-    function deploySuperFaultDisputeGameImpl(Input memory _input, Output memory _output) private {
-        ISuperFaultDisputeGame.GameConstructorParams memory params = ISuperFaultDisputeGame.GameConstructorParams({
-            maxGameDepth: _input.faultGameV2MaxGameDepth,
-            splitDepth: _input.faultGameV2SplitDepth,
-            clockExtension: Duration.wrap(uint64(_input.faultGameV2ClockExtension)),
-            maxClockDuration: Duration.wrap(uint64(_input.faultGameV2MaxClockDuration))
-        });
-
-        ISuperFaultDisputeGame impl = ISuperFaultDisputeGame(
-            DeployUtils.createDeterministic({
-                _name: "SuperFaultDisputeGame",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(ISuperFaultDisputeGame.__constructor__, (params))),
-                _salt: _salt
-            })
-        );
-        vm.label(address(impl), "SuperFaultDisputeGameImpl");
-        _output.superFaultDisputeGameImpl = impl;
-    }
-
-    function deploySuperPermissionedDisputeGameImpl(Input memory _input, Output memory _output) private {
-        ISuperFaultDisputeGame.GameConstructorParams memory params = ISuperFaultDisputeGame.GameConstructorParams({
-            maxGameDepth: _input.faultGameV2MaxGameDepth,
-            splitDepth: _input.faultGameV2SplitDepth,
-            clockExtension: Duration.wrap(uint64(_input.faultGameV2ClockExtension)),
-            maxClockDuration: Duration.wrap(uint64(_input.faultGameV2MaxClockDuration))
-        });
-        ISuperPermissionedDisputeGame impl = ISuperPermissionedDisputeGame(
-            DeployUtils.createDeterministic({
-                _name: "SuperPermissionedDisputeGame",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(ISuperPermissionedDisputeGame.__constructor__, (params))
-                ),
-                _salt: _salt
-            })
-        );
-        vm.label(address(impl), "SuperPermissionedDisputeGameImpl");
-        _output.superPermissionedDisputeGameImpl = impl;
-    }
-
     function deployOPCMBPImplsContainer(
         Input memory _input,
         Output memory _output,
@@ -678,7 +591,6 @@ contract DeployImplementations is Script {
         IOPContractsManagerStandardValidator.Implementations memory opcmImplementations;
         opcmImplementations.l1ERC721BridgeImpl = _implementations.l1ERC721BridgeImpl;
         opcmImplementations.optimismPortalImpl = _implementations.optimismPortalImpl;
-        opcmImplementations.optimismPortalInteropImpl = _implementations.optimismPortalInteropImpl;
         opcmImplementations.ethLockboxImpl = _implementations.ethLockboxImpl;
         opcmImplementations.systemConfigImpl = _implementations.systemConfigImpl;
         opcmImplementations.optimismMintableERC20FactoryImpl = _implementations.optimismMintableERC20FactoryImpl;
@@ -740,8 +652,7 @@ contract DeployImplementations is Script {
                     _input.multiproofConfigHash,
                     _input.l2ChainID,
                     _input.multiproofBlockInterval,
-                    _input.multiproofIntermediateBlockInterval,
-                    _input.multiproofProofThreshold
+                    _input.multiproofIntermediateBlockInterval
                 )
             )
         );
@@ -790,9 +701,6 @@ contract DeployImplementations is Script {
             address(_input.superchainConfigProxy) != address(0), "DeployImplementations: superchainConfigProxy not set"
         );
         require(
-            address(_input.protocolVersionsProxy) != address(0), "DeployImplementations: protocolVersionsProxy not set"
-        );
-        require(
             address(_input.superchainProxyAdmin) != address(0), "DeployImplementations: superchainProxyAdmin not set"
         );
         require(address(_input.l1ProxyAdminOwner) != address(0), "DeployImplementations: L1ProxyAdminOwner not set");
@@ -807,8 +715,7 @@ contract DeployImplementations is Script {
             address(_output.delayedWETHImpl),
             address(_output.preimageOracleSingleton),
             address(_output.mipsSingleton),
-            address(_output.superchainConfigImpl),
-            address(_output.protocolVersionsImpl)
+            address(_output.superchainConfigImpl)
         );
 
         address[] memory addrs2 = Solarray.addresses(
@@ -824,25 +731,7 @@ contract DeployImplementations is Script {
             address(_output.permissionedDisputeGameV2Impl)
         );
 
-        if (DevFeatures.isDevFeatureEnabled(_input.devFeatureBitmap, DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
-            address[] memory superGameAddrs = Solarray.addresses(
-                address(_output.superFaultDisputeGameImpl), address(_output.superPermissionedDisputeGameImpl)
-            );
-            addrs2 = Solarray.extend(addrs2, superGameAddrs);
-        }
-
         DeployUtils.assertValidContractAddresses(Solarray.extend(addrs1, addrs2));
-
-        if (!DevFeatures.isDevFeatureEnabled(_input.devFeatureBitmap, DevFeatures.OPTIMISM_PORTAL_INTEROP)) {
-            require(
-                address(_output.superFaultDisputeGameImpl) == address(0),
-                "DeployImplementations: OptimismPortalInterop flag disabled but SuperFaultDisputeGame was deployed"
-            );
-            require(
-                address(_output.superPermissionedDisputeGameImpl) == address(0),
-                "DeployImplementations: OptimismPortalInterop flag disabled but SuperPermissionedDisputeGame was deployed"
-            );
-        }
 
         Types.ContractSet memory impls = ChainAssertions.dioToContractSet(_output);
 
@@ -858,7 +747,6 @@ contract DeployImplementations is Script {
 
         Types.ContractSet memory proxies;
         proxies.SuperchainConfig = address(_input.superchainConfigProxy);
-        proxies.ProtocolVersions = address(_input.protocolVersionsProxy);
         ChainAssertions.checkOPContractsManager({
             _impls: impls,
             _proxies: proxies,

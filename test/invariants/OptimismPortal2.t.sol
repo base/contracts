@@ -20,7 +20,7 @@ import "src/dispute/lib/Types.sol";
 // Interfaces
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
 
 contract OptimismPortal2_Depositor is StdUtils, ResourceMetering {
     Vm internal vm;
@@ -133,7 +133,7 @@ contract OptimismPortal2_Invariant_Harness is DisputeGameFactory_TestInit {
 
         // Create a dispute game with the output root we've proposed.
         _proposedBlockNumber = 0xFF;
-        IFaultDisputeGame game = IFaultDisputeGame(
+        IFaultDisputeGameV2 game = IFaultDisputeGameV2(
             payable(address(
                     disputeGameFactory.create{
                         value: disputeGameFactory.initBonds(optimismPortal2.respectedGameType())

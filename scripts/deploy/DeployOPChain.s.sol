@@ -15,8 +15,8 @@ import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
 import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
-import { IFaultDisputeGame } from "interfaces/dispute/IFaultDisputeGame.sol";
-import { IPermissionedDisputeGame } from "interfaces/dispute/IPermissionedDisputeGame.sol";
+import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
@@ -39,8 +39,8 @@ contract DeployOPChain is Script {
         IETHLockbox ethLockboxProxy;
         IDisputeGameFactory disputeGameFactoryProxy;
         IAnchorStateRegistry anchorStateRegistryProxy;
-        IFaultDisputeGame faultDisputeGame;
-        IPermissionedDisputeGame permissionedDisputeGame;
+        IFaultDisputeGameV2 faultDisputeGame;
+        IPermissionedDisputeGameV2 permissionedDisputeGame;
         IDelayedWETH delayedWETHPermissionedGameProxy;
         IDelayedWETH delayedWETHPermissionlessGameProxy;
     }
@@ -186,7 +186,6 @@ contract DeployOPChain is Script {
             ETHLockbox: address(_o.ethLockboxProxy),
             SystemConfig: address(_o.systemConfigProxy),
             L1ERC721Bridge: address(_o.l1ERC721BridgeProxy),
-            ProtocolVersions: address(0),
             SuperchainConfig: address(0)
         });
 
