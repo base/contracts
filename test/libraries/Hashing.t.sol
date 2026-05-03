@@ -7,7 +7,6 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 // Libraries
 import { Types } from "src/libraries/Types.sol";
 import { Encoding } from "src/libraries/Encoding.sol";
-import { LegacyCrossDomainUtils } from "src/libraries/LegacyCrossDomainUtils.sol";
 
 // Target contract
 import { Hashing } from "src/libraries/Hashing.sol";
@@ -118,22 +117,6 @@ contract Hashing_hashCrossDomainMessage_Test is CommonTest {
         assertEq(
             Hashing.hashCrossDomainMessage(nonce, _sender, _target, _value, _gasLimit, _data),
             ffi.hashCrossDomainMessage(nonce, _sender, _target, _value, _gasLimit, _data)
-        );
-    }
-
-    /// @notice Tests that hashCrossDomainMessageV0 matches the hash of the legacy encoding.
-    function testFuzz_hashCrossDomainMessageV0_matchesLegacy_succeeds(
-        address _target,
-        address _sender,
-        bytes memory _message,
-        uint256 _messageNonce
-    )
-        external
-        pure
-    {
-        assertEq(
-            keccak256(LegacyCrossDomainUtils.encodeXDomainCalldata(_target, _sender, _message, _messageNonce)),
-            Hashing.hashCrossDomainMessageV0(_target, _sender, _message, _messageNonce)
         );
     }
 

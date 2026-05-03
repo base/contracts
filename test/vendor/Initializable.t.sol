@@ -12,7 +12,6 @@ import { Process } from "scripts/libraries/Process.sol";
 import { LibString } from "@solady/utils/LibString.sol";
 import { GameType, Hash, Proposal } from "src/dispute/lib/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
-import { DevFeatures } from "src/libraries/DevFeatures.sol";
 
 // Interfaces
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";

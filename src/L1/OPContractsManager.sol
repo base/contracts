@@ -12,7 +12,6 @@ import { Claim, Duration, GameType, GameTypes, Proposal } from "src/dispute/lib/
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { SemverComp } from "src/libraries/SemverComp.sol";
 import { Features } from "src/libraries/Features.sol";
-import { DevFeatures } from "src/libraries/DevFeatures.sol";
 import { LibGameArgs } from "src/dispute/lib/LibGameArgs.sol";
 
 // Interfaces
@@ -80,16 +79,6 @@ contract OPContractsManagerContractsContainer {
         return implementation;
     }
 
-    /// @notice Returns the status of a development feature. Note that this function does not check
-    ///         that the input feature represents a single feature and the bitwise AND operation
-    ///         allows for multiple features to be enabled at once. Users should generally check
-    ///         for only a single feature at a time.
-    /// @param _feature The feature to check.
-    /// @return True if the feature is enabled, false otherwise.
-    function isDevFeatureEnabled(bytes32 _feature) public view returns (bool) {
-        return DevFeatures.isDevFeatureEnabled(devFeatureBitmap, _feature);
-    }
-
     /// @notice Returns true if the contract is running in a testing environment. Checks that the
     ///         code for the address 0xbeefcafe is not zero, which is an address that should never
     ///         have any code in production environments but can be made to have code in tests.
@@ -139,16 +128,6 @@ abstract contract OPContractsManagerBase {
     /// @notice Retrieves the development feature bitmap stored in this OPCM contract
     function devFeatureBitmap() public view returns (bytes32) {
         return contractsContainer.devFeatureBitmap();
-    }
-
-    /// @notice Retrieves the status of a development feature. Note that this function does not check
-    ///         that the input feature represents a single feature and the bitwise AND operation
-    ///         allows for multiple features to be enabled at once. Users should generally check
-    ///         for only a single feature at a time.
-    /// @param _feature The feature to check.
-    /// @return True if the feature is enabled, false otherwise.
-    function isDevFeatureEnabled(bytes32 _feature) public view returns (bool) {
-        return contractsContainer.isDevFeatureEnabled(_feature);
     }
 
     /// @notice Maps an L2 chain ID to an L1 batch inbox address as defined by the standard
@@ -1841,16 +1820,6 @@ contract OPContractsManager is ISemver {
     /// @return The development feature bitmap.
     function devFeatureBitmap() public view returns (bytes32) {
         return opcmDeployer.devFeatureBitmap();
-    }
-
-    /// @notice Returns the status of a development feature. Note that this function does not check
-    ///         that the input feature represents a single feature and the bitwise AND operation
-    ///         allows for multiple features to be enabled at once. Users should generally check
-    ///         for only a single feature at a time.
-    /// @param _feature The feature to check.
-    /// @return True if the feature is enabled, false otherwise.
-    function isDevFeatureEnabled(bytes32 _feature) public view returns (bool) {
-        return opcmDeployer.isDevFeatureEnabled(_feature);
     }
 
     /// @notice Helper function to perform a delegatecall to a target contract

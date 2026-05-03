@@ -16,12 +16,12 @@
     "sourceCodeHash": "0xf45435ba73c89393d8441aab7dfe46070ba4fed3e2ddfc4ff247c6ac7703cdc9"
   },
   "src/L1/OPContractsManager.sol:OPContractsManager": {
-    "initCodeHash": "0xf554e50e4e03ab2a05d550fb927e92752662cc533a8c4c84dd1d788c6f496cdf",
-    "sourceCodeHash": "0xf4eb858b9bf57f59dc0e64674c48238a8fc8442313e60ce9ff6f1b2e3e1bbfa2"
+    "initCodeHash": "0x0c82c625e2b92713b6e4bd7e812527edde66addba64845c05eb948cd835f06bf",
+    "sourceCodeHash": "0x235c1e90b8b27fa69b8411fdc6eed0bad2290e65c690e93166fd1ee3a526d305"
   },
   "src/L1/OPContractsManagerStandardValidator.sol:OPContractsManagerStandardValidator": {
     "initCodeHash": "0x61227f43a0bcdfd5542f182d50ce5d82f80e0144345f65bf3b8f5582858afdbb",
-    "sourceCodeHash": "0x88e8b8dd271aee76ddbe06b22c70f2e8afc82c76b92f2c90886c31e51d13c5d0"
+    "sourceCodeHash": "0xc8ffa42a2a86a6d7aabc299e7298470136b73351990558701af954d98002ffb0"
   },
   "src/L1/OptimismPortal2.sol:OptimismPortal2": {
     "initCodeHash": "0x2c01bc6c0a55a1a27263224e05c1b28703ff85c61075bae7ab384b3043820ed2",

@@ -7,7 +7,6 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 // Libraries
 import { Encoding } from "src/libraries/Encoding.sol";
 import { Types } from "src/libraries/Types.sol";
-import { LegacyCrossDomainUtils } from "src/libraries/LegacyCrossDomainUtils.sol";
 
 contract Encoding_Harness {
     function encodeCrossDomainMessage(
@@ -101,30 +100,6 @@ contract Encoding_EncodeCrossDomainMessage_Test is Encoding_TestInit {
 
         vm.expectRevert(bytes("Encoding: unknown cross domain message version"));
         encoding.encodeCrossDomainMessage(nonce, address(this), address(this), 1, 100, hex"");
-    }
-}
-
-/// @title Encoding_EncodeCrossDomainMessageV0_Test
-/// @notice Tests the `encodeCrossDomainMessageV0` function of the `Encoding` contract.
-contract Encoding_EncodeCrossDomainMessageV0_Test is Encoding_TestInit {
-    /// @notice Tests legacy cross domain message encoding.
-    function testFuzz_encodeCrossDomainMessageV0_matchesLegacy_succeeds(
-        uint240 _nonce,
-        address _sender,
-        address _target,
-        bytes memory _data
-    )
-        external
-        pure
-    {
-        uint8 version = 0;
-        uint256 nonce = Encoding.encodeVersionedNonce(_nonce, version);
-
-        bytes memory legacyEncoding = LegacyCrossDomainUtils.encodeXDomainCalldata(_target, _sender, _data, nonce);
-
-        bytes memory bedrockEncoding = Encoding.encodeCrossDomainMessageV0(_target, _sender, _data, nonce);
-
-        assertEq(legacyEncoding, bedrockEncoding);
     }
 }
 

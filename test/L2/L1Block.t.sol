@@ -8,7 +8,6 @@ import { stdStorage, StdStorage } from "forge-std/Test.sol";
 // Libraries
 import { Encoding } from "src/libraries/Encoding.sol";
 import { Constants } from "src/libraries/Constants.sol";
-import "src/libraries/L1BlockErrors.sol";
 import { Features } from "src/libraries/Features.sol";
 
 /// @title L1Block_ TestInit

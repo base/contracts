@@ -21,7 +21,6 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { GameType, Duration, Hash, Claim } from "src/dispute/lib/LibUDT.sol";
 import { Proposal, GameTypes } from "src/dispute/lib/Types.sol";
 import { LibGameArgs } from "src/dispute/lib/LibGameArgs.sol";
-import { DevFeatures } from "src/libraries/DevFeatures.sol";
 
 // Interfaces
 import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
@@ -1779,7 +1778,6 @@ contract OPContractsManager_Deploy_Test is DeployOPChain_TestBase, DisputeGames 
 
     /// @notice Test that deploy sets the permissioned dispute game implementation
     function test_deployPermissioned_succeeds() public {
-        // Sanity-check setup is consistent with devFeatures flag
         IOPContractsManager.Implementations memory impls = opcm.implementations();
         address pdgImpl = address(impls.permissionedDisputeGameV2Impl);
         address fdgImpl = address(impls.faultDisputeGameV2Impl);
