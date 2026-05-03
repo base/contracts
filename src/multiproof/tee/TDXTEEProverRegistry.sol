@@ -38,17 +38,9 @@ contract TDXTEEProverRegistry is TEEProverRegistry {
 
     /// @notice Registers a signer using a ZK proof of Intel TDX DCAP quote verification.
     /// @param output ABI-encoded TDXVerifierJournal public values from the ZK verifier guest.
-    /// @param zkCoprocessor ZK proving system used to generate the proof.
     /// @param proofBytes ZK proof bytes.
-    function registerTDXSigner(
-        bytes calldata output,
-        ZkCoProcessorType zkCoprocessor,
-        bytes calldata proofBytes
-    )
-        external
-        onlyOwnerOrManager
-    {
-        TDXVerifierJournal memory journal = TDX_VERIFIER.verify(output, zkCoprocessor, proofBytes);
+    function registerTDXSigner(bytes calldata output, bytes calldata proofBytes) external onlyOwnerOrManager {
+        TDXVerifierJournal memory journal = TDX_VERIFIER.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
 
         isRegisteredSigner[journal.signer] = true;
         signerImageHash[journal.signer] = journal.imageHash;

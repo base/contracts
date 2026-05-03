@@ -84,7 +84,7 @@ contract TDXTEEProverRegistryTest is Test {
         );
 
         vm.prank(address(0xdEaD));
-        registry.registerTDXSigner("", ZkCoProcessorType.Succinct, "");
+        registry.registerTDXSigner("", "");
 
         assertTrue(registry.isRegisteredSigner(journal.signer));
         assertEq(registry.signerImageHash(journal.signer), IMAGE_HASH);
