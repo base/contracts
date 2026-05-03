@@ -78,7 +78,6 @@ contract_name_validation = [
 function_name_validation = [
     "test/L1/ProxyAdminOwnedBase.t.sol",       # Tests internal functions not in ABI
     "test/L1/SystemConfig.t.sol",              # Tests internal functions not in ABI
-    "test/safe/SafeSigners.t.sol",             # Function name validation issues
     "test/libraries/Predeploys.t.sol",         # Function 'uncategorizedInterop' doesn't exist in library
     "test/libraries/Encoding.t.sol",           # Function 'decodeSuperRootProof' is internal, not in ABI
 ]
@@ -91,8 +90,6 @@ contracts = [
     "OptimismPortal2_MigrateLiquidity_Test",    # Interop tests hosted in the OptimismPortal2 test file
     "OptimismPortal2_MigrateToSuperRoots_Test", # Interop tests hosted in the OptimismPortal2 test file
     "OptimismPortal2_UpgradeInterop_Test",      # Interop tests hosted in the OptimismPortal2 test file
-    "TransactionBuilder",                       # Transaction builder helper library in TimelockGuard test file
     "Constants_Test",                           # Invalid naming pattern - doesn't specify function or Uncategorized
-    "LivenessModule2_TestUtils",                # Test utils library in LivenessModule2 test file
     "OPContractsManagerV2_Upgrade_TestInit",    # Test initialization contract with non-standard naming pattern (4 parts instead of 3)
 ]

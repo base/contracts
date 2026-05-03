@@ -40,9 +40,6 @@ var excludeSourceContracts = []string{
 	// Base contracts with no external functions
 	"CrossDomainMessengerLegacySpacer0", "CrossDomainMessengerLegacySpacer1",
 
-	// Helper contracts
-	"SafeSend", "StorageSetter",
-
 	// Errors because they should be in their own contracts but are in a shared one
 	"OPContractsManagerDeployer", "OPContractsManagerUpgrader", "OPContractsManagerBase", "OPContractsManagerInteropMigrator", "OPContractsManagerContractsContainer", "OPContractsManagerGameTypeAdder", "OPContractsManagerStandardValidator",
 
