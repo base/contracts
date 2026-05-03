@@ -74,7 +74,14 @@ contract DeployTDXVerifier is Script {
         _writeOutput(tdxVerifier, risc0VerifierRouter, tdxVerifierId, intelRootCaHash);
     }
 
-    function _writeOutput(address tdxVerifier, address risc0VerifierRouter, bytes32 tdxVerifierId, bytes32 intelRootCaHash) internal {
+    function _writeOutput(
+        address tdxVerifier,
+        address risc0VerifierRouter,
+        bytes32 tdxVerifierId,
+        bytes32 intelRootCaHash
+    )
+        internal
+    {
         string memory key = "deployment";
         vm.serializeAddress(key, "TDXVerifier", tdxVerifier);
         vm.serializeAddress(key, "RiscZeroVerifierRouter", risc0VerifierRouter);

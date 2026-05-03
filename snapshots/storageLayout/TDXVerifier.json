@@ -7,6 +7,13 @@
     "type": "uint64"
   },
   {
+    "bytes": "20",
+    "label": "proofSubmitter",
+    "offset": 8,
+    "slot": "0",
+    "type": "address"
+  },
+  {
     "bytes": "32",
     "label": "rootCaHash",
     "offset": 0,
@@ -14,24 +21,17 @@
     "type": "bytes32"
   },
   {
-    "bytes": "20",
-    "label": "proofSubmitter",
-    "offset": 0,
-    "slot": "2",
-    "type": "address"
-  },
-  {
     "bytes": "32",
     "label": "zkConfig",
     "offset": 0,
-    "slot": "3",
+    "slot": "2",
     "type": "mapping(enum ZkCoProcessorType => struct ZkCoProcessorConfig)"
   },
   {
     "bytes": "32",
     "label": "allowedTcbStatuses",
     "offset": 0,
-    "slot": "4",
+    "slot": "3",
     "type": "mapping(enum TDXTcbStatus => bool)"
   }
 ]

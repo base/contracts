@@ -152,16 +152,16 @@
     "sourceCodeHash": "0xbedb66738a0ab18600b2ed21de51d552a210c4cc71b2c971440e325791dc3ce7"
   },
   "src/multiproof/tee/TDXVerifier.sol:TDXVerifier": {
-    "initCodeHash": "0x0f511b2f67bd82ff976935ca0a178c3fa9d9cf9b89c6e67b3fd7f1006f5e5147",
-    "sourceCodeHash": "0x7cdf2abefaefa3126960103aa810699973c1c47147114f8a92e63c427b9b1656"
+    "initCodeHash": "0xdfd5a00dc139565ec7102fd5ac05d91f923bfe1ef724e16a4cdfbcb60cd19c3c",
+    "sourceCodeHash": "0xb28e2632fc3591ecdb2d96cbc6b99a08854048a513f444d8282511293a0739e2"
   },
   "src/multiproof/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0xf96d42f3dc474f4f8d29af0e7fbb59b13035a61bc53903ddd14814ae0b3f2f73",
-    "sourceCodeHash": "0x12bf06d225633d1983746ea06e72469388a3db63fd7d8a10144b4267f13f0b5d"
+    "initCodeHash": "0x5304faf5062088ee90dbd08eedbdacea39bdf48ffca689228e63d8f71f952bfb",
+    "sourceCodeHash": "0x37ed4874679b18cdf447a4d1890ecfeff648b0d762d8302827cd5e823b0af3ce"
   },
   "src/multiproof/tee/TEEVerifier.sol:TEEVerifier": {
-    "initCodeHash": "0x37883165bb1924631d830772a811f172059f529fd44ff34694d2511ff52c29c9",
-    "sourceCodeHash": "0x506aba49b3b5b29e565a151c828b8f24662ed5794418bdaa2be149b085b05a7e"
+    "initCodeHash": "0x6af4a7e162b2589076869a920a1f5b8b458d7f0c555068fdd2b82d44a51f3b0f",
+    "sourceCodeHash": "0xb0453b1fee0d1f2d1f53e22cbac4c43dd9e33ab33ac373ec54f81d433aeabbd5"
   },
   "src/multiproof/zk/ZKVerifier.sol:ZkVerifier": {
     "initCodeHash": "0xcdc5bd5fa8ffad76358b8f34a53b8c0cb36540176c31f82d52546373d0bd5245",

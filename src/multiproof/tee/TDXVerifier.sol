@@ -190,7 +190,9 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
     function _verifyJournal(TDXVerifierJournal memory journal) internal view {
         if (journal.result != TDXVerificationResult.Success) revert TDXVerificationFailed(journal.result);
         bytes32 expectedRootCaHash = rootCaHash;
-        if (journal.rootCaHash != expectedRootCaHash) revert RootCaHashMismatch(expectedRootCaHash, journal.rootCaHash);
+        if (journal.rootCaHash != expectedRootCaHash) {
+            revert RootCaHashMismatch(expectedRootCaHash, journal.rootCaHash);
+        }
         if (!allowedTcbStatuses[journal.tcbStatus]) revert TcbStatusNotAllowed(journal.tcbStatus);
         if (journal.collateralExpiration <= block.timestamp) revert CollateralExpired(journal.collateralExpiration);
 
