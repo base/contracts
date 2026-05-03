@@ -27,11 +27,11 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
     /// @notice Maximum accepted age of a TDX quote, in seconds.
     uint64 public maxTimeDiff;
 
-    /// @notice Hash of the trusted Intel root CA used by the ZK verifier guest.
-    bytes32 public rootCaHash;
-
     /// @notice Address authorized to submit TDX proofs, expected to be the TDX-aware registry.
     address public proofSubmitter;
+
+    /// @notice Hash of the trusted Intel root CA used by the ZK verifier guest.
+    bytes32 public rootCaHash;
 
     /// @notice Configuration mapping for each supported ZK coprocessor type.
     mapping(ZkCoProcessorType => ZkCoProcessorConfig) public zkConfig;
@@ -189,7 +189,8 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
 
     function _verifyJournal(TDXVerifierJournal memory journal) internal view {
         if (journal.result != TDXVerificationResult.Success) revert TDXVerificationFailed(journal.result);
-        if (journal.rootCaHash != rootCaHash) revert RootCaHashMismatch(rootCaHash, journal.rootCaHash);
+        bytes32 expectedRootCaHash = rootCaHash;
+        if (journal.rootCaHash != expectedRootCaHash) revert RootCaHashMismatch(expectedRootCaHash, journal.rootCaHash);
         if (!allowedTcbStatuses[journal.tcbStatus]) revert TcbStatusNotAllowed(journal.tcbStatus);
         if (journal.collateralExpiration <= block.timestamp) revert CollateralExpired(journal.collateralExpiration);
 
@@ -228,6 +229,7 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
 
     function _derivePublicKeyHash(bytes memory publicKey) internal pure returns (bytes32 publicKeyHash) {
         if (publicKey.length != 65 || publicKey[0] != 0x04) revert InvalidPublicKey();
+        // Skip the 32-byte length word and the 0x04 uncompressed prefix; hash the 64-byte X||Y.
         assembly {
             publicKeyHash := keccak256(add(publicKey, 0x21), 64)
         }
