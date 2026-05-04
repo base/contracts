@@ -23,7 +23,6 @@ import {
     IOPContractsManagerDeployer,
     IOPContractsManagerUpgrader,
     IOPContractsManagerContractsContainer,
-    IOPContractsManagerInteropMigrator,
     IOPContractsManagerStandardValidator
 } from "interfaces/L1/IOPContractsManager.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
@@ -39,7 +38,6 @@ import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
-import { DevFeatures } from "src/libraries/DevFeatures.sol";
 import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
 import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
 import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
@@ -86,7 +84,6 @@ contract DeployImplementations is Script {
         IOPContractsManagerGameTypeAdder opcmGameTypeAdder;
         IOPContractsManagerDeployer opcmDeployer;
         IOPContractsManagerUpgrader opcmUpgrader;
-        IOPContractsManagerInteropMigrator opcmInteropMigrator;
         IOPContractsManagerStandardValidator opcmStandardValidator;
         IDelayedWETH delayedWETHImpl;
         IOptimismPortal optimismPortalImpl;
@@ -177,7 +174,6 @@ contract DeployImplementations is Script {
         deployOPCMGameTypeAdder(_output);
         deployOPCMDeployer(_input, _output);
         deployOPCMUpgrader(_output);
-        deployOPCMInteropMigrator(_output);
         deployOPCMStandardValidator(_input, _output, implementations);
 
         // Semgrep rule will fail because the arguments are encoded inside of a separate function.
@@ -212,7 +208,6 @@ contract DeployImplementations is Script {
                     _output.opcmGameTypeAdder,
                     _output.opcmDeployer,
                     _output.opcmUpgrader,
-                    _output.opcmInteropMigrator,
                     _output.opcmStandardValidator,
                     _input.superchainConfigProxy
                 )
@@ -567,20 +562,6 @@ contract DeployImplementations is Script {
         );
         vm.label(address(impl), "OPContractsManagerUpgraderImpl");
         _output.opcmUpgrader = impl;
-    }
-
-    function deployOPCMInteropMigrator(Output memory _output) private {
-        IOPContractsManagerInteropMigrator impl = IOPContractsManagerInteropMigrator(
-            DeployUtils.createDeterministic({
-                _name: "OPContractsManager.sol:OPContractsManagerInteropMigrator",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(IOPContractsManagerInteropMigrator.__constructor__, (_output.opcmContractsContainer))
-                ),
-                _salt: _salt
-            })
-        );
-        vm.label(address(impl), "OPContractsManagerInteropMigratorImpl");
-        _output.opcmInteropMigrator = impl;
     }
 
     function deployOPCMStandardValidator(

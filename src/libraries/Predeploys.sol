@@ -11,19 +11,10 @@ library Predeploys {
     uint256 internal constant PREDEPLOY_COUNT = 2048;
 
     /// @custom:legacy
-    /// @notice Address of the LegacyMessagePasser predeploy. Deprecate. Use the updated
-    ///         L2ToL1MessagePasser contract instead.
-    address internal constant LEGACY_MESSAGE_PASSER = 0x4200000000000000000000000000000000000000;
-
-    /// @custom:legacy
     /// @notice Address of the L1MessageSender predeploy. Deprecated. Use L2CrossDomainMessenger
     ///         or access tx.origin (or msg.sender) in a L1 to L2 transaction instead.
     ///         Not embedded into new OP-Stack chains.
     address internal constant L1_MESSAGE_SENDER = 0x4200000000000000000000000000000000000001;
-
-    /// @custom:legacy
-    /// @notice Address of the DeployerWhitelist predeploy. No longer active.
-    address internal constant DEPLOYER_WHITELIST = 0x4200000000000000000000000000000000000002;
 
     /// @notice Address of the canonical WETH contract.
     address internal constant WETH = 0x4200000000000000000000000000000000000006;
@@ -43,11 +34,6 @@ library Predeploys {
 
     /// @notice Address of the OptimismMintableERC20Factory predeploy.
     address internal constant OPTIMISM_MINTABLE_ERC20_FACTORY = 0x4200000000000000000000000000000000000012;
-
-    /// @custom:legacy
-    /// @notice Address of the L1BlockNumber predeploy. Deprecated. Use the L1Block predeploy
-    ///         instead, which exposes more information about the L1 state.
-    address internal constant L1_BLOCK_NUMBER = 0x4200000000000000000000000000000000000013;
 
     /// @notice Address of the L2ERC721Bridge predeploy.
     address internal constant L2_ERC721_BRIDGE = 0x4200000000000000000000000000000000000014;
@@ -85,25 +71,16 @@ library Predeploys {
     ///         can no longer be accessed.
     address internal constant LEGACY_ERC20_ETH = 0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000;
 
-    /// @notice Address of the NativeAssetLiquidity predeploy.
-    address internal constant NATIVE_ASSET_LIQUIDITY = 0x4200000000000000000000000000000000000029;
-
-    /// @notice Address of the LiquidityController predeploy.
-    address internal constant LIQUIDITY_CONTROLLER = 0x420000000000000000000000000000000000002a;
-
     /// @notice Returns the name of the predeploy at the given address.
     function getName(address _addr) internal pure returns (string memory out_) {
         require(isPredeployNamespace(_addr), "Predeploys: address must be a predeploy");
-        if (_addr == LEGACY_MESSAGE_PASSER) return "LegacyMessagePasser";
         if (_addr == L1_MESSAGE_SENDER) return "L1MessageSender";
-        if (_addr == DEPLOYER_WHITELIST) return "DeployerWhitelist";
         if (_addr == WETH) return "WETH";
         if (_addr == L2_CROSS_DOMAIN_MESSENGER) return "L2CrossDomainMessenger";
         if (_addr == GAS_PRICE_ORACLE) return "GasPriceOracle";
         if (_addr == L2_STANDARD_BRIDGE) return "L2StandardBridge";
         if (_addr == SEQUENCER_FEE_WALLET) return "SequencerFeeVault";
         if (_addr == OPTIMISM_MINTABLE_ERC20_FACTORY) return "OptimismMintableERC20Factory";
-        if (_addr == L1_BLOCK_NUMBER) return "L1BlockNumber";
         if (_addr == L2_ERC721_BRIDGE) return "L2ERC721Bridge";
         if (_addr == L1_BLOCK_ATTRIBUTES) return "L1Block";
         if (_addr == L2_TO_L1_MESSAGE_PASSER) return "L2ToL1MessagePasser";
@@ -115,8 +92,6 @@ library Predeploys {
         if (_addr == SCHEMA_REGISTRY) return "SchemaRegistry";
         if (_addr == EAS) return "EAS";
         if (_addr == LEGACY_ERC20_ETH) return "LegacyERC20ETH";
-        if (_addr == LIQUIDITY_CONTROLLER) return "LiquidityController";
-        if (_addr == NATIVE_ASSET_LIQUIDITY) return "NativeAssetLiquidity";
         revert("Predeploys: unnamed predeploy");
     }
 
@@ -126,15 +101,12 @@ library Predeploys {
     }
 
     /// @notice Returns true if the address is a defined predeploy that is embedded into new OP-Stack chains.
-    function isSupportedPredeploy(address _addr, bool _isCustomGasToken) internal pure returns (bool) {
-        return _addr == LEGACY_MESSAGE_PASSER || _addr == DEPLOYER_WHITELIST || _addr == WETH
-            || _addr == L2_CROSS_DOMAIN_MESSENGER || _addr == GAS_PRICE_ORACLE || _addr == L2_STANDARD_BRIDGE
-            || _addr == SEQUENCER_FEE_WALLET || _addr == OPTIMISM_MINTABLE_ERC20_FACTORY || _addr == L1_BLOCK_NUMBER
+    function isSupportedPredeploy(address _addr) internal pure returns (bool) {
+        return _addr == WETH || _addr == L2_CROSS_DOMAIN_MESSENGER || _addr == GAS_PRICE_ORACLE
+            || _addr == L2_STANDARD_BRIDGE || _addr == SEQUENCER_FEE_WALLET || _addr == OPTIMISM_MINTABLE_ERC20_FACTORY
             || _addr == L2_ERC721_BRIDGE || _addr == L1_BLOCK_ATTRIBUTES || _addr == L2_TO_L1_MESSAGE_PASSER
             || _addr == OPTIMISM_MINTABLE_ERC721_FACTORY || _addr == PROXY_ADMIN || _addr == BASE_FEE_VAULT
-            || _addr == L1_FEE_VAULT || _addr == OPERATOR_FEE_VAULT || _addr == SCHEMA_REGISTRY || _addr == EAS
-            || (_isCustomGasToken && _addr == LIQUIDITY_CONTROLLER)
-            || (_isCustomGasToken && _addr == NATIVE_ASSET_LIQUIDITY);
+            || _addr == L1_FEE_VAULT || _addr == OPERATOR_FEE_VAULT || _addr == SCHEMA_REGISTRY || _addr == EAS;
     }
 
     function isPredeployNamespace(address _addr) internal pure returns (bool) {

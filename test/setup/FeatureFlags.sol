@@ -6,7 +6,6 @@ import { console2 as console } from "forge-std/console2.sol";
 import { Vm } from "forge-std/Vm.sol";
 
 // Libraries
-import { DevFeatures } from "src/libraries/DevFeatures.sol";
 import { Config } from "scripts/libraries/Config.sol";
 
 // Interfaces
@@ -49,13 +48,6 @@ abstract contract FeatureFlags {
         return sysCfg.isFeatureEnabled(_feature);
     }
 
-    /// @notice Checks if a development feature is enabled.
-    /// @param _feature The feature to check.
-    /// @return True if the feature is enabled, false otherwise.
-    function isDevFeatureEnabled(bytes32 _feature) public view returns (bool) {
-        return DevFeatures.isDevFeatureEnabled(devFeatureBitmap, _feature);
-    }
-
     /// @notice Skips tests when the provided system feature is enabled.
     /// @param _feature The feature to check.
     function skipIfSysFeatureEnabled(bytes32 _feature) public {
@@ -68,22 +60,6 @@ abstract contract FeatureFlags {
     /// @param _feature The feature to check.
     function skipIfSysFeatureDisabled(bytes32 _feature) public {
         if (!isSysFeatureEnabled(_feature)) {
-            vm.skip(true);
-        }
-    }
-
-    /// @notice Skips tests when the provided development feature is enabled.
-    /// @param _feature The feature to check.
-    function skipIfDevFeatureEnabled(bytes32 _feature) public {
-        if (isDevFeatureEnabled(_feature)) {
-            vm.skip(true);
-        }
-    }
-
-    /// @notice Skips tests when the provided development feature is disabled.
-    /// @param _feature The feature to check.
-    function skipIfDevFeatureDisabled(bytes32 _feature) public {
-        if (!isDevFeatureEnabled(_feature)) {
             vm.skip(true);
         }
     }

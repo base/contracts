@@ -31,7 +31,7 @@ var excludeContracts = []string{
 	"IOPContractsManagerLegacyUpgrade",
 
 	// TODO: Interfaces that need to be fixed
-	"IInitializable", "IOptimismMintableERC20", "ILegacyMintableERC20",
+	"IInitializable", "IOptimismMintableERC20",
 	"KontrolCheatsBase", "IResolvedDelegateProxy",
 }
 
@@ -40,14 +40,8 @@ var excludeSourceContracts = []string{
 	// Base contracts with no external functions
 	"CrossDomainMessengerLegacySpacer0", "CrossDomainMessengerLegacySpacer1",
 
-	// Helper contracts
-	"SafeSend", "StorageSetter", "DisputeMonitorHelper",
-
-	// Periphery
-	"TransferOnion", "AssetReceiver", "AdminFaucetAuthModule", "CheckSecrets", "CheckBalanceLow", "CheckTrue", "Drippie", "Transactor", "Faucet",
-
 	// Errors because they should be in their own contracts but are in a shared one
-	"OPContractsManagerDeployer", "OPContractsManagerUpgrader", "OPContractsManagerBase", "OPContractsManagerInteropMigrator", "OPContractsManagerContractsContainer", "OPContractsManagerGameTypeAdder", "OPContractsManagerStandardValidator",
+	"OPContractsManagerDeployer", "OPContractsManagerUpgrader", "OPContractsManagerBase", "OPContractsManagerContractsContainer", "OPContractsManagerGameTypeAdder", "OPContractsManagerStandardValidator",
 
 	// FIXME
 	"WETH", "MIPS64",

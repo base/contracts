@@ -95,14 +95,6 @@ var (
 		{Name: "encodedCannonMemoryProof", Type: cannonMemoryProof},
 	}
 
-	// Gas paying token tuple (address, uint8, bytes32, bytes32)
-	gasPayingTokenArgs = abi.Arguments{
-		{Name: "token", Type: addressType},
-		{Name: "decimals", Type: uint8Type},
-		{Name: "name", Type: fixedBytes},
-		{Name: "symbol", Type: fixedBytes},
-	}
-
 	// Super root proof tuple (uint8, uint64, OutputRootWithChainId[])
 	superRootProof, _ = abi.NewType("tuple", "SuperRootProof", []abi.ArgumentMarshaling{
 		{Name: "version", Type: "bytes1"},
@@ -503,23 +495,6 @@ func DiffTestUtils() {
 
 		packed, err := decodedScalars.Pack(scalars.BaseFeeScalar, scalars.BlobBaseFeeScalar)
 		checkErr(err, "Error encoding output")
-		fmt.Print(hexutil.Encode(packed))
-	case "encodeGasPayingToken":
-		// Parse input arguments
-		token := common.HexToAddress(args[1])
-		decimals, err := strconv.ParseUint(args[2], 10, 8)
-		checkErr(err, "Error decoding decimals")
-		name := common.HexToHash(args[3])
-		symbol := common.HexToHash(args[4])
-
-		// Encode gas paying token
-		encoded, err := gasPayingTokenArgs.Pack(token, uint8(decimals), name, symbol)
-		checkErr(err, "Error encoding gas paying token")
-
-		// Pack encoded gas paying token
-		packed, err := bytesArgs.Pack(&encoded)
-		checkErr(err, "Error encoding output")
-
 		fmt.Print(hexutil.Encode(packed))
 	case "encodeDependency":
 		// Parse input arguments
