@@ -32,19 +32,6 @@ deps: clean-lib
 	git clone --no-checkout https://github.com/Vectorized/solady.git lib/solady-v0.0.245 && \
 		cd lib/solady-v0.0.245 && git checkout 8583a6e386b897f3db142a541f86d5953eccd835
 
-.PHONY: test
-test:
-	forge test --ffi -vvv
-
 .PHONY: clean-lib
 clean-lib:
 	rm -rf lib
-
-.PHONY: bindings
-bindings:
-	go install github.com/ethereum/go-ethereum/cmd/abigen@v1.15.8
-	forge build
-	mkdir -p bindings
-	abigen --abi out/BalanceTracker.sol/BalanceTracker.abi.json --pkg bindings --type BalanceTracker --out bindings/balance_tracker.go
-	abigen --abi out/FeeDisburser.sol/FeeDisburser.abi.json --pkg bindings --type FeeDisburser --out bindings/fee_disburser.go
-	cd bindings && go mod tidy
