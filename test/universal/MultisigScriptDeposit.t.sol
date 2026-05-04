@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { ICBMulticall, Call3Value } from "src/utils/ICBMulticall.sol";
+import { ICBMulticall, Call3Value } from "interfaces/universal/ICBMulticall.sol";
 import { Test } from "forge-std/Test.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { Preinstalls } from "src/libraries/Preinstalls.sol";

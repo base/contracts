@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-import { ICBMulticall, Call3Value } from "src/utils/ICBMulticall.sol";
+import { ICBMulticall, Call3Value } from "interfaces/universal/ICBMulticall.sol";
 
 import { MultisigScript } from "./MultisigScript.sol";
 import { Enum } from "./IGnosisSafe.sol";

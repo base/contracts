@@ -7,7 +7,7 @@ import { Script } from "lib/forge-std/src/Script.sol";
 import { stdJson } from "lib/forge-std/src/StdJson.sol";
 import { Vm } from "lib/forge-std/src/Vm.sol";
 
-import { ICBMulticall, Call3, Call3Value } from "../../src/utils/ICBMulticall.sol";
+import { ICBMulticall, Call3, Call3Value } from "interfaces/universal/ICBMulticall.sol";
 
 import { IGnosisSafe, Enum } from "./IGnosisSafe.sol";
 import { Signatures } from "./Signatures.sol";

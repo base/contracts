@@ -12,7 +12,7 @@ import { IGnosisSafe, Enum } from "scripts/universal/IGnosisSafe.sol";
 import { Counter } from "test/universal/Counter.sol";
 import { LibString } from "lib/solady/src/utils/LibString.sol";
 
-import { CBMulticall } from "src/utils/CBMulticall.sol";
+import { CBMulticall } from "src/universal/CBMulticall.sol";
 
 contract MultisigScriptTest is Test, MultisigScript {
     Vm.Wallet internal wallet1 = vm.createWallet("1");

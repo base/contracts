@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { CBMulticall, Call, Call3, Call3Value, Result } from "src/utils/CBMulticall.sol";
+import { CBMulticall, Call, Call3, Call3Value, Result } from "src/universal/CBMulticall.sol";
 import { CommonTest } from "test/CommonTest.t.sol";
 import { MockReceiver } from "test/mocks/MockReceiver.sol";
 

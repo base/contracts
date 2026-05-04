@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { ICBMulticall, Call, Call3, Call3Value, Result } from "./ICBMulticall.sol";
+import { ICBMulticall, Call, Call3, Call3Value, Result } from "interfaces/universal/ICBMulticall.sol";
 
 /// @title CBMulticall
 ///
