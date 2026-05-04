@@ -4,7 +4,7 @@ pragma solidity 0.8.25;
 import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 
-import { FeeDisburser } from "src/revenue-share/FeeDisburser.sol";
+import { FeeDisburser } from "src/L2/FeeDisburser.sol";
 import { IFeeVault, Types } from "interfaces/L2/IFeeVault.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 

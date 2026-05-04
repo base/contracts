@@ -338,7 +338,7 @@ contract Initializer_Test is CommonTest {
         // L2 contract initialization is tested in Predeploys.t.sol
         excludes[j++] = "src/L2/*";
         // Contract is not deployed as part of the standard deployment script.
-        excludes[j++] = "src/revenue-share/BalanceTracker.sol";
+        excludes[j++] = "src/L1/BalanceTracker.sol";
         // AggregateVerifier uses a custom `bool initialized` instead of OpenZeppelin's `_initialized` uint8.
         excludes[j++] = "src/bridge/AggregateVerifier.sol";
         // ETHLockbox is only deployed when interop is enabled.

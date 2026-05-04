@@ -39,6 +39,10 @@
     "initCodeHash": "0x838bbd7f381e84e21887f72bd1da605bfc4588b3c39aed96cbce67c09335b3ee",
     "sourceCodeHash": "0xcb329746df0baddd3dc03c6c88da5d6bdc0f0a96d30e6dc78d0891bb1e935032"
   },
+  "src/L2/FeeDisburser.sol:FeeDisburser": {
+    "initCodeHash": "0x1278027e3756e2989e80c0a7b513e221a5fe0d3dbd9ded108375a29b2c1f3d57",
+    "sourceCodeHash": "0xac49a0ecf22b8a7bb3ebef830a2d27b19050f9b08941186e8563d5113cf0ce9c"
+  },
   "src/L2/GasPriceOracle.sol:GasPriceOracle": {
     "initCodeHash": "0xf72c23d9c3775afd7b645fde429d09800622d329116feb5ff9829634655123ca",
     "sourceCodeHash": "0xb4d1bf3669ba87bbeaf4373145c7e1490478c4a05ba4838a524aa6f0ce7348a6"
@@ -134,10 +138,6 @@
   "src/cannon/PreimageOracle.sol:PreimageOracle": {
     "initCodeHash": "0x6af5b0e83b455aab8d0946c160a4dc049a4e03be69f8a2a9e87b574f27b25a66",
     "sourceCodeHash": "0xd3fd2d07ea417c97590c5b1895890186faf7d1f12f1e2d368ba270d077c088fd"
-  },
-  "src/revenue-share/FeeDisburser.sol:FeeDisburser": {
-    "initCodeHash": "0x1278027e3756e2989e80c0a7b513e221a5fe0d3dbd9ded108375a29b2c1f3d57",
-    "sourceCodeHash": "0xac49a0ecf22b8a7bb3ebef830a2d27b19050f9b08941186e8563d5113cf0ce9c"
   },
   "src/universal/OptimismMintableERC20.sol:OptimismMintableERC20": {
     "initCodeHash": "0x3c85eed0d017dca8eda6396aa842ddc12492587b061e8c756a8d32c4610a9658",

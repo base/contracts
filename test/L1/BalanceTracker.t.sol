@@ -3,10 +3,10 @@ pragma solidity 0.8.15;
 
 import { Proxy } from "src/universal/Proxy.sol";
 
-import { BalanceTracker } from "src/revenue-share/BalanceTracker.sol";
+import { BalanceTracker } from "src/L1/BalanceTracker.sol";
 
 import { CommonTest } from "test/CommonTest.t.sol";
-import { ReenterProcessFees } from "test/revenue-share/mocks/ReenterProcessFees.sol";
+import { ReenterProcessFees } from "test/mocks/ReenterProcessFees.sol";
 
 contract BalanceTrackerTest is CommonTest {
     event ProcessedFunds(
