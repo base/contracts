@@ -52,27 +52,27 @@ pragma solidity 0.8.15;
  * ══════════════════════════════════════════════════════════════════════════════════
  */
 
-import { INitroEnclaveVerifier } from "interfaces/bridge/tee/INitroEnclaveVerifier.sol";
+import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { Proxy } from "src/universal/Proxy.sol";
 import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
-import { IAnchorStateRegistry } from "interfaces/bridge/IAnchorStateRegistry.sol";
-import { IDelayedWETH } from "interfaces/bridge/IDelayedWETH.sol";
-import { IDisputeGame } from "interfaces/bridge/IDisputeGame.sol";
-import { IDisputeGameFactory } from "interfaces/bridge/IDisputeGameFactory.sol";
-import { DisputeGameFactory } from "src/bridge/DisputeGameFactory.sol";
+import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
+import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
+import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { DisputeGameFactory } from "src/L1/proofs/DisputeGameFactory.sol";
 import { GameType, Hash } from "src/libraries/bridge/Types.sol";
 
 import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
-import { AggregateVerifier } from "src/bridge/AggregateVerifier.sol";
-import { IVerifier } from "interfaces/bridge/IVerifier.sol";
-import { MockVerifier } from "src/bridge/mocks/MockVerifier.sol";
-import { DevTEEProverRegistry } from "src/bridge/mocks/MockDevTEEProverRegistry.sol";
-import { TEEProverRegistry } from "src/bridge/tee/TEEProverRegistry.sol";
-import { TEEVerifier } from "src/bridge/tee/TEEVerifier.sol";
+import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
+import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { MockVerifier } from "src/L1/proofs/mocks/MockVerifier.sol";
+import { DevTEEProverRegistry } from "src/L1/proofs/mocks/MockDevTEEProverRegistry.sol";
+import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
+import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 
 import { MinimalProxyAdmin } from "./mocks/MinimalProxyAdmin.sol";
 import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";

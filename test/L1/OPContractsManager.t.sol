@@ -23,15 +23,15 @@ import { Proposal, GameTypes } from "src/libraries/bridge/Types.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 
 // Interfaces
-import { IAnchorStateRegistry } from "interfaces/bridge/IAnchorStateRegistry.sol";
+import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IPermissionedDisputeGameV2 } from "interfaces/bridge/v2/IPermissionedDisputeGameV2.sol";
-import { IFaultDisputeGameV2 } from "interfaces/bridge/v2/IFaultDisputeGameV2.sol";
-import { IDelayedWETH } from "interfaces/bridge/IDelayedWETH.sol";
-import { IDisputeGame } from "interfaces/bridge/IDisputeGame.sol";
-import { IDisputeGameFactory } from "interfaces/bridge/IDisputeGameFactory.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
+import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
+import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
+import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import {
     IOPContractsManager,
@@ -40,7 +40,7 @@ import {
     IOPContractsManagerStandardValidator
 } from "interfaces/L1/IOPContractsManager.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
-import { IBigStepper } from "interfaces/bridge/IBigStepper.sol";
+import { IBigStepper } from "interfaces/L1/proofs/IBigStepper.sol";
 
 // Contracts
 import {
@@ -53,7 +53,7 @@ import {
 } from "src/L1/OPContractsManager.sol";
 import { DisputeGames } from "../setup/DisputeGames.sol";
 import { IProxy } from "../../interfaces/universal/IProxy.sol";
-import { IDelayedWETH } from "../../interfaces/bridge/IDelayedWETH.sol";
+import { IDelayedWETH } from "../../interfaces/L1/proofs/IDelayedWETH.sol";
 
 /// @title OPContractsManager_Harness
 /// @notice Exposes internal functions for testing.

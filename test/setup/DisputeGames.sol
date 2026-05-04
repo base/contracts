@@ -13,9 +13,9 @@ import { GameTypes } from "src/libraries/bridge/Types.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 
 // Interfaces
-import "../../interfaces/bridge/IDisputeGame.sol";
-import "../../interfaces/bridge/IDisputeGameFactory.sol";
-import { IPermissionedDisputeGameV2 } from "../../interfaces/bridge/v2/IPermissionedDisputeGameV2.sol";
+import "../../interfaces/L1/proofs/IDisputeGame.sol";
+import "../../interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { IPermissionedDisputeGameV2 } from "../../interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
 
 contract DisputeGames is FeatureFlags {
     using ByteUtils for bytes;

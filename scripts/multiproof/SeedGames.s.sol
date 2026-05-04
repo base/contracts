@@ -45,8 +45,8 @@ pragma solidity 0.8.15;
 import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
 
-import { IDisputeGameFactory } from "interfaces/bridge/IDisputeGameFactory.sol";
-import { IDisputeGame } from "interfaces/bridge/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { Claim, GameType, Hash } from "src/libraries/bridge/Types.sol";
 
 import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";

@@ -6,7 +6,7 @@ import { Types } from "src/libraries/Types.sol";
 import "src/libraries/bridge/Types.sol";
 
 // Interfaces
-import { IDisputeGame } from "interfaces/bridge/IDisputeGame.sol";
+import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 
 /// @title Events
 /// @dev Contains various events that are tested against. This contract needs to

@@ -14,7 +14,7 @@ import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
-import { ISP1Verifier } from "interfaces/bridge/zk/ISP1Verifier.sol";
+import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 
 import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
 
