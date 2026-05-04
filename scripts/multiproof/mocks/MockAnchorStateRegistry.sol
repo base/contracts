@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
-import { GameType, Hash, Proposal } from "src/dispute/lib/Types.sol";
+import { IDisputeGame } from "interfaces/bridge/IDisputeGame.sol";
+import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 
 /// @title MockAnchorStateRegistry
 /// @notice Minimal mock for testing - stores anchor state and factory reference.

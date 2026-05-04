@@ -20,17 +20,17 @@ import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 
 // Libraries
 import { Types } from "scripts/libraries/Types.sol";
-import { Duration } from "src/dispute/lib/LibUDT.sol";
-import { GameType, Claim, GameTypes, Proposal, Hash } from "src/dispute/lib/Types.sol";
+import { Duration } from "src/libraries/bridge/LibUDT.sol";
+import { GameType, Claim, GameTypes, Proposal, Hash } from "src/libraries/bridge/Types.sol";
 
 // Interfaces
 import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
-import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
-import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IDisputeGameFactory } from "interfaces/bridge/IDisputeGameFactory.sol";
+import { IDelayedWETH } from "interfaces/bridge/IDelayedWETH.sol";
+import { IAnchorStateRegistry } from "interfaces/bridge/IAnchorStateRegistry.sol";
 import { IMIPS64 } from "interfaces/cannon/IMIPS64.sol";
 import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
@@ -39,6 +39,7 @@ import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
+import { ISP1Verifier } from "interfaces/bridge/zk/ISP1Verifier.sol";
 
 /// @title Deploy
 /// @notice Script used to deploy a bedrock system. The entire system is deployed within the `run` function.
@@ -246,7 +247,8 @@ contract Deploy is Deployer {
                 l1ProxyAdminOwner: superchainProxyAdmin.owner(),
                 challenger: cfg.l2OutputOracleChallenger(),
                 guardian: cfg.superchainConfigGuardian(),
-                incidentResponder: cfg.superchainConfigIncidentResponder()
+                incidentResponder: cfg.superchainConfigIncidentResponder(),
+                sp1Verifier: ISP1Verifier(cfg.sp1Verifier())
             })
         );
 

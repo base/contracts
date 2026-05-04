@@ -8,24 +8,24 @@ import { OPContractsManagerStandardValidator } from "src/L1/OPContractsManagerSt
 import { Blueprint } from "src/libraries/Blueprint.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { Bytes } from "src/libraries/Bytes.sol";
-import { Claim, Duration, GameType, GameTypes, Proposal } from "src/dispute/lib/Types.sol";
+import { Claim, Duration, GameType, GameTypes, Proposal } from "src/libraries/bridge/Types.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { SemverComp } from "src/libraries/SemverComp.sol";
 import { Features } from "src/libraries/Features.sol";
-import { LibGameArgs } from "src/dispute/lib/LibGameArgs.sol";
+import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
-import { IBigStepper } from "interfaces/dispute/IBigStepper.sol";
-import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
-import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
-import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
+import { IBigStepper } from "interfaces/bridge/IBigStepper.sol";
+import { IDelayedWETH } from "interfaces/bridge/IDelayedWETH.sol";
+import { IAnchorStateRegistry } from "interfaces/bridge/IAnchorStateRegistry.sol";
+import { IDisputeGame } from "interfaces/bridge/IDisputeGame.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
-import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
-import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
+import { IDisputeGameFactory } from "interfaces/bridge/IDisputeGameFactory.sol";
+import { IFaultDisputeGameV2 } from "interfaces/bridge/v2/IFaultDisputeGameV2.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/bridge/v2/IPermissionedDisputeGameV2.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";

@@ -18,20 +18,20 @@ import { DeployOPChain } from "scripts/deploy/DeployOPChain.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { Types } from "scripts/libraries/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
-import { GameType, Duration, Hash, Claim } from "src/dispute/lib/LibUDT.sol";
-import { Proposal, GameTypes } from "src/dispute/lib/Types.sol";
-import { LibGameArgs } from "src/dispute/lib/LibGameArgs.sol";
+import { GameType, Duration, Hash, Claim } from "src/libraries/bridge/LibUDT.sol";
+import { Proposal, GameTypes } from "src/libraries/bridge/Types.sol";
+import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 
 // Interfaces
-import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IAnchorStateRegistry } from "interfaces/bridge/IAnchorStateRegistry.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
-import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
-import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
-import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
-import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/bridge/v2/IPermissionedDisputeGameV2.sol";
+import { IFaultDisputeGameV2 } from "interfaces/bridge/v2/IFaultDisputeGameV2.sol";
+import { IDelayedWETH } from "interfaces/bridge/IDelayedWETH.sol";
+import { IDisputeGame } from "interfaces/bridge/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/bridge/IDisputeGameFactory.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import {
     IOPContractsManager,
@@ -40,7 +40,7 @@ import {
     IOPContractsManagerStandardValidator
 } from "interfaces/L1/IOPContractsManager.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
-import { IBigStepper } from "interfaces/dispute/IBigStepper.sol";
+import { IBigStepper } from "interfaces/bridge/IBigStepper.sol";
 
 // Contracts
 import {
@@ -53,7 +53,7 @@ import {
 } from "src/L1/OPContractsManager.sol";
 import { DisputeGames } from "../setup/DisputeGames.sol";
 import { IProxy } from "../../interfaces/universal/IProxy.sol";
-import { IDelayedWETH } from "../../interfaces/dispute/IDelayedWETH.sol";
+import { IDelayedWETH } from "../../interfaces/bridge/IDelayedWETH.sol";
 
 /// @title OPContractsManager_Harness
 /// @notice Exposes internal functions for testing.

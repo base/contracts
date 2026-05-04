@@ -7,20 +7,20 @@ import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 import { DisputeGames } from "../setup/DisputeGames.sol";
 
 // Libraries
-import { GameType, Hash } from "src/dispute/lib/LibUDT.sol";
-import { GameTypes, Duration, Claim } from "src/dispute/lib/Types.sol";
+import { GameType, Hash } from "src/libraries/bridge/LibUDT.sol";
+import { GameTypes, Duration, Claim } from "src/libraries/bridge/Types.sol";
 import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
 import { Features } from "src/libraries/Features.sol";
 
 // Interfaces
 import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
-import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
-import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
-import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
-import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
-import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
-import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
-import { IBigStepper } from "interfaces/dispute/IBigStepper.sol";
+import { IDisputeGameFactory } from "interfaces/bridge/IDisputeGameFactory.sol";
+import { IFaultDisputeGameV2 } from "interfaces/bridge/v2/IFaultDisputeGameV2.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/bridge/v2/IPermissionedDisputeGameV2.sol";
+import { IDisputeGame } from "interfaces/bridge/IDisputeGame.sol";
+import { IDelayedWETH } from "interfaces/bridge/IDelayedWETH.sol";
+import { IAnchorStateRegistry } from "interfaces/bridge/IAnchorStateRegistry.sol";
+import { IBigStepper } from "interfaces/bridge/IBigStepper.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
@@ -38,11 +38,11 @@ import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { IStandardBridge } from "interfaces/universal/IStandardBridge.sol";
 import { IOPContractsManagerStandardValidator } from "interfaces/L1/IOPContractsManagerStandardValidator.sol";
 import { IMIPS64 } from "interfaces/cannon/IMIPS64.sol";
-import { IBigStepper } from "../../interfaces/dispute/IBigStepper.sol";
-import { IDisputeGameFactory } from "../../interfaces/dispute/IDisputeGameFactory.sol";
+import { IBigStepper } from "../../interfaces/bridge/IBigStepper.sol";
+import { IDisputeGameFactory } from "../../interfaces/bridge/IDisputeGameFactory.sol";
 import { DisputeGames } from "../setup/DisputeGames.sol";
 import { IStaticERC1967Proxy } from "interfaces/universal/IStaticERC1967Proxy.sol";
-import { IDelayedWETH } from "../../interfaces/dispute/IDelayedWETH.sol";
+import { IDelayedWETH } from "../../interfaces/bridge/IDelayedWETH.sol";
 
 /// @title BadDisputeGameFactoryReturner
 /// @notice Used to return a bad DisputeGameFactory address to the OPContractsManagerStandardValidator. Far easier

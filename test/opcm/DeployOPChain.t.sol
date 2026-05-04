@@ -12,8 +12,9 @@ import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
 import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
-import { Claim, Duration, GameType, GameTypes } from "src/dispute/lib/Types.sol";
-import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
+import { Claim, Duration, GameType, GameTypes } from "src/libraries/bridge/Types.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/bridge/v2/IPermissionedDisputeGameV2.sol";
+import { ISP1Verifier } from "interfaces/bridge/zk/ISP1Verifier.sol";
 
 contract DeployOPChain_TestBase is Test, FeatureFlags {
     DeploySuperchain deploySuperchain;
@@ -42,6 +43,7 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
     address unsafeBlockSigner = makeAddr("unsafeBlockSigner");
     address proposer = makeAddr("proposer");
     address challenger = makeAddr("challenger");
+    address sp1Verifier = makeAddr("sp1Verifier");
     uint32 basefeeScalar = 100;
     uint32 blobBaseFeeScalar = 200;
     uint256 l2ChainId = 300;
@@ -98,7 +100,8 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
                 challenger: challenger,
                 devFeatureBitmap: devFeatureBitmap,
                 guardian: guardian,
-                incidentResponder: address(0)
+                incidentResponder: address(0),
+                sp1Verifier: ISP1Verifier(sp1Verifier)
             })
         );
         opcm = dio.opcm;

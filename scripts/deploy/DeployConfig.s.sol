@@ -96,6 +96,7 @@ contract DeployConfig is Script {
     uint256 public multiproofGenesisBlockNumber;
     uint256 public multiproofBlockInterval;
     uint256 public multiproofIntermediateBlockInterval;
+    address public sp1Verifier;
 
     // RISC Zero / NitroEnclaveVerifier Configuration (reference values; DeployRiscZeroStack takes these as CLI args)
     bytes32 public risc0SetBuilderImageId;
@@ -208,6 +209,7 @@ contract DeployConfig is Script {
         multiproofGenesisBlockNumber = _readOr(_json, "$.multiproofGenesisBlockNumber", 0);
         multiproofBlockInterval = _readOr(_json, "$.multiproofBlockInterval", 100);
         multiproofIntermediateBlockInterval = _readOr(_json, "$.multiproofIntermediateBlockInterval", 10);
+        sp1Verifier = stdJson.readAddress(_json, "$.sp1Verifier");
 
         risc0SetBuilderImageId = bytes32(_readOr(_json, "$.risc0SetBuilderImageId", 0));
         nitroRootCert = bytes32(_readOr(_json, "$.nitroRootCert", 0));
