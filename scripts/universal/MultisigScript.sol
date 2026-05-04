@@ -2,17 +2,17 @@
 pragma solidity ^0.8.15;
 
 // solhint-disable no-console
-import {console} from "lib/forge-std/src/console.sol";
-import {Script} from "lib/forge-std/src/Script.sol";
-import {stdJson} from "lib/forge-std/src/StdJson.sol";
-import {Vm} from "lib/forge-std/src/Vm.sol";
+import { console } from "lib/forge-std/src/console.sol";
+import { Script } from "lib/forge-std/src/Script.sol";
+import { stdJson } from "lib/forge-std/src/StdJson.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
 
-import {ICBMulticall, Call3, Call3Value} from "../../src/utils/ICBMulticall.sol";
+import { ICBMulticall, Call3, Call3Value } from "../../src/utils/ICBMulticall.sol";
 
-import {IGnosisSafe, Enum} from "./IGnosisSafe.sol";
-import {Signatures} from "./Signatures.sol";
-import {StateDiff} from "./StateDiff.sol";
-import {Simulation} from "./Simulation.sol";
+import { IGnosisSafe, Enum } from "./IGnosisSafe.sol";
+import { Signatures } from "./Signatures.sol";
+import { StateDiff } from "./StateDiff.sol";
+import { Simulation } from "./Simulation.sol";
 
 /// @title MultisigScript
 /// @notice Script builder for Forge scripts that require signatures from Safes. Supports both non-nested
@@ -64,31 +64,41 @@ import {Simulation} from "./Simulation.sol";
 /// └──────────┘
 ///
 /// Sequence:
-/// ┌───────┐┌───────┐┌───────┐┌───────┐┌───────────┐          ┌──────────────┐
+/// ┌───────┐┌───────┐┌───────┐┌───────┐┌───────────┐
+/// ┌──────────────┐
 /// │Signer1││Signer2││Signer3││Signer4││Facilitator│          │MultisigScript│
-/// └───┬───┘└───┬───┘└───┬───┘└───┬───┘└─────┬─────┘          └───────┬──────┘
+/// └───┬───┘└───┬───┘└───┬───┘└───┬───┘└─────┬─────┘
+/// └───────┬──────┘
 ///     │        │        │       sign(Safe1) │                        │
 ///     │─────────────────────────────────────────────────────────────>│
 ///     │        │      <sig1>     │          │                        │
-///     │────────────────────────────────────>│                        │
+///     │────────────────────────────────────>│
+/// │
 ///     │        │        │        │   sign(Safe1)                     │
-///     │        │────────────────────────────────────────────────────>│
+///     │
+/// │────────────────────────────────────────────────────>│
 ///     │        │        │  <sig2>│          │                        │
-///     │        │───────────────────────────>│                        │
+///     │        │───────────────────────────>│
+/// │
 ///     │        │        │        │          │approve(Safe1,sig1|sig2)│
-///     │        │        │        │          │───────────────────────>│
+///     │        │        │        │
+/// │───────────────────────>│
 ///     │        │        │        │       sign(Safe2)                 │
-///     │        │        │───────────────────────────────────────────>│
+///     │        │
+/// │───────────────────────────────────────────>│
 ///     │        │        │      <sig3>       │                        │
 ///     │        │        │──────────────────>│                        │
 ///     │        │        │        │          │ sign(Safe2)            │
-///     │        │        │        │──────────────────────────────────>│
+///     │        │        │
+/// │──────────────────────────────────>│
 ///     │        │        │        │  <sig4>  │                        │
 ///     │        │        │        │─────────>│                        │
 ///     │        │        │        │          │approve(Safe2,sig3|sig4)│
-///     │        │        │        │          │───────────────────────>│
+///     │        │        │        │
+/// │───────────────────────>│
 ///     │        │        │        │          │         run()          │
-///     │        │        │        │          │───────────────────────>│
+///     │        │        │        │
+/// │───────────────────────>│
 ///
 ///
 /// 3. Multi-layer nested example:
@@ -111,43 +121,65 @@ import {Simulation} from "./Simulation.sol";
 /// └──────────┘
 ///
 /// Sequence:
-/// ┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────────┐                ┌──────────────┐
-/// │Signer1││Signer2││Signer3││Signer4││Signer5││Signer6││Facilitator│                │MultisigScript│
-/// └───┬───┘└───┬───┘└───┬───┘└───┬───┘└───┬───┘└───┬───┘└─────┬─────┘                └───────┬──────┘
+/// ┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────┐┌───────────┐
+/// ┌──────────────┐
+/// │Signer1││Signer2││Signer3││Signer4││Signer5││Signer6││Facilitator│
+/// │MultisigScript│
+/// └───┬───┘└───┬───┘└───┬───┘└───┬───┘└───┬───┘└───┬───┘└─────┬─────┘
+/// └───────┬──────┘
 ///     │        │        │        │       sign(Safe1,Safe4)    │                              │
 ///     │─────────────────────────────────────────────────────────────────────────────────────>│
 ///     │        │        │      <sig1>     │        │          │                              │
-///     │──────────────────────────────────────────────────────>│                              │
+///     │──────────────────────────────────────────────────────>│
+/// │
 ///     │        │        │        │        │   sign(Safe1,Safe4)                              │
-///     │        │────────────────────────────────────────────────────────────────────────────>│
+///     │
+/// │────────────────────────────────────────────────────────────────────────────>│
 ///     │        │        │        │  <sig2>│        │          │                              │
-///     │        │─────────────────────────────────────────────>│                              │
+///     │
+/// │─────────────────────────────────────────────>│
+/// │
 ///     │        │        │        │        │        │          │approve(Safe1,Safe4,sig1|sig2)│
-///     │        │        │        │        │        │          │─────────────────────────────>│
+///     │        │        │        │        │        │
+/// │─────────────────────────────>│
 ///     │        │        │        │        │       sign(Safe2,Safe4)                          │
-///     │        │        │───────────────────────────────────────────────────────────────────>│
+///     │        │
+/// │───────────────────────────────────────────────────────────────────>│
 ///     │        │        │        │      <sig3>     │          │                              │
-///     │        │        │────────────────────────────────────>│                              │
+///     │        │
+/// │────────────────────────────────────>│
+/// │
 ///     │        │        │        │        │        │   sign(Safe2,Safe4)                     │
-///     │        │        │        │──────────────────────────────────────────────────────────>│
+///     │        │        │
+/// │──────────────────────────────────────────────────────────>│
 ///     │        │        │        │        │  <sig4>│          │                              │
-///     │        │        │        │───────────────────────────>│                              │
+///     │        │        │
+/// │───────────────────────────>│
+/// │
 ///     │        │        │        │        │        │          │approve(Safe2,Safe4,sig3|sig4)│
-///     │        │        │        │        │        │          │─────────────────────────────>│
+///     │        │        │        │        │        │
+/// │─────────────────────────────>│
 ///     │        │        │        │        │        │          │        approve(Safe4)        │
-///     │        │        │        │        │        │          │─────────────────────────────>│
+///     │        │        │        │        │        │
+/// │─────────────────────────────>│
 ///     │        │        │        │        │        │          sign(Safe3)                    │
-///     │        │        │        │        │─────────────────────────────────────────────────>│
+///     │        │        │        │
+/// │─────────────────────────────────────────────────>│
 ///     │        │        │        │        │      <sig5>       │                              │
-///     │        │        │        │        │──────────────────>│                              │
+///     │        │        │        │        │──────────────────>│
+/// │
 ///     │        │        │        │        │        │          │    sign(Safe3)               │
-///     │        │        │        │        │        │────────────────────────────────────────>│
+///     │        │        │        │        │
+/// │────────────────────────────────────────>│
 ///     │        │        │        │        │        │  <sig6>  │                              │
-///     │        │        │        │        │        │─────────>│                              │
+///     │        │        │        │        │        │─────────>│
+/// │
 ///     │        │        │        │        │        │          │   approve(Safe3,sig5|sig6)   │
-///     │        │        │        │        │        │          │─────────────────────────────>│
+///     │        │        │        │        │        │
+/// │─────────────────────────────>│
 ///     │        │        │        │        │        │          │            run()             │
-///     │        │        │        │        │        │          │─────────────────────────────>│
+///     │        │        │        │        │        │
+/// │─────────────────────────────>│
 abstract contract MultisigScript is Script {
     address internal constant CB_MULTICALL = 0xA8B8CA1d6F0F5Ce63dCEA9121A01b302c5801303;
 
@@ -189,17 +221,17 @@ abstract contract MultisigScript is Script {
     function _postCheck(Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) internal virtual;
 
     /// @notice Follow up assertions on state and simulation after a `sign` call.
-    function _postSign(Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) internal virtual {}
+    function _postSign(Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) internal virtual { }
 
     /// @notice Follow up assertions on state and simulation after a `approve` call.
-    function _postApprove(Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) internal virtual {}
+    function _postApprove(Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) internal virtual { }
 
     /// @notice Follow up assertions on state and simulation after a `run` call.
-    function _postRun(Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) internal virtual {}
+    function _postRun(Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) internal virtual { }
 
     // Tenderly simulations can accept generic state overrides. This hook enables this functionality.
     // By default, an empty (no-op) override is returned.
-    function _simulationOverrides() internal view virtual returns (Simulation.StateOverride[] memory overrides_) {}
+    function _simulationOverrides() internal view virtual returns (Simulation.StateOverride[] memory overrides_) { }
 
     /// @notice Controls whether the safe tx is printed as hashes or structured EIP-712 data.
     ///
@@ -225,37 +257,37 @@ abstract contract MultisigScript is Script {
     ///
     /// @param safes A list of nested safes (excluding the executing safe returned by `_ownerSafe`).
     function sign(address[] memory safes) public {
-        safes = _appendOwnerSafe({safes: safes});
+        safes = _appendOwnerSafe({ safes: safes });
 
         // Snapshot and restore Safe nonce after simulation, otherwise the data logged to sign
         // would not match the actual data we need to sign, because the simulation
         // would increment the nonce.
         uint256[] memory originalNonces = new uint256[](safes.length);
         for (uint256 i; i < safes.length; i++) {
-            originalNonces[i] = _getNonce({safe: safes[i]});
+            originalNonces[i] = _getNonce({ safe: safes[i] });
         }
 
-        Call[] memory callsChain = _buildCallsChain({safes: safes});
+        Call[] memory callsChain = _buildCallsChain({ safes: safes });
 
         vm.startMappingRecording();
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _simulateForSigner({safes: safes, callsChain: callsChain});
+            _simulateForSigner({ safes: safes, callsChain: callsChain });
         (StateDiff.MappingParent[] memory parents, string memory json) =
-            StateDiff.collectStateDiff(StateDiff.CollectStateDiffOpts({accesses: accesses, simPayload: simPayload}));
+            StateDiff.collectStateDiff(StateDiff.CollectStateDiffOpts({ accesses: accesses, simPayload: simPayload }));
         vm.stopMappingRecording();
 
-        _postSign({accesses: accesses, simPayload: simPayload});
-        _postCheck({accesses: accesses, simPayload: simPayload});
+        _postSign({ accesses: accesses, simPayload: simPayload });
+        _postCheck({ accesses: accesses, simPayload: simPayload });
 
         // Restore the original nonce.
         for (uint256 i; i < safes.length; i++) {
-            vm.store({target: safes[i], slot: Simulation.SAFE_NONCE_SLOT, value: bytes32(originalNonces[i])});
+            vm.store({ target: safes[i], slot: Simulation.SAFE_NONCE_SLOT, value: bytes32(originalNonces[i]) });
         }
 
-        bytes memory txData = _encodeTransactionData({safe: safes[0], call: callsChain[0]});
-        StateDiff.recordStateDiff({json: json, parents: parents, txData: txData, targetSafe: _ownerSafe()});
+        bytes memory txData = _encodeTransactionData({ safe: safes[0], call: callsChain[0] });
+        StateDiff.recordStateDiff({ json: json, parents: parents, txData: txData, targetSafe: _ownerSafe() });
 
-        _printDataToSign({safe: safes[0], call: callsChain[0]});
+        _printDataToSign({ safe: safes[0], call: callsChain[0] });
     }
 
     /// Step 1.1 (optional)
@@ -266,10 +298,10 @@ abstract contract MultisigScript is Script {
     /// @param safes      A list of nested safes (excluding the executing safe returned by `_ownerSafe`).
     /// @param signatures The signatures to verify (concatenated, 65-bytes per sig).
     function verify(address[] memory safes, bytes memory signatures) public view {
-        safes = _appendOwnerSafe({safes: safes});
+        safes = _appendOwnerSafe({ safes: safes });
 
-        Call[] memory callsChain = _buildCallsChain({safes: safes});
-        _checkSignatures({safe: safes[0], call: callsChain[0], signatures: signatures});
+        Call[] memory callsChain = _buildCallsChain({ safes: safes });
+        _checkSignatures({ safe: safes[0], call: callsChain[0], signatures: signatures });
     }
 
     /// Step 2 (optional for non-nested setups)
@@ -285,13 +317,13 @@ abstract contract MultisigScript is Script {
     /// @param safes      A list of nested safes (excluding the executing safe returned by `_ownerSafe`).
     /// @param signatures The signatures from step 1 (concatenated, 65-bytes per sig)
     function approve(address[] memory safes, bytes memory signatures) public {
-        safes = _appendOwnerSafe({safes: safes});
+        safes = _appendOwnerSafe({ safes: safes });
 
-        Call[] memory callsChain = _buildCallsChain({safes: safes});
+        Call[] memory callsChain = _buildCallsChain({ safes: safes });
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _executeTransaction({safe: safes[0], call: callsChain[0], signatures: signatures, broadcast: true});
+            _executeTransaction({ safe: safes[0], call: callsChain[0], signatures: signatures, broadcast: true });
 
-        _postApprove({accesses: accesses, simPayload: simPayload});
+        _postApprove({ accesses: accesses, simPayload: simPayload });
     }
 
     /// Step 2.1 (optional)
@@ -305,15 +337,17 @@ abstract contract MultisigScript is Script {
     /// @param signatures The signatures from step 1 (concatenated, 65-bytes per sig)
     function simulate(bytes memory signatures) public {
         address ownerSafe = _ownerSafe();
-        Call[] memory callsChain = _buildCallsChain({safes: _toArray(ownerSafe)});
+        Call[] memory callsChain = _buildCallsChain({ safes: _toArray(ownerSafe) });
 
-        vm.store({target: ownerSafe, slot: Simulation.SAFE_NONCE_SLOT, value: bytes32(_getNonce({safe: ownerSafe}))});
+        vm.store({
+            target: ownerSafe, slot: Simulation.SAFE_NONCE_SLOT, value: bytes32(_getNonce({ safe: ownerSafe }))
+        });
 
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _executeTransaction({safe: ownerSafe, call: callsChain[0], signatures: signatures, broadcast: false});
+            _executeTransaction({ safe: ownerSafe, call: callsChain[0], signatures: signatures, broadcast: false });
 
-        _postRun({accesses: accesses, simPayload: simPayload});
-        _postCheck({accesses: accesses, simPayload: simPayload});
+        _postRun({ accesses: accesses, simPayload: simPayload });
+        _postCheck({ accesses: accesses, simPayload: simPayload });
     }
 
     /// Step 3
@@ -325,13 +359,13 @@ abstract contract MultisigScript is Script {
     /// @param signatures The signatures from step 1 (concatenated, 65-bytes per sig)
     function run(bytes memory signatures) public {
         address ownerSafe = _ownerSafe();
-        Call[] memory callsChain = _buildCallsChain({safes: _toArray(ownerSafe)});
+        Call[] memory callsChain = _buildCallsChain({ safes: _toArray(ownerSafe) });
 
         (Vm.AccountAccess[] memory accesses, Simulation.Payload memory simPayload) =
-            _executeTransaction({safe: ownerSafe, call: callsChain[0], signatures: signatures, broadcast: true});
+            _executeTransaction({ safe: ownerSafe, call: callsChain[0], signatures: signatures, broadcast: true });
 
-        _postRun({accesses: accesses, simPayload: simPayload});
-        _postCheck({accesses: accesses, simPayload: simPayload});
+        _postRun({ accesses: accesses, simPayload: simPayload });
+        _postCheck({ accesses: accesses, simPayload: simPayload });
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -379,18 +413,19 @@ abstract contract MultisigScript is Script {
         Call[] memory scriptCalls = _buildCallsChecked();
 
         // Build the final script call.
-        Call memory aggregatedScriptCall = _buildAggregatedScriptCall({scriptCalls: scriptCalls});
+        Call memory aggregatedScriptCall = _buildAggregatedScriptCall({ scriptCalls: scriptCalls });
 
         // The very last call is the actual call to execute
         callsChain = new Call[](safes.length);
         callsChain[callsChain.length - 1] = aggregatedScriptCall;
 
-        // The first n-1 calls are the nested approval calls. We build the approvals backwards, starting from the last safe.
+        // The first n-1 calls are the nested approval calls. We build the approvals backwards, starting from the last
+        // safe.
         for (uint256 i = safes.length - 1; i > 0; i--) {
             address safe = safes[i];
             Call memory callToApprove = callsChain[i];
 
-            callsChain[i - 1] = _buildApproveCall({safe: safe, call: callToApprove});
+            callsChain[i - 1] = _buildApproveCall({ safe: safe, call: callToApprove });
         }
     }
 
@@ -447,8 +482,8 @@ abstract contract MultisigScript is Script {
             currentGroupIndex: currentGroupIndex
         });
 
-        // NOTE: When aggregating via a Multicall call, the root call is always a delegatecall to `aggregateDelegateCalls`
-        //       as it offers the most flexibility and allows perofming any other type of call.
+        // NOTE: When aggregating via a Multicall call, the root call is always a delegatecall to
+        // `aggregateDelegateCalls` as it offers the most flexibility and allows perofming any other type of call.
         return Call({
             operation: Enum.Operation.DelegateCall,
             target: CB_MULTICALL,
@@ -472,7 +507,11 @@ abstract contract MultisigScript is Script {
         uint256 rootCallsIndex,
         Call[] memory currentGroup,
         uint256 currentGroupIndex
-    ) internal pure returns (uint256 rootCallsCount) {
+    )
+        internal
+        pure
+        returns (uint256 rootCallsCount)
+    {
         uint256 rootCallsIndexSaved = rootCallsIndex;
 
         // Append the call3 delegate calls directly to the root calls.
@@ -525,7 +564,7 @@ abstract contract MultisigScript is Script {
     ///
     /// @return The approve call.
     function _buildApproveCall(address safe, Call memory call) internal view returns (Call memory) {
-        bytes32 hash = _getTransactionHash({safe: safe, call: call});
+        bytes32 hash = _getTransactionHash({ safe: safe, call: call });
 
         console.log("---\nNested hash for safe %s:", safe);
         console.logBytes32(hash);
@@ -548,13 +587,13 @@ abstract contract MultisigScript is Script {
     /// @param call The call to print the data to sign for.
     function _printDataToSign(address safe, Call memory call) internal {
         bytes memory txData = _printDataHashes()
-            ? _encodeTransactionData({safe: safe, call: call})
-            : _encodeEip712Json({safe: safe, call: call});
+            ? _encodeTransactionData({ safe: safe, call: call })
+            : _encodeEip712Json({ safe: safe, call: call });
 
-        emit DataToSign({data: txData});
+        emit DataToSign({ data: txData });
 
         console.log("---\nIf submitting onchain, call Safe.approveHash on %s with the following hash:", safe);
-        bytes32 hash = _getTransactionHash({safe: safe, call: call});
+        bytes32 hash = _getTransactionHash({ safe: safe, call: call });
         console.logBytes32(hash);
 
         console.log("---\nData to sign:");
@@ -579,18 +618,23 @@ abstract contract MultisigScript is Script {
     /// @param broadcast Whether to broadcast the transaction.
     ///
     /// @return The account accesses and simulation payload.
-    function _executeTransaction(address safe, Call memory call, bytes memory signatures, bool broadcast)
+    function _executeTransaction(
+        address safe,
+        Call memory call,
+        bytes memory signatures,
+        bool broadcast
+    )
         internal
         returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
     {
-        bytes32 hash = _getTransactionHash({safe: safe, call: call});
-        signatures = Signatures.prepareSignatures({safe: safe, hash: hash, signatures: signatures});
+        bytes32 hash = _getTransactionHash({ safe: safe, call: call });
+        signatures = Signatures.prepareSignatures({ safe: safe, hash: hash, signatures: signatures });
 
-        Call memory simCall = _buildExecTransactionCall({safe: safe, call: call, signatures: signatures});
-        Simulation.logSimulationLink({to: safe, data: simCall.data, from: msg.sender});
+        Call memory simCall = _buildExecTransactionCall({ safe: safe, call: call, signatures: signatures });
+        Simulation.logSimulationLink({ to: safe, data: simCall.data, from: msg.sender });
 
         vm.startStateDiffRecording();
-        bool success = _execTransaction({safe: safe, call: call, signatures: signatures, broadcast: broadcast});
+        bool success = _execTransaction({ safe: safe, call: call, signatures: signatures, broadcast: broadcast });
         Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
         require(success, "MultisigScript::_executeTransaction: Transaction failed");
         require(accesses.length > 0, "MultisigScript::_executeTransaction: No state changes");
@@ -609,26 +653,30 @@ abstract contract MultisigScript is Script {
     /// @param callsChain The list of calls to simulate the transaction for.
     ///
     /// @return The account accesses and simulation payload.
-    function _simulateForSigner(address[] memory safes, Call[] memory callsChain)
+    function _simulateForSigner(
+        address[] memory safes,
+        Call[] memory callsChain
+    )
         internal
         returns (Vm.AccountAccess[] memory, Simulation.Payload memory)
     {
         // Define the state overrides for the simulation.
-        bytes32 firstCallDataHash = _getTransactionHash({safe: safes[0], call: callsChain[0]});
-        Simulation.StateOverride[] memory overrides = _overrides({safes: safes, firstCallDataHash: firstCallDataHash});
+        bytes32 firstCallDataHash = _getTransactionHash({ safe: safes[0], call: callsChain[0] });
+        Simulation.StateOverride[] memory overrides = _overrides({ safes: safes, firstCallDataHash: firstCallDataHash });
 
         // Build the `execTransaction` calls chain for all the safe-to-safe approvals followed by the final script call.
-        Call[] memory execTransactionCalls = _buildExecTransactionCalls({safes: safes, callsChain: callsChain});
+        Call[] memory execTransactionCalls = _buildExecTransactionCalls({ safes: safes, callsChain: callsChain });
         bytes memory txData = abi.encodeCall(ICBMulticall.aggregate3, (_toCall3s(execTransactionCalls)));
         console.logBytes(txData);
 
         console.log("---\nSimulation link:");
-        Simulation.logSimulationLink({to: CB_MULTICALL, data: txData, from: msg.sender, overrides: overrides});
+        Simulation.logSimulationLink({ to: CB_MULTICALL, data: txData, from: msg.sender, overrides: overrides });
 
-        // Forge simulation of the data logged in the link. If the simulation fails we revert to make it explicit that the simulation failed.
+        // Forge simulation of the data logged in the link. If the simulation fails we revert to make it explicit that
+        // the simulation failed.
         Simulation.Payload memory simPayload =
-            Simulation.Payload({to: CB_MULTICALL, data: txData, from: msg.sender, stateOverrides: overrides});
-        Vm.AccountAccess[] memory accesses = Simulation.simulateFromSimPayload({simPayload: simPayload});
+            Simulation.Payload({ to: CB_MULTICALL, data: txData, from: msg.sender, stateOverrides: overrides });
+        Vm.AccountAccess[] memory accesses = Simulation.simulateFromSimPayload({ simPayload: simPayload });
         return (accesses, simPayload);
     }
 
@@ -638,7 +686,10 @@ abstract contract MultisigScript is Script {
     /// @param callsChain The list of calls to wrap in a `execTransaction` call.
     ///
     /// @return execTransactionCalls The list of `execTransaction` calls.
-    function _buildExecTransactionCalls(address[] memory safes, Call[] memory callsChain)
+    function _buildExecTransactionCalls(
+        address[] memory safes,
+        Call[] memory callsChain
+    )
         internal
         view
         returns (Call[] memory execTransactionCalls)
@@ -662,7 +713,10 @@ abstract contract MultisigScript is Script {
     // This allows simulation of the final transaction by overriding the threshold to 1.
     // State changes reflected in the simulation as a result of these overrides will
     // not be reflected in the prod execution.
-    function _overrides(address[] memory safes, bytes32 firstCallDataHash)
+    function _overrides(
+        address[] memory safes,
+        bytes32 firstCallDataHash
+    )
         internal
         view
         returns (Simulation.StateOverride[] memory)
@@ -670,14 +724,14 @@ abstract contract MultisigScript is Script {
         Simulation.StateOverride[] memory simOverrides = _simulationOverrides();
         Simulation.StateOverride[] memory overrides = new Simulation.StateOverride[](safes.length + simOverrides.length);
 
-        uint256 nonce = _getNonce({safe: safes[0]});
+        uint256 nonce = _getNonce({ safe: safes[0] });
         overrides[0] = Simulation.overrideSafeThresholdApprovalAndNonce({
             safe: safes[0], nonce: nonce, owner: msg.sender, dataHash: firstCallDataHash
         });
 
         for (uint256 i = 1; i < safes.length; i++) {
             overrides[i] =
-                Simulation.overrideSafeThresholdAndNonce({safe: safes[i], nonce: _getNonce({safe: safes[i]})});
+                Simulation.overrideSafeThresholdAndNonce({ safe: safes[i], nonce: _getNonce({ safe: safes[i] }) });
         }
 
         for (uint256 i; i < simOverrides.length; i++) {
@@ -706,15 +760,15 @@ abstract contract MultisigScript is Script {
         nonce = safeNonce;
 
         // first try SAFE_NONCE
-        try vm.envUint({name: "SAFE_NONCE"}) {
-            nonce = vm.envUint({name: "SAFE_NONCE"});
-        } catch {}
+        try vm.envUint({ name: "SAFE_NONCE" }) {
+            nonce = vm.envUint({ name: "SAFE_NONCE" });
+        } catch { }
 
         // then try SAFE_NONCE_{UPPERCASE_SAFE_ADDRESS}
-        string memory envVarName = string.concat("SAFE_NONCE_", vm.toUppercase({input: vm.toString({value: safe})}));
-        try vm.envUint({name: envVarName}) {
-            nonce = vm.envUint({name: envVarName});
-        } catch {}
+        string memory envVarName = string.concat("SAFE_NONCE_", vm.toUppercase({ input: vm.toString({ value: safe }) }));
+        try vm.envUint({ name: envVarName }) {
+            nonce = vm.envUint({ name: envVarName });
+        } catch { }
 
         // print if any override
         if (nonce != safeNonce) {
@@ -791,13 +845,14 @@ abstract contract MultisigScript is Script {
     /// @param call The call to check the signatures for.
     /// @param signatures The signatures to check.
     function _checkSignatures(address safe, Call memory call, bytes memory signatures) internal view {
-        bytes32 hash = _getTransactionHash({safe: safe, call: call});
-        signatures = Signatures.prepareSignatures({safe: safe, hash: hash, signatures: signatures});
+        bytes32 hash = _getTransactionHash({ safe: safe, call: call });
+        signatures = Signatures.prepareSignatures({ safe: safe, hash: hash, signatures: signatures });
 
         IGnosisSafe(safe)
             .checkSignatures({
                 dataHash: hash,
-                data: _encodeTransactionData({safe: safe, call: call}), // NOTE: This field is the data preimage but not strictly required as `checkSignatures` ignores it.
+                data: _encodeTransactionData({ safe: safe, call: call }), // NOTE: This field is the data preimage but
+                // not strictly required as `checkSignatures` ignores it.
                 signatures: signatures
             });
     }
@@ -809,7 +864,7 @@ abstract contract MultisigScript is Script {
     ///
     /// @return The transaction hash for the given safe and call.
     function _getTransactionHash(address safe, Call memory call) internal view returns (bytes32) {
-        return keccak256(_encodeTransactionData({safe: safe, call: call}));
+        return keccak256(_encodeTransactionData({ safe: safe, call: call }));
     }
 
     /// @notice Wrapps the given `call` in a `execTransaction` call.
@@ -819,7 +874,11 @@ abstract contract MultisigScript is Script {
     /// @param signatures The signatures to use for the transaction.
     ///
     /// @return The execTransaction call.
-    function _buildExecTransactionCall(address safe, Call memory call, bytes memory signatures)
+    function _buildExecTransactionCall(
+        address safe,
+        Call memory call,
+        bytes memory signatures
+    )
         internal
         pure
         returns (Call memory)
@@ -854,7 +913,12 @@ abstract contract MultisigScript is Script {
     /// @param broadcast Whether to broadcast the transaction.
     ///
     /// @return The result of the transaction.
-    function _execTransaction(address safe, Call memory call, bytes memory signatures, bool broadcast)
+    function _execTransaction(
+        address safe,
+        Call memory call,
+        bytes memory signatures,
+        bool broadcast
+    )
         internal
         returns (bool)
     {
@@ -903,7 +967,7 @@ abstract contract MultisigScript is Script {
         require(call.operation == Enum.Operation.Call, "MultisigScript::_toCall3: Operation must be Call");
         require(call.value == 0, "MultisigScript::_toCall3: Value must be 0");
 
-        return Call3({target: call.target, allowFailure: false, callData: call.data});
+        return Call3({ target: call.target, allowFailure: false, callData: call.data });
     }
 
     /// @notice Converts the given call to the format expected by the `ICBMulticall.aggregate3Value` function.
@@ -915,7 +979,7 @@ abstract contract MultisigScript is Script {
         require(call.operation == Enum.Operation.Call, "MultisigScript::_toCall3Value: Operation must be Call");
         require(call.value > 0, "MultisigScript::_toCall3Value: Value must be greater than 0");
 
-        return Call3Value({target: call.target, allowFailure: false, value: call.value, callData: call.data});
+        return Call3Value({ target: call.target, allowFailure: false, value: call.value, callData: call.data });
     }
 
     /// @notice Converts the given call to the format expected by the `ICBMulticall.aggregateDelegateCalls` function.
@@ -930,7 +994,7 @@ abstract contract MultisigScript is Script {
         );
         require(call.value == 0, "MultisigScript::_toDelegateCall3: Value must be 0");
 
-        return Call3({target: call.target, allowFailure: false, callData: call.data});
+        return Call3({ target: call.target, allowFailure: false, callData: call.data });
     }
 
     /// @notice Converts the given calls to the format expected by the `aggregate3` function.

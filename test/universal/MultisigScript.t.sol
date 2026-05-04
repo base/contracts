@@ -5,9 +5,9 @@ import { Test } from "forge-std/Test.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { Preinstalls } from "src/libraries/Preinstalls.sol";
 
-import { MultisigScript } from "script/universal/MultisigScript.sol";
-import { Simulation } from "script/universal/Simulation.sol";
-import { IGnosisSafe, Enum } from "script/universal/IGnosisSafe.sol";
+import { MultisigScript } from "scripts/universal/MultisigScript.sol";
+import { Simulation } from "scripts/universal/Simulation.sol";
+import { IGnosisSafe, Enum } from "scripts/universal/IGnosisSafe.sol";
 
 import { Counter } from "test/universal/Counter.sol";
 import { LibString } from "lib/solady/src/utils/LibString.sol";

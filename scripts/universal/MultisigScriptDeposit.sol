@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-import {ICBMulticall, Call3Value} from "src/utils/ICBMulticall.sol";
+import { ICBMulticall, Call3Value } from "src/utils/ICBMulticall.sol";
 
-import {MultisigScript} from "./MultisigScript.sol";
-import {Enum} from "./IGnosisSafe.sol";
+import { MultisigScript } from "./MultisigScript.sol";
+import { Enum } from "./IGnosisSafe.sol";
 
 /// @notice Interface for OptimismPortal2's depositTransaction function
 interface IOptimismPortal2 {
@@ -14,7 +14,13 @@ interface IOptimismPortal2 {
     /// @param _gasLimit Minimum gas limit for L2 execution
     /// @param _isCreation Whether the transaction creates a contract
     /// @param _data Calldata for the L2 transaction
-    function depositTransaction(address _to, uint256 _value, uint64 _gasLimit, bool _isCreation, bytes memory _data)
+    function depositTransaction(
+        address _to,
+        uint256 _value,
+        uint64 _gasLimit,
+        bool _isCreation,
+        bytes memory _data
+    )
         external
         payable;
 }

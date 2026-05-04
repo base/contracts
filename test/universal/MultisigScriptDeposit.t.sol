@@ -6,9 +6,9 @@ import { Test } from "forge-std/Test.sol";
 import { Vm } from "forge-std/Vm.sol";
 import { Preinstalls } from "src/libraries/Preinstalls.sol";
 
-import { MultisigScriptDeposit } from "script/universal/MultisigScriptDeposit.sol";
-import { Simulation } from "script/universal/Simulation.sol";
-import { IGnosisSafe } from "script/universal/IGnosisSafe.sol";
+import { MultisigScriptDeposit } from "scripts/universal/MultisigScriptDeposit.sol";
+import { Simulation } from "scripts/universal/Simulation.sol";
+import { IGnosisSafe } from "scripts/universal/IGnosisSafe.sol";
 
 import { Counter } from "test/universal/Counter.sol";
 
