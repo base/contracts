@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-import {Vm} from "lib/forge-std/src/Vm.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
 
-import {Simulation} from "./Simulation.sol";
+import { Simulation } from "./Simulation.sol";
 
 library StateDiff {
     struct MappingParent {
@@ -46,7 +46,7 @@ library StateDiff {
                 if (found) {
                     parents = _appendToParents(
                         parents,
-                        MappingParent({slot: opts.accesses[i].storageAccesses[j].slot, parent: parent, key: key})
+                        MappingParent({ slot: opts.accesses[i].storageAccesses[j].slot, parent: parent, key: key })
                     );
                 }
             }
@@ -60,7 +60,9 @@ library StateDiff {
         MappingParent[] memory parents,
         bytes memory txData,
         address targetSafe
-    ) internal {
+    )
+        internal
+    {
         json = VM.serializeBytes(OBJ, "preimages", abi.encode(parents));
         json = VM.serializeBytes(OBJ, "dataToSign", txData);
         json = VM.serializeAddress(OBJ, "targetSafe", targetSafe);
@@ -71,7 +73,10 @@ library StateDiff {
         }
     }
 
-    function _appendToParents(MappingParent[] memory parents, MappingParent memory newParent)
+    function _appendToParents(
+        MappingParent[] memory parents,
+        MappingParent memory newParent
+    )
         private
         pure
         returns (MappingParent[] memory)

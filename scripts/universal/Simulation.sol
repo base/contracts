@@ -2,10 +2,10 @@
 pragma solidity ^0.8.15;
 
 // solhint-disable no-console
-import {console} from "lib/forge-std/src/console.sol";
-import {Vm} from "lib/forge-std/src/Vm.sol";
+import { console } from "lib/forge-std/src/console.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
 
-import {IGnosisSafe} from "./IGnosisSafe.sol";
+import { IGnosisSafe } from "./IGnosisSafe.sol";
 
 /// @title Simulation
 ///
@@ -136,10 +136,10 @@ library Simulation {
 
         // Execute the call in forge and return the state diff.
         VM.startStateDiffRecording();
-        VM.prank({msgSender: simPayload.from});
+        VM.prank({ msgSender: simPayload.from });
         (bool ok, bytes memory returnData) = address(simPayload.to).call(simPayload.data);
         Vm.AccountAccess[] memory accesses = VM.stopAndReturnStateDiff();
-        require(ok, string.concat("Simulator::simulateFromSimPayload failed: ", VM.toString({value: returnData})));
+        require(ok, string.concat("Simulator::simulateFromSimPayload failed: ", VM.toString({ value: returnData })));
         require(accesses.length > 0, "Simulator::simulateFromSimPayload: No state changes");
         return accesses;
     }
@@ -154,16 +154,21 @@ library Simulation {
     /// @param dataHash The transaction hash that should appear as pre-approved
     ///
     /// @return state StateOverride struct containing all the necessary storage overrides
-    function overrideSafeThresholdApprovalAndNonce(address safe, uint256 nonce, address owner, bytes32 dataHash)
+    function overrideSafeThresholdApprovalAndNonce(
+        address safe,
+        uint256 nonce,
+        address owner,
+        bytes32 dataHash
+    )
         internal
         view
         returns (StateOverride memory)
     {
         // solhint-disable-next-line max-line-length
-        StateOverride memory state = StateOverride({contractAddress: safe, overrides: new StorageOverride[](0)});
-        state = addThresholdOverride({safe: safe, state: state});
-        state = addNonceOverride({safe: safe, state: state, nonce: nonce});
-        state = addApprovalOverride({state: state, owner: owner, dataHash: dataHash});
+        StateOverride memory state = StateOverride({ contractAddress: safe, overrides: new StorageOverride[](0) });
+        state = addThresholdOverride({ safe: safe, state: state });
+        state = addNonceOverride({ safe: safe, state: state, nonce: nonce });
+        state = addApprovalOverride({ state: state, owner: owner, dataHash: dataHash });
         return state;
     }
 
@@ -176,9 +181,9 @@ library Simulation {
     ///
     /// @return state StateOverride struct containing threshold and nonce overrides
     function overrideSafeThresholdAndNonce(address safe, uint256 nonce) internal view returns (StateOverride memory) {
-        StateOverride memory state = StateOverride({contractAddress: safe, overrides: new StorageOverride[](0)});
-        state = addThresholdOverride({safe: safe, state: state});
-        state = addNonceOverride({safe: safe, state: state, nonce: nonce});
+        StateOverride memory state = StateOverride({ contractAddress: safe, overrides: new StorageOverride[](0) });
+        state = addThresholdOverride({ safe: safe, state: state });
+        state = addNonceOverride({ safe: safe, state: state, nonce: nonce });
         return state;
     }
 
@@ -191,7 +196,11 @@ library Simulation {
     /// @param dataHash The transaction hash that should appear as approved
     ///
     /// @return _ StateOverride struct with the approval override added
-    function addApprovalOverride(StateOverride memory state, address owner, bytes32 dataHash)
+    function addApprovalOverride(
+        StateOverride memory state,
+        address owner,
+        bytes32 dataHash
+    )
         internal
         pure
         returns (StateOverride memory)
@@ -199,7 +208,7 @@ library Simulation {
         return addOverride({
             state: state,
             storageOverride: StorageOverride({
-                key: computeApprovedHashSlot({owner: owner, dataHash: dataHash}), value: bytes32(uint256(0x1))
+                key: computeApprovedHashSlot({ owner: owner, dataHash: dataHash }), value: bytes32(uint256(0x1))
             })
         });
     }
@@ -212,7 +221,10 @@ library Simulation {
     /// @param state The existing state override to modify
     ///
     /// @return _ StateOverride struct with threshold override added (if needed)
-    function addThresholdOverride(address safe, StateOverride memory state)
+    function addThresholdOverride(
+        address safe,
+        StateOverride memory state
+    )
         internal
         view
         returns (StateOverride memory)
@@ -222,7 +234,7 @@ library Simulation {
 
         // set the threshold to 1
         return addOverride({
-            state: state, storageOverride: StorageOverride({key: SAFE_THRESHOLD_SLOT, value: bytes32(uint256(0x1))})
+            state: state, storageOverride: StorageOverride({ key: SAFE_THRESHOLD_SLOT, value: bytes32(uint256(0x1)) })
         });
     }
 
@@ -235,7 +247,11 @@ library Simulation {
     /// @param nonce The nonce value to set for the safe
     ///
     /// @return _ StateOverride struct with nonce override added (if needed)
-    function addNonceOverride(address safe, StateOverride memory state, uint256 nonce)
+    function addNonceOverride(
+        address safe,
+        StateOverride memory state,
+        uint256 nonce
+    )
         internal
         view
         returns (StateOverride memory)
@@ -244,8 +260,9 @@ library Simulation {
         if (IGnosisSafe(safe).nonce() == nonce) return state;
 
         // set the nonce to the desired value
-        return
-            addOverride({state: state, storageOverride: StorageOverride({key: SAFE_NONCE_SLOT, value: bytes32(nonce)})});
+        return addOverride({
+            state: state, storageOverride: StorageOverride({ key: SAFE_NONCE_SLOT, value: bytes32(nonce) })
+        });
     }
 
     /// @notice Appends a new storage override to an existing state override
@@ -256,7 +273,10 @@ library Simulation {
     /// @param storageOverride The new storage override to add
     ///
     /// @return _ StateOverride struct with the new override added to the array
-    function addOverride(StateOverride memory state, StorageOverride memory storageOverride)
+    function addOverride(
+        StateOverride memory state,
+        StorageOverride memory storageOverride
+    )
         internal
         pure
         returns (StateOverride memory)
@@ -266,7 +286,7 @@ library Simulation {
             overrides[i] = state.overrides[i];
         }
         overrides[state.overrides.length] = storageOverride;
-        return StateOverride({contractAddress: state.contractAddress, overrides: overrides});
+        return StateOverride({ contractAddress: state.contractAddress, overrides: overrides });
     }
 
     /// @notice Generates and logs a Tenderly simulation link without state overrides
@@ -277,7 +297,7 @@ library Simulation {
     /// @param data The transaction data to simulate
     /// @param from The address that will appear as the transaction sender
     function logSimulationLink(address to, bytes memory data, address from) internal view {
-        logSimulationLink({to: to, data: data, from: from, overrides: new StateOverride[](0)});
+        logSimulationLink({ to: to, data: data, from: from, overrides: new StateOverride[](0) });
     }
 
     /// @notice Generates and logs a Tenderly simulation link with state overrides
@@ -288,12 +308,17 @@ library Simulation {
     /// @param data      The transaction data to simulate
     /// @param from      The address that will appear as the transaction sender
     /// @param overrides Array of state overrides to apply during simulation
-    function logSimulationLink(address to, bytes memory data, address from, StateOverride[] memory overrides)
+    function logSimulationLink(
+        address to,
+        bytes memory data,
+        address from,
+        StateOverride[] memory overrides
+    )
         internal
         view
     {
-        string memory proj = VM.envOr({name: "TENDERLY_PROJECT", defaultValue: string("TENDERLY_PROJECT")});
-        string memory username = VM.envOr({name: "TENDERLY_USERNAME", defaultValue: string("TENDERLY_USERNAME")});
+        string memory proj = VM.envOr({ name: "TENDERLY_PROJECT", defaultValue: string("TENDERLY_PROJECT") });
+        string memory username = VM.envOr({ name: "TENDERLY_USERNAME", defaultValue: string("TENDERLY_USERNAME") });
         bool includeOverrides;
 
         // the following characters are url encoded: []{}
@@ -311,7 +336,7 @@ library Simulation {
             stateOverrides = string.concat(
                 stateOverrides,
                 "%7B\"contractAddress\":\"",
-                VM.toString({value: _override.contractAddress}),
+                VM.toString({ value: _override.contractAddress }),
                 "\",\"storage\":%5B"
             );
             for (uint256 j; j < _override.overrides.length; j++) {
@@ -319,9 +344,9 @@ library Simulation {
                 stateOverrides = string.concat(
                     stateOverrides,
                     "%7B\"key\":\"",
-                    VM.toString({value: _override.overrides[j].key}),
+                    VM.toString({ value: _override.overrides[j].key }),
                     "\",\"value\":\"",
-                    VM.toString({value: _override.overrides[j].value}),
+                    VM.toString({ value: _override.overrides[j].value }),
                     "\"%7D"
                 );
             }
@@ -335,11 +360,11 @@ library Simulation {
             "/",
             proj,
             "/simulator/new?network=",
-            VM.toString({value: block.chainid}),
+            VM.toString({ value: block.chainid }),
             "&contractAddress=",
-            VM.toString({value: to}),
+            VM.toString({ value: to }),
             "&from=",
-            VM.toString({value: from})
+            VM.toString({ value: from })
         );
 
         if (includeOverrides) {
@@ -350,9 +375,9 @@ library Simulation {
             // tenderly's nginx has issues with long URLs, so print the raw input data separately
             str = string.concat(str, "\nInsert the following hex into the 'Raw input data' field:");
             console.log(str);
-            console.log(VM.toString({value: data}));
+            console.log(VM.toString({ value: data }));
         } else {
-            str = string.concat(str, "&rawFunctionInput=", VM.toString({value: data}));
+            str = string.concat(str, "&rawFunctionInput=", VM.toString({ value: data }));
             console.log(str);
         }
     }
