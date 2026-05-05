@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { Test } from "forge-std/Test.sol";
-import { Initializable } from "@openzeppelin/contracts-v5/proxy/utils/Initializable.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
+import { Initializable } from "lib/openzeppelin-contracts-v5/contracts/proxy/utils/Initializable.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { IFeeVault } from "interfaces/L2/IFeeVault.sol";
 import { Types } from "src/libraries/Types.sol";

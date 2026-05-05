@@ -12,7 +12,7 @@ import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 
 // External
 // import from openzeppelin-contracts-v5
-import { Initializable } from "@openzeppelin/contracts-v5/proxy/utils/Initializable.sol";
+import { Initializable } from "lib/openzeppelin-contracts-v5/contracts/proxy/utils/Initializable.sol";
 
 /// @title FeeVault
 /// @notice The FeeVault contract contains the basic logic for the various different vault contracts

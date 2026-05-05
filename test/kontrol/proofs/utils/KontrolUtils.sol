@@ -12,8 +12,8 @@
 
 pragma solidity 0.8.15;
 
-import { Vm } from "forge-std/Vm.sol";
-import { KontrolCheats } from "kontrol-cheatcodes/KontrolCheats.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
+import { KontrolCheats } from "lib/kontrol-cheatcodes/src/KontrolCheats.sol";
 
 /// @notice Tests inheriting this contract cannot be run with forge
 abstract contract KontrolUtils is KontrolCheats {

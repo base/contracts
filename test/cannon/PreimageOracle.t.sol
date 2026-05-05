@@ -2,13 +2,13 @@
 pragma solidity 0.8.15;
 
 // Testing
-import { Test, Vm, console2 as console } from "forge-std/Test.sol";
+import { Test, Vm, console2 as console } from "lib/forge-std/src/Test.sol";
 
 // Scripts
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 // Libraries
-import { LibKeccak } from "@lib-keccak/LibKeccak.sol";
+import { LibKeccak } from "lib/lib-keccak/contracts/lib/LibKeccak.sol";
 import { PreimageKeyLib } from "src/cannon/PreimageKeyLib.sol";
 import { Bytes } from "src/libraries/Bytes.sol";
 import { Process } from "scripts/libraries/Process.sol";

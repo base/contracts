@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 // Forge
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 
 // Testing
 import { Setup } from "test/setup/Setup.sol";
@@ -13,11 +13,11 @@ import { FFIInterface } from "test/setup/FFIInterface.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 // Contracts
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
 // Libraries
 import { Config } from "scripts/libraries/Config.sol";
-import { console } from "forge-std/console.sol";
+import { console } from "lib/forge-std/src/console.sol";
 
 // Interfaces
 import { IOptimismMintableERC20Full } from "interfaces/universal/IOptimismMintableERC20Full.sol";

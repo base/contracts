@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 // Testing
-import { console2 as console } from "forge-std/console2.sol";
-import { Vm, VmSafe } from "forge-std/Vm.sol";
+import { console2 as console } from "lib/forge-std/src/console2.sol";
+import { Vm, VmSafe } from "lib/forge-std/src/Vm.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 

@@ -2,10 +2,10 @@
 pragma solidity 0.8.15;
 
 // Forge
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 
 // Libraries
-import { JSONParserLib } from "@solady/utils/JSONParserLib.sol";
+import { JSONParserLib } from "lib/solady/src/utils/JSONParserLib.sol";
 import { SemverComp } from "src/libraries/SemverComp.sol";
 
 /// @title SemverComp_Harness

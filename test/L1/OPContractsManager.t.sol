@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 // Testing
-import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
-import { VmSafe } from "forge-std/Vm.sol";
+import { Test, stdStorage, StdStorage } from "lib/forge-std/src/Test.sol";
+import { VmSafe } from "lib/forge-std/src/Vm.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 import { DeployOPChain_TestBase } from "test/opcm/DeployOPChain.t.sol";

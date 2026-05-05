@@ -2,11 +2,11 @@
 pragma solidity 0.8.15;
 
 // Testing utilities
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
 
 // Libraries
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { Math } from "lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Hashing } from "src/libraries/Hashing.sol";
 import { Encoding } from "src/libraries/Encoding.sol";

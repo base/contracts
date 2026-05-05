@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Contracts
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { Ownable } from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 /// @custom:legacy true
 /// @title AddressManager

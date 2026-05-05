@@ -4,8 +4,8 @@ pragma solidity 0.8.15;
 // Testing
 import { FeatureFlags } from "./FeatureFlags.sol";
 import { ByteUtils } from "./ByteUtils.sol";
-import { Vm } from "forge-std/Vm.sol";
-import { console2 as console } from "forge-std/console2.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
+import { console2 as console } from "lib/forge-std/src/console2.sol";
 
 // Libraries
 import { GameType, Claim } from "src/libraries/bridge/LibUDT.sol";

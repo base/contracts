@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { Test } from "forge-std/Test.sol";
-import { Vm } from "forge-std/Vm.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
 import { Preinstalls } from "src/libraries/Preinstalls.sol";
 
 import { MultisigScript } from "scripts/universal/MultisigScript.sol";

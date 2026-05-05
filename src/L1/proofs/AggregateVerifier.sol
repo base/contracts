@@ -19,9 +19,9 @@ import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.
 import { Claim, GameStatus, GameType, Hash, Proposal, Timestamp } from "src/libraries/bridge/Types.sol";
 
 // Solady
-import { Clone } from "@solady/utils/Clone.sol";
-import { FixedPointMathLib } from "@solady/utils/FixedPointMathLib.sol";
-import { ReentrancyGuard } from "@solady/utils/ReentrancyGuard.sol";
+import { Clone } from "lib/solady/src/utils/Clone.sol";
+import { FixedPointMathLib } from "lib/solady/src/utils/FixedPointMathLib.sol";
+import { ReentrancyGuard } from "lib/solady/src/utils/ReentrancyGuard.sol";
 
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";

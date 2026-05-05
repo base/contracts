@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 
 // Optimism
 import { AnchorStateRegistry } from "src/L1/proofs/AnchorStateRegistry.sol";
@@ -16,7 +16,7 @@ import { Claim, GameStatus, GameType, Hash, Proposal, Timestamp } from "src/libr
 
 // OpenZeppelin
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
-import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { TransparentUpgradeableProxy } from "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
@@ -24,7 +24,7 @@ import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { MockSystemConfig } from "test/mocks/MockSystemConfig.sol";
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 
-import { LibClone } from "@solady/utils/LibClone.sol";
+import { LibClone } from "lib/solady/src/utils/LibClone.sol";
 
 contract BaseTest is Test {
     using LibClone for address;

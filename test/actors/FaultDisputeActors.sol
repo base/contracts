@@ -2,7 +2,7 @@
 pragma solidity ^0.8.15;
 
 // Testing
-import { CommonBase } from "forge-std/Base.sol";
+import { CommonBase } from "lib/forge-std/src/Base.sol";
 
 // Libraries
 import "src/libraries/bridge/Types.sol";

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 import { Features } from "src/libraries/Features.sol";
 

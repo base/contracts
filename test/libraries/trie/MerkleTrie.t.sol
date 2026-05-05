@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 import { MerkleTrie } from "src/libraries/trie/MerkleTrie.sol";
 import { RLPReader } from "src/libraries/rlp/RLPReader.sol";
 import { FFIInterface } from "test/setup/FFIInterface.sol";

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { StdUtils } from "forge-std/StdUtils.sol";
-import { Vm } from "forge-std/Vm.sol";
+import { StdUtils } from "lib/forge-std/src/StdUtils.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
 import { SafeCall } from "src/libraries/SafeCall.sol";
 import { InvariantTest } from "test/invariants/InvariantTest.sol";
 

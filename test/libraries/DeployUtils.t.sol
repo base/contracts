@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Forge
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 
 // Libraries
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";

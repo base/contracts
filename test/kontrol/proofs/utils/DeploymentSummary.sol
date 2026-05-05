@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.13;
 
-import { Vm } from "forge-std/Vm.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
 
 import { DeploymentSummaryCode } from "./DeploymentSummaryCode.sol";
 

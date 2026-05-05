@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { console2 as console } from "forge-std/console2.sol";
-import { StdAssertions } from "forge-std/StdAssertions.sol";
+import { console2 as console } from "lib/forge-std/src/console2.sol";
+import { StdAssertions } from "lib/forge-std/src/StdAssertions.sol";
 
 // Testing
-import { stdToml } from "forge-std/StdToml.sol";
+import { stdToml } from "lib/forge-std/src/StdToml.sol";
 import { DelegateCaller } from "test/mocks/Callers.sol";
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 
@@ -17,7 +17,7 @@ import { Config } from "scripts/libraries/Config.sol";
 // Libraries
 import { GameTypes, Claim } from "src/libraries/bridge/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
-import { LibString } from "@solady/utils/LibString.sol";
+import { LibString } from "lib/solady/src/utils/LibString.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 
 // Interfaces

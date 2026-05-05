@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { LibKeccak } from "@lib-keccak/LibKeccak.sol";
+import { LibKeccak } from "lib/lib-keccak/contracts/lib/LibKeccak.sol";
 import { LPPMetaData } from "src/cannon/libraries/CannonTypes.sol";
 
 interface IPreimageOracle {
