@@ -85,7 +85,7 @@ library Config {
     /// @notice Returns the path on the local filesystem where the deploy config is
     function deployConfigPath() internal view returns (string memory env_) {
         if (vm.isContext(VmSafe.ForgeContext.TestGroup)) {
-            env_ = string.concat(vm.projectRoot(), "/deploy-config/hardhat.json");
+            env_ = string.concat(vm.projectRoot(), "/deploy-config/local.json");
         } else {
             env_ = vm.envOr("DEPLOY_CONFIG_PATH", string(""));
             require(bytes(env_).length > 0, "Config: must set DEPLOY_CONFIG_PATH to filesystem path of deploy config");

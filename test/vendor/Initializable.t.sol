@@ -10,16 +10,16 @@ import { Process } from "scripts/libraries/Process.sol";
 
 // Libraries
 import { LibString } from "@solady/utils/LibString.sol";
-import { GameType, Hash, Proposal } from "src/dispute/lib/Types.sol";
+import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 
 // Interfaces
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
-import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
-import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
+import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
 /// @title Initializer_Test
 /// @dev Ensures that the `initialize()` function on contracts cannot be called more than
@@ -328,21 +328,19 @@ contract Initializer_Test is CommonTest {
         //       label the FaultDisputeGame, PermissionedDisputeGame
         //       contracts and instead simply deploys them anonymously. Means that functions like "getInitializedSlot"
         //       don't work properly. Remove these exclusions once the deployment script is fixed.
-        excludes[j++] = "src/dispute/FaultDisputeGame.sol";
-        excludes[j++] = "src/dispute/v2/FaultDisputeGameV2.sol";
-        excludes[j++] = "src/dispute/v2/PermissionedDisputeGameV2.sol";
-        excludes[j++] = "src/dispute/PermissionedDisputeGame.sol";
-        excludes[j++] = "src/dispute/zk/OPSuccinctFaultDisputeGame.sol";
+        excludes[j++] = "src/L1/proofs/FaultDisputeGame.sol";
+        excludes[j++] = "src/L1/proofs/v2/FaultDisputeGameV2.sol";
+        excludes[j++] = "src/L1/proofs/v2/PermissionedDisputeGameV2.sol";
+        excludes[j++] = "src/L1/proofs/PermissionedDisputeGame.sol";
+        excludes[j++] = "src/L1/proofs/zk/OPSuccinctFaultDisputeGame.sol";
         // TODO: Eventually remove this exclusion. Same reason as above dispute contracts.
         excludes[j++] = "src/L1/OPContractsManager.sol";
         // L2 contract initialization is tested in Predeploys.t.sol
         excludes[j++] = "src/L2/*";
         // Contract is not deployed as part of the standard deployment script.
-        excludes[j++] = "src/revenue-share/BalanceTracker.sol";
-        // Multiproof mocks are not deployed as part of the standard deployment script.
-        excludes[j++] = "src/multiproof/mocks/*";
+        excludes[j++] = "src/L1/BalanceTracker.sol";
         // AggregateVerifier uses a custom `bool initialized` instead of OpenZeppelin's `_initialized` uint8.
-        excludes[j++] = "src/multiproof/AggregateVerifier.sol";
+        excludes[j++] = "src/L1/proofs/AggregateVerifier.sol";
         // ETHLockbox is only deployed when interop is enabled.
         if (address(ethLockbox) == address(0)) {
             excludes[j++] = "src/L1/ETHLockbox.sol";

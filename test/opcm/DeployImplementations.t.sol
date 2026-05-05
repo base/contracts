@@ -14,6 +14,7 @@ import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
+import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 
 import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
 
@@ -30,6 +31,7 @@ contract DeployImplementations_Test is Test, FeatureFlags {
     uint256 disputeGameFinalityDelaySeconds = 500;
     ISuperchainConfig superchainConfigProxy = ISuperchainConfig(makeAddr("superchainConfigProxy"));
     IProxyAdmin superchainProxyAdmin = IProxyAdmin(makeAddr("superchainProxyAdmin"));
+    ISP1Verifier sp1Verifier = ISP1Verifier(makeAddr("sp1Verifier"));
     address l1ProxyAdminOwner = makeAddr("l1ProxyAdminOwner");
     address challenger = makeAddr("challenger");
 
@@ -180,6 +182,7 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             8453, // l2ChainID
             100, // multiproofBlockInterval
             10, // multiproofIntermediateBlockInterval
+            sp1Verifier,
             superchainConfigProxy,
             superchainProxyAdmin,
             l1ProxyAdminOwner,
@@ -409,6 +412,7 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             8453, // l2ChainID
             100, // multiproofBlockInterval
             10, // multiproofIntermediateBlockInterval
+            sp1Verifier,
             superchainConfigProxy,
             superchainProxyAdmin,
             l1ProxyAdminOwner,

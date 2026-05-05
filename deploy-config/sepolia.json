@@ -72,5 +72,6 @@
   "multiproofBlockInterval": 600,
   "multiproofIntermediateBlockInterval": 30,
   "risc0VerifierRouter": "0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187",
-  "risc0SetBuilderImageId": "0x70909b25db0db00f1d4b4016aeb876f53568a3e5a8e6397cb562d79947a02cc9"
+  "risc0SetBuilderImageId": "0x70909b25db0db00f1d4b4016aeb876f53568a3e5a8e6397cb562d79947a02cc9",
+  "sp1Verifier": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B"
 }

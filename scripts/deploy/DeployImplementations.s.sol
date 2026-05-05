@@ -9,14 +9,15 @@ import { Types } from "scripts/libraries/Types.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
+import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
 import { IMIPS64 } from "interfaces/cannon/IMIPS64.sol";
-import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
-import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
-import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
-import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
-import { Duration } from "src/dispute/lib/Types.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
+import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
+import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
+import { Duration } from "src/libraries/bridge/Types.sol";
 import {
     IOPContractsManager,
     IOPContractsManagerGameTypeAdder,
@@ -34,17 +35,17 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IOPContractsManagerStandardValidator } from "interfaces/L1/IOPContractsManagerStandardValidator.sol";
-import { IVerifier } from "interfaces/multiproof/IVerifier.sol";
+import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
-import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
-import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
-import { MockVerifier } from "src/multiproof/mocks/MockVerifier.sol";
-import { TEEVerifier } from "src/multiproof/tee/TEEVerifier.sol";
-import { AggregateVerifier } from "src/multiproof/AggregateVerifier.sol";
-import { GameType } from "src/dispute/lib/Types.sol";
-import { ITDXVerifier } from "interfaces/multiproof/tee/ITDXVerifier.sol";
+import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
+import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
+import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
+import { GameType } from "src/libraries/bridge/Types.sol";
+import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
+import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 
 contract DeployImplementations is Script {
     struct Input {
@@ -69,6 +70,7 @@ contract DeployImplementations is Script {
         uint256 l2ChainID;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+        ISP1Verifier sp1Verifier;
         // Outputs from DeploySuperchain.s.sol.
         ISuperchainConfig superchainConfigProxy;
         IProxyAdmin superchainProxyAdmin;
@@ -610,7 +612,7 @@ contract DeployImplementations is Script {
     }
 
     function deployAggregateVerifierImpl(Input memory _input, Output memory _output) private {
-        address zkVerifier = address(new MockVerifier(_output.anchorStateRegistryImpl));
+        address zkVerifier = address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryImpl));
 
         address teeVerifierImpl;
         {

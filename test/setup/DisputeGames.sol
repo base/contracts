@@ -8,14 +8,14 @@ import { Vm } from "forge-std/Vm.sol";
 import { console2 as console } from "forge-std/console2.sol";
 
 // Libraries
-import { GameType, Claim } from "src/dispute/lib/LibUDT.sol";
-import { GameTypes } from "src/dispute/lib/Types.sol";
-import { LibGameArgs } from "src/dispute/lib/LibGameArgs.sol";
+import { GameType, Claim } from "src/libraries/bridge/LibUDT.sol";
+import { GameTypes } from "src/libraries/bridge/Types.sol";
+import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 
 // Interfaces
-import "../../interfaces/dispute/IDisputeGame.sol";
-import "../../interfaces/dispute/IDisputeGameFactory.sol";
-import { IPermissionedDisputeGameV2 } from "../../interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
+import "../../interfaces/L1/proofs/IDisputeGame.sol";
+import "../../interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { IPermissionedDisputeGameV2 } from "../../interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
 
 contract DisputeGames is FeatureFlags {
     using ByteUtils for bytes;
