@@ -59,7 +59,7 @@ import {
     NitroEnclaveVerifier,
     ZkCoProcessorType,
     ZkCoProcessorConfig
-} from "src/multiproof/tee/NitroEnclaveVerifier.sol";
+} from "src/L1/proofs/tee/NitroEnclaveVerifier.sol";
 
 /// @title DeployRiscZeroStack
 /// @notice Deploys RiscZeroSetVerifier + NitroEnclaveVerifier using an existing Router.
