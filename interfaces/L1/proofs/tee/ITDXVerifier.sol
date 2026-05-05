@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { ZkCoProcessorType, ZkCoProcessorConfig } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { ZkCoProcessorType, ZkCoProcessorConfig } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 
 /// @notice Statuses that a TDX quote/collateral verifier may emit.
 /// @dev Unknown is index 0 so uninitialized values fail closed.

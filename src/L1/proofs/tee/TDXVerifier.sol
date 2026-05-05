@@ -13,7 +13,7 @@ import {
     TDXVerifierJournal,
     ZkCoProcessorType,
     ZkCoProcessorConfig
-} from "interfaces/multiproof/tee/ITDXVerifier.sol";
+} from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 
 /// @title TDXVerifier
 /// @notice Production-shape Intel TDX DCAP verifier for multiproof signer registration.

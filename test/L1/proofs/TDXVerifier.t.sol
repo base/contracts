@@ -3,10 +3,10 @@ pragma solidity ^0.8.0;
 
 import { Test } from "forge-std/Test.sol";
 
-import { TDXTcbStatus, TDXVerificationResult, TDXVerifierJournal } from "interfaces/multiproof/tee/ITDXVerifier.sol";
-import { ZkCoProcessorConfig, ZkCoProcessorType } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { TDXTcbStatus, TDXVerificationResult, TDXVerifierJournal } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
+import { ZkCoProcessorConfig, ZkCoProcessorType } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 
-import { TDXVerifier } from "src/multiproof/tee/TDXVerifier.sol";
+import { TDXVerifier } from "src/L1/proofs/tee/TDXVerifier.sol";
 
 contract TDXVerifierTest is Test {
     TDXVerifier internal verifier;

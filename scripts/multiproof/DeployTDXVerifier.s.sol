@@ -23,9 +23,9 @@ pragma solidity ^0.8.20;
 import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
 
-import { ZkCoProcessorConfig, ZkCoProcessorType } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
-import { TDXTcbStatus } from "interfaces/multiproof/tee/ITDXVerifier.sol";
-import { TDXVerifier } from "src/multiproof/tee/TDXVerifier.sol";
+import { ZkCoProcessorConfig, ZkCoProcessorType } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { TDXTcbStatus } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
+import { TDXVerifier } from "src/L1/proofs/tee/TDXVerifier.sol";
 
 contract DeployTDXVerifier is Script {
     /// @notice Maximum TDX quote age accepted by TDXVerifier.

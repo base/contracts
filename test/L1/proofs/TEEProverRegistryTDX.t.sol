@@ -3,19 +3,19 @@ pragma solidity 0.8.15;
 
 import { Test } from "forge-std/Test.sol";
 
-import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
-import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
-import { INitroEnclaveVerifier } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
+import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import {
     ITDXVerifier,
     TDXTcbStatus,
     TDXVerificationResult,
     TDXVerifierJournal
-} from "interfaces/multiproof/tee/ITDXVerifier.sol";
-import { ZkCoProcessorConfig, ZkCoProcessorType } from "interfaces/multiproof/tee/INitroEnclaveVerifier.sol";
-import { GameType } from "src/dispute/lib/Types.sol";
+} from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
+import { ZkCoProcessorConfig, ZkCoProcessorType } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { GameType } from "src/libraries/bridge/Types.sol";
 
-import { TEEProverRegistry } from "src/multiproof/tee/TEEProverRegistry.sol";
+import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
 /// @notice Mock AggregateVerifier that returns a configurable TEE_IMAGE_HASH.
 contract MockAggregateVerifierForTDXRegistry {
