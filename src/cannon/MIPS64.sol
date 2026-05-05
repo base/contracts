@@ -13,7 +13,7 @@ import { MIPS64Instructions as ins } from "src/cannon/libraries/MIPS64Instructio
 import { MIPS64Memory } from "src/cannon/libraries/MIPS64Memory.sol";
 import { MIPS64State as st } from "src/cannon/libraries/MIPS64State.sol";
 import { MIPS64Syscalls as sys } from "src/cannon/libraries/MIPS64Syscalls.sol";
-import { VMStatuses } from "src/dispute/lib/Types.sol";
+import { VMStatuses } from "src/libraries/bridge/Types.sol";
 
 // Interfaces
 import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";

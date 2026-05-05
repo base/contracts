@@ -2,18 +2,18 @@
 pragma solidity ^0.8.0;
 
 // Libraries
-import { Claim, Duration, GameType, Proposal } from "src/dispute/lib/Types.sol";
+import { Claim, Duration, GameType, Proposal } from "src/libraries/bridge/Types.sol";
 
 // Interfaces
-import { IBigStepper } from "interfaces/dispute/IBigStepper.sol";
-import { IDelayedWETH } from "interfaces/dispute/IDelayedWETH.sol";
-import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IBigStepper } from "interfaces/L1/proofs/IBigStepper.sol";
+import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
+import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
-import { IFaultDisputeGameV2 } from "interfaces/dispute/v2/IFaultDisputeGameV2.sol";
-import { IPermissionedDisputeGameV2 } from "interfaces/dispute/v2/IPermissionedDisputeGameV2.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";

@@ -8,7 +8,7 @@ This guide covers deploying the multiproof contracts and registering a prover on
 
 The scripts in this directory are **development and testing tools only**. They are not suitable for production deployments. Specifically, the NoNitro path (`DeployDevNoNitro.s.sol`):
 
-- Does **no AWS Nitro attestation checking**. Instead it uses a bypass function for quickly registering provers: [`MockDevTEEProverRegistry.addDevSigner()`](https://github.com/base/contracts/blob/main/src/multiproof/mocks/MockDevTEEProverRegistry.sol#L22)
+- Does **no AWS Nitro attestation checking**. Instead it uses a bypass function for quickly registering provers: [`MockDevTEEProverRegistry.addDevSigner()`](https://github.com/base/contracts/blob/main/test/mocks/MockDevTEEProverRegistry.sol#L22)
 - Uses a simplified mock `AnchorStateRegistry` (with some differences from the real one): [`MockAnchorStateRegistry`](https://github.com/base/contracts/blob/main/scripts/multiproof/mocks/MockAnchorStateRegistry.sol)
 
 ---
@@ -40,13 +40,13 @@ Ensure `finalSystemOwner` is set to the address you will deploy from (i.e. the a
 
 Other relevant fields:
 
-| Field | Description |
-|---|---|
-| `teeProposer` | Address to be registered as the TEE proposer |
-| `teeImageHash` | PCR0 hash used when registering the dev signer (use `bytes32(0x01...01)` for dev) |
-| `multiproofGameType` | Game type ID for the dispute game |
-| `multiproofGenesisOutputRoot` | Initial anchor output root |
-| `multiproofGenesisBlockNumber` | Initial anchor L2 block number |
+| Field                          | Description                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------- |
+| `teeProposer`                  | Address to be registered as the TEE proposer                                      |
+| `teeImageHash`                 | PCR0 hash used when registering the dev signer (use `bytes32(0x01...01)` for dev) |
+| `multiproofGameType`           | Game type ID for the dispute game                                                 |
+| `multiproofGenesisOutputRoot`  | Initial anchor output root                                                        |
+| `multiproofGenesisBlockNumber` | Initial anchor L2 block number                                                    |
 
 ### Step 2: Deploy contracts
 
@@ -184,9 +184,9 @@ forge script scripts/multiproof/SeedGames.s.sol \
 
 Optional env vars:
 
-| Variable | Default | Description |
-|---|---|---|
-| `GAME_COUNT` | 500 | Number of games to create |
+| Variable     | Default      | Description                   |
+| ------------ | ------------ | ----------------------------- |
+| `GAME_COUNT` | 500          | Number of games to create     |
 | `ROOTS_FILE` | `roots.json` | Path to the output roots JSON |
 
 ### Step 5: Verify on-chain

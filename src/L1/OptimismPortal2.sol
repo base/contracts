@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Contracts
-import { ProxyAdminOwnedBase } from "src/L1/ProxyAdminOwnedBase.sol";
+import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { ResourceMetering } from "src/L1/ResourceMetering.sol";
 import { ReinitializableBase } from "src/universal/ReinitializableBase.sol";
@@ -15,16 +15,16 @@ import { Types } from "src/libraries/Types.sol";
 import { Hashing } from "src/libraries/Hashing.sol";
 import { SecureMerkleTrie } from "src/libraries/trie/SecureMerkleTrie.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
-import { GameStatus, GameType } from "src/dispute/lib/Types.sol";
+import { GameStatus, GameType } from "src/libraries/bridge/Types.sol";
 import { Features } from "src/libraries/Features.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
-import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
-import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
-import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
+import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 

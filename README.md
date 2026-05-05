@@ -46,4 +46,4 @@ just semver-lock
 
 - If you don't have foundry installed, run `make install-foundry`.
 - `make deps`
-- Test contracts: `make test`
+- Test contracts: `just test`
