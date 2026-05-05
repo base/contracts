@@ -44,6 +44,6 @@ just semver-lock
 
 ### setup and testing
 
-- If you don't have foundry installed, run `make install-foundry`.
-- `make deps`
+- If you don't have foundry installed, run `just install-foundry`.
+- `just deps`
 - Test contracts: `just test`

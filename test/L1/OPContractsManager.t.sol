@@ -136,7 +136,7 @@ contract OPContractsManager_Upgrade_Harness is CommonTest, DisputeGames {
             })
         );
 
-        // Retrieve the l2ChainId, which was read from the superchain-registry, and saved in
+        // Retrieve the l2ChainId, which was read from the local addresses file, and saved in
         // Artifacts encoded as an address.
         l2ChainId = uint256(uint160(address(artifacts.mustGetAddress("L2ChainId"))));
 

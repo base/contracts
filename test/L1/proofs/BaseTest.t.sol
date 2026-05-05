@@ -16,7 +16,9 @@ import { Claim, GameStatus, GameType, Hash, Proposal, Timestamp } from "src/libr
 
 // OpenZeppelin
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
-import { TransparentUpgradeableProxy } from "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {
+    TransparentUpgradeableProxy
+} from "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";

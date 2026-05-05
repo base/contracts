@@ -2,14 +2,32 @@
 #                        INSTALL                       #
 ########################################################
 
-# Installs dependencies.
-install:
-  forge install
+# Installs Foundry.
+install-foundry:
+  curl -L https://foundry.paradigm.xyz | bash
+  ~/.foundry/bin/foundryup
 
-# Shows the status of the git submodules.
-dep-status:
-  git submodule status
+# Installs pinned dependencies.
+deps: clean-lib
+  forge install --no-git \
+    github.com/foundry-rs/forge-std@6853b9ec7df5dc0c213b05ae67785ad4f4baa0ea \
+    github.com/runtimeverification/kontrol-cheatcodes@2c48ae1ab44228c199dca29414c0b4b18a3434e6 \
+    github.com/ethereum-optimism/lib-keccak@3b1e7bbb4cc23e9228097cfebe42aedaf3b8f2b9 \
+    github.com/OpenZeppelin/openzeppelin-contracts@ecd2ca2cd7cac116f7a37d0e474bbb3d7d5e1c4d \
+    github.com/OpenZeppelin/openzeppelin-contracts-upgradeable@0a2cb9a445c365870ed7a8ab461b12acf3e27d63 \
+    github.com/transmissions11/solmate@8f9b23f8838670afda0fd8983f2c41e8037ae6bc \
+    github.com/Vectorized/solady@502cc1ea718e6fa73b380635ee0868b0740595f0 \
+    github.com/risc0/risc0-ethereum@a78ac4a52fe9cfa14120c3b496430f0d42e1d8d3
+  @# openzeppelin-contracts-v5 and solady-v0.0.245 use the same orgs as their
+  @# counterparts but are pinned to different commits, so we clone them manually.
+  git clone --no-checkout https://github.com/OpenZeppelin/openzeppelin-contracts.git lib/openzeppelin-contracts-v5 && \
+    cd lib/openzeppelin-contracts-v5 && git checkout dbb6104ce834628e473d2173bbc9d47f81a9eec3
+  git clone --no-checkout https://github.com/Vectorized/solady.git lib/solady-v0.0.245 && \
+    cd lib/solady-v0.0.245 && git checkout 8583a6e386b897f3db142a541f86d5953eccd835
 
+# Cleans dependency installs.
+clean-lib:
+  rm -rf lib
 
 ########################################################
 #                         BUILD                        #

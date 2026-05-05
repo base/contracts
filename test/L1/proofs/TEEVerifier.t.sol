@@ -3,7 +3,9 @@ pragma solidity 0.8.15;
 
 import { Test } from "lib/forge-std/src/Test.sol";
 
-import { TransparentUpgradeableProxy } from "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {
+    TransparentUpgradeableProxy
+} from "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
