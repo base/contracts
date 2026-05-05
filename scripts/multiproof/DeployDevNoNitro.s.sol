@@ -70,7 +70,7 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
-import { DevTEEProverRegistry } from "src/L1/proofs/mocks/MockDevTEEProverRegistry.sol";
+import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 
