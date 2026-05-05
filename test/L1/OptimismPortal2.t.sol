@@ -213,7 +213,7 @@ contract OptimismPortal2_Initialize_Test is OptimismPortal2_TestInit {
         );
         address guardian = superchainConfig.guardian();
 
-        // This check is not valid for forked tests, as the guardian is not the same as the one in hardhat.json
+        // This check is not valid for forked tests, as the guardian is not the same as the one in local.json
         assertEq(guardian, deploy.cfg().superchainConfigGuardian());
 
         // This check is not valid on forked tests as the respectedGameType varies between OP Chains.

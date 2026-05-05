@@ -58,5 +58,6 @@
   "respectedGameType": 0,
   "useFaultProofs": true,
   "useRevenueShare": true,
-  "chainFeesRecipient": "0xa3d596EAfaB6B13Ab18D40FaE1A962700C84ADEa"
+  "chainFeesRecipient": "0xa3d596EAfaB6B13Ab18D40FaE1A962700C84ADEa",
+  "sp1Verifier": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B"
 }
