@@ -179,7 +179,7 @@ contract DeployDevWithNitro is Script {
                 IDelayedWETH(payable(mockDelayedWETH)),
                 IVerifier(teeVerifier),
                 IVerifier(zkVerifier),
-                cfg.teeImageHash(),
+                AggregateVerifier.TeeHashes(cfg.teeNitroImageHash(), cfg.teeTdxImageHash()),
                 zkHashes,
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainID(),
@@ -209,7 +209,8 @@ contract DeployDevWithNitro is Script {
         console.log("\nGame:");
         console.log("  AggregateVerifier:", aggregateVerifier);
         console.log("  Game Type:", cfg.multiproofGameType());
-        console.log("  TEE Image Hash:", vm.toString(cfg.teeImageHash()));
+        console.log("  Nitro Image Hash:", vm.toString(cfg.teeNitroImageHash()));
+        console.log("  TDX Image Hash:", vm.toString(cfg.teeTdxImageHash()));
         console.log("  Config Hash:", vm.toString(cfg.multiproofConfigHash()));
         console.log("========================================");
         console.log("\n>>> NEXT STEP: Register one Nitro signer and one TDX signer <<<");

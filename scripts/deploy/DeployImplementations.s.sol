@@ -62,7 +62,8 @@ contract DeployImplementations is Script {
         uint256 faultGameV2ClockExtension;
         uint256 faultGameV2MaxClockDuration;
         // Multiproof parameters
-        bytes32 teeImageHash;
+        bytes32 teeNitroImageHash;
+        bytes32 teeTdxImageHash;
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
         address nitroEnclaveVerifier;
@@ -634,7 +635,7 @@ contract DeployImplementations is Script {
                     _output.delayedWETHImpl,
                     IVerifier(teeVerifierImpl),
                     IVerifier(zkVerifier),
-                    _input.teeImageHash,
+                    AggregateVerifier.TeeHashes(_input.teeNitroImageHash, _input.teeTdxImageHash),
                     AggregateVerifier.ZkHashes(bytes32(0), bytes32(0)),
                     _input.multiproofConfigHash,
                     _input.l2ChainID,

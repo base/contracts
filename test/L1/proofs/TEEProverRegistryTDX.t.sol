@@ -17,12 +17,14 @@ import { GameType } from "src/libraries/bridge/Types.sol";
 
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
-/// @notice Mock AggregateVerifier that returns a configurable TEE_IMAGE_HASH.
+/// @notice Mock AggregateVerifier that returns configurable TEE image hashes.
 contract MockAggregateVerifierForTDXRegistry {
-    bytes32 public TEE_IMAGE_HASH;
+    bytes32 public TEE_NITRO_IMAGE_HASH;
+    bytes32 public TEE_TDX_IMAGE_HASH;
 
     constructor(bytes32 imageHash) {
-        TEE_IMAGE_HASH = imageHash;
+        TEE_NITRO_IMAGE_HASH = imageHash;
+        TEE_TDX_IMAGE_HASH = imageHash;
     }
 }
 

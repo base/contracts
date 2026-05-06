@@ -85,6 +85,8 @@ contract DeployConfig is Script {
 
     // Multiproof Configuration
     bytes32 public teeImageHash;
+    bytes32 public teeNitroImageHash;
+    bytes32 public teeTdxImageHash;
     bytes32 public multiproofConfigHash;
     uint256 public multiproofGameType;
     address public teeProposer;
@@ -199,6 +201,8 @@ contract DeployConfig is Script {
         faultGameV2ClockExtension = _readOr(_json, "$.faultGameV2ClockExtension", 10800);
         faultGameV2MaxClockDuration = _readOr(_json, "$.faultGameV2MaxClockDuration", 302400);
         teeImageHash = bytes32(_readOr(_json, "$.teeImageHash", 0));
+        teeNitroImageHash = bytes32(_readOr(_json, "$.teeNitroImageHash", uint256(teeImageHash)));
+        teeTdxImageHash = bytes32(_readOr(_json, "$.teeTdxImageHash", uint256(teeImageHash)));
         multiproofConfigHash = bytes32(_readOr(_json, "$.multiproofConfigHash", 0));
         multiproofGameType = _readOr(_json, "$.multiproofGameType", 621);
         teeProposer = stdJson.readAddress(_json, "$.teeProposer");

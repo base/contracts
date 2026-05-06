@@ -174,7 +174,8 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             _faultGameV2SplitDepth, // faultGameV2SplitDepth (bounded)
             _faultGameV2ClockExtension, // faultGameV2ClockExtension (bounded)
             _faultGameV2MaxClockDuration, // faultGameV2MaxClockDuration (bounded)
-            bytes32(uint256(1)), // teeImageHash
+            bytes32(uint256(1)), // teeNitroImageHash
+            bytes32(uint256(2)), // teeTdxImageHash
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
             address(0), // nitroEnclaveVerifier
@@ -404,7 +405,8 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             30, // faultGameV2SplitDepth
             10800, // faultGameV2ClockExtension
             302400, // faultGameV2MaxClockDuration
-            bytes32(uint256(1)), // teeImageHash
+            bytes32(uint256(1)), // teeNitroImageHash
+            bytes32(uint256(2)), // teeTdxImageHash
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
             address(0), // nitroEnclaveVerifier

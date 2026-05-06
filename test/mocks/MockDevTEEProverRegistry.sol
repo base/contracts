@@ -23,7 +23,7 @@ contract DevTEEProverRegistry is TEEProverRegistry {
     /// @notice Registers a Nitro signer for testing (bypasses attestation verification).
     /// @dev Only callable by owner. For development/testing use only.
     ///      The imageHash parameter is stored so isValidSigner() can validate against
-    ///      the current AggregateVerifier's TEE_IMAGE_HASH.
+    ///      the current AggregateVerifier's TEE_NITRO_IMAGE_HASH.
     /// @param signer The address of the signer to register.
     /// @param imageHash The TEE image hash to associate with this signer.
     function addDevSigner(address signer, bytes32 imageHash) external onlyOwner {

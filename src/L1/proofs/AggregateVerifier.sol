@@ -43,6 +43,23 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 aggregateHash;
     }
 
+    /// @notice Hashes for the TEE proving images.
+    struct TeeHashes {
+        bytes32 nitroHash;
+        bytes32 tdxHash;
+    }
+
+    /// @notice Common public inputs used to compute each TEE signature journal.
+    struct TeeJournalInputs {
+        address proposer;
+        bytes32 l1OriginHash;
+        bytes32 startingRoot;
+        uint64 startingL2SequenceNumber;
+        bytes32 endingRoot;
+        uint64 endingL2SequenceNumber;
+        bytes intermediateRoots;
+    }
+
     ////////////////////////////////////////////////////////////////
     //                         Constants                          //
     ////////////////////////////////////////////////////////////////
@@ -66,8 +83,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The minimum number of proofs required to resolve the game.
     uint256 public constant PROOF_THRESHOLD = 1;
 
-    /// @notice TEE proof payload size: nitro signature(65) + tdx signature(65).
-    uint256 internal constant TEE_PROOF_BYTES_LENGTH = 130;
+    /// @notice TEE proof payload size:
+    ///         nitro image hash(32) + nitro signature(65) + tdx image hash(32) + tdx signature(65).
+    uint256 internal constant TEE_PROOF_BYTES_LENGTH = 194;
+
     ////////////////////////////////////////////////////////////////
     //                         Immutables                         //
     ////////////////////////////////////////////////////////////////
@@ -83,8 +102,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The TEE prover.
     IVerifier public immutable TEE_VERIFIER;
 
-    /// @notice The hash of the TEE image.
-    bytes32 public immutable TEE_IMAGE_HASH;
+    /// @notice The hash of the Nitro TEE image.
+    bytes32 public immutable TEE_NITRO_IMAGE_HASH;
+
+    /// @notice The hash of the TDX TEE image.
+    bytes32 public immutable TEE_TDX_IMAGE_HASH;
 
     /// @notice The ZK prover.
     IVerifier public immutable ZK_VERIFIER;
@@ -258,7 +280,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param delayedWETH The delayed WETH contract.
     /// @param teeVerifier The TEE verifier.
     /// @param zkVerifier The ZK verifier.
-    /// @param teeImageHash The hash of the TEE image.
+    /// @param teeHashes The hashes of the Nitro and TDX TEE images.
     /// @param zkHashes The hashes of the ZK range and aggregate programs.
     /// @param configHash The hash of the rollup configuration.
     /// @param l2ChainId The chain ID of the L2 network.
@@ -270,7 +292,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         IDelayedWETH delayedWETH,
         IVerifier teeVerifier,
         IVerifier zkVerifier,
-        bytes32 teeImageHash,
+        TeeHashes memory teeHashes,
         ZkHashes memory zkHashes,
         bytes32 configHash,
         uint256 l2ChainId,
@@ -289,7 +311,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         DELAYED_WETH = delayedWETH;
         TEE_VERIFIER = teeVerifier;
         ZK_VERIFIER = zkVerifier;
-        TEE_IMAGE_HASH = teeImageHash;
+        TEE_NITRO_IMAGE_HASH = teeHashes.nitroHash;
+        TEE_TDX_IMAGE_HASH = teeHashes.tdxHash;
         ZK_RANGE_HASH = zkHashes.rangeHash;
         ZK_AGGREGATE_HASH = zkHashes.aggregateHash;
         CONFIG_HASH = configHash;
@@ -880,7 +903,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Verifies a TEE proof for the current game.
-    /// @param proofBytes The proof: nitro signature(65) + tdx signature(65).
+    /// @param proofBytes The proof: nitro image hash(32) + nitro signature(65) + tdx image hash(32)
+    ///        + tdx signature(65).
     function _verifyTeeProof(
         bytes calldata proofBytes,
         address proposer,
@@ -896,23 +920,48 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     {
         if (proofBytes.length != TEE_PROOF_BYTES_LENGTH) revert InvalidProof();
 
+        bytes32 nitroImageHash = bytes32(proofBytes[:32]);
+        bytes32 tdxImageHash = bytes32(proofBytes[97:129]);
+        if (nitroImageHash != TEE_NITRO_IMAGE_HASH || tdxImageHash != TEE_TDX_IMAGE_HASH) revert InvalidProof();
+
+        TeeJournalInputs memory inputs = TeeJournalInputs({
+            proposer: proposer,
+            l1OriginHash: l1OriginHash,
+            startingRoot: startingRoot,
+            startingL2SequenceNumber: startingL2SequenceNumber,
+            endingRoot: endingRoot,
+            endingL2SequenceNumber: endingL2SequenceNumber,
+            intermediateRoots: intermediateRoots
+        });
+
+        _verifyTeeSignature(proofBytes[32:97], nitroImageHash, inputs);
+        _verifyTeeSignature(proofBytes[129:194], tdxImageHash, inputs);
+    }
+
+    function _verifyTeeSignature(
+        bytes calldata signature,
+        bytes32 imageHash,
+        TeeJournalInputs memory inputs
+    )
+        internal
+        view
+    {
         bytes32 journal = keccak256(
             abi.encodePacked(
-                proposer,
-                l1OriginHash,
-                startingRoot,
-                startingL2SequenceNumber,
-                endingRoot,
-                endingL2SequenceNumber,
-                intermediateRoots,
+                inputs.proposer,
+                inputs.l1OriginHash,
+                inputs.startingRoot,
+                inputs.startingL2SequenceNumber,
+                inputs.endingRoot,
+                inputs.endingL2SequenceNumber,
+                inputs.intermediateRoots,
                 CONFIG_HASH,
-                TEE_IMAGE_HASH
+                imageHash
             )
         );
 
-        // Validate the proof.
-        bytes memory proof = abi.encodePacked(proposer, proofBytes);
-        if (!TEE_VERIFIER.verify(proof, TEE_IMAGE_HASH, journal)) revert InvalidProof();
+        bytes memory verifierProof = abi.encodePacked(inputs.proposer, signature);
+        if (!TEE_VERIFIER.verify(verifierProof, imageHash, journal)) revert InvalidProof();
     }
 
     /// @notice Verifies a ZK proof for the current game.

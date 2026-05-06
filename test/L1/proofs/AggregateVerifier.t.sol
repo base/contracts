@@ -19,6 +19,53 @@ contract AggregateVerifierTest is BaseTest {
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
         bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
 
+        bytes memory intermediateRoots =
+            abi.encodePacked(_generateIntermediateRootsExceptLast(currentL2BlockNumber), rootClaim.raw());
+        bytes32 l1OriginHash = blockhash(block.number - 1);
+        bytes32 startingRoot = keccak256(abi.encode(uint256(0)));
+        bytes32 saltHash = keccak256("tee-proof");
+        bytes memory nitroSignature = abi.encodePacked(saltHash, bytes32(0), uint8(27));
+        bytes memory tdxSignature = abi.encodePacked(saltHash, bytes32(uint256(1)), uint8(28));
+        bytes32 nitroJournal = keccak256(
+            abi.encodePacked(
+                TEE_PROVER,
+                l1OriginHash,
+                startingRoot,
+                uint64(0),
+                rootClaim.raw(),
+                uint64(currentL2BlockNumber),
+                intermediateRoots,
+                CONFIG_HASH,
+                TEE_NITRO_IMAGE_HASH
+            )
+        );
+        bytes32 tdxJournal = keccak256(
+            abi.encodePacked(
+                TEE_PROVER,
+                l1OriginHash,
+                startingRoot,
+                uint64(0),
+                rootClaim.raw(),
+                uint64(currentL2BlockNumber),
+                intermediateRoots,
+                CONFIG_HASH,
+                TEE_TDX_IMAGE_HASH
+            )
+        );
+
+        vm.expectCall(
+            address(teeVerifier),
+            abi.encodeCall(
+                IVerifier.verify, (abi.encodePacked(TEE_PROVER, nitroSignature), TEE_NITRO_IMAGE_HASH, nitroJournal)
+            )
+        );
+        vm.expectCall(
+            address(teeVerifier),
+            abi.encodeCall(
+                IVerifier.verify, (abi.encodePacked(TEE_PROVER, tdxSignature), TEE_TDX_IMAGE_HASH, tdxJournal)
+            )
+        );
+
         AggregateVerifier game = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
         );
@@ -268,7 +315,7 @@ contract AggregateVerifierTest is BaseTest {
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
 
         bytes memory proofBytes =
-            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(130));
+            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(194));
 
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.L1OriginInFuture.selector, l1OriginNumber, block.number)
@@ -290,7 +337,7 @@ contract AggregateVerifierTest is BaseTest {
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
 
         bytes memory proofBytes =
-            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(130));
+            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(194));
 
         vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginTooOld.selector, l1OriginNumber, block.number));
         _createAggregateVerifierGame(
@@ -325,8 +372,12 @@ contract AggregateVerifierTest is BaseTest {
         bytes32 l1OriginHash = blockhash(l1OriginNumber);
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
 
-        bytes memory proofBytes =
-            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(130));
+        bytes memory proofBytes = abi.encodePacked(
+            uint8(AggregateVerifier.ProofType.TEE),
+            l1OriginHash,
+            l1OriginNumber,
+            _generateProofBody("tee-proof", AggregateVerifier.ProofType.TEE)
+        );
 
         _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proofBytes
@@ -351,8 +402,12 @@ contract AggregateVerifierTest is BaseTest {
             abi.encode(expectedHash) // returns the blockhash
         );
 
-        bytes memory proofBytes =
-            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), expectedHash, l1OriginNumber, new bytes(130));
+        bytes memory proofBytes = abi.encodePacked(
+            uint8(AggregateVerifier.ProofType.TEE),
+            expectedHash,
+            l1OriginNumber,
+            _generateProofBody("tee-proof", AggregateVerifier.ProofType.TEE)
+        );
 
         _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proofBytes
@@ -370,7 +425,7 @@ contract AggregateVerifierTest is BaseTest {
             IDelayedWETH(payable(address(delayedWETH))),
             IVerifier(address(teeVerifier)),
             IVerifier(address(zkVerifier)),
-            TEE_IMAGE_HASH,
+            AggregateVerifier.TeeHashes(TEE_NITRO_IMAGE_HASH, TEE_TDX_IMAGE_HASH),
             AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
             CONFIG_HASH,
             L2_CHAIN_ID,
@@ -386,7 +441,7 @@ contract AggregateVerifierTest is BaseTest {
             IDelayedWETH(payable(address(delayedWETH))),
             IVerifier(address(teeVerifier)),
             IVerifier(address(zkVerifier)),
-            TEE_IMAGE_HASH,
+            AggregateVerifier.TeeHashes(TEE_NITRO_IMAGE_HASH, TEE_TDX_IMAGE_HASH),
             AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
             CONFIG_HASH,
             L2_CHAIN_ID,
@@ -402,7 +457,7 @@ contract AggregateVerifierTest is BaseTest {
             IDelayedWETH(payable(address(delayedWETH))),
             IVerifier(address(teeVerifier)),
             IVerifier(address(zkVerifier)),
-            TEE_IMAGE_HASH,
+            AggregateVerifier.TeeHashes(TEE_NITRO_IMAGE_HASH, TEE_TDX_IMAGE_HASH),
             AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
             CONFIG_HASH,
             L2_CHAIN_ID,

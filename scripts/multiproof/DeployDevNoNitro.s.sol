@@ -29,11 +29,11 @@ pragma solidity 0.8.15;
  * After deployment, register one dev Nitro signer and one dev TDX signer:
  *
  *   cast send $TEE_PROVER_REGISTRY \
- *     "addDevSigner(address,bytes32)" $NITRO_SIGNER_ADDRESS $TEE_IMAGE_HASH \
+ *     "addDevSigner(address,bytes32)" $NITRO_SIGNER_ADDRESS $TEE_NITRO_IMAGE_HASH \
  *     --private-key $OWNER_KEY --rpc-url $RPC_URL
  *
  *   cast send $TEE_PROVER_REGISTRY \
- *     "addDevTDXSigner(address,bytes32)" $TDX_SIGNER_ADDRESS $TEE_IMAGE_HASH \
+ *     "addDevTDXSigner(address,bytes32)" $TDX_SIGNER_ADDRESS $TEE_TDX_IMAGE_HASH \
  *     --private-key $OWNER_KEY --rpc-url $RPC_URL
  *
  * No attestation, PCR0 registration, or certificate validation required.
@@ -190,7 +190,7 @@ contract DeployDevNoNitro is Script {
                 IDelayedWETH(payable(mockDelayedWETH)),
                 IVerifier(teeVerifier),
                 IVerifier(zkVerifier),
-                cfg.teeImageHash(),
+                AggregateVerifier.TeeHashes(cfg.teeNitroImageHash(), cfg.teeTdxImageHash()),
                 zkHashes,
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainID(),
@@ -219,17 +219,18 @@ contract DeployDevNoNitro is Script {
         console.log("\nGame:");
         console.log("  AggregateVerifier:", aggregateVerifier);
         console.log("  Game Type:", cfg.multiproofGameType());
-        console.log("  TEE Image Hash:", vm.toString(cfg.teeImageHash()));
+        console.log("  Nitro Image Hash:", vm.toString(cfg.teeNitroImageHash()));
+        console.log("  TDX Image Hash:", vm.toString(cfg.teeTdxImageHash()));
         console.log("  Config Hash:", vm.toString(cfg.multiproofConfigHash()));
         console.log("========================================");
         console.log("\n>>> NEXT STEP - Register dev Nitro and TDX signers (NO ATTESTATION NEEDED) <<<");
         console.log("\ncast send", teeProverRegistryProxy);
         console.log('  "addDevSigner(address,bytes32)" <NITRO_SIGNER_ADDRESS>');
-        console.log(" ", vm.toString(cfg.teeImageHash()));
+        console.log(" ", vm.toString(cfg.teeNitroImageHash()));
         console.log("  --private-key <OWNER_KEY> --rpc-url <RPC>");
         console.log("\ncast send", teeProverRegistryProxy);
         console.log('  "addDevTDXSigner(address,bytes32)" <TDX_SIGNER_ADDRESS>');
-        console.log(" ", vm.toString(cfg.teeImageHash()));
+        console.log(" ", vm.toString(cfg.teeTdxImageHash()));
         console.log("  --private-key <OWNER_KEY> --rpc-url <RPC>");
         console.log("\n========================================\n");
     }

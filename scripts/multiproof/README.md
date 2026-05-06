@@ -43,7 +43,8 @@ Other relevant fields:
 | Field                          | Description                                                                       |
 | ------------------------------ | --------------------------------------------------------------------------------- |
 | `teeProposer`                  | Address to be registered as the TEE proposer                                      |
-| `teeImageHash`                 | PCR0 hash used when registering the dev signer (use `bytes32(0x01...01)` for dev) |
+| `teeNitroImageHash`            | PCR0 hash used when registering the Nitro dev signer                              |
+| `teeTdxImageHash`              | TDX image hash used when registering the TDX dev signer                           |
 | `multiproofGameType`           | Game type ID for the dispute game                                                 |
 | `multiproofGenesisOutputRoot`  | Initial anchor output root                                                        |
 | `multiproofGenesisBlockNumber` | Initial anchor L2 block number                                                    |
@@ -100,8 +101,9 @@ This returns a raw byte array representing an uncompressed secp256k1 public key 
 
 Call `addDevSigner` for the Nitro signer and `addDevTDXSigner` for the TDX signer on the deployed `DevTEEProverRegistry`.
 
-> **Note:** PCR0 enforcement is handled by `AggregateVerifier` (which bakes `teeImageHash` into the
-> journal the enclave signs). The registry only tracks which signer addresses are valid.
+> **Note:** PCR0 / TDX image enforcement is handled by `AggregateVerifier` (which bakes
+> `teeNitroImageHash` and `teeTdxImageHash` into the journal the enclaves sign). The registry
+> only tracks which signer addresses are valid.
 
 ```bash
 # Replace:
@@ -110,15 +112,15 @@ Call `addDevSigner` for the Nitro signer and `addDevTDXSigner` for the TDX signe
 cast send 0x587d410B205449fB889EC4a5b351D375C656d084 \
   "addDevSigner(address,bytes32)" \
   0x080f42420846c613158D7b4334257C78bE5A9B90 \
-  $TEE_IMAGE_HASH \
+  $TEE_NITRO_IMAGE_HASH \
   --rpc-url https://c3-chainproxy-eth-sepolia-full-dev.cbhq.net \
   --ledger --mnemonic-derivation-path "m/44'/60'/1'/0/0"
 
-# Register a TDX dev signer for the same image hash.
+# Register a TDX dev signer for the TDX image hash.
 cast send 0x587d410B205449fB889EC4a5b351D375C656d084 \
   "addDevTDXSigner(address,bytes32)" \
   $TDX_SIGNER_ADDRESS \
-  $TEE_IMAGE_HASH \
+  $TEE_TDX_IMAGE_HASH \
   --rpc-url https://c3-chainproxy-eth-sepolia-full-dev.cbhq.net \
   --ledger --mnemonic-derivation-path "m/44'/60'/1'/0/0"
 ```
@@ -154,7 +156,7 @@ CRLs/revocation state
 TDREPORT field extraction
 ```
 
-The Solidity verifier then enforces local policy over the proven journal. The PoC maps TDX measurements into the existing multiproof `TEE_IMAGE_HASH` field as:
+The Solidity verifier then enforces local policy over the proven journal. The PoC maps TDX measurements into `TEE_TDX_IMAGE_HASH` as:
 
 ```text
 keccak256(MRTD || RTMR0 || RTMR1 || RTMR2 || RTMR3)
@@ -168,7 +170,7 @@ The attested public key must be supplied as an uncompressed 65-byte secp256k1 pu
 
 The quote's TDREPORT `REPORTDATA` must put `keccak256(x || y)` in the first 32 bytes. The last 32 bytes are returned by the verifier as app-specific binding data and emitted by the registry.
 
-`TEEVerifier` is still the proposal-proof verifier, but a TEE proposal proof now requires two signatures over the same journal: one from a Nitro-registered signer and one from a TDX-registered signer. The proof bytes are `proposer || signatureA || signatureB`; either signature order is accepted as long as both registered TEE types are present and both signers match the expected `TEE_IMAGE_HASH`.
+`TEEVerifier` is still the proposal-proof verifier, but a TEE proposal proof now requires two signatures over the same journal: one from a Nitro-registered signer and one from a TDX-registered signer. The proof bytes are `proposer || signatureA || signatureB`; either signature order is accepted as long as both registered TEE types are present and both signers match their expected type-specific image hash.
 
 > **PoC boundary:** this repo now contains the production-shaped Solidity path and policy checks. The remaining off-chain piece is the actual RISC Zero/SP1 TDX DCAP guest that emits `TDXVerifierJournal` after verifying Intel collateral.
 

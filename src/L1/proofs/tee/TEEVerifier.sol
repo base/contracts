@@ -12,9 +12,7 @@ import { Verifier } from "../Verifier.sol";
 /// @title TEEVerifier
 /// @notice Stateless TEE proof verifier that validates Nitro and TDX signatures against registered signers.
 /// @dev This contract is designed to be used as the TEE_VERIFIER in the AggregateVerifier.
-///      It verifies that proofs are signed by a Nitro signer and a TDX signer registered in
-///      TEEProverRegistry. PCR0 / TDX image hash enforcement is handled by
-///      AggregateVerifier, which bakes TEE_IMAGE_HASH into the journal that the enclave signs.
+///      It verifies one TEE signature at a time against a registered Nitro or TDX signer.
 ///      The contract is intentionally stateless - all state related to output proposals and
 ///      L1 origin verification is managed by the calling contract (e.g., AggregateVerifier).
 contract TEEVerifier is Verifier, ISemver {
@@ -25,8 +23,8 @@ contract TEEVerifier is Verifier, ISemver {
     /// @notice Size of an ECDSA signature in bytes.
     uint256 internal constant SIGNATURE_SIZE = 65;
 
-    /// @notice Size of a TEE proof: proposer(20) + nitro signature(65) + tdx signature(65).
-    uint256 internal constant TEE_PROOF_SIZE = 20 + SIGNATURE_SIZE * 2;
+    /// @notice Size of a TEE proof: proposer(20) + signature(65).
+    uint256 internal constant TEE_PROOF_SIZE = 20 + SIGNATURE_SIZE;
 
     /// @notice Thrown when a recovered signer is not a valid registered signer.
     error InvalidSigner(address signer);
@@ -43,15 +41,6 @@ contract TEEVerifier is Verifier, ISemver {
     /// @notice Thrown when the proposer is not a valid registered proposer.
     error InvalidProposer(address proposer);
 
-    /// @notice Thrown when both signatures recover to the same signer.
-    error DuplicateSigner(address signer);
-
-    /// @notice Thrown when neither signature came from a Nitro-registered signer.
-    error MissingNitroSignature();
-
-    /// @notice Thrown when neither signature came from a TDX-registered signer.
-    error MissingTDXSignature();
-
     /// @notice Constructs the TEEVerifier contract.
     /// @param teeProverRegistry The TEEProverRegistry contract address.
     constructor(
@@ -64,10 +53,8 @@ contract TEEVerifier is Verifier, ISemver {
     }
 
     /// @notice Verifies a TEE proof for a state transition.
-    /// @param proofBytes The proof: proposer(20) + two signatures(65 each) = 150 bytes.
-    ///        One signature must recover to a Nitro signer and the other to a TDX signer.
-    /// @param imageId The claimed TEE image hash (from the calling AggregateVerifier's TEE_IMAGE_HASH).
-    ///        Validated against each signer's registered image hash to prevent cross-game-type attacks.
+    /// @param proofBytes The proof: proposer(20) + signature(65) = 85 bytes.
+    /// @param imageId The TEE image hash expected for the recovered signer.
     /// @param journal The keccak256 hash of the proof's public inputs.
     /// @return valid Whether the proof is valid.
     function verify(
@@ -88,23 +75,9 @@ contract TEEVerifier is Verifier, ISemver {
             revert InvalidProposer(proposer);
         }
 
-        bytes calldata firstSignature = proofBytes[20:20 + SIGNATURE_SIZE];
-        bytes calldata secondSignature = proofBytes[20 + SIGNATURE_SIZE:TEE_PROOF_SIZE];
-
-        address firstSigner = _recoverSigner(journal, firstSignature);
-        address secondSigner = _recoverSigner(journal, secondSignature);
-
-        TEEProverRegistry.TEEType firstTEEType = _validateSigner(firstSigner, imageId);
-        TEEProverRegistry.TEEType secondTEEType = _validateSigner(secondSigner, imageId);
-
-        if (firstSigner == secondSigner) revert DuplicateSigner(firstSigner);
-
-        if (firstTEEType != TEEProverRegistry.TEEType.NITRO && secondTEEType != TEEProverRegistry.TEEType.NITRO) {
-            revert MissingNitroSignature();
-        }
-        if (firstTEEType != TEEProverRegistry.TEEType.TDX && secondTEEType != TEEProverRegistry.TEEType.TDX) {
-            revert MissingTDXSignature();
-        }
+        bytes calldata signature = proofBytes[20:TEE_PROOF_SIZE];
+        address signer = _recoverSigner(journal, signature);
+        _validateSigner(signer, imageId);
 
         return true;
     }
@@ -116,15 +89,11 @@ contract TEEVerifier is Verifier, ISemver {
         if (err != ECDSA.RecoverError.NoError) revert InvalidSignature();
     }
 
-    function _validateSigner(address signer, bytes32 imageId)
-        internal
-        view
-        returns (TEEProverRegistry.TEEType teeType)
-    {
+    function _validateSigner(address signer, bytes32 imageId) internal view {
         // A registered signer always has a non-NONE TEE type, so this single read also
         // serves as the registration check (saves an SLOAD versus calling isRegisteredSigner).
-        teeType = TEE_PROVER_REGISTRY.signerTEEType(signer);
-        if (teeType == TEEProverRegistry.TEEType.NONE) revert InvalidSigner(signer);
+        TEEProverRegistry.TEEType signerTEEType = TEE_PROVER_REGISTRY.signerTEEType(signer);
+        if (signerTEEType == TEEProverRegistry.TEEType.NONE) revert InvalidSigner(signer);
 
         // Prevents a signer registered under one enclave image from being used in a game
         // that expects a different image (e.g., after an upgrade or across game types).

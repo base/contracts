@@ -22,9 +22,9 @@ import { GameType } from "src/libraries/bridge/Types.sol";
 ///      verified through an external NitroEnclaveVerifier contract (Risc0). TDX signers are registered
 ///      through the TDXVerifier configured on the implementation.
 ///      Registration is PCR0-agnostic: any enclave with a valid attestation can register,
-///      enabling pre-registration before hardforks. PCR0 enforcement happens at proof-submission
+///      enabling pre-registration before hardforks. PCR0 / image enforcement happens at proof-submission
 ///      time in TEEVerifier, which checks signerImageHash against the AggregateVerifier's
-///      TEE_IMAGE_HASH and requires one Nitro signer plus one TDX signer.
+///      type-specific TEE image hash and requires one Nitro signer plus one TDX signer.
 contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     using EnumerableSetLib for EnumerableSetLib.AddressSet;
     enum TEEType {
@@ -47,7 +47,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice The external TDXVerifier contract used for ZK TDX quote verification.
     ITDXVerifier public immutable TDX_VERIFIER;
 
-    /// @notice The DisputeGameFactory used to look up the current AggregateVerifier and its TEE_IMAGE_HASH.
+    /// @notice The DisputeGameFactory used to look up the current AggregateVerifier and its TEE image hashes.
     IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
 
     /// @notice The game type used to look up the AggregateVerifier in the factory.
@@ -59,7 +59,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
     /// @notice Mapping of signer address to the PCR0 image hash from their attestation.
     /// @dev Stored at registration time from the ZK-verified attestation document.
-    ///      TEEVerifier checks this against the AggregateVerifier's TEE_IMAGE_HASH at
+    ///      TEEVerifier checks this against the AggregateVerifier's type-specific TEE image hash at
     ///      proof-submission time, so signers automatically become unusable when the
     ///      AggregateVerifier upgrades to a new image hash. isValidSigner also uses
     ///      this for off-chain pre-submission checks.
@@ -106,10 +106,10 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Thrown when the dispute game factory is not configured.
     error DisputeGameFactoryNotSet();
 
-    /// @notice Thrown when reading TEE_IMAGE_HASH from the AggregateVerifier fails.
+    /// @notice Thrown when reading a TEE image hash from the AggregateVerifier fails.
     error ImageHashReadFailed();
 
-    /// @notice Thrown when setting a game type whose AggregateVerifier has no TEE_IMAGE_HASH.
+    /// @notice Thrown when setting a game type whose AggregateVerifier has no type-specific TEE image hash.
     error InvalidGameType();
 
     /// @notice Thrown when the TDX verifier is not configured.
@@ -144,10 +144,13 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     }
 
     /// @notice Updates the game type used to look up the AggregateVerifier.
-    /// @dev Validates that the new game type has an AggregateVerifier with a non-zero TEE_IMAGE_HASH.
+    /// @dev Validates that the new game type has an AggregateVerifier with non-zero type-specific TEE image hashes.
     /// @param gameType_ The new game type ID.
     function setGameType(GameType gameType_) external onlyOwner {
-        if (_getExpectedImageHash(gameType_) == bytes32(0)) revert InvalidGameType();
+        if (
+            _getExpectedImageHash(gameType_, TEEType.NITRO) == bytes32(0)
+                || _getExpectedImageHash(gameType_, TEEType.TDX) == bytes32(0)
+        ) revert InvalidGameType();
         gameType = gameType_;
         emit GameTypeUpdated(gameType_);
     }
@@ -158,9 +161,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     ///      2. Is less than MAX_AGE old
     ///      Registration is PCR0-agnostic: any enclave with a valid attestation can register.
     ///      This enables pre-registration of new-PCR0 enclaves before a hardfork, eliminating
-    ///      proof-generation delay when the on-chain TEE_IMAGE_HASH rotates. The TEEVerifier
+    ///      proof-generation delay when the on-chain Nitro image hash rotates. The TEEVerifier
     ///      enforces PCR0 correctness at proof-submission time by checking signerImageHash
-    ///      against the AggregateVerifier's TEE_IMAGE_HASH, so pre-registered enclaves cannot
+    ///      against the AggregateVerifier's TEE_NITRO_IMAGE_HASH, so pre-registered enclaves cannot
     ///      produce accepted proofs until the hardfork activates.
     /// @param output The ABI-encoded VerifierJournal from the ZK proof.
     /// @param proofBytes The Risc0 ZK proof bytes.
@@ -211,13 +214,15 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
     /// @notice Checks if an address is a valid signer.
     /// @dev Defense-in-depth: checks both that the signer is registered AND that their
-    ///      registered image hash matches the current AggregateVerifier's TEE_IMAGE_HASH.
+    ///      registered image hash matches the current AggregateVerifier's type-specific TEE image hash.
     ///      This ensures signers automatically become invalid when the AggregateVerifier upgrades.
     /// @param signer The address to check.
     /// @return True if the signer is registered with the current image hash, false otherwise.
     function isValidSigner(address signer) external view returns (bool) {
         if (!isRegisteredSigner[signer]) return false;
-        return signerImageHash[signer] == _getExpectedImageHash(gameType);
+        TEEType teeType = signerTEEType[signer];
+        if (teeType == TEEType.NONE) return false;
+        return signerImageHash[signer] == _getExpectedImageHash(gameType, teeType);
     }
 
     /// @notice Returns all currently registered signer addresses.
@@ -228,10 +233,16 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         return _registeredSigners.values();
     }
 
-    /// @notice Returns the expected TEE image hash from the current AggregateVerifier.
-    /// @return The TEE_IMAGE_HASH from the AggregateVerifier registered in the factory.
-    function getExpectedImageHash() external view returns (bytes32) {
-        return _getExpectedImageHash(gameType);
+    /// @notice Returns the expected Nitro TEE image hash from the current AggregateVerifier.
+    /// @return The TEE_NITRO_IMAGE_HASH from the AggregateVerifier registered in the factory.
+    function getExpectedNitroImageHash() external view returns (bytes32) {
+        return _getExpectedImageHash(gameType, TEEType.NITRO);
+    }
+
+    /// @notice Returns the expected TDX TEE image hash from the current AggregateVerifier.
+    /// @return The TEE_TDX_IMAGE_HASH from the AggregateVerifier registered in the factory.
+    function getExpectedTDXImageHash() external view returns (bytes32) {
+        return _getExpectedImageHash(gameType, TEEType.TDX);
     }
 
     /// @notice Initializes the contract with owner, manager, proposers, and game type.
@@ -281,11 +292,14 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         emit SignerRegistered(signer);
     }
 
-    /// @dev Reads TEE_IMAGE_HASH from the AggregateVerifier registered in the factory for `gameType_`.
-    function _getExpectedImageHash(GameType gameType_) internal view returns (bytes32) {
+    /// @dev Reads a type-specific TEE image hash from the AggregateVerifier registered in the factory for `gameType_`.
+    function _getExpectedImageHash(GameType gameType_, TEEType teeType) internal view returns (bytes32) {
+        if (teeType == TEEType.NONE) revert InvalidTEEType();
         address impl = address(DISPUTE_GAME_FACTORY.gameImpls(gameType_));
-        // AggregateVerifier.TEE_IMAGE_HASH() selector
-        (bool success, bytes memory data) = impl.staticcall(abi.encodeWithSignature("TEE_IMAGE_HASH()"));
+        bytes memory callData = teeType == TEEType.NITRO
+            ? abi.encodeWithSignature("TEE_NITRO_IMAGE_HASH()")
+            : abi.encodeWithSignature("TEE_TDX_IMAGE_HASH()");
+        (bool success, bytes memory data) = impl.staticcall(callData);
         if (!success || data.length != 32) revert ImageHashReadFailed();
         return abi.decode(data, (bytes32));
     }

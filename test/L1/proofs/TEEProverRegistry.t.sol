@@ -16,12 +16,14 @@ import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
-/// @notice Mock AggregateVerifier that returns a configurable TEE_IMAGE_HASH.
+/// @notice Mock AggregateVerifier that returns configurable TEE image hashes.
 contract MockAggregateVerifierForRegistry {
-    bytes32 public TEE_IMAGE_HASH;
+    bytes32 public TEE_NITRO_IMAGE_HASH;
+    bytes32 public TEE_TDX_IMAGE_HASH;
 
     constructor(bytes32 imageHash) {
-        TEE_IMAGE_HASH = imageHash;
+        TEE_NITRO_IMAGE_HASH = imageHash;
+        TEE_TDX_IMAGE_HASH = imageHash;
     }
 }
 
