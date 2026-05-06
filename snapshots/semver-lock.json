@@ -37,7 +37,7 @@
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0x6e50ad8219dfc59503395bf63d2a4d91c002bd21a1df7c902debedea9c2e13eb",
-    "sourceCodeHash": "0x5708e88bac4268a2c1310c3b9aa84335310ae6941a90e41bc10212f356b2060a"
+    "sourceCodeHash": "0x802a3645c05ae98232b091f779f6321f60230dd22f536b00dcbacccde6af4d3a"
   },
   "src/L1/proofs/AnchorStateRegistry.sol:AnchorStateRegistry": {
     "initCodeHash": "0x6f3afd2d0ef97a82ca3111976322b99343a270e54cd4a405028f2f29c75f7fb1",
@@ -61,11 +61,11 @@
   },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
     "initCodeHash": "0x4b2fb8ba42668b1b9a8ebb99518fc0552703dfda190acde45d771847b450ac65",
-    "sourceCodeHash": "0xd14971b269de818bcceac3493284196dd0168fad3d21315db965d6d05a2cc050"
+    "sourceCodeHash": "0x3e763a25f5353756c2ab52f6ae003f8cc7c1da2965aa2fd8b6ec6a0ac0ae6720"
   },
   "src/L1/proofs/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0x5f42455c6d41c0a49e05681a6fa7dbf21eb22c89705fd11b6030952b3227e559",
-    "sourceCodeHash": "0x83a09b025e33838859a7b5848463bb7f4d6d76031f5b8b8bc9f3cd5e73ad4464"
+    "sourceCodeHash": "0xcd8358734ff27b0c17af73713b7f3d2b0f348ba0646efc356345bad9fa8d6a8c"
   },
   "src/L1/proofs/v2/FaultDisputeGameV2.sol:FaultDisputeGameV2": {
     "initCodeHash": "0x6fc59e2da083c9e2093e42b0fda705e8215cc216e4dcedbf728c08f69ec2d3bd",
