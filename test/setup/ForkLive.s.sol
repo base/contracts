@@ -4,20 +4,19 @@ pragma solidity ^0.8.0;
 import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { StdAssertions } from "lib/forge-std/src/StdAssertions.sol";
 
-// Testing
-import { DelegateCaller } from "test/mocks/Callers.sol";
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 
 // Scripts
 import { Deployer } from "scripts/deploy/Deployer.sol";
 import { Deploy } from "scripts/deploy/Deploy.s.sol";
+import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
 
 // Libraries
 import { GameTypes, Claim } from "src/libraries/bridge/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
-import { Types, IOPContractsManagerInterop } from "scripts/libraries/Types.sol";
+import { Types } from "scripts/libraries/Types.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
@@ -31,7 +30,6 @@ import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
-import { IOPContractsManagerUpgrader } from "interfaces/L1/IOPContractsManager.sol";
 
 /// @title ForkLive
 /// @notice This script is called by Setup.sol as a preparation step for the foundry test suite, and is run as an
@@ -49,7 +47,6 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
     struct SystemAddresses {
         address systemConfig;
         address superchainConfig;
-        address opcm;
     }
 
     struct GameAddresses {
@@ -66,18 +63,16 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         if (block.chainid == 1) {
             system_ = SystemAddresses({
                 systemConfig: 0x73a79Fab69143498Ed3712e519A88a918e1f4072,
-                superchainConfig: 0xb535ff7F118260a952CE65e7fF41B1743De8EE6c,
-                opcm: 0x50F47B43c24F40B92C873Fa0704D4207586D0C9f
+                superchainConfig: 0xb535ff7F118260a952CE65e7fF41B1743De8EE6c
             });
         } else if (block.chainid == 11155111) {
             system_ = SystemAddresses({
                 systemConfig: 0xf272670eb55e895584501d564AfEB048bEd26194,
-                superchainConfig: 0xE4401EB53AE90a5335a51fe1828d7BeCf7a63508,
-                opcm: 0xF0a2e224519E876979eA6B2cd15eF5CC3d6703bd
+                superchainConfig: 0xE4401EB53AE90a5335a51fe1828d7BeCf7a63508
             });
         } else if (block.chainid == 560048) {
             system_ = SystemAddresses({
-                systemConfig: 0xcC7c76564bea74A963A0Bd75E0bC9BcE3FF0EA80, superchainConfig: address(0), opcm: address(0)
+                systemConfig: 0xcC7c76564bea74A963A0Bd75E0bC9BcE3FF0EA80, superchainConfig: address(0)
             });
         } else {
             revert UnsupportedChainId();
@@ -88,8 +83,8 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
     ///      1. Check if the SUPERCHAIN_OPS_ALLOCS_PATH environment variable was set from superchain ops.
     ///      2. If set, load the state from the given path.
     ///      3. Derive the live system addresses from the configured fork entrypoints.
-    ///      4. If the environment variable wasn't set, deploy the updated OPCM and implementations of the contracts.
-    ///      5. Upgrade the system using the OPCM.upgrade() function if useUpgradedFork is true.
+    ///      4. If the environment variable wasn't set, deploy the updated implementations of the contracts.
+    ///      5. Upgrade the system using SystemDeploy.upgrade() if useUpgradedFork is true.
     function run() public {
         string memory superchainOpsAllocsPath = Config.superchainOpsAllocsPath();
 
@@ -107,7 +102,7 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         } else {
             // Read the live system and save the addresses to the Artifacts contract.
             _readForkAddresses();
-            // Now deploy the updated OPCM and implementations of the contracts.
+            // Now deploy the updated implementations of the contracts.
             _deployNewImplementations();
         }
 
@@ -123,7 +118,7 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
     /// @notice Reads the live fork system and saves the addresses to disk.
     /// @dev During development of an upgrade which adds a new contract, the contract will not yet be derivable from
     ///      the live fork. In this case, the contract will be deployed by the upgrade process, and will need to be
-    ///      stored by artifacts.save() after the call to opcm.upgrade().
+    ///      stored by artifacts.save() after the call to SystemDeploy.upgrade().
     function _readForkAddresses() internal {
         SystemAddresses memory system = forkSystemAddresses();
         ISystemConfig systemConfig = ISystemConfig(system.systemConfig);
@@ -143,8 +138,6 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         if (superchainConfig != address(0)) {
             _saveProxyAndImpl("SuperchainConfig", superchainConfig);
         }
-        artifacts.save("OPContractsManager", system.opcm);
-
         // Core contracts
         artifacts.save("ProxyAdmin", EIP1967Helper.getAdmin(address(systemConfig)));
         _saveProxyAndImpl("SystemConfig", address(systemConfig));
@@ -202,10 +195,12 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         deploy.deployImplementations({ _isInterop: false });
     }
 
-    /// @notice Performs a single OPCM upgrade.
-    /// @param _opcm The OPCM contract to upgrade.
-    /// @param _delegateCaller The address of the upgrader to use for the upgrade.
-    function _doUpgrade(IOPContractsManagerInterop _opcm, address _delegateCaller) internal {
+    /// @notice Performs a script-level upgrade without a manager delegatecall.
+    /// @param _upgrader The address of the OP Chain ProxyAdmin owner to use for the chain upgrade.
+    function _doUpgrade(address _upgrader) internal {
+        SystemDeploy systemDeploy = new SystemDeploy();
+        Types.Implementations memory implementations = _latestImplementations();
+
         ISystemConfig systemConfig = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
         Types.OpChainConfig[] memory opChains = new Types.OpChainConfig[](1);
         opChains[0] = Types.OpChainConfig({
@@ -214,51 +209,36 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
             cannonKonaPrestate: Claim.wrap(bytes32(keccak256("cannonKonaPrestate")))
         });
 
-        // Turn the SuperchainPAO into a DelegateCaller so we can try to upgrade the
-        // SuperchainConfig contract.
         ISuperchainConfig superchainConfig = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
         IProxyAdmin superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
         address superchainPAO = superchainProxyAdmin.owner();
-        bytes memory superchainPAOCode = address(superchainPAO).code;
-        vm.etch(superchainPAO, vm.getDeployedCode("test/mocks/Callers.sol:DelegateCaller"));
 
-        // Always try to upgrade the SuperchainConfig. Not always necessary but easier to do it
-        // every time rather than adding or removing this code for each upgrade.
-        try DelegateCaller(superchainPAO)
-            .dcForward(
-                address(_opcm), abi.encodeCall(IOPContractsManagerInterop.upgradeSuperchainConfig, (superchainConfig))
-            ) {
-        // Great, the upgrade succeeded.
-        }
-        catch (bytes memory reason) {
-            // Only acceptable revert reason is the SuperchainConfig already being up to date.
-            assertTrue(
-                bytes4(reason)
-                    == IOPContractsManagerUpgrader.OPContractsManagerUpgrader_SuperchainConfigAlreadyUpToDate.selector,
-                "Revert reason other than SuperchainConfigAlreadyUpToDate"
-            );
-        }
+        // Run the shared SuperchainConfig upgrade as the Superchain ProxyAdmin owner. The script
+        // skips this step when the proxy is already at or above the target implementation version.
+        vm.prank(superchainPAO);
+        systemDeploy.upgrade(
+            SystemDeploy.UpgradeInput({
+                saveArtifacts: false,
+                superchainConfigProxy: superchainConfig,
+                implementations: implementations,
+                opChainConfigs: new Types.OpChainConfig[](0)
+            })
+        );
 
-        // Reset the superchainPAO to the original code.
-        vm.etch(superchainPAO, superchainPAOCode);
-
-        // Temporarily replace the upgrader with a DelegateCaller so we can test the upgrade,
-        // then reset its code to the original code.
-        bytes memory upgraderCode = address(_delegateCaller).code;
-        vm.etch(_delegateCaller, vm.getDeployedCode("test/mocks/Callers.sol:DelegateCaller"));
-
-        // Upgrade the chain.
-        DelegateCaller(_delegateCaller)
-            .dcForward(address(_opcm), abi.encodeCall(IOPContractsManagerInterop.upgrade, (opChains)));
-
-        // Reset the upgrader to the original code.
-        vm.etch(_delegateCaller, upgraderCode);
+        // Run the per-chain upgrade as the OP Chain ProxyAdmin owner.
+        vm.prank(_upgrader);
+        systemDeploy.upgrade(
+            SystemDeploy.UpgradeInput({
+                saveArtifacts: false,
+                superchainConfigProxy: ISuperchainConfig(address(0)),
+                implementations: implementations,
+                opChainConfigs: opChains
+            })
+        );
     }
 
-    /// @notice Upgrades the contracts using the OPCM.
+    /// @notice Upgrades the contracts using the script-level upgrade API.
     function _upgrade() internal {
-        IOPContractsManagerInterop opcm = IOPContractsManagerInterop(artifacts.mustGetAddress("OPContractsManager"));
-
         ISystemConfig systemConfig = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
         IProxyAdmin proxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(systemConfig)));
 
@@ -275,7 +255,7 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         }
 
         // Current upgrade.
-        _doUpgrade(opcm, upgrader);
+        _doUpgrade(upgrader);
 
         console.log("ForkLive: Saving newly deployed contracts");
 
@@ -300,6 +280,12 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
             IDelayedWETH(payable(LibGameArgs.decode(disputeGameFactory.gameArgs(GameTypes.PERMISSIONED_CANNON)).weth));
         artifacts.save("DelayedWETHProxy", address(newDelayedWeth));
         artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(address(newDelayedWeth)));
+    }
+
+    /// @notice Returns the latest implementation set saved by deployImplementations.
+    function _latestImplementations() internal view returns (Types.Implementations memory) {
+        Deploy deploy = Deploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
+        return deploy.getImplementations();
     }
 
     /// @notice Saves the proxy and implementation addresses for a contract name.

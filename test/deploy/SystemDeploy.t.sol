@@ -10,8 +10,10 @@ import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
+import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
+import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 import { Claim, Duration, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 
 contract SystemDeploy_Test is Test {
@@ -82,6 +84,68 @@ contract SystemDeploy_Test is Test {
             output.implementationOutput.implementations.permissionedDisputeGameV2Impl,
             "permissioned game impl after upgrade"
         );
+        _assertUpgradedProxyImplementations(output);
+    }
+
+    function test_upgrade_existingCannonKonaFallsBackToCurrentPrestate_succeeds() public {
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_defaultDeployInput());
+
+        Claim currentCannonPrestate = Claim.wrap(bytes32(uint256(3)));
+        Claim currentCannonKonaPrestate = Claim.wrap(bytes32(uint256(4)));
+        output.opChain.disputeGameFactoryProxy
+            .setImplementation(
+                GameTypes.CANNON,
+                IDisputeGame(output.implementationOutput.implementations.permissionedDisputeGameV2Impl),
+                _permissionlessGameArgs(output, currentCannonPrestate)
+            );
+        output.opChain.disputeGameFactoryProxy
+            .setImplementation(
+                GameTypes.CANNON_KONA,
+                IDisputeGame(output.implementationOutput.implementations.permissionedDisputeGameV2Impl),
+                _permissionlessGameArgs(output, currentCannonKonaPrestate)
+            );
+        output.opChain.disputeGameFactoryProxy.setInitBond(GameTypes.CANNON, 1 ether);
+
+        Types.OpChainConfig[] memory opChainConfigs = new Types.OpChainConfig[](1);
+        opChainConfigs[0] = Types.OpChainConfig({
+            systemConfigProxy: output.opChain.systemConfigProxy,
+            cannonPrestate: Claim.wrap(bytes32(0)),
+            cannonKonaPrestate: Claim.wrap(bytes32(0))
+        });
+
+        systemDeploy.upgrade(
+            SystemDeploy.UpgradeInput({
+                saveArtifacts: false,
+                superchainConfigProxy: output.superchain.superchainConfigProxy,
+                implementations: output.implementationOutput.implementations,
+                opChainConfigs: opChainConfigs
+            })
+        );
+
+        assertEq(
+            address(output.opChain.disputeGameFactoryProxy.gameImpls(GameTypes.CANNON)),
+            output.implementationOutput.implementations.faultDisputeGameV2Impl,
+            "cannon impl"
+        );
+        assertEq(
+            address(output.opChain.disputeGameFactoryProxy.gameImpls(GameTypes.CANNON_KONA)),
+            output.implementationOutput.implementations.faultDisputeGameV2Impl,
+            "cannon kona impl"
+        );
+
+        LibGameArgs.GameArgs memory cannonArgs =
+            LibGameArgs.decode(output.opChain.disputeGameFactoryProxy.gameArgs(GameTypes.CANNON));
+        LibGameArgs.GameArgs memory cannonKonaArgs =
+            LibGameArgs.decode(output.opChain.disputeGameFactoryProxy.gameArgs(GameTypes.CANNON_KONA));
+        assertEq(cannonArgs.absolutePrestate, currentCannonPrestate.raw(), "cannon prestate");
+        assertEq(cannonKonaArgs.absolutePrestate, currentCannonKonaPrestate.raw(), "cannon kona prestate");
+        assertEq(cannonKonaArgs.weth, cannonArgs.weth, "shared weth");
+        assertEq(cannonKonaArgs.anchorStateRegistry, cannonArgs.anchorStateRegistry, "shared asr");
+        assertEq(
+            output.opChain.disputeGameFactoryProxy.initBonds(GameTypes.CANNON_KONA),
+            output.opChain.disputeGameFactoryProxy.initBonds(GameTypes.CANNON),
+            "cannon kona bond"
+        );
     }
 
     function _defaultDeployInput() internal view returns (SystemDeploy.DeployInput memory input_) {
@@ -140,5 +204,78 @@ contract SystemDeploy_Test is Test {
             disputeClockExtension: Duration.wrap(10_800),
             disputeMaxClockDuration: Duration.wrap(302_400)
         });
+    }
+
+    function _permissionlessGameArgs(
+        SystemDeploy.DeployOutput memory _output,
+        Claim _absolutePrestate
+    )
+        internal
+        view
+        returns (bytes memory)
+    {
+        return LibGameArgs.encode(
+            LibGameArgs.GameArgs({
+                absolutePrestate: _absolutePrestate.raw(),
+                vm: _output.implementationOutput.implementations.mipsImpl,
+                anchorStateRegistry: address(_output.opChain.anchorStateRegistryProxy),
+                weth: address(_output.opChain.delayedWETHPermissionlessGameProxy),
+                l2ChainId: l2ChainId,
+                proposer: address(0),
+                challenger: address(0)
+            })
+        );
+    }
+
+    function _assertUpgradedProxyImplementations(SystemDeploy.DeployOutput memory _output) internal view {
+        IProxyAdmin superchainProxyAdmin = _output.superchain.superchainProxyAdmin;
+        IProxyAdmin opChainProxyAdmin = _output.opChain.opChainProxyAdmin;
+        Types.Implementations memory impls = _output.implementationOutput.implementations;
+
+        assertEq(
+            superchainProxyAdmin.getProxyImplementation(address(_output.superchain.superchainConfigProxy)),
+            impls.superchainConfigImpl,
+            "superchain config impl"
+        );
+        assertEq(
+            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.systemConfigProxy)),
+            impls.systemConfigImpl,
+            "system config impl"
+        );
+        assertEq(
+            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.optimismPortalProxy)),
+            impls.optimismPortalImpl,
+            "portal impl"
+        );
+        assertEq(
+            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.anchorStateRegistryProxy)),
+            impls.anchorStateRegistryImpl,
+            "anchor state registry impl"
+        );
+        assertEq(
+            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.optimismMintableERC20FactoryProxy)),
+            impls.optimismMintableERC20FactoryImpl,
+            "erc20 factory impl"
+        );
+        assertEq(
+            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.disputeGameFactoryProxy)),
+            impls.disputeGameFactoryImpl,
+            "dispute game factory impl"
+        );
+        assertEq(
+            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.l1CrossDomainMessengerProxy)),
+            impls.l1CrossDomainMessengerImpl,
+            "messenger impl"
+        );
+        assertEq(
+            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.l1StandardBridgeProxy)),
+            impls.l1StandardBridgeImpl,
+            "standard bridge impl"
+        );
+        assertEq(
+            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.l1ERC721BridgeProxy)),
+            impls.l1ERC721BridgeImpl,
+            "erc721 bridge impl"
+        );
     }
 }

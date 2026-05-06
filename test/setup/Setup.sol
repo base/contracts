@@ -261,7 +261,10 @@ abstract contract Setup is FeatureFlags {
         anchorStateRegistry = IAnchorStateRegistry(artifacts.mustGetAddress("AnchorStateRegistryProxy"));
         disputeGameFactory = IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
         delayedWeth = IDelayedWETH(artifacts.mustGetAddress("DelayedWETHProxy"));
-        opcm = IOPContractsManager(artifacts.mustGetAddress("OPContractsManager"));
+        address opcmAddress = artifacts.getAddress("OPContractsManager");
+        if (opcmAddress != address(0)) {
+            opcm = IOPContractsManager(opcmAddress);
+        }
         proxyAdmin = IProxyAdmin(artifacts.mustGetAddress("ProxyAdmin"));
         proxyAdminOwner = proxyAdmin.owner();
         superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));

@@ -440,37 +440,71 @@ contract SystemDeploy is Script {
             _opChainConfig: _config
         });
 
-        IDisputeGame permissionlessGame = disputeGameFactory.gameImpls(GameTypes.CANNON);
-        if (address(permissionlessGame) != address(0)) {
+        _upgradePermissionlessGames(_config, _impls, disputeGameFactory);
+        emit Upgraded(_config.systemConfigProxy.l2ChainId(), _config.systemConfigProxy, msg.sender);
+    }
+
+    function _upgradePermissionlessGames(
+        Types.OpChainConfig memory _config,
+        Types.Implementations memory _impls,
+        IDisputeGameFactory _disputeGameFactory
+    )
+        internal
+    {
+        IDisputeGame cannonGame = _disputeGameFactory.gameImpls(GameTypes.CANNON);
+        IDelayedWETH cannonWeth;
+        IAnchorStateRegistry cannonAnchorStateRegistry;
+        if (address(cannonGame) != address(0)) {
+            cannonWeth = _getWETH(_disputeGameFactory, cannonGame, GameTypes.CANNON);
+            cannonAnchorStateRegistry = _getAnchorStateRegistryFromGame(cannonGame);
+
             Claim cannonPrestate = _config.cannonPrestate.raw() != bytes32(0)
                 ? _config.cannonPrestate
-                : _getAbsolutePrestate(disputeGameFactory, address(permissionlessGame), GameTypes.CANNON);
+                : _getAbsolutePrestate(_disputeGameFactory, address(cannonGame), GameTypes.CANNON);
             _setNewPermissionlessGameImplV2({
                 _impls: _impls,
                 _l2ChainId: _config.systemConfigProxy.l2ChainId(),
                 _newAbsolutePrestate: cannonPrestate,
-                _newDelayedWeth: _getWETH(disputeGameFactory, permissionlessGame, GameTypes.CANNON),
-                _newAnchorStateRegistryProxy: _getAnchorStateRegistryFromGame(permissionlessGame),
+                _newDelayedWeth: cannonWeth,
+                _newAnchorStateRegistryProxy: cannonAnchorStateRegistry,
                 _gameType: GameTypes.CANNON,
-                _disputeGameFactory: disputeGameFactory
+                _disputeGameFactory: _disputeGameFactory
             });
+        }
 
-            if (_config.cannonKonaPrestate.raw() != bytes32(0)) {
+        IDisputeGame cannonKonaGame = _disputeGameFactory.gameImpls(GameTypes.CANNON_KONA);
+        if (address(cannonKonaGame) != address(0) || address(cannonGame) != address(0)) {
+            Claim cannonKonaPrestate = _config.cannonKonaPrestate.raw() != bytes32(0)
+                ? _config.cannonKonaPrestate
+                : address(cannonKonaGame) != address(0)
+                    ? _getAbsolutePrestate(_disputeGameFactory, address(cannonKonaGame), GameTypes.CANNON_KONA)
+                    : Claim.wrap(bytes32(0));
+
+            if (cannonKonaPrestate.raw() != bytes32(0)) {
+                IDelayedWETH cannonKonaWeth = address(cannonGame) != address(0)
+                    ? cannonWeth
+                    : _getWETH(_disputeGameFactory, cannonKonaGame, GameTypes.CANNON_KONA);
+                IAnchorStateRegistry cannonKonaAnchorStateRegistry = address(cannonGame) != address(0)
+                    ? cannonAnchorStateRegistry
+                    : _getAnchorStateRegistryFromGame(cannonKonaGame);
+
                 _setNewPermissionlessGameImplV2({
                     _impls: _impls,
                     _l2ChainId: _config.systemConfigProxy.l2ChainId(),
-                    _newAbsolutePrestate: _config.cannonKonaPrestate,
-                    _newDelayedWeth: _getWETH(disputeGameFactory, permissionlessGame, GameTypes.CANNON),
-                    _newAnchorStateRegistryProxy: _getAnchorStateRegistryFromGame(permissionlessGame),
+                    _newAbsolutePrestate: cannonKonaPrestate,
+                    _newDelayedWeth: cannonKonaWeth,
+                    _newAnchorStateRegistryProxy: cannonKonaAnchorStateRegistry,
                     _gameType: GameTypes.CANNON_KONA,
-                    _disputeGameFactory: disputeGameFactory
+                    _disputeGameFactory: _disputeGameFactory
                 });
-                vm.broadcast(msg.sender);
-                disputeGameFactory.setInitBond(GameTypes.CANNON_KONA, disputeGameFactory.initBonds(GameTypes.CANNON));
+
+                uint256 cannonInitBond = _disputeGameFactory.initBonds(GameTypes.CANNON);
+                if (cannonInitBond != 0) {
+                    vm.broadcast(msg.sender);
+                    _disputeGameFactory.setInitBond(GameTypes.CANNON_KONA, cannonInitBond);
+                }
             }
         }
-
-        emit Upgraded(_config.systemConfigProxy.l2ChainId(), _config.systemConfigProxy, msg.sender);
     }
 
     function _encodeSystemConfigInitializer(
