@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Vm } from "forge-std/Vm.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
 
 /// @title EIP1967Helper
 /// @dev Testing library to help with reading EIP 1967 variables from state

@@ -5,7 +5,7 @@ pragma solidity 0.8.15;
 import { CommonTest } from "test/setup/CommonTest.sol";
 
 // Contracts
-import { ERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import { ERC721 } from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 import { OptimismMintableERC721 } from "src/L2/OptimismMintableERC721.sol";
 
 // Interfaces

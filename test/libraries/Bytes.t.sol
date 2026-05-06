@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Testing utilities
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 
 // Target contract
 import { Bytes } from "src/libraries/Bytes.sol";

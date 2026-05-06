@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache2.0
 pragma solidity ^0.8.0;
 
-import { Ownable } from "@solady/auth/Ownable.sol";
+import { Ownable } from "lib/solady/src/auth/Ownable.sol";
 import {
     INitroEnclaveVerifier,
     ZkCoProcessorType,

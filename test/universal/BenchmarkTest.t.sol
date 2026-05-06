@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Forge
-import { Vm } from "forge-std/Vm.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
 
 // Testing
 import { CommonTest } from "test/setup/CommonTest.sol";

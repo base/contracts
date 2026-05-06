@@ -2,10 +2,10 @@
 pragma solidity ^0.8.15;
 
 // Testing
-import { Vm } from "forge-std/Vm.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
 import { DisputeGameFactory_TestInit } from "test/L1/proofs/DisputeGameFactory.t.sol";
 import { AlphabetVM } from "test/mocks/AlphabetVM.sol";
-import { stdError } from "forge-std/StdError.sol";
+import { stdError } from "lib/forge-std/src/StdError.sol";
 
 // Scripts
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";

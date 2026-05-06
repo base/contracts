@@ -49,8 +49,8 @@ pragma solidity ^0.8.20;
  * ─────────────────────────────────────────────────────────────────────────────────
  */
 
-import { Script } from "forge-std/Script.sol";
-import { console2 as console } from "forge-std/console2.sol";
+import { Script } from "lib/forge-std/src/Script.sol";
+import { console2 as console } from "lib/forge-std/src/console2.sol";
 
 import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
 import { RiscZeroSetVerifier, RiscZeroSetVerifierLib } from "lib/risc0-ethereum/contracts/src/RiscZeroSetVerifier.sol";

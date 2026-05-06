@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { Constants } from "src/libraries/Constants.sol";

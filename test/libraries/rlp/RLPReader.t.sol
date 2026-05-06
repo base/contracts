@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { stdError } from "forge-std/Test.sol";
-import { Test } from "forge-std/Test.sol";
+import { stdError } from "lib/forge-std/src/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 import { RLPReader } from "src/libraries/rlp/RLPReader.sol";
 import "src/libraries/rlp/RLPErrors.sol";
 

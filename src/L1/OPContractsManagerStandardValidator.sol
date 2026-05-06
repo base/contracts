@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Libraries
-import { LibString } from "@solady/utils/LibString.sol";
+import { LibString } from "lib/solady/src/utils/LibString.sol";
 import { GameType, Claim, GameTypes } from "src/libraries/bridge/Types.sol";
 import { Duration } from "src/libraries/bridge/LibUDT.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";

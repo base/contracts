@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 import { Types } from "src/libraries/Types.sol";
-import { Vm } from "forge-std/Vm.sol";
-import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
+import { Strings } from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import { Process } from "scripts/libraries/Process.sol";
 
 /// @title FFIInterface

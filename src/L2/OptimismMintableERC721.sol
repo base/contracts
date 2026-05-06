@@ -2,11 +2,11 @@
 pragma solidity 0.8.15;
 
 // Contracts
-import { ERC721Enumerable } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import { ERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import { ERC721Enumerable } from "lib/openzeppelin-contracts/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import { ERC721 } from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 
 // Libraries
-import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
+import { Strings } from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";

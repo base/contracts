@@ -2,12 +2,12 @@
 pragma solidity 0.8.15;
 
 // Testing
-import { stdStorage, StdStorage } from "forge-std/Test.sol";
+import { stdStorage, StdStorage } from "lib/forge-std/src/Test.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
 
 // Contracts
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import { StandardBridge } from "src/universal/StandardBridge.sol";
 
 // Libraries

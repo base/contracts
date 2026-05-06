@@ -10,10 +10,10 @@ import {
     Bytes48
 } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { ITDXVerifier, TDXVerifierJournal } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
-import { OwnableManagedUpgradeable } from "lib/op-enclave/contracts/src/OwnableManagedUpgradeable.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
-import { EnumerableSetLib } from "@solady-v0.0.245/utils/EnumerableSetLib.sol";
+import { EnumerableSetLib } from "lib/solady-v0.0.245/src/utils/EnumerableSetLib.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { OwnableManagedUpgradeable } from "src/universal/OwnableManagedUpgradeable.sol";
 import { GameType } from "src/libraries/bridge/Types.sol";
 
 /// @title TEEProverRegistry

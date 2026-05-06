@@ -2,14 +2,14 @@
 pragma solidity 0.8.15;
 
 // Contracts
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
+import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import { ERC20Permit } from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 
 // Libraries
 import { Preinstalls } from "src/libraries/Preinstalls.sol";
 
 // Interfaces
-import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { IERC165 } from "lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { IOptimismMintableERC20 } from "interfaces/universal/IOptimismMintableERC20.sol";
 import { ILegacyMintableERC20 } from "interfaces/legacy/ILegacyMintableERC20.sol";

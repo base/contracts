@@ -44,19 +44,7 @@ evm_version = 'cancun'
 
 remappings = [
   '@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts',
-  '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts',
-  '@openzeppelin/contracts-v5/=lib/openzeppelin-contracts-v5/contracts',
   'openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/',
-  '@rari-capital/solmate/=lib/solmate',
-  '@lib-keccak/=lib/lib-keccak/contracts/lib',
-  'solady/=lib/solady/src/',
-  '@solady/=lib/solady/src',
-  '@solady-v0.0.245/=lib/solady-v0.0.245/src',
-  'forge-std/=lib/forge-std/src',
-  'ds-test/=lib/forge-std/lib/ds-test/src',
-  'safe-contracts/=lib/safe-contracts/contracts',
-  'kontrol-cheatcodes/=lib/kontrol-cheatcodes/src',
-  'interfaces/=interfaces'
 ]
 
 fs_permissions = [
@@ -64,14 +52,7 @@ fs_permissions = [
   { access='read-write', path='./snapshots/' },
   { access='read-write', path='./deployments/' },
   { access='read', path='./deploy-config/' },
-  { access='read', path='./deploy-config-periphery/' },
-  { access='read', path='./broadcast/' },
   { access='read', path = './forge-artifacts/' },
-  { access='read-write', path='./.testdata/' },
-  { access='read', path='./kout-deployment' },
-  { access='read', path='./test/fixtures' },
-  { access='read', path='./lib/superchain-registry/superchain/configs/' },
-  { access='read', path='./lib/superchain-registry/validation/standard/' },
 ]
 
 # 5159 error code is selfdestruct error code

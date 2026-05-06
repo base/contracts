@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { L2Genesis } from "scripts/L2Genesis.s.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";

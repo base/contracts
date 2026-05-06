@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { StdUtils } from "forge-std/StdUtils.sol";
-import { StdInvariant } from "forge-std/StdInvariant.sol";
+import { StdUtils } from "lib/forge-std/src/StdUtils.sol";
+import { StdInvariant } from "lib/forge-std/src/StdInvariant.sol";
 
 import { Arithmetic } from "src/libraries/Arithmetic.sol";
 import { ResourceMetering } from "src/L1/ResourceMetering.sol";

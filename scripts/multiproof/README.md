@@ -18,7 +18,7 @@ The scripts in this directory are **development and testing tools only**. They a
 Install dependencies if you haven't already (required after any `lib/` changes):
 
 ```bash
-make deps
+just deps
 ```
 
 ---

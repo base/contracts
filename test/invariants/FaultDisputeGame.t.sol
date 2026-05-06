@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 // Testing
-import { Vm } from "forge-std/Vm.sol";
-import { StdUtils } from "forge-std/StdUtils.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
+import { StdUtils } from "lib/forge-std/src/StdUtils.sol";
 import { BaseFaultDisputeGame_TestInit } from "test/L1/proofs/FaultDisputeGame.t.sol";
 
 // Libraries

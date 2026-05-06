@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
 
 /// @title AddressAliasHelper_Uncategorized_Test

@@ -9,7 +9,7 @@ import { Blueprint } from "src/libraries/Blueprint.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { Bytes } from "src/libraries/Bytes.sol";
 import { Claim, Duration, GameType, GameTypes, Proposal } from "src/libraries/bridge/Types.sol";
-import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
+import { Strings } from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import { SemverComp } from "src/libraries/SemverComp.sol";
 import { Features } from "src/libraries/Features.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
