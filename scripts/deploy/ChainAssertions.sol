@@ -12,13 +12,12 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 // Libraries
 import { Constants } from "src/libraries/Constants.sol";
-import { Types } from "scripts/libraries/Types.sol";
+import { Types, IOPContractsManagerInterop } from "scripts/libraries/Types.sol";
 import { Blueprint } from "src/libraries/Blueprint.sol";
 import { GameTypes } from "src/libraries/bridge/Types.sol";
 import { Hash } from "src/libraries/bridge/Types.sol";
 
 // Interfaces
-import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
@@ -108,10 +107,7 @@ library ChainAssertions {
         require(config.scalar() >> 248 == 1, "CHECK-SCFG-70");
         // Depends on start block being set to 0 in `initialize`
         require(config.startBlock() == block.number, "CHECK-SCFG-140");
-        require(
-            config.batchInbox() == IOPContractsManager(_doi.opcm).chainIdToBatchInboxAddress(_doi.l2ChainId),
-            "CHECK-SCFG-150"
-        );
+        require(config.batchInbox() == Types.chainIdToBatchInboxAddress(_doi.l2ChainId), "CHECK-SCFG-150");
         // Check _addresses
         require(config.l1CrossDomainMessenger() == _contracts.L1CrossDomainMessenger, "CHECK-SCFG-160");
         require(config.l1ERC721Bridge() == _contracts.L1ERC721Bridge, "CHECK-SCFG-170");
@@ -329,7 +325,7 @@ library ChainAssertions {
     function checkOPContractsManager(
         Types.ContractSet memory _impls,
         Types.ContractSet memory _proxies,
-        IOPContractsManager _opcm,
+        IOPContractsManagerInterop _opcm,
         IMIPS64 _mips
     )
         internal
@@ -342,7 +338,7 @@ library ChainAssertions {
         require(address(_opcm.superchainConfig()) == _proxies.SuperchainConfig, "CHECK-OPCM-19");
 
         // Ensure that the OPCM impls are correctly saved
-        IOPContractsManager.Implementations memory impls = _opcm.implementations();
+        Types.Implementations memory impls = _opcm.implementations();
         require(impls.l1ERC721BridgeImpl == _impls.L1ERC721Bridge, "CHECK-OPCM-50");
         require(impls.optimismPortalImpl == _impls.OptimismPortal, "CHECK-OPCM-60");
         require(impls.systemConfigImpl == _impls.SystemConfig, "CHECK-OPCM-70");
@@ -355,7 +351,7 @@ library ChainAssertions {
         require(impls.superchainConfigImpl == _impls.SuperchainConfig, "CHECK-OPCM-140");
 
         // Verify that initCode is correctly set into the blueprints
-        IOPContractsManager.Blueprints memory blueprints = _opcm.blueprints();
+        Types.Blueprints memory blueprints = _opcm.blueprints();
         Blueprint.Preamble memory addressManagerPreamble =
             Blueprint.parseBlueprintPreamble(address(blueprints.addressManager).code);
         require(keccak256(addressManagerPreamble.initcode) == keccak256(vm.getCode("AddressManager")), "CHECK-OPCM-160");

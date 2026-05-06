@@ -7,10 +7,9 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
 import { Constants as ScriptConstants } from "scripts/libraries/Constants.sol";
-import { Types } from "scripts/libraries/Types.sol";
+import { Types, IOPContractsManagerInterop } from "scripts/libraries/Types.sol";
 
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
@@ -24,7 +23,6 @@ import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
-import { IOPContractsManager } from "../../interfaces/L1/IOPContractsManager.sol";
 
 contract DeployOPChain is Script {
     struct Output {
@@ -54,9 +52,9 @@ contract DeployOPChain is Script {
     function run(Types.DeployOPChainInput memory _input) public returns (Output memory output_) {
         checkInput(_input);
 
-        IOPContractsManager opcm = IOPContractsManager(_input.opcm);
+        IOPContractsManagerInterop opcm = IOPContractsManagerInterop(_input.opcm);
 
-        IOPContractsManager.Roles memory roles = IOPContractsManager.Roles({
+        Types.Roles memory roles = Types.Roles({
             opChainProxyAdminOwner: _input.opChainProxyAdminOwner,
             systemConfigOwner: _input.systemConfigOwner,
             batcher: _input.batcher,
@@ -64,7 +62,7 @@ contract DeployOPChain is Script {
             proposer: _input.proposer,
             challenger: _input.challenger
         });
-        IOPContractsManager.DeployInput memory deployInput = IOPContractsManager.DeployInput({
+        Types.DeployInput memory deployInput = Types.DeployInput({
             roles: roles,
             basefeeScalar: _input.basefeeScalar,
             blobBasefeeScalar: _input.blobBaseFeeScalar,
@@ -81,7 +79,7 @@ contract DeployOPChain is Script {
         });
 
         vm.broadcast(msg.sender);
-        IOPContractsManager.DeployOutput memory deployOutput = opcm.deploy(deployInput);
+        Types.DeployOutput memory deployOutput = opcm.deploy(deployInput);
 
         vm.label(address(deployOutput.opChainProxyAdmin), "opChainProxyAdmin");
         vm.label(address(deployOutput.addressManager), "addressManager");
@@ -190,7 +188,7 @@ contract DeployOPChain is Script {
 
         // Check dispute games
         // With v2 game contracts enabled, we use the predeployed pdg implementation
-        address expectedPDGImpl = IOPContractsManager(_i.opcm).implementations().permissionedDisputeGameV2Impl;
+        address expectedPDGImpl = IOPContractsManagerInterop(_i.opcm).implementations().permissionedDisputeGameV2Impl;
         ChainAssertions.checkDisputeGameFactory(
             _o.disputeGameFactoryProxy, _i.opChainProxyAdminOwner, expectedPDGImpl, true
         );
@@ -199,7 +197,7 @@ contract DeployOPChain is Script {
         ChainAssertions.checkL1CrossDomainMessenger(_o.l1CrossDomainMessengerProxy, vm, true);
         ChainAssertions.checkOptimismPortal2({
             _contracts: proxies,
-            _superchainConfig: IOPContractsManager(_i.opcm).superchainConfig(),
+            _superchainConfig: IOPContractsManagerInterop(_i.opcm).superchainConfig(),
             _opChainProxyAdminOwner: _i.opChainProxyAdminOwner,
             _isProxy: true
         });

@@ -17,6 +17,7 @@ import { Config } from "scripts/libraries/Config.sol";
 import { GameTypes, Claim } from "src/libraries/bridge/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
+import { Types, IOPContractsManagerInterop } from "scripts/libraries/Types.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
@@ -27,7 +28,6 @@ import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
@@ -205,10 +205,10 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
     /// @notice Performs a single OPCM upgrade.
     /// @param _opcm The OPCM contract to upgrade.
     /// @param _delegateCaller The address of the upgrader to use for the upgrade.
-    function _doUpgrade(IOPContractsManager _opcm, address _delegateCaller) internal {
+    function _doUpgrade(IOPContractsManagerInterop _opcm, address _delegateCaller) internal {
         ISystemConfig systemConfig = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
-        IOPContractsManager.OpChainConfig[] memory opChains = new IOPContractsManager.OpChainConfig[](1);
-        opChains[0] = IOPContractsManager.OpChainConfig({
+        Types.OpChainConfig[] memory opChains = new Types.OpChainConfig[](1);
+        opChains[0] = Types.OpChainConfig({
             systemConfigProxy: systemConfig,
             cannonPrestate: Claim.wrap(bytes32(keccak256("cannonPrestate"))),
             cannonKonaPrestate: Claim.wrap(bytes32(keccak256("cannonKonaPrestate")))
@@ -226,7 +226,7 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         // every time rather than adding or removing this code for each upgrade.
         try DelegateCaller(superchainPAO)
             .dcForward(
-                address(_opcm), abi.encodeCall(IOPContractsManager.upgradeSuperchainConfig, (superchainConfig))
+                address(_opcm), abi.encodeCall(IOPContractsManagerInterop.upgradeSuperchainConfig, (superchainConfig))
             ) {
         // Great, the upgrade succeeded.
         }
@@ -249,7 +249,7 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
 
         // Upgrade the chain.
         DelegateCaller(_delegateCaller)
-            .dcForward(address(_opcm), abi.encodeCall(IOPContractsManager.upgrade, (opChains)));
+            .dcForward(address(_opcm), abi.encodeCall(IOPContractsManagerInterop.upgrade, (opChains)));
 
         // Reset the upgrader to the original code.
         vm.etch(_delegateCaller, upgraderCode);
@@ -257,7 +257,7 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
 
     /// @notice Upgrades the contracts using the OPCM.
     function _upgrade() internal {
-        IOPContractsManager opcm = IOPContractsManager(artifacts.mustGetAddress("OPContractsManager"));
+        IOPContractsManagerInterop opcm = IOPContractsManagerInterop(artifacts.mustGetAddress("OPContractsManager"));
 
         ISystemConfig systemConfig = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
         IProxyAdmin proxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(systemConfig)));

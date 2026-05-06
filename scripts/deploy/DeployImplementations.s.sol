@@ -5,7 +5,7 @@ import { Script } from "lib/forge-std/src/Script.sol";
 
 // Libraries
 import { Chains } from "scripts/libraries/Chains.sol";
-import { Types } from "scripts/libraries/Types.sol";
+import { Types, IOPContractsManagerInterop } from "scripts/libraries/Types.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
@@ -733,7 +733,7 @@ contract DeployImplementations is Script {
         ChainAssertions.checkOPContractsManager({
             _impls: impls,
             _proxies: proxies,
-            _opcm: IOPContractsManager(address(_output.opcm)),
+            _opcm: IOPContractsManagerInterop(address(_output.opcm)),
             _mips: IMIPS64(address(_output.mipsSingleton))
         });
 

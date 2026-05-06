@@ -1,9 +1,137 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { IBigStepper } from "interfaces/L1/proofs/IBigStepper.sol";
+import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
+import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
+import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
+import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
+import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
+import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
+import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
+import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
+import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
+import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
+import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
+import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
+import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
+
 import { Claim, Duration, GameType } from "src/libraries/bridge/Types.sol";
 
 library Types {
+    /// @notice Represents the roles that can be set when deploying a standard OP Stack chain.
+    struct Roles {
+        address opChainProxyAdminOwner;
+        address systemConfigOwner;
+        address batcher;
+        address unsafeBlockSigner;
+        address proposer;
+        address challenger;
+    }
+
+    /// @notice The full set of inputs to deploy a new OP Stack chain.
+    struct DeployInput {
+        Roles roles;
+        uint32 basefeeScalar;
+        uint32 blobBasefeeScalar;
+        uint256 l2ChainId;
+        // The correct type is Proposal memory but OP Deployer does not yet support structs.
+        bytes startingAnchorRoot;
+        // The salt mixer is used as part of making the resulting salt unique.
+        string saltMixer;
+        uint64 gasLimit;
+        // Configurable dispute game parameters.
+        GameType disputeGameType;
+        Claim disputeAbsolutePrestate;
+        uint256 disputeMaxGameDepth;
+        uint256 disputeSplitDepth;
+        Duration disputeClockExtension;
+        Duration disputeMaxClockDuration;
+    }
+
+    /// @notice The full set of outputs from deploying a new OP Stack chain.
+    struct DeployOutput {
+        IProxyAdmin opChainProxyAdmin;
+        IAddressManager addressManager;
+        IL1ERC721Bridge l1ERC721BridgeProxy;
+        ISystemConfig systemConfigProxy;
+        IOptimismMintableERC20Factory optimismMintableERC20FactoryProxy;
+        IL1StandardBridge l1StandardBridgeProxy;
+        IL1CrossDomainMessenger l1CrossDomainMessengerProxy;
+        IETHLockbox ethLockboxProxy;
+        // Fault proof contracts below.
+        IOptimismPortal2 optimismPortalProxy;
+        IDisputeGameFactory disputeGameFactoryProxy;
+        IAnchorStateRegistry anchorStateRegistryProxy;
+        IFaultDisputeGameV2 faultDisputeGame;
+        IPermissionedDisputeGameV2 permissionedDisputeGame;
+        IDelayedWETH delayedWETHPermissionedGameProxy;
+        IDelayedWETH delayedWETHPermissionlessGameProxy;
+    }
+
+    /// @notice Addresses of ERC-5202 Blueprint contracts used by the legacy OPCM deployment path.
+    struct Blueprints {
+        address addressManager;
+        address proxy;
+        address proxyAdmin;
+        address l1ChugSplashProxy;
+        address resolvedDelegateProxy;
+    }
+
+    /// @notice The latest implementation contracts for the OP Stack.
+    struct Implementations {
+        address superchainConfigImpl;
+        address l1ERC721BridgeImpl;
+        address optimismPortalImpl;
+        address ethLockboxImpl;
+        address systemConfigImpl;
+        address optimismMintableERC20FactoryImpl;
+        address l1CrossDomainMessengerImpl;
+        address l1StandardBridgeImpl;
+        address disputeGameFactoryImpl;
+        address anchorStateRegistryImpl;
+        address delayedWETHImpl;
+        address mipsImpl;
+        address faultDisputeGameV2Impl;
+        address permissionedDisputeGameV2Impl;
+    }
+
+    /// @notice The input required to identify a chain for upgrading, along with new prestate hashes.
+    struct OpChainConfig {
+        ISystemConfig systemConfigProxy;
+        Claim cannonPrestate;
+        Claim cannonKonaPrestate;
+    }
+
+    /// @notice The input required to identify a chain for updating prestates.
+    struct UpdatePrestateInput {
+        ISystemConfig systemConfigProxy;
+        Claim cannonPrestate;
+        Claim cannonKonaPrestate;
+    }
+
+    struct AddGameInput {
+        string saltMixer;
+        ISystemConfig systemConfig;
+        IDelayedWETH delayedWETH;
+        GameType disputeGameType;
+        Claim disputeAbsolutePrestate;
+        uint256 disputeMaxGameDepth;
+        uint256 disputeSplitDepth;
+        Duration disputeClockExtension;
+        Duration disputeMaxClockDuration;
+        uint256 initialBond;
+        IBigStepper vm;
+        bool permissioned;
+    }
+
+    struct AddGameOutput {
+        IDelayedWETH delayedWETH;
+        IFaultDisputeGameV2 faultDisputeGame;
+    }
+
     /// @notice Represents a set of L1 contracts. Used to represent a set of proxies.
     /// This is not an exhaustive list of all contracts on L1, but rather a subset.
     struct ContractSet {
@@ -49,4 +177,24 @@ library Types {
         uint32 operatorFeeScalar;
         uint64 operatorFeeConstant;
     }
+
+    /// @notice Maps an L2 chain ID to the standard L1 batch inbox address.
+    /// @dev The convention is `versionByte || keccak256(bytes32(chainId))[:19]`.
+    function chainIdToBatchInboxAddress(uint256 _l2ChainId) internal pure returns (address) {
+        bytes1 versionByte = 0x00;
+        bytes32 hashedChainId = keccak256(bytes.concat(bytes32(_l2ChainId)));
+        bytes19 first19Bytes = bytes19(hashedChainId);
+        return address(uint160(bytes20(bytes.concat(versionByte, first19Bytes))));
+    }
+}
+
+/// @notice ABI-compatible transition interface for calling the current OPCM with neutral script types.
+interface IOPContractsManagerInterop {
+    function version() external view returns (string memory);
+    function superchainConfig() external view returns (ISuperchainConfig);
+    function deploy(Types.DeployInput calldata _input) external returns (Types.DeployOutput memory);
+    function upgrade(Types.OpChainConfig[] memory _opChainConfigs) external;
+    function upgradeSuperchainConfig(ISuperchainConfig _superchainConfig) external;
+    function blueprints() external view returns (Types.Blueprints memory);
+    function implementations() external view returns (Types.Implementations memory);
 }

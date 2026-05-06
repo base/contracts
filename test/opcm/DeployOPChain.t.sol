@@ -164,6 +164,11 @@ contract DeployOPChain_Test is DeployOPChain_TestBase {
             false,
             "SystemConfig CUSTOM_GAS_TOKEN feature"
         );
+        assertEq(
+            doo.systemConfigProxy.batchInbox(),
+            Types.chainIdToBatchInboxAddress(deployOPChainInput.l2ChainId),
+            "SystemConfig batch inbox"
+        );
     }
 
     function testFuzz_run_memory_succeeds(bytes32 _seed) public {

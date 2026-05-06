@@ -11,6 +11,7 @@ import { GameType, Hash } from "src/libraries/bridge/LibUDT.sol";
 import { GameTypes, Duration, Claim } from "src/libraries/bridge/Types.sol";
 import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
 import { Features } from "src/libraries/Features.sol";
+import { Types } from "scripts/libraries/Types.sol";
 
 // Interfaces
 import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
@@ -112,7 +113,7 @@ contract BadVersionReturner {
 /// @notice Base contract for `OPContractsManagerStandardValidator` tests, handles common setup.
 abstract contract OPContractsManagerStandardValidator_TestInit is CommonTest, DisputeGames {
     /// @notice Deploy input that was used to deploy the contracts being tested.
-    IOPContractsManager.DeployInput deployInput;
+    Types.DeployInput deployInput;
 
     /// @notice The l2ChainId, either from config or from registry if fork test.
     uint256 l2ChainId;

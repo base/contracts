@@ -19,12 +19,11 @@ import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.so
 import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 
 // Libraries
-import { Types } from "scripts/libraries/Types.sol";
+import { Types, IOPContractsManagerInterop } from "scripts/libraries/Types.sol";
 import { Duration } from "src/libraries/bridge/LibUDT.sol";
 import { GameType, Claim, GameTypes, Proposal, Hash } from "src/libraries/bridge/Types.sol";
 
 // Interfaces
-import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
@@ -290,7 +289,7 @@ contract Deploy is Deployer {
         ChainAssertions.checkOPContractsManager({
             _impls: impls,
             _proxies: _proxies(),
-            _opcm: IOPContractsManager(address(dio.opcm)),
+            _opcm: IOPContractsManagerInterop(address(dio.opcm)),
             _mips: IMIPS64(address(dio.mipsSingleton))
         });
         ChainAssertions.checkSystemConfigImpls(impls);
@@ -302,10 +301,10 @@ contract Deploy is Deployer {
         console.log("Deploying OP Chain");
 
         // Ensure that the requisite contracts are deployed
-        IOPContractsManager opcm = IOPContractsManager(artifacts.mustGetAddress("OPContractsManager"));
+        IOPContractsManagerInterop opcm = IOPContractsManagerInterop(artifacts.mustGetAddress("OPContractsManager"));
 
-        IOPContractsManager.DeployInput memory deployInput = getDeployInput();
-        IOPContractsManager.DeployOutput memory deployOutput = opcm.deploy(deployInput);
+        Types.DeployInput memory deployInput = getDeployInput();
+        Types.DeployOutput memory deployOutput = opcm.deploy(deployInput);
 
         // Store code in the Final system owner address so that it can be used for prank delegatecalls
         // Store "fe" opcode so that accidental calls to this address revert
@@ -379,10 +378,10 @@ contract Deploy is Deployer {
     }
 
     /// @notice Get the DeployInput struct to use for testing
-    function getDeployInput() public view returns (IOPContractsManager.DeployInput memory) {
+    function getDeployInput() public view returns (Types.DeployInput memory) {
         string memory saltMixer = "salt mixer";
-        return IOPContractsManager.DeployInput({
-            roles: IOPContractsManager.Roles({
+        return Types.DeployInput({
+            roles: Types.Roles({
                 opChainProxyAdminOwner: cfg.finalSystemOwner(),
                 systemConfigOwner: cfg.finalSystemOwner(),
                 batcher: cfg.batchSenderAddress(),

@@ -1061,6 +1061,35 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
         runPastUpgrades(upgrader);
     }
 
+    function toOPCMDeployInput(Types.DeployInput memory _input)
+        internal
+        pure
+        returns (IOPContractsManager.DeployInput memory)
+    {
+        return IOPContractsManager.DeployInput({
+            roles: IOPContractsManager.Roles({
+                opChainProxyAdminOwner: _input.roles.opChainProxyAdminOwner,
+                systemConfigOwner: _input.roles.systemConfigOwner,
+                batcher: _input.roles.batcher,
+                unsafeBlockSigner: _input.roles.unsafeBlockSigner,
+                proposer: _input.roles.proposer,
+                challenger: _input.roles.challenger
+            }),
+            basefeeScalar: _input.basefeeScalar,
+            blobBasefeeScalar: _input.blobBasefeeScalar,
+            l2ChainId: _input.l2ChainId,
+            startingAnchorRoot: _input.startingAnchorRoot,
+            saltMixer: _input.saltMixer,
+            gasLimit: _input.gasLimit,
+            disputeGameType: _input.disputeGameType,
+            disputeAbsolutePrestate: _input.disputeAbsolutePrestate,
+            disputeMaxGameDepth: _input.disputeMaxGameDepth,
+            disputeSplitDepth: _input.disputeSplitDepth,
+            disputeClockExtension: _input.disputeClockExtension,
+            disputeMaxClockDuration: _input.disputeMaxClockDuration
+        });
+    }
+
     function getDisputeGameV2AbsolutePrestate(GameType _gameType) internal view returns (Claim) {
         bytes memory gameArgsBytes = disputeGameFactory.gameArgs(_gameType);
         LibGameArgs.GameArgs memory gameArgs = LibGameArgs.decode(gameArgsBytes);
@@ -1075,10 +1104,10 @@ contract OPContractsManager_Upgrade_Test is OPContractsManager_Upgrade_Harness {
     function test_upgrade_duplicateL2ChainId_succeeds() public {
         // Deploy a new OPChain with the same L2 chain ID as the current OPChain
         Deploy deploy = Deploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
-        IOPContractsManager.DeployInput memory deployInput = deploy.getDeployInput();
+        Types.DeployInput memory deployInput = deploy.getDeployInput();
         deployInput.l2ChainId = l2ChainId;
         deployInput.saltMixer = "v2.0.0";
-        opcm.deploy(deployInput);
+        opcm.deploy(toOPCMDeployInput(deployInput));
 
         // Try to upgrade the current OPChain
         runCurrentUpgrade(upgrader);
