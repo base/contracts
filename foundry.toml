@@ -52,6 +52,7 @@ fs_permissions = [
   { access='read-write', path='./snapshots/' },
   { access='read-write', path='./deployments/' },
   { access='read', path='./deploy-config/' },
+  { access='read', path = './forge-artifacts/' },
 ]
 
 # 5159 error code is selfdestruct error code
