@@ -7,11 +7,10 @@ forge_account := "testnet-admin"
 l1_rpc_url := "https://ethereum-full-sepolia-k8s-dev.cbhq.net"
 
 sepolia_risc0_verifier_router := "0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187"
-sepolia_tdx_verifier_id := "0x1f1bc81fae82605af46a4c9a20f641922b7542befd9219644c7e6c59ccdeccab"
+sepolia_tdx_verifier_id := "0xb9681d1f76f5dbf70da84ad06b5b20befa392638060e947965269b6f63ebbf3b"
 sepolia_intel_root_ca_hash := "0xa1acc73eb45794fa1734f14d882e91925b6006f79d3bb2460df9d01b333d7009"
-sepolia_tdx_image_hash := "0xa227306080459e4bcf1324b229b344af4469846f9861aa8aff450f35046df9d6"
-sepolia_tdx_signer := "0x6A1f38f20044e8e69EAC755144F14f973e7b8d6E"
-sepolia_tdx_registration_manager := "0x93900CB7eCdB5994352b19DfD8a900Cd4fa437B7"
+sepolia_tdx_image_hash := "0x4cb35ee476a8098c4e567098714c65f5afe25236fc460b38487a356e14e7db66"
+sepolia_tdx_registration_manager := "0x44E999A5859c2D12378a349882fAe5805DCE71b9"
 
 # List available multiproof deployment recipes.
 default:
@@ -49,7 +48,6 @@ tdx-sepolia-config:
   @echo "TDX_VERIFIER_ID={{sepolia_tdx_verifier_id}}"
   @echo "INTEL_ROOT_CA_HASH={{sepolia_intel_root_ca_hash}}"
   @echo "TDX_IMAGE_HASH={{sepolia_tdx_image_hash}}"
-  @echo "TDX_SIGNER={{sepolia_tdx_signer}}"
   @echo "TDX_REGISTRATION_MANAGER={{sepolia_tdx_registration_manager}}"
 
 # Deploy the TDX multiproof dev/test stack using deploy-config/sepolia.json.
