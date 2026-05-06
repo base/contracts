@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { Ownable } from "@solady/auth/Ownable.sol";
-import { ISP1Verifier } from "lib/sp1-contracts/contracts/src/ISP1Verifier.sol";
+import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
 
 import { ISemver } from "interfaces/universal/ISemver.sol";

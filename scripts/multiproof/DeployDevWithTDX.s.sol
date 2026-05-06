@@ -54,6 +54,8 @@ contract DeployDevWithTDX is Script {
     IAnchorStateRegistry public mockAnchorRegistry;
     address public mockDelayedWETH;
     address public aggregateVerifier;
+    Hash public startingAnchorRoot;
+    uint256 public startingAnchorBlockNumber;
 
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
@@ -65,12 +67,26 @@ contract DeployDevWithTDX is Script {
     }
 
     function run(address tdxVerifier, address registrationManager) public {
+        run(tdxVerifier, registrationManager, cfg.multiproofGenesisOutputRoot(), cfg.multiproofGenesisBlockNumber());
+    }
+
+    function run(
+        address tdxVerifier,
+        address registrationManager,
+        bytes32 asrStartingOutputRoot,
+        uint256 asrStartingBlockNumber
+    )
+        public
+    {
         nitroEnclaveVerifierAddr = cfg.nitroEnclaveVerifier();
         require(tdxVerifier != address(0), "tdxVerifier must be non-zero");
         require(nitroEnclaveVerifierAddr != address(0), "nitroEnclaveVerifier must be set in config");
         require(registrationManager != address(0), "registrationManager must be non-zero");
+        require(asrStartingOutputRoot != bytes32(0), "asrStartingOutputRoot must be non-zero");
         tdxVerifierAddr = tdxVerifier;
         tdxRegistrationManager = registrationManager;
+        startingAnchorRoot = Hash.wrap(asrStartingOutputRoot);
+        startingAnchorBlockNumber = asrStartingBlockNumber;
 
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
 
@@ -83,6 +99,8 @@ contract DeployDevWithTDX is Script {
         console.log("NitroEnclaveVerifier:", nitroEnclaveVerifierAddr);
         console.log("TDXVerifier:", tdxVerifierAddr);
         console.log("TDX Registration Manager:", tdxRegistrationManager);
+        console.log("ASR Starting Output Root:", vm.toString(startingAnchorRoot.raw()));
+        console.log("ASR Starting L2 Block:", startingAnchorBlockNumber);
         console.log("");
         console.log("NOTE: TDXVerifier owner must be the broadcaster/finalSystemOwner.");
 
@@ -137,12 +155,7 @@ contract DeployDevWithTDX is Script {
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
         mockAnchorRegistry = IAnchorStateRegistry(address(asr));
-        asr.initialize(
-            disputeGameFactory,
-            Hash.wrap(cfg.multiproofGenesisOutputRoot()),
-            cfg.multiproofGenesisBlockNumber(),
-            gameType
-        );
+        asr.initialize(disputeGameFactory, startingAnchorRoot, startingAnchorBlockNumber, gameType);
     }
 
     function _deployAggregateVerifier(GameType gameType) internal {
@@ -186,6 +199,8 @@ contract DeployDevWithTDX is Script {
         console.log("\nInfrastructure:");
         console.log("  DisputeGameFactory:", disputeGameFactory);
         console.log("  AnchorStateRegistry (mock):", address(mockAnchorRegistry));
+        console.log("  ASR Starting Output Root:", vm.toString(startingAnchorRoot.raw()));
+        console.log("  ASR Starting L2 Block:", startingAnchorBlockNumber);
         console.log("  DelayedWETH (mock):", mockDelayedWETH);
         console.log("\nGame:");
         console.log("  AggregateVerifier:", aggregateVerifier);
@@ -212,6 +227,8 @@ contract DeployDevWithTDX is Script {
         vm.serializeAddress(key, "TEEVerifier", teeVerifier);
         vm.serializeAddress(key, "DisputeGameFactory", disputeGameFactory);
         vm.serializeAddress(key, "AnchorStateRegistry", address(mockAnchorRegistry));
+        vm.serializeBytes32(key, "ASRStartingOutputRoot", startingAnchorRoot.raw());
+        vm.serializeUint(key, "ASRStartingBlockNumber", startingAnchorBlockNumber);
         vm.serializeAddress(key, "DelayedWETH", mockDelayedWETH);
         string memory json = vm.serializeAddress(key, "AggregateVerifier", aggregateVerifier);
 

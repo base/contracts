@@ -138,10 +138,10 @@ The deployer address (`finalSystemOwner`) is the owner of `DevTEEProverRegistry`
 The TDX path follows the same split as Nitro: expensive attestation verification happens off-chain in a ZK guest,
 and Solidity verifies the proof plus the on-chain acceptance policy before registering the signer.
 
-| Contract               | Purpose                                                                                                                                                                                                                                       |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TDXVerifier`          | Verifies a RISC Zero or SP1 proof whose public values are an ABI-encoded `TDXVerifierJournal`, then checks trusted Intel root, TCB status policy, collateral expiry, quote freshness, signer derivation, and `REPORTDATA` public-key binding. |
-| `TEEProverRegistry`    | Registers Nitro signers through `registerSigner(bytes,bytes)` and TDX signers through `registerTDXSigner(bytes,bytes)`, tracking which TEE type each signer came from for `TEEVerifier`.                                                       |
+| Contract            | Purpose                                                                                                                                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TDXVerifier`       | Verifies a RISC Zero or SP1 proof whose public values are an ABI-encoded `TDXVerifierJournal`, then checks trusted Intel root, TCB status policy, collateral expiry, quote freshness, signer derivation, and `REPORTDATA` public-key binding. |
+| `TEEProverRegistry` | Registers Nitro signers through `registerSigner(bytes,bytes)` and TDX signers through `registerTDXSigner(bytes,bytes)`, tracking which TEE type each signer came from for `TEEVerifier`.                                                      |
 
 The ZK verifier guest is expected to perform the full Intel DCAP verification path:
 
@@ -217,6 +217,8 @@ Set `DEPLOY_CONFIG_PATH` to the Sepolia deploy config and pass the `TDXVerifier`
 
 The TDX registry manager is set to `TDX_REGISTRATION_MANAGER`, allowing that address to call `registerTDXSigner(bytes,bytes)`. Register a Nitro signer through `registerSigner(bytes,bytes)` as well before submitting TEE proposal proofs.
 
+The `deploy-tdx-stack` recipe resolves a recent L2 output root before invoking `DeployDevWithTDX`, then injects the resolved output root and L2 block through `run(address,address,bytes32,uint256)`. Use `L2_OUTPUT_ROOT_RPC_URL` if the `optimism_outputAtBlock` endpoint differs from the L2 execution RPC, and `ASR_ANCHOR_BLOCK_LOOKBACK` to anchor a fixed number of L2 blocks behind head. For a fixed anchor, set both `ASR_ANCHOR_OUTPUT_ROOT` and `ASR_ANCHOR_BLOCK_NUMBER`.
+
 ```bash
 just --justfile scripts/multiproof/justfile deploy-tdx-stack $TDX_VERIFIER
 ```
@@ -224,10 +226,18 @@ just --justfile scripts/multiproof/justfile deploy-tdx-stack $TDX_VERIFIER
 To override the manager manually, use:
 
 ```bash
+export L2_RPC_URL=<l2-execution-rpc>
+export L2_OUTPUT_ROOT_RPC_URL=<l2-op-node-or-archive-rpc>
+ASR_ANCHOR_BLOCK_NUMBER=$(cast block-number --rpc-url $L2_RPC_URL)
+ASR_ANCHOR_OUTPUT_ROOT=$(cast rpc optimism_outputAtBlock $(cast to-hex $ASR_ANCHOR_BLOCK_NUMBER) \
+  --rpc-url $L2_OUTPUT_ROOT_RPC_URL | jq -r '.outputRoot')
+
 forge script scripts/multiproof/DeployDevWithTDX.s.sol:DeployDevWithTDX \
-  --sig "run(address,address)" \
+  --sig "run(address,address,bytes32,uint256)" \
   $TDX_VERIFIER \
   $TDX_REGISTRATION_MANAGER \
+  $ASR_ANCHOR_OUTPUT_ROOT \
+  $ASR_ANCHOR_BLOCK_NUMBER \
   --rpc-url $L1_RPC_URL \
   --broadcast \
   --private-key $PRIVATE_KEY

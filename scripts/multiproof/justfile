@@ -4,7 +4,9 @@ repo_root := justfile_directory() + "/../.."
 justfile_path := justfile_directory() + "/justfile"
 default_deploy_config := "deploy-config/sepolia.json"
 forge_account := "testnet-admin"
-l1_rpc_url := "https://ethereum-full-sepolia-k8s-dev.cbhq.net"
+l1_rpc_url := env_var_or_default("L1_RPC_URL", "https://ethereum-full-sepolia-k8s-dev.cbhq.net")
+l2_rpc_url := env_var_or_default("L2_RPC_URL", "https://base-sepolia-archive-k8s-dev.cbhq.net:8545")
+l2_output_root_rpc_url := env_var_or_default("L2_OUTPUT_ROOT_RPC_URL", "https://base-sepolia-archive-k8s-dev.cbhq.net:7545")
 
 sepolia_risc0_verifier_router := "0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187"
 sepolia_tdx_verifier_id := "0xb9681d1f76f5dbf70da84ad06b5b20befa392638060e947965269b6f63ebbf3b"
@@ -44,31 +46,69 @@ deploy-tdx-verifier risc0_router=sepolia_risc0_verifier_router tdx_verifier_id=s
 
 # Print the Sepolia TDX constants used by these recipes.
 tdx-sepolia-config:
+  @echo "L1_RPC_URL={{l1_rpc_url}}"
   @echo "RISC0_VERIFIER_ROUTER={{sepolia_risc0_verifier_router}}"
   @echo "TDX_VERIFIER_ID={{sepolia_tdx_verifier_id}}"
   @echo "INTEL_ROOT_CA_HASH={{sepolia_intel_root_ca_hash}}"
   @echo "TDX_IMAGE_HASH={{sepolia_tdx_image_hash}}"
   @echo "TDX_REGISTRATION_MANAGER={{sepolia_tdx_registration_manager}}"
+  @echo "L2_RPC_URL={{l2_rpc_url}}"
+  @echo "L2_OUTPUT_ROOT_RPC_URL={{l2_output_root_rpc_url}}"
 
 # Deploy the TDX multiproof dev/test stack using deploy-config/sepolia.json.
 #
 # Required env:
 #   L1_RPC_URL
+#   L2_RPC_URL                 Optional when using this recipe; defaults to Base Sepolia L2.
+#   L2_OUTPUT_ROOT_RPC_URL     Optional when using this recipe; defaults to Base Sepolia op-node/archive RPC.
+#   ASR_ANCHOR_BLOCK_LOOKBACK  Optional L2 block lookback from head; defaults to 0.
+#   ASR_ANCHOR_BLOCK_NUMBER    Optional explicit L2 block. Requires ASR_ANCHOR_OUTPUT_ROOT.
+#   ASR_ANCHOR_OUTPUT_ROOT     Optional explicit output root. Requires ASR_ANCHOR_BLOCK_NUMBER.
 #
 # Args:
 #   tdx_verifier TDXVerifier address from deploy-tdx-verifier
 #   tdx_manager  Manager that can call registerTDXSigner()
-deploy-tdx-stack tdx_verifier tdx_manager=sepolia_tdx_registration_manager deploy_config=default_deploy_config:
+deploy-tdx-stack tdx_verifier tdx_manager=sepolia_tdx_registration_manager deploy_config=default_deploy_config l2_rpc=l2_rpc_url l2_output_root_rpc=l2_output_root_rpc_url:
   #!/usr/bin/env bash
   set -euo pipefail
   cd "{{repo_root}}"
   owner="$(cast wallet address --account "{{forge_account}}")"
   echo "Using {{forge_account}} as deployer: $owner"
+
+  if [[ -n "${ASR_ANCHOR_BLOCK_NUMBER:-}" || -n "${ASR_ANCHOR_OUTPUT_ROOT:-}" ]]; then
+    if [[ -z "${ASR_ANCHOR_BLOCK_NUMBER:-}" || -z "${ASR_ANCHOR_OUTPUT_ROOT:-}" ]]; then
+      echo "ASR_ANCHOR_BLOCK_NUMBER and ASR_ANCHOR_OUTPUT_ROOT must be set together" >&2
+      exit 1
+    fi
+    asr_anchor_block="$ASR_ANCHOR_BLOCK_NUMBER"
+    asr_anchor_output_root="$ASR_ANCHOR_OUTPUT_ROOT"
+  else
+    lookback="${ASR_ANCHOR_BLOCK_LOOKBACK:-0}"
+    l2_head="$(cast block-number --rpc-url "{{l2_rpc}}")"
+    if (( lookback > l2_head )); then
+      echo "ASR_ANCHOR_BLOCK_LOOKBACK ($lookback) exceeds L2 head ($l2_head)" >&2
+      exit 1
+    fi
+    asr_anchor_block=$((l2_head - lookback))
+    asr_anchor_block_hex="$(cast to-hex "$asr_anchor_block")"
+    asr_anchor_output_root="$(cast rpc optimism_outputAtBlock "$asr_anchor_block_hex" --rpc-url "{{l2_output_root_rpc}}" | jq -r '.outputRoot')"
+  fi
+
+  if [[ -z "$asr_anchor_output_root" || "$asr_anchor_output_root" == "null" || "$asr_anchor_output_root" == "0x0000000000000000000000000000000000000000000000000000000000000000" ]]; then
+    echo "Invalid ASR anchor output root: $asr_anchor_output_root" >&2
+    exit 1
+  fi
+
+  echo "Using ASR anchor output root: $asr_anchor_output_root"
+  echo "Using ASR anchor L2 block: $asr_anchor_block"
+
   DEPLOY_CONFIG_PATH="{{deploy_config}}" \
   forge script scripts/multiproof/DeployDevWithTDX.s.sol:DeployDevWithTDX \
-    --sig "run(address,address)" \
+    --sig "run(address,address,bytes32,uint256)" \
     "{{tdx_verifier}}" \
     "{{tdx_manager}}" \
+    "$asr_anchor_output_root" \
+    "$asr_anchor_block" \
     --rpc-url "{{l1_rpc_url}}" \
     --broadcast \
     --account "{{forge_account}}" \
@@ -77,6 +117,8 @@ deploy-tdx-stack tdx_verifier tdx_manager=sepolia_tdx_registration_manager deplo
 # Print the two-step Sepolia command template.
 tdx-sepolia-help:
   @echo 'export L1_RPC_URL=<sepolia-l1-rpc>'
+  @echo 'export L2_RPC_URL=<base-sepolia-l2-rpc>'
+  @echo 'export L2_OUTPUT_ROOT_RPC_URL=<base-sepolia-op-node-or-archive-rpc>'
   @echo 'just deploy-tdx-verifier'
-  @echo 'just deploy-tdx-stack <tdx-verifier> [tdx-manager]'
+  @echo 'just deploy-tdx-stack <tdx-verifier> [tdx-manager] [deploy-config] [l2-rpc] [l2-output-root-rpc]'
   @echo 'just tdx-sepolia-config'
