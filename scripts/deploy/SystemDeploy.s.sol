@@ -232,7 +232,8 @@ contract SystemDeploy is Script {
     {
         _assertValidOPChainInput(_input);
 
-        output_.addressManager = IAddressManager(_create1("AddressManager", abi.encode()));
+        output_.addressManager =
+            IAddressManager(_createDeterministicFromThis("AddressManager", abi.encode(), _input, "AddressManager"));
         output_.opChainProxyAdmin = IProxyAdmin(
             _createDeterministic(
                 "ProxyAdmin",
@@ -648,9 +649,18 @@ contract SystemDeploy is Script {
         });
     }
 
-    function _create1(string memory _name, bytes memory _args) internal returns (address payable) {
-        vm.broadcast(msg.sender);
-        return DeployUtils.create1({ _name: _name, _args: _args });
+    function _createDeterministicFromThis(
+        string memory _name,
+        bytes memory _args,
+        Types.DeployInput memory _input,
+        string memory _contractName
+    )
+        internal
+        returns (address payable)
+    {
+        return DeployUtils.create2({
+            _name: _name, _args: _args, _salt: keccak256(abi.encode(_input.l2ChainId, _input.saltMixer, _contractName))
+        });
     }
 
     function _upgradeToAndCall(
@@ -673,6 +683,10 @@ contract SystemDeploy is Script {
     }
 
     function _transferOwnership(address _target, address _newOwner) internal {
+        if (IAddressManager(_target).owner() == address(this)) {
+            IAddressManager(_target).transferOwnership(_newOwner);
+            return;
+        }
         vm.broadcast(msg.sender);
         IAddressManager(_target).transferOwnership(_newOwner);
     }
@@ -1082,7 +1096,22 @@ contract SystemDeploy is Script {
         artifacts.save("SuperchainProxyAdmin", address(_output.superchain.superchainProxyAdmin));
         artifacts.save("SuperchainConfigProxy", address(_output.superchain.superchainConfigProxy));
         artifacts.save("SuperchainConfigImpl", _output.implementationOutput.implementations.superchainConfigImpl);
+        artifacts.save("SystemConfigImpl", _output.implementationOutput.implementations.systemConfigImpl);
+        artifacts.save(
+            "L1CrossDomainMessengerImpl", _output.implementationOutput.implementations.l1CrossDomainMessengerImpl
+        );
+        artifacts.save("L1ERC721BridgeImpl", _output.implementationOutput.implementations.l1ERC721BridgeImpl);
+        artifacts.save("L1StandardBridgeImpl", _output.implementationOutput.implementations.l1StandardBridgeImpl);
+        artifacts.save(
+            "OptimismMintableERC20FactoryImpl",
+            _output.implementationOutput.implementations.optimismMintableERC20FactoryImpl
+        );
+        artifacts.save("OptimismPortalImpl", _output.implementationOutput.implementations.optimismPortalImpl);
+        artifacts.save("ETHLockboxImpl", _output.implementationOutput.implementations.ethLockboxImpl);
+        artifacts.save("DisputeGameFactoryImpl", _output.implementationOutput.implementations.disputeGameFactoryImpl);
+        artifacts.save("AnchorStateRegistryImpl", _output.implementationOutput.implementations.anchorStateRegistryImpl);
         artifacts.save("MipsSingleton", address(_output.implementationOutput.mipsSingleton));
+        artifacts.save("FaultDisputeGame", _output.implementationOutput.implementations.faultDisputeGameV2Impl);
         artifacts.save("PreimageOracle", address(_output.implementationOutput.preimageOracleSingleton));
         artifacts.save(
             "PermissionedDisputeGame", _output.implementationOutput.implementations.permissionedDisputeGameV2Impl

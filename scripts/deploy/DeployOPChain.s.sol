@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Script } from "lib/forge-std/src/Script.sol";
-
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
 import { Constants as ScriptConstants } from "scripts/libraries/Constants.sol";
-import { Types, IOPContractsManagerInterop } from "scripts/libraries/Types.sol";
+import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
+import { Types } from "scripts/libraries/Types.sol";
 
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
@@ -24,7 +23,7 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 
-contract DeployOPChain is Script {
+contract DeployOPChain is SystemDeploy {
     struct Output {
         IProxyAdmin opChainProxyAdmin;
         IAddressManager addressManager;
@@ -52,8 +51,6 @@ contract DeployOPChain is Script {
     function run(Types.DeployOPChainInput memory _input) public returns (Output memory output_) {
         checkInput(_input);
 
-        IOPContractsManagerInterop opcm = IOPContractsManagerInterop(_input.opcm);
-
         Types.Roles memory roles = Types.Roles({
             opChainProxyAdminOwner: _input.opChainProxyAdminOwner,
             systemConfigOwner: _input.systemConfigOwner,
@@ -78,8 +75,8 @@ contract DeployOPChain is Script {
             disputeMaxClockDuration: _input.disputeMaxClockDuration
         });
 
-        vm.broadcast(msg.sender);
-        Types.DeployOutput memory deployOutput = opcm.deploy(deployInput);
+        Types.DeployOutput memory deployOutput =
+            _deployOPChain(deployInput, _input.superchainConfigProxy, _input.implementations);
 
         vm.label(address(deployOutput.opChainProxyAdmin), "opChainProxyAdmin");
         vm.label(address(deployOutput.addressManager), "addressManager");
@@ -136,8 +133,9 @@ contract DeployOPChain is Script {
         require(_i.l2ChainId != 0, "DeployOPChainInput: l2ChainId not set");
         require(_i.l2ChainId != block.chainid, "DeployOPChainInput: l2ChainId matches block.chainid");
 
-        require(_i.opcm != address(0), "DeployOPChainInput: opcm not set");
-        DeployUtils.assertValidContractAddress(_i.opcm);
+        require(address(_i.superchainConfigProxy) != address(0), "DeployOPChainInput: superchainConfigProxy not set");
+        DeployUtils.assertValidContractAddress(address(_i.superchainConfigProxy));
+        assertValidImplementations(_i.implementations);
 
         require(_i.disputeMaxGameDepth != 0, "DeployOPChainInput: disputeMaxGameDepth not set");
         require(_i.disputeSplitDepth != 0, "DeployOPChainInput: disputeSplitDepth not set");
@@ -162,6 +160,7 @@ contract DeployOPChain is Script {
             address(_o.disputeGameFactoryProxy),
             address(_o.anchorStateRegistryProxy),
             address(_o.delayedWETHPermissionedGameProxy),
+            address(_o.delayedWETHPermissionlessGameProxy),
             address(_o.ethLockboxProxy)
         );
 
@@ -188,7 +187,7 @@ contract DeployOPChain is Script {
 
         // Check dispute games
         // With v2 game contracts enabled, we use the predeployed pdg implementation
-        address expectedPDGImpl = IOPContractsManagerInterop(_i.opcm).implementations().permissionedDisputeGameV2Impl;
+        address expectedPDGImpl = _i.implementations.permissionedDisputeGameV2Impl;
         ChainAssertions.checkDisputeGameFactory(
             _o.disputeGameFactoryProxy, _i.opChainProxyAdminOwner, expectedPDGImpl, true
         );
@@ -197,7 +196,7 @@ contract DeployOPChain is Script {
         ChainAssertions.checkL1CrossDomainMessenger(_o.l1CrossDomainMessengerProxy, vm, true);
         ChainAssertions.checkOptimismPortal2({
             _contracts: proxies,
-            _superchainConfig: IOPContractsManagerInterop(_i.opcm).superchainConfig(),
+            _superchainConfig: _i.superchainConfigProxy,
             _opChainProxyAdminOwner: _i.opChainProxyAdminOwner,
             _isProxy: true
         });
@@ -292,8 +291,25 @@ contract DeployOPChain is Script {
         // anchor root and deploy a new permissioned dispute game contract anyway.
         //
         // You can `console.logBytes(abi.encode(ScriptConstants.DEFAULT_OUTPUT_ROOT()))` to get the bytes that
-        // are hardcoded into `op-chain-ops/deployer/opcm/opchain.go`
+        // are hardcoded into `op-chain-ops/deployer/opchain.go`
 
         return abi.encode(ScriptConstants.DEFAULT_OUTPUT_ROOT());
+    }
+
+    function assertValidImplementations(Types.Implementations memory _impls) internal view {
+        DeployUtils.assertValidContractAddress(_impls.superchainConfigImpl);
+        DeployUtils.assertValidContractAddress(_impls.l1ERC721BridgeImpl);
+        DeployUtils.assertValidContractAddress(_impls.optimismPortalImpl);
+        DeployUtils.assertValidContractAddress(_impls.ethLockboxImpl);
+        DeployUtils.assertValidContractAddress(_impls.systemConfigImpl);
+        DeployUtils.assertValidContractAddress(_impls.optimismMintableERC20FactoryImpl);
+        DeployUtils.assertValidContractAddress(_impls.l1CrossDomainMessengerImpl);
+        DeployUtils.assertValidContractAddress(_impls.l1StandardBridgeImpl);
+        DeployUtils.assertValidContractAddress(_impls.disputeGameFactoryImpl);
+        DeployUtils.assertValidContractAddress(_impls.anchorStateRegistryImpl);
+        DeployUtils.assertValidContractAddress(_impls.delayedWETHImpl);
+        DeployUtils.assertValidContractAddress(_impls.mipsImpl);
+        DeployUtils.assertValidContractAddress(_impls.faultDisputeGameV2Impl);
+        DeployUtils.assertValidContractAddress(_impls.permissionedDisputeGameV2Impl);
     }
 }

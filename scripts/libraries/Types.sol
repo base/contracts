@@ -162,7 +162,8 @@ library Types {
         uint32 basefeeScalar;
         uint32 blobBaseFeeScalar;
         uint256 l2ChainId;
-        address opcm;
+        ISuperchainConfig superchainConfigProxy;
+        Implementations implementations;
         string saltMixer;
         uint64 gasLimit;
         // Configurable dispute game inputs

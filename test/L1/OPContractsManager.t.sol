@@ -1373,7 +1373,7 @@ contract OPContractsManager_UpgradeSuperchainConfig_Test is OPContractsManager_U
 }
 
 /// @title OPContractsManager_Deploy_Test
-/// @notice Tests the `deploy` function of the `OPContractsManager` contract.
+/// @notice Tests the deployment behavior now executed directly by deploy scripts.
 /// @dev Unlike other test suites, we intentionally do not inherit from CommonTest or Setup. This
 ///      is because OPContractsManager acts as a deploy script, so we start from a clean slate here
 ///      and work OPContractsManager's deployment into the existing test setup, instead of using
@@ -1383,15 +1383,10 @@ contract OPContractsManager_UpgradeSuperchainConfig_Test is OPContractsManager_U
 contract OPContractsManager_Deploy_Test is DeployOPChain_TestBase, DisputeGames {
     using stdStorage for StdStorage;
 
-    // This helper function is used to convert the input struct type defined in DeployOPChain.s.sol
-    // to the input struct type defined in OPContractsManager.sol.
-    function toOPCMDeployInput(Types.DeployOPChainInput memory _doi)
-        internal
-        returns (IOPContractsManager.DeployInput memory)
-    {
+    function toDeployInput(Types.DeployOPChainInput memory _doi) internal returns (Types.DeployInput memory) {
         bytes memory startingAnchorRoot = new DeployOPChain().startingAnchorRoot();
-        return IOPContractsManager.DeployInput({
-            roles: IOPContractsManager.Roles({
+        return Types.DeployInput({
+            roles: Types.Roles({
                 opChainProxyAdminOwner: _doi.opChainProxyAdminOwner,
                 systemConfigOwner: _doi.systemConfigOwner,
                 batcher: _doi.batcher,
@@ -1415,41 +1410,55 @@ contract OPContractsManager_Deploy_Test is DeployOPChain_TestBase, DisputeGames 
     }
 
     function test_deploy_l2ChainIdEqualsZero_reverts() public {
-        IOPContractsManager.DeployInput memory input = toOPCMDeployInput(deployOPChainInput);
-        input.l2ChainId = 0;
+        deployOPChainInput.l2ChainId = 0;
 
-        vm.expectRevert(IOPContractsManager.InvalidChainId.selector);
-        opcm.deploy(input);
+        vm.expectRevert("DeployOPChainInput: l2ChainId not set");
+        deployOPChain.run(deployOPChainInput);
     }
 
     function test_deploy_l2ChainIdEqualsCurrentChainId_reverts() public {
-        IOPContractsManager.DeployInput memory input = toOPCMDeployInput(deployOPChainInput);
-        input.l2ChainId = block.chainid;
+        deployOPChainInput.l2ChainId = block.chainid;
 
-        vm.expectRevert(IOPContractsManager.InvalidChainId.selector);
-        opcm.deploy(input);
+        vm.expectRevert("DeployOPChainInput: l2ChainId matches block.chainid");
+        deployOPChain.run(deployOPChainInput);
     }
 
     function test_deploy_succeeds() public {
-        vm.expectEmit(true, true, true, false); // TODO precompute the expected `deployOutput`.
-        emit Deployed(deployOPChainInput.l2ChainId, address(this), bytes(""));
-        opcm.deploy(toOPCMDeployInput(deployOPChainInput));
+        DeployOPChain.Output memory output = deployOPChain.run(deployOPChainInput);
+
+        assertNotEq(address(output.opChainProxyAdmin), address(0), "ProxyAdmin");
+        assertNotEq(address(output.addressManager), address(0), "AddressManager");
+        assertNotEq(address(output.l1ERC721BridgeProxy), address(0), "L1ERC721Bridge");
+        assertNotEq(address(output.systemConfigProxy), address(0), "SystemConfig");
+        assertNotEq(address(output.optimismMintableERC20FactoryProxy), address(0), "OptimismMintableERC20Factory");
+        assertNotEq(address(output.l1StandardBridgeProxy), address(0), "L1StandardBridge");
+        assertNotEq(address(output.l1CrossDomainMessengerProxy), address(0), "L1CrossDomainMessenger");
+        assertNotEq(address(output.optimismPortalProxy), address(0), "OptimismPortal");
+        assertNotEq(address(output.ethLockboxProxy), address(0), "ETHLockbox");
+        assertNotEq(address(output.disputeGameFactoryProxy), address(0), "DisputeGameFactory");
+        assertNotEq(address(output.anchorStateRegistryProxy), address(0), "AnchorStateRegistry");
+        assertNotEq(address(output.delayedWETHPermissionedGameProxy), address(0), "PermissionedDelayedWETH");
+        assertNotEq(address(output.delayedWETHPermissionlessGameProxy), address(0), "DelayedWETH");
+        assertNotEq(
+            address(output.disputeGameFactoryProxy.gameImpls(GameTypes.PERMISSIONED_CANNON)),
+            address(0),
+            "PermissionedDisputeGame"
+        );
     }
 
     /// @notice Test that deploy sets the permissioned dispute game implementation
     function test_deployPermissioned_succeeds() public {
-        IOPContractsManager.Implementations memory impls = opcm.implementations();
-        address pdgImpl = address(impls.permissionedDisputeGameV2Impl);
-        address fdgImpl = address(impls.faultDisputeGameV2Impl);
+        address pdgImpl = implementations.permissionedDisputeGameV2Impl;
+        address fdgImpl = implementations.faultDisputeGameV2Impl;
         assertFalse(pdgImpl == address(0), "PDG implementation address should be non-zero");
         assertFalse(fdgImpl == address(0), "FDG implementation address should be non-zero");
 
-        // Run OPCM.deploy
-        IOPContractsManager.DeployInput memory opcmInput = toOPCMDeployInput(deployOPChainInput);
-        IOPContractsManager.DeployOutput memory opcmOutput = opcm.deploy(opcmInput);
+        Types.DeployInput memory deployInput = toDeployInput(deployOPChainInput);
+        DeployOPChain.Output memory deployOutput = deployOPChain.run(deployOPChainInput);
 
         // Verify that the DisputeGameFactory has registered an implementation for the PERMISSIONED_CANNON game type
-        address actualPDGAddress = address(opcmOutput.disputeGameFactoryProxy.gameImpls(GameTypes.PERMISSIONED_CANNON));
+        address actualPDGAddress =
+            address(deployOutput.disputeGameFactoryProxy.gameImpls(GameTypes.PERMISSIONED_CANNON));
         assertNotEq(actualPDGAddress, address(0), "DisputeGameFactory should have a registered PERMISSIONED_CANNON");
         assertEq(actualPDGAddress, pdgImpl, "PDG address should match");
 
@@ -1458,9 +1467,9 @@ contract OPContractsManager_Deploy_Test is DeployOPChain_TestBase, DisputeGames 
         uint256 l2BlockNumber = uint256(123);
         IPermissionedDisputeGameV2 pdg = IPermissionedDisputeGameV2(
             payable(createGame(
-                    opcmOutput.disputeGameFactoryProxy,
+                    deployOutput.disputeGameFactoryProxy,
                     GameTypes.PERMISSIONED_CANNON,
-                    opcmInput.roles.proposer,
+                    deployInput.roles.proposer,
                     claim,
                     l2BlockNumber
                 ))
@@ -1469,29 +1478,29 @@ contract OPContractsManager_Deploy_Test is DeployOPChain_TestBase, DisputeGames 
         // Verify immutable fields on the game proxy
         // Constructor args
         assertEq(pdg.gameType().raw(), GameTypes.PERMISSIONED_CANNON.raw(), "Game type should match");
-        assertEq(pdg.clockExtension().raw(), opcmInput.disputeClockExtension.raw(), "Clock extension should match");
+        assertEq(pdg.clockExtension().raw(), deployInput.disputeClockExtension.raw(), "Clock extension should match");
         assertEq(
-            pdg.maxClockDuration().raw(), opcmInput.disputeMaxClockDuration.raw(), "Max clock duration should match"
+            pdg.maxClockDuration().raw(), deployInput.disputeMaxClockDuration.raw(), "Max clock duration should match"
         );
-        assertEq(pdg.splitDepth(), opcmInput.disputeSplitDepth, "Split depth should match");
-        assertEq(pdg.maxGameDepth(), opcmInput.disputeMaxGameDepth, "Max game depth should match");
+        assertEq(pdg.splitDepth(), deployInput.disputeSplitDepth, "Split depth should match");
+        assertEq(pdg.maxGameDepth(), deployInput.disputeMaxGameDepth, "Max game depth should match");
         // Clone-with-immutable-args
-        assertEq(pdg.gameCreator(), opcmInput.roles.proposer, "Game creator should match");
+        assertEq(pdg.gameCreator(), deployInput.roles.proposer, "Game creator should match");
         assertEq(pdg.rootClaim().raw(), claim.raw(), "Claim should match");
         assertEq(pdg.l1Head().raw(), blockhash(block.number - 1), "L1 head should match");
         assertEq(pdg.l2BlockNumber(), l2BlockNumber, "L2 Block number should match");
         assertEq(
             pdg.absolutePrestate().raw(),
-            opcmInput.disputeAbsolutePrestate.raw(),
+            deployInput.disputeAbsolutePrestate.raw(),
             "Absolute prestate should match input"
         );
-        assertEq(address(pdg.vm()), address(impls.mipsImpl), "VM should match MIPS implementation");
-        assertEq(address(pdg.anchorStateRegistry()), address(opcmOutput.anchorStateRegistryProxy), "ASR should match");
-        assertEq(address(pdg.weth()), address(opcmOutput.delayedWETHPermissionedGameProxy), "WETH should match");
-        assertEq(pdg.l2ChainId(), opcmInput.l2ChainId, "L2 chain ID should match");
+        assertEq(address(pdg.vm()), implementations.mipsImpl, "VM should match MIPS implementation");
+        assertEq(address(pdg.anchorStateRegistry()), address(deployOutput.anchorStateRegistryProxy), "ASR should match");
+        assertEq(address(pdg.weth()), address(deployOutput.delayedWETHPermissionedGameProxy), "WETH should match");
+        assertEq(pdg.l2ChainId(), deployInput.l2ChainId, "L2 chain ID should match");
         // For permissioned game, check proposer and challenger
-        assertEq(pdg.proposer(), opcmInput.roles.proposer, "Proposer should match");
-        assertEq(pdg.challenger(), opcmInput.roles.challenger, "Challenger should match");
+        assertEq(pdg.proposer(), deployInput.roles.proposer, "Proposer should match");
+        assertEq(pdg.challenger(), deployInput.roles.challenger, "Challenger should match");
     }
 }
 

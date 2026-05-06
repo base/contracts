@@ -5,7 +5,7 @@ import { Script } from "lib/forge-std/src/Script.sol";
 
 // Libraries
 import { Chains } from "scripts/libraries/Chains.sol";
-import { Types, IOPContractsManagerInterop } from "scripts/libraries/Types.sol";
+import { Types } from "scripts/libraries/Types.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
@@ -18,14 +18,6 @@ import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2
 import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { Duration } from "src/libraries/bridge/Types.sol";
-import {
-    IOPContractsManager,
-    IOPContractsManagerGameTypeAdder,
-    IOPContractsManagerDeployer,
-    IOPContractsManagerUpgrader,
-    IOPContractsManagerContractsContainer,
-    IOPContractsManagerStandardValidator
-} from "interfaces/L1/IOPContractsManager.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
@@ -34,7 +26,6 @@ import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { IOPContractsManagerStandardValidator } from "interfaces/L1/IOPContractsManagerStandardValidator.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
@@ -79,12 +70,6 @@ contract DeployImplementations is Script {
     }
 
     struct Output {
-        IOPContractsManager opcm;
-        IOPContractsManagerContractsContainer opcmContractsContainer;
-        IOPContractsManagerGameTypeAdder opcmGameTypeAdder;
-        IOPContractsManagerDeployer opcmDeployer;
-        IOPContractsManagerUpgrader opcmUpgrader;
-        IOPContractsManagerStandardValidator opcmStandardValidator;
         IDelayedWETH delayedWETHImpl;
         IOptimismPortal optimismPortalImpl;
         IETHLockbox ethLockboxImpl;
@@ -135,110 +120,10 @@ contract DeployImplementations is Script {
         deployPermissionedDisputeGameV2Impl(_input, output_);
         deployAggregateVerifierImpl(_input, output_);
 
-        // Deploy the OP Contracts Manager with the new implementations set.
-        deployOPContractsManager(_input, output_);
-
         assertValidOutput(_input, output_);
     }
 
     // -------- Deployment Steps --------
-
-    // --- OP Contracts Manager ---
-
-    function createOPCMContract(
-        Input memory _input,
-        Output memory _output,
-        IOPContractsManager.Blueprints memory _blueprints
-    )
-        private
-        returns (IOPContractsManager opcm_)
-    {
-        IOPContractsManager.Implementations memory implementations = IOPContractsManager.Implementations({
-            superchainConfigImpl: address(_output.superchainConfigImpl),
-            l1ERC721BridgeImpl: address(_output.l1ERC721BridgeImpl),
-            optimismPortalImpl: address(_output.optimismPortalImpl),
-            ethLockboxImpl: address(_output.ethLockboxImpl),
-            systemConfigImpl: address(_output.systemConfigImpl),
-            optimismMintableERC20FactoryImpl: address(_output.optimismMintableERC20FactoryImpl),
-            l1CrossDomainMessengerImpl: address(_output.l1CrossDomainMessengerImpl),
-            l1StandardBridgeImpl: address(_output.l1StandardBridgeImpl),
-            disputeGameFactoryImpl: address(_output.disputeGameFactoryImpl),
-            anchorStateRegistryImpl: address(_output.anchorStateRegistryImpl),
-            delayedWETHImpl: address(_output.delayedWETHImpl),
-            mipsImpl: address(_output.mipsSingleton),
-            faultDisputeGameV2Impl: address(_output.faultDisputeGameV2Impl),
-            permissionedDisputeGameV2Impl: address(_output.permissionedDisputeGameV2Impl)
-        });
-
-        deployOPCMBPImplsContainer(_input, _output, _blueprints, implementations);
-        deployOPCMGameTypeAdder(_output);
-        deployOPCMDeployer(_input, _output);
-        deployOPCMUpgrader(_output);
-        deployOPCMStandardValidator(_input, _output, implementations);
-
-        // Semgrep rule will fail because the arguments are encoded inside of a separate function.
-        opcm_ = IOPContractsManager(
-            // nosemgrep: sol-safety-deployutils-args
-            DeployUtils.createDeterministic({
-                _name: "OPContractsManager", _args: encodeOPCMConstructor(_input, _output), _salt: _salt
-            })
-        );
-
-        vm.label(address(opcm_), "OPContractsManager");
-        _output.opcm = opcm_;
-    }
-
-    /// @notice Encodes the constructor of the OPContractsManager contract. Used to avoid stack too
-    ///         deep errors inside of the createOPCMContract function.
-    /// @param _input The deployment input parameters.
-    /// @param _output The deployment output parameters.
-    /// @return encoded_ The encoded constructor.
-    function encodeOPCMConstructor(
-        Input memory _input,
-        Output memory _output
-    )
-        private
-        pure
-        returns (bytes memory encoded_)
-    {
-        encoded_ = DeployUtils.encodeConstructor(
-            abi.encodeCall(
-                IOPContractsManager.__constructor__,
-                (
-                    _output.opcmGameTypeAdder,
-                    _output.opcmDeployer,
-                    _output.opcmUpgrader,
-                    _output.opcmStandardValidator,
-                    _input.superchainConfigProxy
-                )
-            )
-        );
-    }
-
-    function deployOPContractsManager(Input memory _input, Output memory _output) private {
-        // First we deploy the blueprints for the singletons deployed by OPCM.
-        // forgefmt: disable-start
-        IOPContractsManager.Blueprints memory blueprints;
-        vm.startBroadcast(msg.sender);
-        address checkAddress;
-        (blueprints.addressManager, checkAddress) = DeployUtils.createDeterministicBlueprint(vm.getCode("AddressManager"), _salt);
-        require(checkAddress == address(0), "OPCM-10");
-        (blueprints.proxy, checkAddress) = DeployUtils.createDeterministicBlueprint(vm.getCode("src/universal/Proxy.sol:Proxy"), _salt);
-        require(checkAddress == address(0), "OPCM-20");
-        (blueprints.proxyAdmin, checkAddress) = DeployUtils.createDeterministicBlueprint(vm.getCode("ProxyAdmin"), _salt);
-        require(checkAddress == address(0), "OPCM-30");
-        (blueprints.l1ChugSplashProxy, checkAddress) = DeployUtils.createDeterministicBlueprint(vm.getCode("L1ChugSplashProxy"), _salt);
-        require(checkAddress == address(0), "OPCM-40");
-        (blueprints.resolvedDelegateProxy, checkAddress) = DeployUtils.createDeterministicBlueprint(vm.getCode("ResolvedDelegateProxy"), _salt);
-        require(checkAddress == address(0), "OPCM-50");
-        // forgefmt: disable-end
-        vm.stopBroadcast();
-
-        IOPContractsManager opcm = createOPCMContract(_input, _output, blueprints);
-
-        vm.label(address(opcm), "OPContractsManager");
-        _output.opcm = opcm;
-    }
 
     // --- Core Contracts ---
 
@@ -335,8 +220,8 @@ contract DeployImplementations is Script {
     // |-------------------------|---------|-----------------------------------|------------|
     // | DisputeGameFactory      | Yes     | Bespoke                           | Yes        |
     // | AnchorStateRegistry     | Yes     | Bespoke                           | Yes         |
-    // | FaultDisputeGame        | No      | Bespoke                           | No         | Not yet supported by OPCM
-    // | PermissionedDisputeGame | No      | Bespoke                           | No         |
+    // | FaultDisputeGame        | No      | Bespoke                           | No         | Not yet supported by
+    // scripts | PermissionedDisputeGame | No      | Bespoke                           | No         |
     // | DelayedWETH             | Yes     | Two bespoke (one per DisputeGame) | Yes *️⃣     |
     // | PreimageOracle          | No      | Shared                            | N/A        |
     // | MIPS                    | No      | Shared                            | N/A        |
@@ -413,7 +298,7 @@ contract DeployImplementations is Script {
         uint256 mipsVersion = _input.mipsVersion;
         IPreimageOracle preimageOracle = IPreimageOracle(address(_output.preimageOracleSingleton));
 
-        // We want to ensure that the OPCM for upgrade 13 is deployed with Mips32 on production networks.
+        // We want to ensure that upgrade 13 uses MIPS64 on production networks.
         if (mipsVersion < 2) {
             if (block.chainid == Chains.Mainnet || block.chainid == Chains.Sepolia) {
                 revert("DeployImplementations: Only Mips64 should be deployed on Mainnet or Sepolia");
@@ -498,117 +383,6 @@ contract DeployImplementations is Script {
         _output.permissionedDisputeGameV2Impl = impl;
     }
 
-    function deployOPCMBPImplsContainer(
-        Input memory _input,
-        Output memory _output,
-        IOPContractsManager.Blueprints memory _blueprints,
-        IOPContractsManager.Implementations memory _implementations
-    )
-        private
-    {
-        IOPContractsManagerContractsContainer impl = IOPContractsManagerContractsContainer(
-            DeployUtils.createDeterministic({
-                _name: "OPContractsManager.sol:OPContractsManagerContractsContainer",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        IOPContractsManagerContractsContainer.__constructor__,
-                        (_blueprints, _implementations, _input.devFeatureBitmap)
-                    )
-                ),
-                _salt: _salt
-            })
-        );
-        vm.label(address(impl), "OPContractsManagerBPImplsContainerImpl");
-        _output.opcmContractsContainer = impl;
-    }
-
-    function deployOPCMGameTypeAdder(Output memory _output) private {
-        IOPContractsManagerGameTypeAdder impl = IOPContractsManagerGameTypeAdder(
-            DeployUtils.createDeterministic({
-                _name: "OPContractsManager.sol:OPContractsManagerGameTypeAdder",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(IOPContractsManagerGameTypeAdder.__constructor__, (_output.opcmContractsContainer))
-                ),
-                _salt: _salt
-            })
-        );
-        vm.label(address(impl), "OPContractsManagerGameTypeAdderImpl");
-        _output.opcmGameTypeAdder = impl;
-    }
-
-    function deployOPCMDeployer(Input memory, Output memory _output) private {
-        IOPContractsManagerDeployer impl = IOPContractsManagerDeployer(
-            DeployUtils.createDeterministic({
-                _name: "OPContractsManager.sol:OPContractsManagerDeployer",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(IOPContractsManagerDeployer.__constructor__, (_output.opcmContractsContainer))
-                ),
-                _salt: _salt
-            })
-        );
-        vm.label(address(impl), "OPContractsManagerDeployerImpl");
-        _output.opcmDeployer = impl;
-    }
-
-    function deployOPCMUpgrader(Output memory _output) private {
-        IOPContractsManagerUpgrader impl = IOPContractsManagerUpgrader(
-            DeployUtils.createDeterministic({
-                _name: "OPContractsManager.sol:OPContractsManagerUpgrader",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(IOPContractsManagerUpgrader.__constructor__, (_output.opcmContractsContainer))
-                ),
-                _salt: _salt
-            })
-        );
-        vm.label(address(impl), "OPContractsManagerUpgraderImpl");
-        _output.opcmUpgrader = impl;
-    }
-
-    function deployOPCMStandardValidator(
-        Input memory _input,
-        Output memory _output,
-        IOPContractsManager.Implementations memory _implementations
-    )
-        private
-    {
-        IOPContractsManagerStandardValidator.Implementations memory opcmImplementations;
-        opcmImplementations.l1ERC721BridgeImpl = _implementations.l1ERC721BridgeImpl;
-        opcmImplementations.optimismPortalImpl = _implementations.optimismPortalImpl;
-        opcmImplementations.ethLockboxImpl = _implementations.ethLockboxImpl;
-        opcmImplementations.systemConfigImpl = _implementations.systemConfigImpl;
-        opcmImplementations.optimismMintableERC20FactoryImpl = _implementations.optimismMintableERC20FactoryImpl;
-        opcmImplementations.l1CrossDomainMessengerImpl = _implementations.l1CrossDomainMessengerImpl;
-        opcmImplementations.l1StandardBridgeImpl = _implementations.l1StandardBridgeImpl;
-        opcmImplementations.disputeGameFactoryImpl = _implementations.disputeGameFactoryImpl;
-        opcmImplementations.anchorStateRegistryImpl = _implementations.anchorStateRegistryImpl;
-        opcmImplementations.delayedWETHImpl = _implementations.delayedWETHImpl;
-        opcmImplementations.mipsImpl = _implementations.mipsImpl;
-        opcmImplementations.faultDisputeGameImpl = _implementations.faultDisputeGameV2Impl;
-        opcmImplementations.permissionedDisputeGameImpl = _implementations.permissionedDisputeGameV2Impl;
-
-        IOPContractsManagerStandardValidator impl = IOPContractsManagerStandardValidator(
-            DeployUtils.createDeterministic({
-                _name: "OPContractsManagerStandardValidator.sol:OPContractsManagerStandardValidator",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        IOPContractsManagerStandardValidator.__constructor__,
-                        (
-                            opcmImplementations,
-                            _input.superchainConfigProxy,
-                            _input.l1ProxyAdminOwner,
-                            _input.challenger,
-                            _input.withdrawalDelaySeconds,
-                            _input.devFeatureBitmap
-                        )
-                    )
-                ),
-                _salt: _salt
-            })
-        );
-        vm.label(address(impl), "OPContractsManagerStandardValidatorImpl");
-        _output.opcmStandardValidator = impl;
-    }
-
     function deployAggregateVerifierImpl(Input memory _input, Output memory _output) private {
         address zkVerifier = address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryImpl));
 
@@ -690,10 +464,9 @@ contract DeployImplementations is Script {
     }
 
     function assertValidOutput(Input memory _input, Output memory _output) private {
-        // With 12 addresses, we'd get a stack too deep error if we tried to do this inline as a
+        // With many addresses, we'd get a stack too deep error if we tried to do this inline as a
         // single call to `Solarray.addresses`. So we split it into two calls.
         address[] memory addrs1 = Solarray.addresses(
-            address(_output.opcm),
             address(_output.optimismPortalImpl),
             address(_output.delayedWETHImpl),
             address(_output.preimageOracleSingleton),
@@ -727,15 +500,6 @@ contract DeployImplementations is Script {
         ChainAssertions.checkL1ERC721BridgeImpl(_output.l1ERC721BridgeImpl);
         ChainAssertions.checkL1StandardBridgeImpl(_output.l1StandardBridgeImpl);
         ChainAssertions.checkMIPS(_output.mipsSingleton, _output.preimageOracleSingleton);
-
-        Types.ContractSet memory proxies;
-        proxies.SuperchainConfig = address(_input.superchainConfigProxy);
-        ChainAssertions.checkOPContractsManager({
-            _impls: impls,
-            _proxies: proxies,
-            _opcm: IOPContractsManagerInterop(address(_output.opcm)),
-            _mips: IMIPS64(address(_output.mipsSingleton))
-        });
 
         ChainAssertions.checkOptimismMintableERC20FactoryImpl(_output.optimismMintableERC20FactoryImpl);
         ChainAssertions.checkOptimismPortal2({
