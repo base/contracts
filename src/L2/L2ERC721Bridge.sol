@@ -5,7 +5,7 @@ pragma solidity 0.8.15;
 import { ERC721Bridge } from "src/universal/ERC721Bridge.sol";
 
 // Libraries
-import { ERC165Checker } from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+import { ERC165Checker } from "lib/openzeppelin-contracts/contracts/utils/introspection/ERC165Checker.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 
 // Interfaces

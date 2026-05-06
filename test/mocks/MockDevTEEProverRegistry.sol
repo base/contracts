@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { EnumerableSetLib } from "@solady-v0.0.245/utils/EnumerableSetLib.sol";
+import { EnumerableSetLib } from "lib/solady-v0.0.245/src/utils/EnumerableSetLib.sol";
 
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 

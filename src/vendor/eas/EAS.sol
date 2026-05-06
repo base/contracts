@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { Address } from "@openzeppelin/contracts/utils/Address.sol";
+import { Address } from "lib/openzeppelin-contracts/contracts/utils/Address.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { EIP1271Verifier } from "src/vendor/eas/eip1271/EIP1271Verifier.sol";

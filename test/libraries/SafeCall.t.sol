@@ -5,12 +5,12 @@ pragma solidity 0.8.15;
 import { Config } from "scripts/libraries/Config.sol";
 
 // Forge
-import { Test } from "forge-std/Test.sol";
-import { VmSafe } from "forge-std/Vm.sol";
-import { StdCheatsSafe } from "forge-std/StdCheats.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
+import { VmSafe } from "lib/forge-std/src/Vm.sol";
+import { StdCheatsSafe } from "lib/forge-std/src/StdCheats.sol";
 
 // Libraries
-import { LibString } from "@solady/utils/LibString.sol";
+import { LibString } from "lib/solady/src/utils/LibString.sol";
 import { SafeCall } from "src/libraries/SafeCall.sol";
 
 contract SimpleSafeCaller {

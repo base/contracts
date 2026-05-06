@@ -2,8 +2,8 @@
 pragma solidity ^0.8.0;
 
 // Testing
-import { console } from "forge-std/console.sol";
-import { Script } from "forge-std/Script.sol";
+import { console } from "lib/forge-std/src/console.sol";
+import { Script } from "lib/forge-std/src/Script.sol";
 
 // Scripts
 import { Artifacts } from "scripts/Artifacts.s.sol";

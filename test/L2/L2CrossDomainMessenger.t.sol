@@ -5,7 +5,7 @@ pragma solidity 0.8.15;
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { Reverter, GasBurner } from "test/mocks/Callers.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
-import { stdError } from "forge-std/StdError.sol";
+import { stdError } from "lib/forge-std/src/StdError.sol";
 
 // Libraries
 import { Hashing } from "src/libraries/Hashing.sol";

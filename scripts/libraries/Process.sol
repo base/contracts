@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Vm } from "forge-std/Vm.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
 
 library Process {
     /// @notice Error for when an ffi command fails.

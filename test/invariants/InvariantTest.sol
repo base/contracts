@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import { FFIInterface } from "test/setup/FFIInterface.sol";
 import { Deploy } from "scripts/deploy/Deploy.s.sol";
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 
 /// @title InvariantTest
 /// @dev An extension to `Test` that sets up excluded contracts for invariant testing.

@@ -4,7 +4,7 @@ pragma solidity ^0.8.15;
 // solhint-disable no-console
 import { console } from "lib/forge-std/src/console.sol";
 import { Bytes } from "src/libraries/Bytes.sol";
-import { LibSort } from "@solady/utils/LibSort.sol";
+import { LibSort } from "lib/solady/src/utils/LibSort.sol";
 
 import { IGnosisSafe } from "./IGnosisSafe.sol";
 

@@ -2,9 +2,9 @@
 pragma solidity 0.8.15;
 
 // Libraries
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import { FixedPointMathLib } from "@solady/utils/FixedPointMathLib.sol";
-import { Clone } from "@solady/utils/Clone.sol";
+import { Math } from "lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
+import { FixedPointMathLib } from "lib/solady/src/utils/FixedPointMathLib.sol";
+import { Clone } from "lib/solady/src/utils/Clone.sol";
 import { Types } from "src/libraries/Types.sol";
 import { Hashing } from "src/libraries/Hashing.sol";
 import { RLPReader } from "src/libraries/rlp/RLPReader.sol";

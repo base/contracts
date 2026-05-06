@@ -2,15 +2,15 @@
 pragma solidity 0.8.15;
 
 // Forge
-import { Test } from "forge-std/Test.sol";
-import { VmSafe } from "forge-std/Vm.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
+import { VmSafe } from "lib/forge-std/src/Vm.sol";
 
 // Scripts
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Config } from "scripts/libraries/Config.sol";
 
 // Libraries
-import { LibString } from "@solady/utils/LibString.sol";
+import { LibString } from "lib/solady/src/utils/LibString.sol";
 
 // Interfaces
 import { IL1ChugSplashProxy } from "interfaces/legacy/IL1ChugSplashProxy.sol";

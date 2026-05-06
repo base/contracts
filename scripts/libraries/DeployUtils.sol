@@ -2,12 +2,12 @@
 pragma solidity ^0.8.0;
 
 // Scripts
-import { Vm } from "forge-std/Vm.sol";
-import { console2 as console } from "forge-std/console2.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
+import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { Artifacts } from "scripts/Artifacts.s.sol";
 
 // Libraries
-import { LibString } from "@solady/utils/LibString.sol";
+import { LibString } from "lib/solady/src/utils/LibString.sol";
 import { Bytes } from "src/libraries/Bytes.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { Blueprint } from "src/libraries/Blueprint.sol";

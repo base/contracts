@@ -7,7 +7,7 @@ import { Fork } from "scripts/libraries/Config.sol";
 
 // Libraries
 import { Encoding } from "src/libraries/Encoding.sol";
-import { stdError } from "forge-std/Test.sol";
+import { stdError } from "lib/forge-std/src/Test.sol";
 
 contract GasPriceOracle_Test is CommonTest {
     address depositor;

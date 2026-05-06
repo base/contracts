@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import { RLPWriter } from "src/libraries/rlp/RLPWriter.sol";
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 
 /// @title RLPWriter_writeString_Test
 /// @notice Tests the `writeString` function of the `RLPWriter` library.

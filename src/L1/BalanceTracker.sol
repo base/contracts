@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import {
     ReentrancyGuardUpgradeable
-} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+} from "lib/openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpgradeable.sol";
 import { SafeCall } from "src/libraries/SafeCall.sol";
 
 /// @title BalanceTracker

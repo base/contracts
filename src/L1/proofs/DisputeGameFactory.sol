@@ -2,12 +2,12 @@
 pragma solidity 0.8.15;
 
 // Contracts
-import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { OwnableUpgradeable } from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
 import { ReinitializableBase } from "src/universal/ReinitializableBase.sol";
 import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 
 // Libraries
-import { LibClone } from "@solady/utils/LibClone.sol";
+import { LibClone } from "lib/solady/src/utils/LibClone.sol";
 import { GameType, Claim, GameId, Timestamp, Hash, LibGameId } from "src/libraries/bridge/Types.sol";
 import { NoImplementation, IncorrectBondAmount, GameAlreadyExists } from "src/libraries/bridge/Errors.sol";
 

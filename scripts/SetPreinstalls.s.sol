@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Script } from "forge-std/Script.sol";
-import { console2 as console } from "forge-std/console2.sol";
+import { Script } from "lib/forge-std/src/Script.sol";
+import { console2 as console } from "lib/forge-std/src/console2.sol";
 
 import { Preinstalls } from "src/libraries/Preinstalls.sol";
 

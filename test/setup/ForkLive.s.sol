@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { console2 as console } from "forge-std/console2.sol";
-import { StdAssertions } from "forge-std/StdAssertions.sol";
+import { console2 as console } from "lib/forge-std/src/console2.sol";
+import { StdAssertions } from "lib/forge-std/src/StdAssertions.sol";
 
 // Testing
-import { stdToml } from "forge-std/StdToml.sol";
 import { DelegateCaller } from "test/mocks/Callers.sol";
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 
@@ -17,13 +16,13 @@ import { Config } from "scripts/libraries/Config.sol";
 // Libraries
 import { GameTypes, Claim } from "src/libraries/bridge/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
-import { LibString } from "@solady/utils/LibString.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { IBigStepper } from "interfaces/L1/proofs/IBigStepper.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
@@ -38,37 +37,57 @@ import { IOPContractsManagerUpgrader } from "interfaces/L1/IOPContractsManager.s
 /// @notice This script is called by Setup.sol as a preparation step for the foundry test suite, and is run as an
 ///         alternative to Deploy.s.sol, when `FORK_TEST=true` is set in the env.
 ///         Like Deploy.s.sol this script saves the system addresses to the Artifacts contract so that they can be
-///         read by other contracts. However, rather than deploying new contracts from the local source code, it
-///         simply reads the addresses from the superchain-registry.
-///         Therefore this script can only be run against a fork of a production network which is listed in the
-///         superchain-registry.
+///         read by other contracts. However, rather than deploying new contracts from the local source code, it seeds
+///         the fork with a small set of production entrypoint addresses and derives the rest onchain.
+///         Therefore this script can only be run against a fork of a production network which is listed in
+///         `forkSystemAddresses`.
 ///         This contract must not have constructor logic because it is set into state using `etch`.
 
 contract ForkLive is Deployer, StdAssertions, FeatureFlags {
-    using stdToml for string;
-    using LibString for string;
-
     bool public useOpsRepo;
+
+    struct SystemAddresses {
+        address systemConfig;
+        address superchainConfig;
+        address opcm;
+    }
+
+    struct GameAddresses {
+        address anchorStateRegistry;
+        address weth;
+        address mips;
+    }
 
     /// @notice Thrown when testing with an unsupported chain ID.
     error UnsupportedChainId();
 
-    /// @notice Returns the base chain name to use for forking
-    /// @return The base chain name as a string
-    function baseChain() internal view returns (string memory) {
-        return Config.forkBaseChain();
-    }
-
-    /// @notice Returns the OP chain name to use for forking
-    /// @return The OP chain name as a string
-    function opChain() internal view returns (string memory) {
-        return Config.forkOpChain();
+    /// @notice Returns the production entrypoints for the current L1 fork.
+    function forkSystemAddresses() internal view returns (SystemAddresses memory system_) {
+        if (block.chainid == 1) {
+            system_ = SystemAddresses({
+                systemConfig: 0x73a79Fab69143498Ed3712e519A88a918e1f4072,
+                superchainConfig: 0xb535ff7F118260a952CE65e7fF41B1743De8EE6c,
+                opcm: 0x50F47B43c24F40B92C873Fa0704D4207586D0C9f
+            });
+        } else if (block.chainid == 11155111) {
+            system_ = SystemAddresses({
+                systemConfig: 0xf272670eb55e895584501d564AfEB048bEd26194,
+                superchainConfig: 0xE4401EB53AE90a5335a51fe1828d7BeCf7a63508,
+                opcm: 0xF0a2e224519E876979eA6B2cd15eF5CC3d6703bd
+            });
+        } else if (block.chainid == 560048) {
+            system_ = SystemAddresses({
+                systemConfig: 0xcC7c76564bea74A963A0Bd75E0bC9BcE3FF0EA80, superchainConfig: address(0), opcm: address(0)
+            });
+        } else {
+            revert UnsupportedChainId();
+        }
     }
 
     /// @dev This function sets up the system to test it as follows:
     ///      1. Check if the SUPERCHAIN_OPS_ALLOCS_PATH environment variable was set from superchain ops.
     ///      2. If set, load the state from the given path.
-    ///      3. Read the superchain-registry to get the contract addresses we wish to test from that network.
+    ///      3. Derive the live system addresses from the configured fork entrypoints.
     ///      4. If the environment variable wasn't set, deploy the updated OPCM and implementations of the contracts.
     ///      5. Upgrade the system using the OPCM.upgrade() function if useUpgradedFork is true.
     function run() public {
@@ -81,13 +100,13 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
             // The allocs are generated when simulating an upgrade task that runs vm.dumpState.
             // These allocs represent the state of the EVM after the upgrade has been simulated.
             vm.loadAllocs(superchainOpsAllocsPath);
-            // Next, fetch the addresses from the superchain registry. This function uses a local EVM
-            // to retrieve implementation addresses by reading from proxy addresses provided by the registry.
+            // Next, fetch the addresses from the configured fork entrypoints. This function uses a local EVM
+            // to retrieve implementation addresses by reading from the live proxy addresses.
             // Setting the allocs first ensures the correct implementation addresses are retrieved.
-            _readSuperchainRegistry();
+            _readForkAddresses();
         } else {
-            // Read the superchain registry and save the addresses to the Artifacts contract.
-            _readSuperchainRegistry();
+            // Read the live system and save the addresses to the Artifacts contract.
+            _readForkAddresses();
             // Now deploy the updated OPCM and implementations of the contracts.
             _deployNewImplementations();
         }
@@ -101,39 +120,37 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         }
     }
 
-    /// @notice Reads the superchain config files and saves the addresses to disk.
-    /// @dev During development of an upgrade which adds a new contract, the contract will not yet be present in the
-    ///      superchain-registry. In this case, the contract will be deployed by the upgrade process, and will need to
-    ///      be stored by artifacts.save() after the call to opcm.upgrade().
-    ///      After the upgrade is complete, the superchain-registry will be updated and the contract will be present. At
-    ///      that point, this function will need to be updated to read the new contract from the superchain-registry
-    ///      using either the `saveProxyAndImpl` or `artifacts.save()` functions.
-    function _readSuperchainRegistry() internal {
-        string memory superchainBasePath = "./lib/superchain-registry/superchain/configs/";
-        string memory validationBasePath = "./lib/superchain-registry/validation/standard/";
+    /// @notice Reads the live fork system and saves the addresses to disk.
+    /// @dev During development of an upgrade which adds a new contract, the contract will not yet be derivable from
+    ///      the live fork. In this case, the contract will be deployed by the upgrade process, and will need to be
+    ///      stored by artifacts.save() after the call to opcm.upgrade().
+    function _readForkAddresses() internal {
+        SystemAddresses memory system = forkSystemAddresses();
+        ISystemConfig systemConfig = ISystemConfig(system.systemConfig);
+        ISystemConfig.Addresses memory systemConfigAddresses = systemConfig.getAddresses();
 
-        string memory superchainToml = vm.readFile(string.concat(superchainBasePath, baseChain(), "/superchain.toml"));
-        string memory opToml = vm.readFile(string.concat(superchainBasePath, baseChain(), "/", opChain(), ".toml"));
-
-        string memory standardVersionsToml =
-            vm.readFile(string.concat(validationBasePath, "standard-versions-", baseChain(), ".toml"));
-
-        standardVersionsToml = standardVersionsToml.replace('"op-contracts/v2.0.0-rc.1"', "RELEASE");
+        console.log("ForkLive: loading addresses from SystemConfig %s", address(systemConfig));
 
         // Slightly hacky, we encode the uint chainId as an address to save it in Artifacts
-        artifacts.save("L2ChainId", address(uint160(vm.parseTomlUint(opToml, ".chain_id"))));
+        artifacts.save("L2ChainId", address(uint160(systemConfig.l2ChainId())));
         // Superchain shared contracts
-        saveProxyAndImpl("SuperchainConfig", superchainToml, ".superchain_config_addr");
-        artifacts.save(
-            "OPContractsManager", vm.parseTomlAddress(standardVersionsToml, "$.RELEASE.op_contracts_manager.address")
-        );
+        address superchainConfig = system.superchainConfig;
+        if (superchainConfig == address(0)) {
+            try systemConfig.superchainConfig() returns (ISuperchainConfig superchainConfig_) {
+                superchainConfig = address(superchainConfig_);
+            } catch { }
+        }
+        if (superchainConfig != address(0)) {
+            _saveProxyAndImpl("SuperchainConfig", superchainConfig);
+        }
+        artifacts.save("OPContractsManager", system.opcm);
 
         // Core contracts
-        artifacts.save("ProxyAdmin", vm.parseTomlAddress(opToml, ".addresses.ProxyAdmin"));
-        saveProxyAndImpl("SystemConfig", opToml, ".addresses.SystemConfigProxy");
+        artifacts.save("ProxyAdmin", EIP1967Helper.getAdmin(address(systemConfig)));
+        _saveProxyAndImpl("SystemConfig", address(systemConfig));
 
         // Bridge contracts
-        address optimismPortal = vm.parseTomlAddress(opToml, ".addresses.OptimismPortalProxy");
+        address optimismPortal = systemConfigAddresses.optimismPortal;
         artifacts.save("OptimismPortalProxy", optimismPortal);
         artifacts.save("OptimismPortal2Impl", EIP1967Helper.getImplementation(optimismPortal));
 
@@ -146,40 +163,36 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
             console.log("ForkLive: ETHLockboxProxy not found");
         }
 
-        address addressManager = vm.parseTomlAddress(opToml, ".addresses.AddressManager");
+        address l1CrossDomainMessenger = systemConfigAddresses.l1CrossDomainMessenger;
+        address addressManager = _legacyAddressManager(l1CrossDomainMessenger);
         artifacts.save("AddressManager", addressManager);
         artifacts.save(
             "L1CrossDomainMessengerImpl", IAddressManager(addressManager).getAddress("OVM_L1CrossDomainMessenger")
         );
-        artifacts.save(
-            "L1CrossDomainMessengerProxy", vm.parseTomlAddress(opToml, ".addresses.L1CrossDomainMessengerProxy")
-        );
-        saveProxyAndImpl("OptimismMintableERC20Factory", opToml, ".addresses.OptimismMintableERC20FactoryProxy");
-        saveProxyAndImpl("L1StandardBridge", opToml, ".addresses.L1StandardBridgeProxy");
-        saveProxyAndImpl("L1ERC721Bridge", opToml, ".addresses.L1ERC721BridgeProxy");
+        artifacts.save("L1CrossDomainMessengerProxy", l1CrossDomainMessenger);
+        _saveProxyAndImpl("OptimismMintableERC20Factory", systemConfigAddresses.optimismMintableERC20Factory);
+        _saveProxyAndImpl("L1StandardBridge", systemConfigAddresses.l1StandardBridge);
+        _saveProxyAndImpl("L1ERC721Bridge", systemConfigAddresses.l1ERC721Bridge);
 
         // Fault proof proxied contracts
-        saveProxyAndImpl("AnchorStateRegistry", opToml, ".addresses.AnchorStateRegistryProxy");
-        saveProxyAndImpl("DisputeGameFactory", opToml, ".addresses.DisputeGameFactoryProxy");
-
-        // Fault proof non-proxied contracts
-        // For chains that don't have a permissionless game, we save the dispute game and WETH
-        // addresses as the zero address.
-        artifacts.save("PreimageOracle", vm.parseTomlAddress(opToml, ".addresses.PreimageOracle"));
-        artifacts.save("MipsSingleton", vm.parseTomlAddress(opToml, ".addresses.MIPS"));
-        IDisputeGameFactory disputeGameFactory =
-            IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
-
-        // The PermissionedDisputeGame and PermissionedDelayedWETHProxy are not listed in the registry for OP, so we
-        // look it up onchain
+        IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(systemConfig.disputeGameFactory());
         IFaultDisputeGameV2 permissionedDisputeGame =
             IFaultDisputeGameV2(address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON)));
-        artifacts.save("PermissionedDisputeGame", address(permissionedDisputeGame));
-        artifacts.save("PermissionedDelayedWETHProxy", address(permissionedDisputeGame.weth()));
+        GameAddresses memory gameAddresses = _permissionedGameAddresses(disputeGameFactory, permissionedDisputeGame);
+        _saveProxyAndImpl("AnchorStateRegistry", gameAddresses.anchorStateRegistry);
+        _saveProxyAndImpl("DisputeGameFactory", address(disputeGameFactory));
 
-        // The SR seems out-of-date, so pull the DelayedWETH addresses from the PermissionedDisputeGame.
-        artifacts.save("DelayedWETHProxy", address(permissionedDisputeGame.weth()));
-        artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(address(permissionedDisputeGame.weth())));
+        // Fault proof non-proxied contracts
+        IBigStepper mips = IBigStepper(gameAddresses.mips);
+        artifacts.save("PreimageOracle", address(mips.oracle()));
+        artifacts.save("MipsSingleton", address(mips));
+
+        artifacts.save("PermissionedDisputeGame", address(permissionedDisputeGame));
+        artifacts.save("PermissionedDelayedWETHProxy", gameAddresses.weth);
+
+        // Pull the DelayedWETH addresses from the PermissionedDisputeGame so stale local data cannot break this.
+        artifacts.save("DelayedWETHProxy", gameAddresses.weth);
+        artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(gameAddresses.weth));
     }
 
     /// @notice Calls to the Deploy.s.sol contract etched by Setup.sol to a deterministic address, sets up the
@@ -289,16 +302,45 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(address(newDelayedWeth)));
     }
 
-    /// @notice Saves the proxy and implementation addresses for a contract name
-    /// @param _contractName The name of the contract to save
-    /// @param _tomlPath The path to the superchain config file
-    /// @param _tomlKey The key in the superchain config file to get the proxy address
-    function saveProxyAndImpl(string memory _contractName, string memory _tomlPath, string memory _tomlKey) internal {
-        address proxy = vm.parseTomlAddress(_tomlPath, _tomlKey);
-        artifacts.save(string.concat(_contractName, "Proxy"), proxy);
+    /// @notice Saves the proxy and implementation addresses for a contract name.
+    function _saveProxyAndImpl(string memory _contractName, address _proxy) internal {
+        artifacts.save(string.concat(_contractName, "Proxy"), _proxy);
 
-        address impl = EIP1967Helper.getImplementation(proxy);
+        address impl = EIP1967Helper.getImplementation(_proxy);
         require(impl != address(0), "Upgrade: Implementation address is zero");
         artifacts.save(string.concat(_contractName, "Impl"), impl);
+    }
+
+    /// @notice Returns the AddressManager backing the legacy L1CrossDomainMessenger proxy.
+    function _legacyAddressManager(address _proxy) internal view returns (address) {
+        return address(uint160(uint256(vm.load(_proxy, keccak256(abi.encode(_proxy, uint256(1)))))));
+    }
+
+    /// @notice Returns the addresses encoded for the permissioned dispute game.
+    function _permissionedGameAddresses(
+        IDisputeGameFactory _disputeGameFactory,
+        IFaultDisputeGameV2 _permissionedDisputeGame
+    )
+        internal
+        view
+        returns (GameAddresses memory game_)
+    {
+        bytes memory gameArgs = _disputeGameFactory.gameArgs(GameTypes.PERMISSIONED_CANNON);
+        if (
+            gameArgs.length == LibGameArgs.PERMISSIONED_ARGS_LENGTH
+                || gameArgs.length == LibGameArgs.PERMISSIONLESS_ARGS_LENGTH
+        ) {
+            LibGameArgs.GameArgs memory decoded = LibGameArgs.decode(gameArgs);
+            return
+                GameAddresses({
+                    anchorStateRegistry: decoded.anchorStateRegistry, weth: decoded.weth, mips: decoded.vm
+                });
+        }
+
+        return GameAddresses({
+            anchorStateRegistry: address(_permissionedDisputeGame.anchorStateRegistry()),
+            weth: address(_permissionedDisputeGame.weth()),
+            mips: address(_permissionedDisputeGame.vm())
+        });
     }
 }

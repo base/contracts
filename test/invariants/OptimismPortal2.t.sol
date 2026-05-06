@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 // Testing
-import { StdUtils } from "forge-std/Test.sol";
-import { Vm } from "forge-std/Vm.sol";
+import { StdUtils } from "lib/forge-std/src/Test.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { DisputeGameFactory_TestInit } from "test/L1/proofs/DisputeGameFactory.t.sol";

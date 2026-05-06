@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { console2 as console } from "forge-std/console2.sol";
-import { stdJson } from "forge-std/StdJson.sol";
-import { Vm } from "forge-std/Vm.sol";
+import { console2 as console } from "lib/forge-std/src/console2.sol";
+import { stdJson } from "lib/forge-std/src/StdJson.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";

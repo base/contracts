@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Vm } from "forge-std/Vm.sol";
-import { stdJson } from "forge-std/StdJson.sol";
-import { LibString } from "@solady/utils/LibString.sol";
+import { Vm } from "lib/forge-std/src/Vm.sol";
+import { stdJson } from "lib/forge-std/src/StdJson.sol";
+import { LibString } from "lib/solady/src/utils/LibString.sol";
 import { Process } from "scripts/libraries/Process.sol";
 
 /// @notice Contains information about a storage slot. Mirrors the layout of the storage

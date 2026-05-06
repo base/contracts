@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Libraries
-import { LibKeccak } from "@lib-keccak/LibKeccak.sol";
+import { LibKeccak } from "lib/lib-keccak/contracts/lib/LibKeccak.sol";
 import { PreimageKeyLib } from "src/cannon/PreimageKeyLib.sol";
 import {
     PartOffsetOOB,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { StdInvariant } from "forge-std/StdInvariant.sol";
+import { StdInvariant } from "lib/forge-std/src/StdInvariant.sol";
 import { Encoding } from "src/libraries/Encoding.sol";
 import { Hashing } from "src/libraries/Hashing.sol";
 import { InvariantTest } from "test/invariants/InvariantTest.sol";
