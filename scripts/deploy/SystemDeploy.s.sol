@@ -120,9 +120,7 @@ contract SystemDeploy is Script {
             output_.implementationOutput =
                 _deployImplementations(_withSuperchainImplementationsInput(_input, output_.superchain));
         } else {
-            _assertValidImplementations(_input.implementations);
-            output_.implementationOutput.implementations = _input.implementations;
-            output_.implementationOutput.mipsSingleton = IMIPS64(_input.implementations.mipsImpl);
+            output_.implementationOutput = _existingImplementationOutput(_input.implementations);
         }
 
         output_.opChain = _deployOPChain({
@@ -220,6 +218,17 @@ contract SystemDeploy is Script {
         output_.implementations.permissionedDisputeGameV2Impl = address(_deployPermissionedDisputeGameV2Impl(_input));
         (output_.aggregateVerifierImpl, output_.teeProverRegistryImpl) =
             _deployAggregateVerifierImpl(_input, output_.implementations);
+    }
+
+    function _existingImplementationOutput(Types.Implementations memory _impls)
+        internal
+        view
+        returns (ImplementationOutput memory output_)
+    {
+        _assertValidImplementations(_impls);
+        output_.implementations = _impls;
+        output_.mipsSingleton = IMIPS64(_impls.mipsImpl);
+        output_.preimageOracleSingleton = output_.mipsSingleton.oracle();
     }
 
     function _deployOPChain(
@@ -1160,12 +1169,12 @@ contract SystemDeploy is Script {
         artifacts.save("AnchorStateRegistryImpl", _output.implementationOutput.implementations.anchorStateRegistryImpl);
         artifacts.save("MipsSingleton", address(_output.implementationOutput.mipsSingleton));
         artifacts.save("FaultDisputeGame", _output.implementationOutput.implementations.faultDisputeGameV2Impl);
-        artifacts.save("PreimageOracle", address(_output.implementationOutput.preimageOracleSingleton));
+        _saveIfSet("PreimageOracle", address(_output.implementationOutput.preimageOracleSingleton));
         artifacts.save(
             "PermissionedDisputeGame", _output.implementationOutput.implementations.permissionedDisputeGameV2Impl
         );
-        artifacts.save("AggregateVerifier", address(_output.implementationOutput.aggregateVerifierImpl));
-        artifacts.save("TEEProverRegistry", _output.implementationOutput.teeProverRegistryImpl);
+        _saveIfSet("AggregateVerifier", address(_output.implementationOutput.aggregateVerifierImpl));
+        _saveIfSet("TEEProverRegistry", _output.implementationOutput.teeProverRegistryImpl);
         artifacts.save("DelayedWETHImpl", _output.implementationOutput.implementations.delayedWETHImpl);
         artifacts.save("ProxyAdmin", address(_output.opChain.opChainProxyAdmin));
         artifacts.save("AddressManager", address(_output.opChain.addressManager));
@@ -1181,6 +1190,12 @@ contract SystemDeploy is Script {
         artifacts.save("AnchorStateRegistryProxy", address(_output.opChain.anchorStateRegistryProxy));
         artifacts.save("OptimismPortalProxy", address(_output.opChain.optimismPortalProxy));
         artifacts.save("OptimismPortal2Proxy", address(_output.opChain.optimismPortalProxy));
+    }
+
+    function _saveIfSet(string memory _name, address _addr) internal {
+        if (_addr != address(0)) {
+            artifacts.save(_name, _addr);
+        }
     }
 
     function _saveUpgradeArtifacts(Types.Implementations memory _impls) internal {

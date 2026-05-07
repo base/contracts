@@ -3,6 +3,7 @@ pragma solidity 0.8.15;
 
 import { Test } from "lib/forge-std/src/Test.sol";
 
+import { Artifacts } from "scripts/Artifacts.s.sol";
 import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
 import { DeploySuperchain } from "scripts/deploy/DeploySuperchain.s.sol";
 import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
@@ -18,6 +19,9 @@ import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 import { Claim, Duration, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 
 contract SystemDeploy_Test is Test, StandardSystemAssertions {
+    Artifacts internal constant artifacts =
+        Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
+
     SystemDeploy internal systemDeploy;
 
     address internal owner = address(this);
@@ -155,6 +159,43 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
         assertValidStandardSystem(
             _expected(output, _defaultDeployInput(), true, true, currentCannonPrestate, currentCannonKonaPrestate)
         );
+    }
+
+    function test_deploy_reusingImplementations_doesNotSaveZeroImplementationOnlyArtifacts() public {
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_defaultDeployInput());
+
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.deploySuperchain = false;
+        input.deployImplementations = false;
+        input.saveArtifacts = true;
+        input.superchainConfigProxy = output.superchain.superchainConfigProxy;
+        input.implementations = output.implementationOutput.implementations;
+        input.opChainInput.l2ChainId = l2ChainId + 1;
+        input.opChainInput.saltMixer = "system-deploy-reuse-test";
+
+        vm.mockCallRevert(
+            address(artifacts), abi.encodeCall(Artifacts.save, ("PreimageOracle", address(0))), "zero preimage oracle"
+        );
+        vm.mockCallRevert(
+            address(artifacts),
+            abi.encodeCall(Artifacts.save, ("AggregateVerifier", address(0))),
+            "zero aggregate verifier"
+        );
+        vm.mockCallRevert(
+            address(artifacts),
+            abi.encodeCall(Artifacts.save, ("TEEProverRegistry", address(0))),
+            "zero tee prover registry"
+        );
+
+        SystemDeploy.DeployOutput memory reuseOutput = systemDeploy.deploy(input);
+
+        assertEq(
+            address(reuseOutput.implementationOutput.preimageOracleSingleton),
+            address(output.implementationOutput.preimageOracleSingleton),
+            "preimage oracle"
+        );
+        assertEq(address(reuseOutput.implementationOutput.aggregateVerifierImpl), address(0), "aggregate verifier");
+        assertEq(reuseOutput.implementationOutput.teeProverRegistryImpl, address(0), "tee prover registry");
     }
 
     function _defaultDeployInput() internal view returns (SystemDeploy.DeployInput memory input_) {
