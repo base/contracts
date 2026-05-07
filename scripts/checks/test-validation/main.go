@@ -68,11 +68,6 @@ func processFile(path string) (*common.Void, []error) {
 func validateTestName(artifact *solc.ForgeArtifact) []error {
 	var errors []error
 
-	filePath, _, err := getCompilationTarget(artifact)
-	if err == nil && isExcludedTestNamePath(filePath) {
-		return nil
-	}
-
 	// Extract all test function names from the artifact
 	names := extractTestNames(artifact)
 
@@ -184,7 +179,7 @@ func checkTestStructure(artifact *solc.ForgeArtifact) []error {
 			errors = append(errors, checkTestMethodName(artifact, contractName, contractParts[1], "")...)
 		} else if len(contractParts) == 3 && contractParts[2] == "Harness" {
 			// Pattern: <ContractName>_<Descriptor>_Harness
-			// (e.g., ProxyAdmin_Upgrade_Harness)
+			// (e.g., OPContractsManager_Upgrade_Harness)
 			continue
 		} else if len(contractParts) == 4 && contractParts[3] == "Test" {
 			errors = append(errors, checkTestMethodName(artifact, contractName, contractParts[1], contractParts[2])...)
@@ -379,7 +374,6 @@ func checkFunctionExists(artifact *solc.ForgeArtifact, functionName string) bool
 
 // Variables to hold exclusion lists loaded from TOML
 var excludedPaths []string
-var excludedTestNamePaths []string
 var excludedTests []string
 
 // Structure to match the TOML file format
@@ -388,7 +382,6 @@ type ExclusionsConfig struct {
 		SrcValidation          []string `toml:"src_validation"`
 		ContractNameValidation []string `toml:"contract_name_validation"`
 		FunctionNameValidation []string `toml:"function_name_validation"`
-		TestNameValidation     []string `toml:"test_name_validation"`
 	} `toml:"excluded_paths"`
 	ExcludedTests struct {
 		Contracts []string `toml:"contracts"`
@@ -406,8 +399,6 @@ func loadExclusions(configPath string) error {
 	excludedPaths = append(excludedPaths, config.ExcludedPaths.SrcValidation...)
 	excludedPaths = append(excludedPaths, config.ExcludedPaths.ContractNameValidation...)
 	excludedPaths = append(excludedPaths, config.ExcludedPaths.FunctionNameValidation...)
-	excludedPaths = append(excludedPaths, config.ExcludedPaths.TestNameValidation...)
-	excludedTestNamePaths = config.ExcludedPaths.TestNameValidation
 
 	// Load excluded test contracts
 	excludedTests = config.ExcludedTests.Contracts
@@ -418,16 +409,6 @@ func loadExclusions(configPath string) error {
 // Checks if a file path should be excluded from validation
 func isExcluded(filePath string) bool {
 	for _, excluded := range excludedPaths {
-		if strings.HasPrefix(filePath, excluded) {
-			return true
-		}
-	}
-	return false
-}
-
-// Checks if a file path should be excluded from test-name validation.
-func isExcludedTestNamePath(filePath string) bool {
-	for _, excluded := range excludedTestNamePaths {
 		if strings.HasPrefix(filePath, excluded) {
 			return true
 		}
