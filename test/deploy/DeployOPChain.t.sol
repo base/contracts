@@ -88,12 +88,16 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
                 faultGameV2ClockExtension: 10800,
                 faultGameV2MaxClockDuration: 302400,
                 teeImageHash: bytes32(uint256(1)),
+                zkRangeHash: bytes32(0),
+                zkAggregationHash: bytes32(0),
                 multiproofConfigHash: bytes32(0),
                 multiproofGameType: 621,
                 nitroEnclaveVerifier: address(0),
                 l2ChainID: 8453,
                 multiproofBlockInterval: 100,
                 multiproofIntermediateBlockInterval: 10,
+                teeProposer: proposer,
+                teeChallenger: challenger,
                 superchainConfigProxy: superchainOutput.superchainConfigProxy,
                 superchainProxyAdmin: superchainOutput.superchainProxyAdmin,
                 l1ProxyAdminOwner: superchainOutput.superchainProxyAdmin.owner(),
@@ -152,7 +156,11 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
             delayedWETHImpl: address(_output.delayedWETHImpl),
             mipsImpl: address(_output.mipsSingleton),
             faultDisputeGameV2Impl: address(_output.faultDisputeGameV2Impl),
-            permissionedDisputeGameV2Impl: address(_output.permissionedDisputeGameV2Impl)
+            permissionedDisputeGameV2Impl: address(_output.permissionedDisputeGameV2Impl),
+            aggregateVerifierImpl: address(0),
+            teeProverRegistryImpl: address(0),
+            teeVerifierImpl: address(0),
+            zkVerifierImpl: address(0)
         });
     }
 }

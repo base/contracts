@@ -26,16 +26,9 @@ import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
-import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
-import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
-import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
-import { GameType } from "src/libraries/bridge/Types.sol";
-import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 
 contract DeployImplementations is Script {
     struct Input {
@@ -53,6 +46,8 @@ contract DeployImplementations is Script {
         uint256 faultGameV2MaxClockDuration;
         // Multiproof parameters
         bytes32 teeImageHash;
+        bytes32 zkRangeHash;
+        bytes32 zkAggregationHash;
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
         address nitroEnclaveVerifier;
@@ -60,6 +55,8 @@ contract DeployImplementations is Script {
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
         ISP1Verifier sp1Verifier;
+        address teeProposer;
+        address teeChallenger;
         // Outputs from DeploySuperchain.s.sol.
         ISuperchainConfig superchainConfigProxy;
         IProxyAdmin superchainProxyAdmin;
@@ -85,8 +82,6 @@ contract DeployImplementations is Script {
         ISuperchainConfig superchainConfigImpl;
         IFaultDisputeGameV2 faultDisputeGameV2Impl;
         IPermissionedDisputeGameV2 permissionedDisputeGameV2Impl;
-        IVerifier aggregateVerifierImpl;
-        TEEProverRegistry teeProverRegistryImpl;
     }
 
     bytes32 internal _salt = DeployUtils.DEFAULT_SALT;
@@ -118,7 +113,6 @@ contract DeployImplementations is Script {
         deployAnchorStateRegistryImpl(_input, output_);
         deployFaultDisputeGameV2Impl(_input, output_);
         deployPermissionedDisputeGameV2Impl(_input, output_);
-        deployAggregateVerifierImpl(_input, output_);
 
         assertValidOutput(_input, output_);
     }
@@ -383,39 +377,6 @@ contract DeployImplementations is Script {
         _output.permissionedDisputeGameV2Impl = impl;
     }
 
-    function deployAggregateVerifierImpl(Input memory _input, Output memory _output) private {
-        address zkVerifier = address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryImpl));
-
-        address teeVerifierImpl;
-        {
-            TEEProverRegistry scgImpl = new TEEProverRegistry(
-                INitroEnclaveVerifier(_input.nitroEnclaveVerifier), IDisputeGameFactory(address(1))
-            );
-            vm.label(address(scgImpl), "TEEProverRegistryImpl");
-            _output.teeProverRegistryImpl = scgImpl;
-            teeVerifierImpl = address(new TEEVerifier(scgImpl, _output.anchorStateRegistryImpl));
-        }
-
-        _output.aggregateVerifierImpl = IVerifier(
-            address(
-                new AggregateVerifier(
-                    GameType.wrap(uint32(_input.multiproofGameType)),
-                    _output.anchorStateRegistryImpl,
-                    _output.delayedWETHImpl,
-                    IVerifier(teeVerifierImpl),
-                    IVerifier(zkVerifier),
-                    _input.teeImageHash,
-                    AggregateVerifier.ZkHashes(bytes32(0), bytes32(0)),
-                    _input.multiproofConfigHash,
-                    _input.l2ChainID,
-                    _input.multiproofBlockInterval,
-                    _input.multiproofIntermediateBlockInterval
-                )
-            )
-        );
-        vm.label(address(_output.aggregateVerifierImpl), "AggregateVerifierImpl");
-    }
-
     function assertValidInput(Input memory _input) private pure {
         // Validate V2 game depth parameters are sensible
         require(
@@ -454,6 +415,26 @@ contract DeployImplementations is Script {
             "DeployImplementations: disputeGameFinalityDelaySeconds not set"
         );
         require(_input.mipsVersion != 0, "DeployImplementations: mipsVersion not set");
+        if (_multiproofEnabled(_input)) {
+            require(_input.teeImageHash != bytes32(0), "DeployImplementations: teeImageHash not set");
+            require(_input.zkRangeHash != bytes32(0), "DeployImplementations: zkRangeHash not set");
+            require(_input.zkAggregationHash != bytes32(0), "DeployImplementations: zkAggregationHash not set");
+            require(_input.multiproofGameType != 0, "DeployImplementations: multiproofGameType not set");
+            require(_input.nitroEnclaveVerifier != address(0), "DeployImplementations: nitroEnclaveVerifier not set");
+            require(address(_input.sp1Verifier) != address(0), "DeployImplementations: sp1Verifier not set");
+            require(_input.l2ChainID != 0, "DeployImplementations: l2ChainID not set");
+            require(_input.multiproofBlockInterval != 0, "DeployImplementations: multiproofBlockInterval not set");
+            require(
+                _input.multiproofIntermediateBlockInterval != 0,
+                "DeployImplementations: multiproofIntermediateBlockInterval not set"
+            );
+            require(
+                _input.multiproofBlockInterval % _input.multiproofIntermediateBlockInterval == 0,
+                "DeployImplementations: invalid multiproof block intervals"
+            );
+            require(_input.teeProposer != address(0), "DeployImplementations: teeProposer not set");
+            require(_input.teeChallenger != address(0), "DeployImplementations: teeChallenger not set");
+        }
         require(
             address(_input.superchainConfigProxy) != address(0), "DeployImplementations: superchainConfigProxy not set"
         );
@@ -461,6 +442,10 @@ contract DeployImplementations is Script {
             address(_input.superchainProxyAdmin) != address(0), "DeployImplementations: superchainProxyAdmin not set"
         );
         require(address(_input.l1ProxyAdminOwner) != address(0), "DeployImplementations: L1ProxyAdminOwner not set");
+    }
+
+    function _multiproofEnabled(Input memory _input) private pure returns (bool) {
+        return _input.multiproofConfigHash != bytes32(0);
     }
 
     function assertValidOutput(Input memory _input, Output memory _output) private {

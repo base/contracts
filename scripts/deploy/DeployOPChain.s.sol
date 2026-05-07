@@ -5,6 +5,7 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
 import { Constants as ScriptConstants } from "scripts/libraries/Constants.sol";
+import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
 import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
@@ -75,8 +76,10 @@ contract DeployOPChain is SystemDeploy {
             disputeMaxClockDuration: _input.disputeMaxClockDuration
         });
 
-        Types.DeployOutput memory deployOutput =
-            _deployOPChain(deployInput, _input.superchainConfigProxy, _input.implementations);
+        DeployImplementations.Input memory implementationsInput;
+        Types.DeployOutput memory deployOutput;
+        (deployOutput,) =
+            _deployOPChain(deployInput, _input.superchainConfigProxy, _input.implementations, implementationsInput);
 
         vm.label(address(deployOutput.opChainProxyAdmin), "opChainProxyAdmin");
         vm.label(address(deployOutput.addressManager), "addressManager");

@@ -34,6 +34,8 @@ contract DeployImplementations_Test is Test, FeatureFlags {
     ISP1Verifier sp1Verifier = ISP1Verifier(makeAddr("sp1Verifier"));
     address l1ProxyAdminOwner = makeAddr("l1ProxyAdminOwner");
     address challenger = makeAddr("challenger");
+    address teeProposer = makeAddr("teeProposer");
+    address teeChallenger = makeAddr("teeChallenger");
 
     function setUp() public virtual {
         // We'll need to store some code on these two addresses so that the deployment script checks pass
@@ -174,6 +176,8 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             _faultGameV2ClockExtension, // faultGameV2ClockExtension (bounded)
             _faultGameV2MaxClockDuration, // faultGameV2MaxClockDuration (bounded)
             bytes32(uint256(1)), // teeImageHash
+            bytes32(0), // zkRangeHash
+            bytes32(0), // zkAggregationHash
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
             address(0), // nitroEnclaveVerifier
@@ -181,6 +185,8 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             100, // multiproofBlockInterval
             10, // multiproofIntermediateBlockInterval
             sp1Verifier,
+            teeProposer,
+            teeChallenger,
             superchainConfigProxy,
             superchainProxyAdmin,
             l1ProxyAdminOwner,
@@ -388,6 +394,8 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             10800, // faultGameV2ClockExtension
             302400, // faultGameV2MaxClockDuration
             bytes32(uint256(1)), // teeImageHash
+            bytes32(0), // zkRangeHash
+            bytes32(0), // zkAggregationHash
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
             address(0), // nitroEnclaveVerifier
@@ -395,6 +403,8 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             100, // multiproofBlockInterval
             10, // multiproofIntermediateBlockInterval
             sp1Verifier,
+            teeProposer,
+            teeChallenger,
             superchainConfigProxy,
             superchainProxyAdmin,
             l1ProxyAdminOwner,

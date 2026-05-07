@@ -264,8 +264,8 @@ abstract contract Setup is FeatureFlags {
         superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
         superchainProxyAdminOwner = superchainProxyAdmin.owner();
         mips = IBigStepper(artifacts.mustGetAddress("MipsSingleton"));
-        aggregateVerifier = IVerifier(artifacts.mustGetAddress("AggregateVerifier"));
-        teeProverRegistry = TEEProverRegistry(artifacts.mustGetAddress("TEEProverRegistry"));
+        aggregateVerifier = IVerifier(artifacts.getAddress("AggregateVerifier"));
+        teeProverRegistry = TEEProverRegistry(artifacts.getAddress("TEEProverRegistry"));
 
         console.log("Setup: registered L1 deployments");
 

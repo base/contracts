@@ -236,12 +236,16 @@ contract Deploy is Deployer {
                 faultGameV2ClockExtension: cfg.faultGameV2ClockExtension(),
                 faultGameV2MaxClockDuration: cfg.faultGameV2MaxClockDuration(),
                 teeImageHash: cfg.teeImageHash(),
+                zkRangeHash: cfg.zkRangeHash(),
+                zkAggregationHash: cfg.zkAggregationHash(),
                 multiproofConfigHash: cfg.multiproofConfigHash(),
                 multiproofGameType: cfg.multiproofGameType(),
                 nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
                 l2ChainID: cfg.l2ChainID(),
                 multiproofBlockInterval: cfg.multiproofBlockInterval(),
                 multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
+                teeProposer: cfg.teeProposer(),
+                teeChallenger: cfg.teeChallenger(),
                 superchainConfigProxy: superchainConfigProxy,
                 superchainProxyAdmin: superchainProxyAdmin,
                 l1ProxyAdminOwner: superchainProxyAdmin.owner(),
@@ -269,8 +273,6 @@ contract Deploy is Deployer {
         artifacts.save("FaultDisputeGame", address(dio.faultDisputeGameV2Impl));
         artifacts.save("PreimageOracle", address(dio.preimageOracleSingleton));
         artifacts.save("PermissionedDisputeGame", address(dio.permissionedDisputeGameV2Impl));
-        artifacts.save("AggregateVerifier", address(dio.aggregateVerifierImpl));
-        artifacts.save("TEEProverRegistry", address(dio.teeProverRegistryImpl));
 
         // Get a contract set from the implementation addresses which were just deployed.
         Types.ContractSet memory impls = ChainAssertions.dioToContractSet(dio);
@@ -307,7 +309,39 @@ contract Deploy is Deployer {
 
         Types.DeployInput memory deployInput = getDeployInput();
         DeploySuperchain.Input memory superchainInput;
-        DeployImplementations.Input memory implementationsInput;
+        ISuperchainConfig superchainConfigProxy = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
+        IProxyAdmin superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfigProxy)));
+        DeployImplementations.Input memory implementationsInput = DeployImplementations.Input({
+            withdrawalDelaySeconds: cfg.faultGameWithdrawalDelay(),
+            minProposalSizeBytes: cfg.preimageOracleMinProposalSize(),
+            challengePeriodSeconds: cfg.preimageOracleChallengePeriod(),
+            proofMaturityDelaySeconds: cfg.proofMaturityDelaySeconds(),
+            disputeGameFinalityDelaySeconds: cfg.disputeGameFinalityDelaySeconds(),
+            mipsVersion: StandardConstants.MIPS_VERSION,
+            devFeatureBitmap: cfg.devFeatureBitmap(),
+            faultGameV2MaxGameDepth: cfg.faultGameV2MaxGameDepth(),
+            faultGameV2SplitDepth: cfg.faultGameV2SplitDepth(),
+            faultGameV2ClockExtension: cfg.faultGameV2ClockExtension(),
+            faultGameV2MaxClockDuration: cfg.faultGameV2MaxClockDuration(),
+            teeImageHash: cfg.teeImageHash(),
+            zkRangeHash: cfg.zkRangeHash(),
+            zkAggregationHash: cfg.zkAggregationHash(),
+            multiproofConfigHash: cfg.multiproofConfigHash(),
+            multiproofGameType: cfg.multiproofGameType(),
+            nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
+            l2ChainID: cfg.l2ChainID(),
+            multiproofBlockInterval: cfg.multiproofBlockInterval(),
+            multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
+            sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
+            teeProposer: cfg.teeProposer(),
+            teeChallenger: cfg.teeChallenger(),
+            superchainConfigProxy: superchainConfigProxy,
+            superchainProxyAdmin: superchainProxyAdmin,
+            l1ProxyAdminOwner: superchainProxyAdmin.owner(),
+            challenger: cfg.l2OutputOracleChallenger(),
+            guardian: cfg.superchainConfigGuardian(),
+            incidentResponder: cfg.superchainConfigIncidentResponder()
+        });
         SystemDeploy.DeployOutput memory systemOutput = new SystemDeploy()
             .deploy(
                 SystemDeploy.DeployInput({
@@ -315,13 +349,14 @@ contract Deploy is Deployer {
                     deployImplementations: false,
                     saveArtifacts: false,
                     superchainInput: superchainInput,
-                    superchainConfigProxy: ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy")),
+                    superchainConfigProxy: superchainConfigProxy,
                     implementationsInput: implementationsInput,
                     implementations: getImplementations(),
                     opChainInput: deployInput
                 })
             );
         Types.DeployOutput memory deployOutput = systemOutput.opChain;
+        Types.Implementations memory implementations = systemOutput.implementationOutput.implementations;
 
         // Store code in the Final system owner address so that it can be used for prank delegatecalls
         // Store "fe" opcode so that accidental calls to this address revert
@@ -344,6 +379,16 @@ contract Deploy is Deployer {
         artifacts.save("AnchorStateRegistryProxy", address(deployOutput.anchorStateRegistryProxy));
         artifacts.save("OptimismPortalProxy", address(deployOutput.optimismPortalProxy));
         artifacts.save("OptimismPortal2Proxy", address(deployOutput.optimismPortalProxy));
+        if (address(deployOutput.aggregateVerifier) != address(0)) {
+            artifacts.save("AggregateVerifier", implementations.aggregateVerifierImpl);
+            artifacts.save("TEEProverRegistryProxy", address(deployOutput.teeProverRegistryProxy));
+            artifacts.save("TEEProverRegistry", address(deployOutput.teeProverRegistryProxy));
+            artifacts.save("TEEProverRegistryImpl", implementations.teeProverRegistryImpl);
+            artifacts.save("TEEVerifier", implementations.teeVerifierImpl);
+            artifacts.save("ZKVerifier", implementations.zkVerifierImpl);
+            artifacts.save("NitroEnclaveVerifier", address(deployOutput.nitroEnclaveVerifier));
+            artifacts.save("SP1Verifier", address(deployOutput.sp1Verifier));
+        }
     }
 
     ////////////////////////////////////////////////////////////////
@@ -391,7 +436,11 @@ contract Deploy is Deployer {
             delayedWETHImpl: artifacts.mustGetAddress("DelayedWETHImpl"),
             mipsImpl: artifacts.mustGetAddress("MipsSingleton"),
             faultDisputeGameV2Impl: artifacts.mustGetAddress("FaultDisputeGame"),
-            permissionedDisputeGameV2Impl: artifacts.mustGetAddress("PermissionedDisputeGame")
+            permissionedDisputeGameV2Impl: artifacts.mustGetAddress("PermissionedDisputeGame"),
+            aggregateVerifierImpl: artifacts.getAddress("AggregateVerifier"),
+            teeProverRegistryImpl: artifacts.getAddress("TEEProverRegistryImpl"),
+            teeVerifierImpl: artifacts.getAddress("TEEVerifier"),
+            zkVerifierImpl: artifacts.getAddress("ZKVerifier")
         });
     }
 

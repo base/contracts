@@ -29,6 +29,7 @@ import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.so
 import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
 import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
@@ -64,8 +65,6 @@ contract SystemDeploy is Script {
         Types.Implementations implementations;
         IPreimageOracle preimageOracleSingleton;
         IMIPS64 mipsSingleton;
-        IVerifier aggregateVerifierImpl;
-        address teeProverRegistryImpl;
     }
 
     struct DeployOutput {
@@ -93,10 +92,20 @@ contract SystemDeploy is Script {
         IVerifier teeVerifier;
         IVerifier zkVerifier;
         bytes32 teeImageHash;
+        bytes32 zkRangeHash;
+        bytes32 zkAggregationHash;
         bytes32 multiproofConfigHash;
         uint256 l2ChainID;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+    }
+
+    struct MultiproofOutput {
+        IVerifier aggregateVerifier;
+        TEEProverRegistry teeProverRegistryProxy;
+        TEEProverRegistry teeProverRegistryImpl;
+        IVerifier teeVerifier;
+        IVerifier zkVerifier;
     }
 
     event Deployed(uint256 indexed l2ChainId, address indexed deployer, bytes deployOutput);
@@ -123,11 +132,14 @@ contract SystemDeploy is Script {
             output_.implementationOutput = _existingImplementationOutput(_input.implementations);
         }
 
-        output_.opChain = _deployOPChain({
+        Types.Implementations memory implementations;
+        (output_.opChain, implementations) = _deployOPChain({
             _input: _input.opChainInput,
             _superchainConfig: output_.superchain.superchainConfigProxy,
-            _impls: output_.implementationOutput.implementations
+            _impls: output_.implementationOutput.implementations,
+            _implementationsInput: _withSuperchainImplementationsInput(_input, output_.superchain)
         });
+        output_.implementationOutput.implementations = implementations;
 
         if (_input.saveArtifacts) {
             _saveDeployArtifacts(output_);
@@ -216,8 +228,6 @@ contract SystemDeploy is Script {
         output_.implementations.anchorStateRegistryImpl = address(_deployAnchorStateRegistryImpl(_input));
         output_.implementations.faultDisputeGameV2Impl = address(_deployFaultDisputeGameV2Impl(_input));
         output_.implementations.permissionedDisputeGameV2Impl = address(_deployPermissionedDisputeGameV2Impl(_input));
-        (output_.aggregateVerifierImpl, output_.teeProverRegistryImpl) =
-            _deployAggregateVerifierImpl(_input, output_.implementations);
     }
 
     function _existingImplementationOutput(Types.Implementations memory _impls)
@@ -234,12 +244,14 @@ contract SystemDeploy is Script {
     function _deployOPChain(
         Types.DeployInput memory _input,
         ISuperchainConfig _superchainConfig,
-        Types.Implementations memory _impls
+        Types.Implementations memory _impls,
+        DeployImplementations.Input memory _implementationsInput
     )
         internal
-        returns (Types.DeployOutput memory output_)
+        returns (Types.DeployOutput memory output_, Types.Implementations memory impls_)
     {
         _assertValidOPChainInput(_input);
+        impls_ = _impls;
 
         output_.addressManager =
             IAddressManager(_createDeterministicFromThis("AddressManager", abi.encode(), _input, "AddressManager"));
@@ -302,7 +314,7 @@ contract SystemDeploy is Script {
         output_.delayedWETHPermissionedGameProxy =
             IDelayedWETH(payable(_deployProxy(_input, output_.opChainProxyAdmin, "DelayedWETHPermissionedGame")));
 
-        _initializeOPChain(_input, _superchainConfig, _impls, output_);
+        _initializeOPChain(_input, _superchainConfig, impls_, output_);
 
         output_.delayedWETHPermissionlessGameProxy =
             IDelayedWETH(payable(_deployProxy(_input, output_.opChainProxyAdmin, "DelayedWETHPermissionlessGame")));
@@ -313,6 +325,21 @@ contract SystemDeploy is Script {
             abi.encodeCall(IDelayedWETH.initialize, (output_.systemConfigProxy))
         );
 
+        if (_multiproofEnabled(_implementationsInput)) {
+            MultiproofOutput memory multiproof = _deployMultiproofContracts(_input, _implementationsInput, output_);
+            impls_.aggregateVerifierImpl = address(multiproof.aggregateVerifier);
+            impls_.teeProverRegistryImpl = address(multiproof.teeProverRegistryImpl);
+            impls_.teeVerifierImpl = address(multiproof.teeVerifier);
+            impls_.zkVerifierImpl = address(multiproof.zkVerifier);
+            output_.aggregateVerifier = multiproof.aggregateVerifier;
+            output_.teeProverRegistryProxy = ITEEProverRegistry(address(multiproof.teeProverRegistryProxy));
+            output_.teeVerifier = multiproof.teeVerifier;
+            output_.zkVerifier = multiproof.zkVerifier;
+            output_.nitroEnclaveVerifier = INitroEnclaveVerifier(_implementationsInput.nitroEnclaveVerifier);
+            output_.sp1Verifier = _implementationsInput.sp1Verifier;
+        }
+
+        _transferOwnership(address(output_.disputeGameFactoryProxy), _input.roles.opChainProxyAdminOwner);
         _transferOwnership(address(output_.opChainProxyAdmin), _input.roles.opChainProxyAdminOwner);
     }
 
@@ -391,7 +418,6 @@ contract SystemDeploy is Script {
             abi.encodeCall(IDisputeGameFactory.initialize, (msg.sender))
         );
         _setPermissionedGameImpl(_input, _impls, _output);
-        _transferOwnership(address(_output.disputeGameFactoryProxy), _input.roles.opChainProxyAdminOwner);
 
         _upgradeToAndCall(
             _output.opChainProxyAdmin,
@@ -929,35 +955,77 @@ contract SystemDeploy is Script {
         );
     }
 
-    function _deployAggregateVerifierImpl(
+    function _deployMultiproofContracts(
+        Types.DeployInput memory _opChainInput,
         DeployImplementations.Input memory _input,
-        Types.Implementations memory _impls
+        Types.DeployOutput memory _output
     )
         internal
-        returns (IVerifier aggregateVerifier_, address teeProverRegistry_)
+        returns (MultiproofOutput memory output_)
     {
-        IAnchorStateRegistry anchorStateRegistry = IAnchorStateRegistry(_impls.anchorStateRegistryImpl);
-        address zkVerifier = address(new ZKVerifier(_input.sp1Verifier, anchorStateRegistry));
-        TEEProverRegistry registry = new TEEProverRegistry(
-            INitroEnclaveVerifier(_input.nitroEnclaveVerifier), IDisputeGameFactory(address(1))
-        );
-        teeProverRegistry_ = address(registry);
-        address teeVerifier = address(new TEEVerifier(registry, anchorStateRegistry));
+        _assertValidMultiproofInput(_opChainInput, _input);
 
-        aggregateVerifier_ = _newAggregateVerifier(
+        GameType gameType = GameType.wrap(uint32(_input.multiproofGameType));
+
+        output_.teeProverRegistryImpl = new TEEProverRegistry(
+            INitroEnclaveVerifier(_input.nitroEnclaveVerifier), _output.disputeGameFactoryProxy
+        );
+
+        output_.teeProverRegistryProxy =
+            TEEProverRegistry(_deployProxy(_opChainInput, _output.opChainProxyAdmin, "TEEProverRegistry"));
+        address[] memory initialProposers = new address[](2);
+        initialProposers[0] = _input.teeProposer;
+        initialProposers[1] = _input.teeChallenger;
+        _upgradeToAndCall(
+            _output.opChainProxyAdmin,
+            address(output_.teeProverRegistryProxy),
+            address(output_.teeProverRegistryImpl),
+            abi.encodeCall(
+                TEEProverRegistry.initialize,
+                (
+                    _opChainInput.roles.opChainProxyAdminOwner,
+                    _opChainInput.roles.opChainProxyAdminOwner,
+                    initialProposers,
+                    gameType
+                )
+            )
+        );
+
+        INitroEnclaveVerifier nitroVerifier = INitroEnclaveVerifier(_input.nitroEnclaveVerifier);
+        if (nitroVerifier.proofSubmitter() != address(output_.teeProverRegistryProxy)) {
+            vm.broadcast(msg.sender);
+            nitroVerifier.setProofSubmitter(address(output_.teeProverRegistryProxy));
+        }
+
+        output_.teeVerifier =
+            IVerifier(address(new TEEVerifier(output_.teeProverRegistryProxy, _output.anchorStateRegistryProxy)));
+        output_.zkVerifier = IVerifier(address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryProxy)));
+
+        output_.aggregateVerifier = _newAggregateVerifier(
             AggregateVerifierInput({
-                multiproofGameType: GameType.wrap(uint32(_input.multiproofGameType)),
-                anchorStateRegistry: anchorStateRegistry,
-                delayedWETH: IDelayedWETH(payable(_impls.delayedWETHImpl)),
-                teeVerifier: IVerifier(teeVerifier),
-                zkVerifier: IVerifier(zkVerifier),
+                multiproofGameType: gameType,
+                anchorStateRegistry: _output.anchorStateRegistryProxy,
+                delayedWETH: _output.delayedWETHPermissionlessGameProxy,
+                teeVerifier: output_.teeVerifier,
+                zkVerifier: output_.zkVerifier,
                 teeImageHash: _input.teeImageHash,
+                zkRangeHash: _input.zkRangeHash,
+                zkAggregationHash: _input.zkAggregationHash,
                 multiproofConfigHash: _input.multiproofConfigHash,
                 l2ChainID: _input.l2ChainID,
                 multiproofBlockInterval: _input.multiproofBlockInterval,
                 multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval
             })
         );
+
+        vm.broadcast(msg.sender);
+        _output.disputeGameFactoryProxy.setImplementation(gameType, IDisputeGame(address(output_.aggregateVerifier)));
+
+        vm.label(address(output_.teeProverRegistryImpl), "TEEProverRegistryImpl");
+        vm.label(address(output_.teeProverRegistryProxy), "TEEProverRegistryProxy");
+        vm.label(address(output_.teeVerifier), "TEEVerifier");
+        vm.label(address(output_.zkVerifier), "ZKVerifier");
+        vm.label(address(output_.aggregateVerifier), "AggregateVerifier");
     }
 
     function _newAggregateVerifier(AggregateVerifierInput memory _input) internal returns (IVerifier) {
@@ -970,7 +1038,7 @@ contract SystemDeploy is Script {
                     _input.teeVerifier,
                     _input.zkVerifier,
                     _input.teeImageHash,
-                    AggregateVerifier.ZkHashes(bytes32(0), bytes32(0)),
+                    AggregateVerifier.ZkHashes(_input.zkRangeHash, _input.zkAggregationHash),
                     _input.multiproofConfigHash,
                     _input.l2ChainID,
                     _input.multiproofBlockInterval,
@@ -1117,9 +1185,57 @@ contract SystemDeploy is Script {
         require(_input.proofMaturityDelaySeconds != 0, "SystemDeploy: proofMaturityDelaySeconds not set");
         require(_input.disputeGameFinalityDelaySeconds != 0, "SystemDeploy: finality delay not set");
         require(_input.mipsVersion != 0, "SystemDeploy: mipsVersion not set");
+        if (_multiproofEnabled(_input)) {
+            require(_input.multiproofGameType != 0, "SystemDeploy: multiproofGameType not set");
+            require(_input.l2ChainID != 0, "SystemDeploy: multiproof l2ChainID not set");
+            require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
+            require(
+                _input.multiproofIntermediateBlockInterval != 0,
+                "SystemDeploy: multiproof intermediate interval not set"
+            );
+            require(
+                _input.multiproofBlockInterval % _input.multiproofIntermediateBlockInterval == 0,
+                "SystemDeploy: invalid multiproof block intervals"
+            );
+            require(_input.teeProposer != address(0), "SystemDeploy: teeProposer not set");
+            require(_input.teeChallenger != address(0), "SystemDeploy: teeChallenger not set");
+        }
         require(address(_input.superchainConfigProxy) != address(0), "SystemDeploy: superchainConfigProxy not set");
         require(address(_input.superchainProxyAdmin) != address(0), "SystemDeploy: superchainProxyAdmin not set");
         require(_input.l1ProxyAdminOwner != address(0), "SystemDeploy: l1ProxyAdminOwner not set");
+    }
+
+    function _multiproofEnabled(DeployImplementations.Input memory _input) internal pure returns (bool) {
+        return _input.multiproofConfigHash != bytes32(0);
+    }
+
+    function _assertValidMultiproofInput(
+        Types.DeployInput memory _opChainInput,
+        DeployImplementations.Input memory _input
+    )
+        internal
+        view
+    {
+        require(_input.teeImageHash != bytes32(0), "SystemDeploy: teeImageHash not set");
+        require(_input.zkRangeHash != bytes32(0), "SystemDeploy: zkRangeHash not set");
+        require(_input.zkAggregationHash != bytes32(0), "SystemDeploy: zkAggregationHash not set");
+        require(_input.multiproofConfigHash != bytes32(0), "SystemDeploy: multiproofConfigHash not set");
+        require(_input.multiproofGameType != 0, "SystemDeploy: multiproofGameType not set");
+        require(_input.nitroEnclaveVerifier != address(0), "SystemDeploy: nitroEnclaveVerifier not set");
+        require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
+        _assertValidContractAddress(_input.nitroEnclaveVerifier);
+        _assertValidContractAddress(address(_input.sp1Verifier));
+        require(_input.l2ChainID == _opChainInput.l2ChainId, "SystemDeploy: multiproof l2ChainID mismatch");
+        require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
+        require(
+            _input.multiproofIntermediateBlockInterval != 0, "SystemDeploy: multiproof intermediate interval not set"
+        );
+        require(
+            _input.multiproofBlockInterval % _input.multiproofIntermediateBlockInterval == 0,
+            "SystemDeploy: invalid multiproof block intervals"
+        );
+        require(_input.teeProposer != address(0), "SystemDeploy: teeProposer not set");
+        require(_input.teeChallenger != address(0), "SystemDeploy: teeChallenger not set");
     }
 
     function _assertValidImplementations(Types.Implementations memory _impls) internal view {
@@ -1173,8 +1289,6 @@ contract SystemDeploy is Script {
         artifacts.save(
             "PermissionedDisputeGame", _output.implementationOutput.implementations.permissionedDisputeGameV2Impl
         );
-        _saveIfSet("AggregateVerifier", address(_output.implementationOutput.aggregateVerifierImpl));
-        _saveIfSet("TEEProverRegistry", _output.implementationOutput.teeProverRegistryImpl);
         artifacts.save("DelayedWETHImpl", _output.implementationOutput.implementations.delayedWETHImpl);
         artifacts.save("ProxyAdmin", address(_output.opChain.opChainProxyAdmin));
         artifacts.save("AddressManager", address(_output.opChain.addressManager));
@@ -1190,6 +1304,14 @@ contract SystemDeploy is Script {
         artifacts.save("AnchorStateRegistryProxy", address(_output.opChain.anchorStateRegistryProxy));
         artifacts.save("OptimismPortalProxy", address(_output.opChain.optimismPortalProxy));
         artifacts.save("OptimismPortal2Proxy", address(_output.opChain.optimismPortalProxy));
+        _saveIfSet("AggregateVerifier", _output.implementationOutput.implementations.aggregateVerifierImpl);
+        _saveIfSet("TEEProverRegistryProxy", address(_output.opChain.teeProverRegistryProxy));
+        _saveIfSet("TEEProverRegistry", address(_output.opChain.teeProverRegistryProxy));
+        _saveIfSet("TEEProverRegistryImpl", _output.implementationOutput.implementations.teeProverRegistryImpl);
+        _saveIfSet("TEEVerifier", _output.implementationOutput.implementations.teeVerifierImpl);
+        _saveIfSet("ZKVerifier", _output.implementationOutput.implementations.zkVerifierImpl);
+        _saveIfSet("NitroEnclaveVerifier", address(_output.opChain.nitroEnclaveVerifier));
+        _saveIfSet("SP1Verifier", address(_output.opChain.sp1Verifier));
     }
 
     function _saveIfSet(string memory _name, address _addr) internal {
@@ -1213,5 +1335,9 @@ contract SystemDeploy is Script {
         artifacts.save("MipsSingleton", _impls.mipsImpl);
         artifacts.save("FaultDisputeGame", _impls.faultDisputeGameV2Impl);
         artifacts.save("PermissionedDisputeGame", _impls.permissionedDisputeGameV2Impl);
+        _saveIfSet("AggregateVerifier", _impls.aggregateVerifierImpl);
+        _saveIfSet("TEEProverRegistryImpl", _impls.teeProverRegistryImpl);
+        _saveIfSet("TEEVerifier", _impls.teeVerifierImpl);
+        _saveIfSet("ZKVerifier", _impls.zkVerifierImpl);
     }
 }

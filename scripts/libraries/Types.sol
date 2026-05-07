@@ -4,6 +4,10 @@ pragma solidity ^0.8.0;
 import { IBigStepper } from "interfaces/L1/proofs/IBigStepper.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
+import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.sol";
+import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
@@ -69,6 +73,13 @@ library Types {
         IPermissionedDisputeGameV2 permissionedDisputeGame;
         IDelayedWETH delayedWETHPermissionedGameProxy;
         IDelayedWETH delayedWETHPermissionlessGameProxy;
+        // Multiproof contracts.
+        IVerifier aggregateVerifier;
+        ITEEProverRegistry teeProverRegistryProxy;
+        IVerifier teeVerifier;
+        IVerifier zkVerifier;
+        INitroEnclaveVerifier nitroEnclaveVerifier;
+        ISP1Verifier sp1Verifier;
     }
 
     /// @notice The latest implementation contracts for the OP Stack.
@@ -87,6 +98,10 @@ library Types {
         address mipsImpl;
         address faultDisputeGameV2Impl;
         address permissionedDisputeGameV2Impl;
+        address aggregateVerifierImpl;
+        address teeProverRegistryImpl;
+        address teeVerifierImpl;
+        address zkVerifierImpl;
     }
 
     /// @notice The input required to identify a chain for upgrading, along with new prestate hashes.

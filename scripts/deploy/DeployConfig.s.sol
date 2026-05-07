@@ -200,16 +200,16 @@ contract DeployConfig is Script {
         teeImageHash = bytes32(_readOr(_json, "$.teeImageHash", 0));
         multiproofConfigHash = bytes32(_readOr(_json, "$.multiproofConfigHash", 0));
         multiproofGameType = _readOr(_json, "$.multiproofGameType", 621);
-        teeProposer = stdJson.readAddress(_json, "$.teeProposer");
-        teeChallenger = stdJson.readAddress(_json, "$.teeChallenger");
-        zkRangeHash = stdJson.readBytes32(_json, "$.zkRangeHash");
-        zkAggregationHash = stdJson.readBytes32(_json, "$.zkAggregationHash");
+        teeProposer = _readOr(_json, "$.teeProposer", address(0));
+        teeChallenger = _readOr(_json, "$.teeChallenger", address(0));
+        zkRangeHash = bytes32(_readOr(_json, "$.zkRangeHash", 0));
+        zkAggregationHash = bytes32(_readOr(_json, "$.zkAggregationHash", 0));
         nitroEnclaveVerifier = _readOr(_json, "$.nitroEnclaveVerifier", address(0));
         multiproofGenesisOutputRoot = bytes32(_readOr(_json, "$.multiproofGenesisOutputRoot", uint256(1)));
         multiproofGenesisBlockNumber = _readOr(_json, "$.multiproofGenesisBlockNumber", 0);
         multiproofBlockInterval = _readOr(_json, "$.multiproofBlockInterval", 100);
         multiproofIntermediateBlockInterval = _readOr(_json, "$.multiproofIntermediateBlockInterval", 10);
-        sp1Verifier = stdJson.readAddress(_json, "$.sp1Verifier");
+        sp1Verifier = _readOr(_json, "$.sp1Verifier", address(0));
 
         risc0SetBuilderImageId = bytes32(_readOr(_json, "$.risc0SetBuilderImageId", 0));
         nitroRootCert = bytes32(_readOr(_json, "$.nitroRootCert", 0));

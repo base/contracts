@@ -16,7 +16,23 @@ import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
-import { Claim, Duration, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
+import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
+import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
+import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
+import { Claim, Duration, GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+
+contract MockNitroEnclaveVerifier {
+    address public proofSubmitter;
+
+    function setProofSubmitter(address _proofSubmitter) external {
+        proofSubmitter = _proofSubmitter;
+    }
+}
+
+contract MockSP1Verifier {
+    function verifyProof(bytes32, bytes calldata, bytes calldata) external pure { }
+}
 
 contract SystemDeploy_Test is Test, StandardSystemAssertions {
     Artifacts internal constant artifacts =
@@ -31,13 +47,16 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
     address internal unsafeBlockSigner = makeAddr("unsafeBlockSigner");
     address internal proposer = makeAddr("proposer");
     address internal challenger = makeAddr("challenger");
-    address internal sp1Verifier = makeAddr("sp1Verifier");
+    MockNitroEnclaveVerifier internal nitroEnclaveVerifier;
+    MockSP1Verifier internal sp1Verifier;
 
     uint256 internal l2ChainId = 901;
     Claim internal absolutePrestate = Claim.wrap(0x038512e02c4c3f7bdaec27d00edf55b7155e0905301e1a88083e4e0a6764d54c);
 
     function setUp() public {
         systemDeploy = new SystemDeploy();
+        nitroEnclaveVerifier = new MockNitroEnclaveVerifier();
+        sp1Verifier = new MockSP1Verifier();
     }
 
     function test_deploy_withoutManagerAddress_succeeds() public {
@@ -57,6 +76,7 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
             output.implementationOutput.implementations.permissionedDisputeGameV2Impl,
             "permissioned game impl"
         );
+        _assertMultiproofDeployed(output, input);
         assertEq(
             address(output.opChain.systemConfigProxy.superchainConfig()),
             address(output.superchain.superchainConfigProxy),
@@ -171,22 +191,12 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
         input.superchainConfigProxy = output.superchain.superchainConfigProxy;
         input.implementations = output.implementationOutput.implementations;
         input.opChainInput.l2ChainId = l2ChainId + 1;
+        input.implementationsInput.l2ChainID = input.opChainInput.l2ChainId;
         input.opChainInput.saltMixer = "system-deploy-reuse-test";
 
         vm.mockCallRevert(
             address(artifacts), abi.encodeCall(Artifacts.save, ("PreimageOracle", address(0))), "zero preimage oracle"
         );
-        vm.mockCallRevert(
-            address(artifacts),
-            abi.encodeCall(Artifacts.save, ("AggregateVerifier", address(0))),
-            "zero aggregate verifier"
-        );
-        vm.mockCallRevert(
-            address(artifacts),
-            abi.encodeCall(Artifacts.save, ("TEEProverRegistry", address(0))),
-            "zero tee prover registry"
-        );
-
         SystemDeploy.DeployOutput memory reuseOutput = systemDeploy.deploy(input);
 
         assertEq(
@@ -194,8 +204,7 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
             address(output.implementationOutput.preimageOracleSingleton),
             "preimage oracle"
         );
-        assertEq(address(reuseOutput.implementationOutput.aggregateVerifierImpl), address(0), "aggregate verifier");
-        assertEq(reuseOutput.implementationOutput.teeProverRegistryImpl, address(0), "tee prover registry");
+        _assertMultiproofDeployed(reuseOutput, input);
     }
 
     function _defaultDeployInput() internal view returns (SystemDeploy.DeployInput memory input_) {
@@ -218,13 +227,17 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
             faultGameV2ClockExtension: 10_800,
             faultGameV2MaxClockDuration: 302_400,
             teeImageHash: bytes32(uint256(1)),
-            multiproofConfigHash: bytes32(0),
+            zkRangeHash: bytes32(uint256(2)),
+            zkAggregationHash: bytes32(uint256(3)),
+            multiproofConfigHash: bytes32(uint256(4)),
             multiproofGameType: 621,
-            nitroEnclaveVerifier: address(0),
+            nitroEnclaveVerifier: address(nitroEnclaveVerifier),
             l2ChainID: l2ChainId,
             multiproofBlockInterval: 100,
             multiproofIntermediateBlockInterval: 10,
-            sp1Verifier: ISP1Verifier(sp1Verifier),
+            sp1Verifier: ISP1Verifier(address(sp1Verifier)),
+            teeProposer: proposer,
+            teeChallenger: challenger,
             superchainConfigProxy: ISuperchainConfig(address(0)),
             superchainProxyAdmin: IProxyAdmin(address(0)),
             l1ProxyAdminOwner: owner,
@@ -275,6 +288,82 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
                 challenger: address(0)
             })
         );
+    }
+
+    function _assertMultiproofDeployed(
+        SystemDeploy.DeployOutput memory _output,
+        SystemDeploy.DeployInput memory _input
+    )
+        internal
+        view
+    {
+        GameType gameType = GameType.wrap(uint32(_input.implementationsInput.multiproofGameType));
+        address aggregateVerifierAddr = address(_output.opChain.aggregateVerifier);
+        address teeProverRegistryProxyAddr = address(_output.opChain.teeProverRegistryProxy);
+        address teeVerifierAddr = address(_output.opChain.teeVerifier);
+        address zkVerifierAddr = address(_output.opChain.zkVerifier);
+        Types.Implementations memory impls = _output.implementationOutput.implementations;
+
+        assertNotEq(aggregateVerifierAddr, address(0), "aggregate verifier");
+        assertNotEq(teeProverRegistryProxyAddr, address(0), "tee prover registry proxy");
+        assertNotEq(impls.teeProverRegistryImpl, address(0), "tee prover registry impl");
+        assertNotEq(teeVerifierAddr, address(0), "tee verifier");
+        assertNotEq(zkVerifierAddr, address(0), "zk verifier");
+        assertEq(impls.aggregateVerifierImpl, aggregateVerifierAddr, "aggregate verifier impl");
+        assertEq(impls.teeVerifierImpl, teeVerifierAddr, "tee verifier impl");
+        assertEq(impls.zkVerifierImpl, zkVerifierAddr, "zk verifier impl");
+        assertEq(address(_output.opChain.nitroEnclaveVerifier), _input.implementationsInput.nitroEnclaveVerifier);
+        assertEq(address(_output.opChain.sp1Verifier), address(_input.implementationsInput.sp1Verifier));
+        assertEq(
+            _output.opChain.opChainProxyAdmin.getProxyImplementation(teeProverRegistryProxyAddr),
+            impls.teeProverRegistryImpl,
+            "tee registry proxy impl"
+        );
+
+        assertEq(
+            address(_output.opChain.disputeGameFactoryProxy.gameImpls(gameType)),
+            aggregateVerifierAddr,
+            "multiproof game impl"
+        );
+
+        AggregateVerifier aggregateVerifier = AggregateVerifier(aggregateVerifierAddr);
+        assertEq(
+            address(aggregateVerifier.anchorStateRegistry()),
+            address(_output.opChain.anchorStateRegistryProxy),
+            "aggregate verifier asr"
+        );
+        assertEq(address(aggregateVerifier.DISPUTE_GAME_FACTORY()), address(_output.opChain.disputeGameFactoryProxy));
+        assertEq(address(aggregateVerifier.DELAYED_WETH()), address(_output.opChain.delayedWETHPermissionlessGameProxy));
+        assertEq(address(aggregateVerifier.TEE_VERIFIER()), teeVerifierAddr);
+        assertEq(address(aggregateVerifier.ZK_VERIFIER()), zkVerifierAddr);
+        assertEq(aggregateVerifier.TEE_IMAGE_HASH(), _input.implementationsInput.teeImageHash);
+        assertEq(aggregateVerifier.ZK_RANGE_HASH(), _input.implementationsInput.zkRangeHash);
+        assertEq(aggregateVerifier.ZK_AGGREGATE_HASH(), _input.implementationsInput.zkAggregationHash);
+        assertEq(aggregateVerifier.CONFIG_HASH(), _input.implementationsInput.multiproofConfigHash);
+        assertEq(aggregateVerifier.L2_CHAIN_ID(), _input.opChainInput.l2ChainId);
+
+        TEEProverRegistry teeProverRegistry = TEEProverRegistry(teeProverRegistryProxyAddr);
+        assertEq(teeProverRegistry.owner(), _input.opChainInput.roles.opChainProxyAdminOwner, "tee registry owner");
+        assertEq(teeProverRegistry.manager(), _input.opChainInput.roles.opChainProxyAdminOwner, "tee registry manager");
+        assertTrue(teeProverRegistry.isValidProposer(_input.implementationsInput.teeProposer), "tee proposer");
+        assertTrue(teeProverRegistry.isValidProposer(_input.implementationsInput.teeChallenger), "tee challenger");
+        assertEq(
+            MockNitroEnclaveVerifier(_input.implementationsInput.nitroEnclaveVerifier).proofSubmitter(),
+            teeProverRegistryProxyAddr,
+            "nitro proof submitter"
+        );
+        assertEq(
+            address(teeProverRegistry.DISPUTE_GAME_FACTORY()),
+            address(_output.opChain.disputeGameFactoryProxy),
+            "tee registry dgf"
+        );
+
+        assertEq(
+            address(TEEVerifier(teeVerifierAddr).TEE_PROVER_REGISTRY()),
+            teeProverRegistryProxyAddr,
+            "tee verifier registry"
+        );
+        assertEq(address(ZKVerifier(zkVerifierAddr).SP1_VERIFIER()), address(_input.implementationsInput.sp1Verifier));
     }
 
     function _assertUpgradedProxyImplementations(SystemDeploy.DeployOutput memory _output) internal view {
