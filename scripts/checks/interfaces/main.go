@@ -28,10 +28,7 @@ var excludeContracts = []string{
 	"IEAS", "ISchemaResolver", "ISchemaRegistry",
 
 	// TODO: Interfaces that need to be fixed
-	"IInitializable", "IOptimismMintableERC20", "IOptimismPortal2",
-	"IAggregateVerifier", "ICBMulticall", "IDisputeGameFactory", "IFaultDisputeGameV2", "IGnosisSafe",
-	"INitroEnclaveVerifier", "IOwnable", "IPermissionedDisputeGameV2", "IRiscZeroSetVerifier",
-	"IRiscZeroVerifier", "ISuperchainConfig", "IVerifier",
+	"IInitializable", "IOptimismMintableERC20",
 	"KontrolCheatsBase", "IResolvedDelegateProxy",
 }
 
@@ -41,8 +38,7 @@ var excludeSourceContracts = []string{
 	"CrossDomainMessengerLegacySpacer0", "CrossDomainMessengerLegacySpacer1",
 
 	// FIXME
-	"AggregateVerifier", "BalanceTracker", "FeeDisburser", "MIPS64", "OwnableManagedUpgradeable",
-	"ProxyAdminOwnedBase", "TEEProverRegistry", "TEEVerifier", "WETH", "ZKVerifier",
+	"WETH", "MIPS64",
 }
 
 type ContractDefinition struct {
