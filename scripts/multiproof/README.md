@@ -215,7 +215,7 @@ The script saves output to `deployments/<chainId>-tdx-verifier.json`.
 
 ### Step 2: Deploy the TDX multiproof test stack
 
-Set `DEPLOY_CONFIG_PATH` to the Sepolia deploy config and pass the `TDXVerifier` address from Step 1. The deploy config must also contain the `NitroEnclaveVerifier` address, because TEE proposal proofs now require both Nitro and TDX signatures. `finalSystemOwner` in the deploy config must be the account broadcasting this transaction because the script updates `TDXVerifier.proofSubmitter` to the deployed `TEEProverRegistry`.
+Set `DEPLOY_CONFIG_PATH` to the Sepolia deploy config and pass the `TDXVerifier` address from Step 1. The deploy config must also contain the `NitroEnclaveVerifier` address, because TEE proposal proofs now require both Nitro and TDX signatures. `finalSystemOwner` in the deploy config must be the account broadcasting this transaction because the script updates both `TDXVerifier.proofSubmitter` and `NitroEnclaveVerifier.proofSubmitter` to the deployed `TEEProverRegistry`.
 
 The TDX registry manager is set to `TDX_REGISTRATION_MANAGER`, allowing that address to call `registerTDXSigner(bytes,bytes)`. Register a Nitro signer through `registerSigner(bytes,bytes)` as well before submitting TEE proposal proofs.
 

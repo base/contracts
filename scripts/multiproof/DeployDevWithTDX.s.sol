@@ -8,6 +8,7 @@ pragma solidity 0.8.15;
  * This deploys the same local multiproof testing infrastructure as the existing
  * dev scripts, but configures TEEProverRegistry for TDX signer registration. Deploy
  * TDXVerifier first with DeployTDXVerifier.s.sol and pass its address to run().
+ * The NitroEnclaveVerifier in the deploy config must also already be deployed.
  * The default run(address) entrypoint configures DEFAULT_TDX_REGISTRATION_MANAGER
  * as the registry manager so it can submit TDX signer registrations.
  */
@@ -102,7 +103,7 @@ contract DeployDevWithTDX is Script {
         console.log("ASR Starting Output Root:", vm.toString(startingAnchorRoot.raw()));
         console.log("ASR Starting L2 Block:", startingAnchorBlockNumber);
         console.log("");
-        console.log("NOTE: TDXVerifier owner must be the broadcaster/finalSystemOwner.");
+        console.log("NOTE: TDXVerifier and NitroEnclaveVerifier owners must be the broadcaster/finalSystemOwner.");
 
         vm.startBroadcast();
 
@@ -139,6 +140,7 @@ contract DeployDevWithTDX is Script {
         teeProverRegistryProxy = address(registryProxy);
 
         ITDXVerifier(tdxVerifierAddr).setProofSubmitter(teeProverRegistryProxy);
+        INitroEnclaveVerifier(nitroEnclaveVerifierAddr).setProofSubmitter(teeProverRegistryProxy);
 
         teeVerifier = address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), mockAnchorRegistry));
     }
