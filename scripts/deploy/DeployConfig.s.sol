@@ -293,7 +293,7 @@ contract DeployConfig is Script {
     ///      When false, the forked system WILL NOT be upgraded in setUp().
     ///      This function does nothing when not testing in a forked environment.
     ///      Generally the only time you should call this function is if you want to
-    ///      call opcm.upgrade() in the test itself, rather than have the upgraded
+    ///      call the upgrade script in the test itself, rather than have the upgraded
     ///      system be deployed in setUp().
     function setUseUpgradedFork(bool _useUpgradedFork) public {
         useUpgradedFork = _useUpgradedFork;

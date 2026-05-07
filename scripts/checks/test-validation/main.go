@@ -179,7 +179,7 @@ func checkTestStructure(artifact *solc.ForgeArtifact) []error {
 			errors = append(errors, checkTestMethodName(artifact, contractName, contractParts[1], "")...)
 		} else if len(contractParts) == 3 && contractParts[2] == "Harness" {
 			// Pattern: <ContractName>_<Descriptor>_Harness
-			// (e.g., OPContractsManager_Upgrade_Harness)
+			// (e.g., ProxyAdmin_Upgrade_Harness)
 			continue
 		} else if len(contractParts) == 4 && contractParts[3] == "Test" {
 			errors = append(errors, checkTestMethodName(artifact, contractName, contractParts[1], contractParts[2])...)

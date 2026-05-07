@@ -12,8 +12,7 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 // Libraries
 import { Constants } from "src/libraries/Constants.sol";
-import { Types, IOPContractsManagerInterop } from "scripts/libraries/Types.sol";
-import { Blueprint } from "src/libraries/Blueprint.sol";
+import { Types } from "scripts/libraries/Types.sol";
 import { GameTypes } from "src/libraries/bridge/Types.sol";
 import { Hash } from "src/libraries/bridge/Types.sol";
 
@@ -319,63 +318,6 @@ library ChainAssertions {
 
         require(_cfg.superchainConfigGuardian() != address(0), "CHECK-SC-20");
         require(superchainConfig.guardian() == _cfg.superchainConfigGuardian(), "CHECK-SC-30");
-    }
-
-    /// @notice Asserts that the OPContractsManager is setup correctly
-    function checkOPContractsManager(
-        Types.ContractSet memory _impls,
-        Types.ContractSet memory _proxies,
-        IOPContractsManagerInterop _opcm,
-        IMIPS64 _mips
-    )
-        internal
-        view
-    {
-        console.log("Running chain assertions on the OPContractsManager at %s", address(_opcm));
-        require(address(_opcm) != address(0), "CHECK-OPCM-10");
-
-        require(bytes(_opcm.version()).length > 0, "CHECK-OPCM-15");
-        require(address(_opcm.superchainConfig()) == _proxies.SuperchainConfig, "CHECK-OPCM-19");
-
-        // Ensure that the OPCM impls are correctly saved
-        Types.Implementations memory impls = _opcm.implementations();
-        require(impls.l1ERC721BridgeImpl == _impls.L1ERC721Bridge, "CHECK-OPCM-50");
-        require(impls.optimismPortalImpl == _impls.OptimismPortal, "CHECK-OPCM-60");
-        require(impls.systemConfigImpl == _impls.SystemConfig, "CHECK-OPCM-70");
-        require(impls.optimismMintableERC20FactoryImpl == _impls.OptimismMintableERC20Factory, "CHECK-OPCM-80");
-        require(impls.l1CrossDomainMessengerImpl == _impls.L1CrossDomainMessenger, "CHECK-OPCM-90");
-        require(impls.l1StandardBridgeImpl == _impls.L1StandardBridge, "CHECK-OPCM-100");
-        require(impls.disputeGameFactoryImpl == _impls.DisputeGameFactory, "CHECK-OPCM-110");
-        require(impls.delayedWETHImpl == _impls.DelayedWETH, "CHECK-OPCM-120");
-        require(impls.mipsImpl == address(_mips), "CHECK-OPCM-130");
-        require(impls.superchainConfigImpl == _impls.SuperchainConfig, "CHECK-OPCM-140");
-
-        // Verify that initCode is correctly set into the blueprints
-        Types.Blueprints memory blueprints = _opcm.blueprints();
-        Blueprint.Preamble memory addressManagerPreamble =
-            Blueprint.parseBlueprintPreamble(address(blueprints.addressManager).code);
-        require(keccak256(addressManagerPreamble.initcode) == keccak256(vm.getCode("AddressManager")), "CHECK-OPCM-160");
-
-        Blueprint.Preamble memory proxyPreamble = Blueprint.parseBlueprintPreamble(address(blueprints.proxy).code);
-        require(
-            keccak256(proxyPreamble.initcode) == keccak256(vm.getCode("src/universal/Proxy.sol:Proxy")),
-            "CHECK-OPCM-170"
-        );
-
-        Blueprint.Preamble memory proxyAdminPreamble =
-            Blueprint.parseBlueprintPreamble(address(blueprints.proxyAdmin).code);
-        require(keccak256(proxyAdminPreamble.initcode) == keccak256(vm.getCode("ProxyAdmin")), "CHECK-OPCM-180");
-
-        Blueprint.Preamble memory l1ChugSplashProxyPreamble =
-            Blueprint.parseBlueprintPreamble(address(blueprints.l1ChugSplashProxy).code);
-        require(
-            keccak256(l1ChugSplashProxyPreamble.initcode) == keccak256(vm.getCode("L1ChugSplashProxy")),
-            "CHECK-OPCM-190"
-        );
-
-        Blueprint.Preamble memory rdProxyPreamble =
-            Blueprint.parseBlueprintPreamble(address(blueprints.resolvedDelegateProxy).code);
-        require(keccak256(rdProxyPreamble.initcode) == keccak256(vm.getCode("ResolvedDelegateProxy")), "CHECK-OPCM-200");
     }
 
     function checkAnchorStateRegistryProxy(IAnchorStateRegistry _anchorStateRegistryProxy, bool _isProxy) internal {

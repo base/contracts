@@ -71,15 +71,6 @@ library Types {
         IDelayedWETH delayedWETHPermissionlessGameProxy;
     }
 
-    /// @notice Addresses of ERC-5202 Blueprint contracts used by the legacy OPCM deployment path.
-    struct Blueprints {
-        address addressManager;
-        address proxy;
-        address proxyAdmin;
-        address l1ChugSplashProxy;
-        address resolvedDelegateProxy;
-    }
-
     /// @notice The latest implementation contracts for the OP Stack.
     struct Implementations {
         address superchainConfigImpl;
@@ -187,15 +178,4 @@ library Types {
         bytes19 first19Bytes = bytes19(hashedChainId);
         return address(uint160(bytes20(bytes.concat(versionByte, first19Bytes))));
     }
-}
-
-/// @notice ABI-compatible transition interface for calling the current OPCM with neutral script types.
-interface IOPContractsManagerInterop {
-    function version() external view returns (string memory);
-    function superchainConfig() external view returns (ISuperchainConfig);
-    function deploy(Types.DeployInput calldata _input) external returns (Types.DeployOutput memory);
-    function upgrade(Types.OpChainConfig[] memory _opChainConfigs) external;
-    function upgradeSuperchainConfig(ISuperchainConfig _superchainConfig) external;
-    function blueprints() external view returns (Types.Blueprints memory);
-    function implementations() external view returns (Types.Implementations memory);
 }

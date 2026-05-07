@@ -27,9 +27,6 @@ var excludeContracts = []string{
 	// EAS
 	"IEAS", "ISchemaResolver", "ISchemaRegistry",
 
-	// Misc stuff that can be ignored
-	"IOPContractsManagerLegacyUpgrade",
-
 	// TODO: Interfaces that need to be fixed
 	"IInitializable", "IOptimismMintableERC20",
 	"KontrolCheatsBase", "IResolvedDelegateProxy",
@@ -39,9 +36,6 @@ var excludeContracts = []string{
 var excludeSourceContracts = []string{
 	// Base contracts with no external functions
 	"CrossDomainMessengerLegacySpacer0", "CrossDomainMessengerLegacySpacer1",
-
-	// Errors because they should be in their own contracts but are in a shared one
-	"OPContractsManagerDeployer", "OPContractsManagerUpgrader", "OPContractsManagerBase", "OPContractsManagerContractsContainer", "OPContractsManagerGameTypeAdder",
 
 	// FIXME
 	"WETH", "MIPS64",

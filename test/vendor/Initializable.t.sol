@@ -333,8 +333,6 @@ contract Initializer_Test is CommonTest {
         excludes[j++] = "src/L1/proofs/v2/PermissionedDisputeGameV2.sol";
         excludes[j++] = "src/L1/proofs/PermissionedDisputeGame.sol";
         excludes[j++] = "src/L1/proofs/zk/OPSuccinctFaultDisputeGame.sol";
-        // TODO: Eventually remove this exclusion. Same reason as above dispute contracts.
-        excludes[j++] = "src/L1/OPContractsManager.sol";
         // L2 contract initialization is tested in Predeploys.t.sol
         excludes[j++] = "src/L2/*";
         // Contract is not deployed as part of the standard deployment script.
