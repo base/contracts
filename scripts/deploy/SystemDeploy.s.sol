@@ -34,6 +34,7 @@ import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMin
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 
+import { AddressManager } from "src/legacy/AddressManager.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
@@ -253,8 +254,6 @@ contract SystemDeploy is Script {
         _assertValidOPChainInput(_input);
         impls_ = _impls;
 
-        output_.addressManager =
-            IAddressManager(_createDeterministicFromThis("AddressManager", abi.encode(), _input, "AddressManager"));
         output_.opChainProxyAdmin = IProxyAdmin(
             _createDeterministic(
                 "ProxyAdmin",
@@ -263,10 +262,10 @@ contract SystemDeploy is Script {
                 "ProxyAdmin"
             )
         );
+        output_.addressManager = _deployAddressManager(_input, output_.opChainProxyAdmin);
 
         vm.broadcast(msg.sender);
         output_.opChainProxyAdmin.setAddressManager(output_.addressManager);
-        _transferOwnership(address(output_.addressManager), address(output_.opChainProxyAdmin));
 
         output_.l1ERC721BridgeProxy = IL1ERC721Bridge(_deployProxy(_input, output_.opChainProxyAdmin, "L1ERC721Bridge"));
         output_.optimismPortalProxy =
@@ -720,20 +719,6 @@ contract SystemDeploy is Script {
         });
     }
 
-    function _createDeterministicFromThis(
-        string memory _name,
-        bytes memory _args,
-        Types.DeployInput memory _input,
-        string memory _contractName
-    )
-        internal
-        returns (address payable)
-    {
-        return DeployUtils.create2({
-            _name: _name, _args: _args, _salt: keccak256(abi.encode(_input.l2ChainId, _input.saltMixer, _contractName))
-        });
-    }
-
     function _upgradeToAndCall(
         IProxyAdmin _proxyAdmin,
         address _target,
@@ -751,6 +736,25 @@ contract SystemDeploy is Script {
         _assertValidContractAddress(_implementation);
         vm.broadcast(msg.sender);
         _proxyAdmin.upgrade(payable(_target), _implementation);
+    }
+
+    function _deployAddressManager(
+        Types.DeployInput memory _input,
+        IProxyAdmin _proxyAdmin
+    )
+        internal
+        returns (IAddressManager)
+    {
+        bytes32 addressManagerSalt = keccak256(abi.encode(_input.l2ChainId, _input.saltMixer, "AddressManager"));
+        AddressManagerDeployer deployer = AddressManagerDeployer(
+            _createDeterministic(
+                "scripts/deploy/SystemDeploy.s.sol:AddressManagerDeployer",
+                abi.encode(addressManagerSalt, address(_proxyAdmin)),
+                _input,
+                "AddressManagerDeployer"
+            )
+        );
+        return deployer.addressManager();
     }
 
     function _transferOwnership(address _target, address _newOwner) internal {
@@ -967,6 +971,7 @@ contract SystemDeploy is Script {
 
         GameType gameType = GameType.wrap(uint32(_input.multiproofGameType));
 
+        vm.broadcast(msg.sender);
         output_.teeProverRegistryImpl = new TEEProverRegistry(
             INitroEnclaveVerifier(_input.nitroEnclaveVerifier), _output.disputeGameFactoryProxy
         );
@@ -997,8 +1002,10 @@ contract SystemDeploy is Script {
             nitroVerifier.setProofSubmitter(address(output_.teeProverRegistryProxy));
         }
 
+        vm.broadcast(msg.sender);
         output_.teeVerifier =
             IVerifier(address(new TEEVerifier(output_.teeProverRegistryProxy, _output.anchorStateRegistryProxy)));
+        vm.broadcast(msg.sender);
         output_.zkVerifier = IVerifier(address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryProxy)));
 
         output_.aggregateVerifier = _newAggregateVerifier(
@@ -1029,6 +1036,7 @@ contract SystemDeploy is Script {
     }
 
     function _newAggregateVerifier(AggregateVerifierInput memory _input) internal returns (IVerifier) {
+        vm.broadcast(msg.sender);
         return IVerifier(
             address(
                 new AggregateVerifier(
@@ -1339,5 +1347,15 @@ contract SystemDeploy is Script {
         _saveIfSet("TEEProverRegistryImpl", _impls.teeProverRegistryImpl);
         _saveIfSet("TEEVerifier", _impls.teeVerifierImpl);
         _saveIfSet("ZKVerifier", _impls.zkVerifierImpl);
+    }
+}
+
+contract AddressManagerDeployer {
+    IAddressManager public immutable addressManager;
+
+    constructor(bytes32 _salt, address _owner) {
+        IAddressManager manager = IAddressManager(address(new AddressManager{ salt: _salt }()));
+        manager.transferOwnership(_owner);
+        addressManager = manager;
     }
 }
