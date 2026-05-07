@@ -17,7 +17,6 @@
 # for standard contract tests.
 src_validation = [
     "test/invariants/",                    # Invariant testing framework - no direct src counterpart
-    "test/deploy/",                        # Script deployment tests - no direct src counterpart
     "test/scripts/",                       # Script tests - test deployment/utility scripts, not contracts
     "test/integration/",                   # Integration tests - test multiple contracts together
     "test/cannon/MIPS64Memory.t.sol",      # Tests external MIPS implementation
@@ -29,7 +28,6 @@ src_validation = [
     "test/universal/ExtendedPause.t.sol",  # Tests extended functionality
     "test/vendor/Initializable.t.sol",     # Tests external vendor code
     "test/vendor/InitializableOZv5.t.sol", # Tests external vendor code
-    "test/L1/proofs/zk/OptimisticZkGame.t.sol", # Renamed from OPSuccinctFaultDisputeGame - artifacts may reference old name
 ]
 
 # PATHS EXCLUDED FROM CONTRACT NAME FILE PATH VALIDATION:
@@ -49,13 +47,12 @@ src_validation = [
 contract_name_validation = [
     "test/L1/proofs/FaultDisputeGame.t.sol",                # Contains contracts not matching FaultDisputeGame base name
     "test/L1/proofs/v2/FaultDisputeGameV2.t.sol",           # Contains contracts not matching FaultDisputeGameV2 base name
-    "test/L1/ResourceMetering.t.sol",              # Contains contracts not matching ResourceMetering base name
-    "test/deploy/",                                # Script deployment tests use script-oriented contract names
-    "test/L2/GasPriceOracle.t.sol",                # Contains contracts not matching GasPriceOracle base name
-    "test/universal/StandardBridge.t.sol",         # Contains contracts not matching StandardBridge base name
-    "test/L2/RevenueSharingIntegration.t.sol",     # Contains contracts not matching RevenueSharingIntegration base name
-    "test/libraries/Blueprint.t.sol",              # Contains helper contracts (BlueprintHarness, ConstructorArgMock)
-    "test/libraries/SafeCall.t.sol",               # Contains helper contracts (SimpleSafeCaller)
+    "test/L1/ResourceMetering.t.sol",                     # Contains contracts not matching ResourceMetering base name
+    "test/L2/GasPriceOracle.t.sol",                       # Contains contracts not matching GasPriceOracle base name
+    "test/universal/StandardBridge.t.sol",                # Contains contracts not matching StandardBridge base name
+	"test/L2/RevenueSharingIntegration.t.sol",            # Contains contracts not matching RevenueSharingIntegration base name
+    "test/libraries/Blueprint.t.sol",                     # Contains helper contracts (BlueprintHarness, ConstructorArgMock)
+    "test/libraries/SafeCall.t.sol",                      # Contains helper contracts (SimpleSafeCaller)
 ]
 
 # PATHS EXCLUDED FROM FUNCTION NAME VALIDATION:
@@ -78,29 +75,6 @@ function_name_validation = [
     "test/L1/SystemConfig.t.sol",              # Tests internal functions not in ABI
     "test/libraries/Predeploys.t.sol",         # Function 'uncategorizedInterop' doesn't exist in library
     "test/libraries/Encoding.t.sol",           # Function 'decodeSuperRootProof' is internal, not in ABI
-]
-
-# PATHS EXCLUDED FROM TEST NAME VALIDATION:
-# These files predate the stricter naming convention or cover integration/helper surfaces that
-# do not map cleanly to the enforced <unit>_<condition>_<outcome> naming scheme.
-test_name_validation = [
-    "test/CommonTest.t.sol",
-    "test/MockERC20.t.sol",
-    "test/L1/BalanceTracker.t.sol",
-    "test/L1/proofs/AggregateVerifier.t.sol",
-    "test/L1/proofs/BaseTest.t.sol",
-    "test/L1/proofs/Challenge.t.sol",
-    "test/L1/proofs/NitroEnclaveVerifier.t.sol",
-    "test/L1/proofs/Nullify.t.sol",
-    "test/L1/proofs/PermissionedDisputeGame.t.sol",
-    "test/L1/proofs/TEEProverRegistry.t.sol",
-    "test/L1/proofs/TEEVerifier.t.sol",
-    "test/L2/FeeDisburser.t.sol",
-    "test/universal/MultisigScript.t.sol",
-    "test/universal/MultisigScriptDeposit.t.sol",
-    "test/universal/MultisigScriptDoubleNested.t.sol",
-    "test/universal/MultisigScriptNested.t.sol",
-    "test/utils/CBMulticall.t.sol",
 ]
 
 [excluded_tests]
