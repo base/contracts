@@ -36,7 +36,7 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
         systemDeploy = new SystemDeploy();
     }
 
-    function test_deploy_succeeds_withoutOPCMAddress() public {
+    function test_deploy_withoutManagerAddress_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
 
@@ -61,7 +61,7 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
         assertValidStandardSystem(_expected(output, input, false, false, absolutePrestate, Claim.wrap(bytes32(0))));
     }
 
-    function test_upgrade_succeeds_withoutOPCMDelegatecall() public {
+    function test_upgrade_withoutManagerDelegatecall_succeeds() public {
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_defaultDeployInput());
 
         Types.OpChainConfig[] memory opChainConfigs = new Types.OpChainConfig[](1);
