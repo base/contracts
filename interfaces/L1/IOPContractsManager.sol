@@ -22,7 +22,6 @@ import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
-import { IOPContractsManagerStandardValidator } from "interfaces/L1/IOPContractsManagerStandardValidator.sol";
 
 interface IOPContractsManagerContractsContainer {
     error OPContractsManagerContractsContainer_DevFeatureInProd();
@@ -269,44 +268,9 @@ interface IOPContractsManager {
         IOPContractsManagerGameTypeAdder _opcmGameTypeAdder,
         IOPContractsManagerDeployer _opcmDeployer,
         IOPContractsManagerUpgrader _opcmUpgrader,
-        IOPContractsManagerStandardValidator _opcmStandardValidator,
         ISuperchainConfig _superchainConfig
     )
         external;
-
-    function validateWithOverrides(
-        IOPContractsManagerStandardValidator.ValidationInput calldata _input,
-        bool _allowFailure,
-        IOPContractsManagerStandardValidator.ValidationOverrides calldata _overrides
-    )
-        external
-        view
-        returns (string memory);
-
-    function validate(
-        IOPContractsManagerStandardValidator.ValidationInput calldata _input,
-        bool _allowFailure
-    )
-        external
-        view
-        returns (string memory);
-
-    function validateWithOverrides(
-        IOPContractsManagerStandardValidator.ValidationInputDev calldata _input,
-        bool _allowFailure,
-        IOPContractsManagerStandardValidator.ValidationOverrides calldata _overrides
-    )
-        external
-        view
-        returns (string memory);
-
-    function validate(
-        IOPContractsManagerStandardValidator.ValidationInputDev calldata _input,
-        bool _allowFailure
-    )
-        external
-        view
-        returns (string memory);
 
     function deploy(DeployInput calldata _input) external returns (DeployOutput memory);
 
@@ -340,8 +304,6 @@ interface IOPContractsManager {
     function opcmUpgrader() external view returns (IOPContractsManagerUpgrader);
 
     function opcmGameTypeAdder() external view returns (IOPContractsManagerGameTypeAdder);
-
-    function opcmStandardValidator() external view returns (IOPContractsManagerStandardValidator);
 
     /// @notice Retrieves the development feature bitmap stored in this OPCM contract
     /// @return The development feature bitmap.

@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-// Contracts
-import { OPContractsManagerStandardValidator } from "src/L1/OPContractsManagerStandardValidator.sol";
-
 // Libraries
 import { Blueprint } from "src/libraries/Blueprint.sol";
 import { Constants } from "src/libraries/Constants.sol";
@@ -1496,8 +1493,6 @@ contract OPContractsManager is ISemver {
 
     OPContractsManagerUpgrader public immutable opcmUpgrader;
 
-    OPContractsManagerStandardValidator public immutable opcmStandardValidator;
-
     /// @notice Address of the SuperchainConfig contract shared by all chains.
     ISuperchainConfig public immutable superchainConfig;
 
@@ -1555,72 +1550,17 @@ contract OPContractsManager is ISemver {
         OPContractsManagerGameTypeAdder _opcmGameTypeAdder,
         OPContractsManagerDeployer _opcmDeployer,
         OPContractsManagerUpgrader _opcmUpgrader,
-        OPContractsManagerStandardValidator _opcmStandardValidator,
         ISuperchainConfig _superchainConfig
     ) {
         _opcmDeployer.assertValidContractAddress(address(_superchainConfig));
         _opcmDeployer.assertValidContractAddress(address(_opcmGameTypeAdder));
         _opcmDeployer.assertValidContractAddress(address(_opcmDeployer));
         _opcmDeployer.assertValidContractAddress(address(_opcmUpgrader));
-        _opcmDeployer.assertValidContractAddress(address(_opcmStandardValidator));
         opcmGameTypeAdder = _opcmGameTypeAdder;
         opcmDeployer = _opcmDeployer;
         opcmUpgrader = _opcmUpgrader;
-        opcmStandardValidator = _opcmStandardValidator;
         superchainConfig = _superchainConfig;
         thisOPCM = this;
-    }
-
-    /// @notice Validates the configuration of the L1 contracts.
-    function validate(
-        OPContractsManagerStandardValidator.ValidationInput memory _input,
-        bool _allowFailure
-    )
-        public
-        view
-        returns (string memory)
-    {
-        return opcmStandardValidator.validate(_input, _allowFailure);
-    }
-
-    /// @notice Validates the configuration of the L1 contracts.
-    /// @notice Supports overrides of certain storage values denoted in the ValidationOverrides struct.
-    function validateWithOverrides(
-        OPContractsManagerStandardValidator.ValidationInput memory _input,
-        bool _allowFailure,
-        OPContractsManagerStandardValidator.ValidationOverrides memory _overrides
-    )
-        public
-        view
-        returns (string memory)
-    {
-        return opcmStandardValidator.validateWithOverrides(_input, _allowFailure, _overrides);
-    }
-
-    /// @notice Validates the configuration of the L1 contracts.
-    function validate(
-        OPContractsManagerStandardValidator.ValidationInputDev memory _input,
-        bool _allowFailure
-    )
-        public
-        view
-        returns (string memory)
-    {
-        return opcmStandardValidator.validate(_input, _allowFailure);
-    }
-
-    /// @notice Validates the configuration of the L1 contracts.
-    /// @notice Supports overrides of certain storage values denoted in the ValidationOverrides struct.
-    function validateWithOverrides(
-        OPContractsManagerStandardValidator.ValidationInputDev memory _input,
-        bool _allowFailure,
-        OPContractsManagerStandardValidator.ValidationOverrides memory _overrides
-    )
-        public
-        view
-        returns (string memory)
-    {
-        return opcmStandardValidator.validateWithOverrides(_input, _allowFailure, _overrides);
     }
 
     /// @notice Deploys a new OP Stack chain.

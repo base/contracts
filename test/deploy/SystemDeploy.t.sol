@@ -8,6 +8,7 @@ import { DeploySuperchain } from "scripts/deploy/DeploySuperchain.s.sol";
 import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Types } from "scripts/libraries/Types.sol";
+import { StandardSystemAssertions } from "test/setup/StandardSystemAssertions.sol";
 
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
@@ -16,7 +17,7 @@ import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 import { Claim, Duration, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 
-contract SystemDeploy_Test is Test {
+contract SystemDeploy_Test is Test, StandardSystemAssertions {
     SystemDeploy internal systemDeploy;
 
     address internal owner = address(this);
@@ -36,7 +37,8 @@ contract SystemDeploy_Test is Test {
     }
 
     function test_deploy_succeeds_withoutOPCMAddress() public {
-        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_defaultDeployInput());
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
 
         assertNotEq(address(output.opChain.opChainProxyAdmin), address(0), "proxy admin");
         assertNotEq(address(output.opChain.systemConfigProxy), address(0), "system config");
@@ -56,6 +58,7 @@ contract SystemDeploy_Test is Test {
             address(output.superchain.superchainConfigProxy),
             "superchain config"
         );
+        assertValidStandardSystem(_expected(output, input, false, false, absolutePrestate, Claim.wrap(bytes32(0))));
     }
 
     function test_upgrade_succeeds_withoutOPCMDelegatecall() public {
@@ -85,6 +88,9 @@ contract SystemDeploy_Test is Test {
             "permissioned game impl after upgrade"
         );
         _assertUpgradedProxyImplementations(output);
+        assertValidStandardSystem(
+            _expected(output, _defaultDeployInput(), false, false, absolutePrestate, Claim.wrap(bytes32(0)))
+        );
     }
 
     function test_upgrade_existingCannonKonaFallsBackToCurrentPrestate_succeeds() public {
@@ -145,6 +151,9 @@ contract SystemDeploy_Test is Test {
             output.opChain.disputeGameFactoryProxy.initBonds(GameTypes.CANNON_KONA),
             output.opChain.disputeGameFactoryProxy.initBonds(GameTypes.CANNON),
             "cannon kona bond"
+        );
+        assertValidStandardSystem(
+            _expected(output, _defaultDeployInput(), true, true, currentCannonPrestate, currentCannonKonaPrestate)
         );
     }
 
@@ -277,5 +286,42 @@ contract SystemDeploy_Test is Test {
             impls.l1ERC721BridgeImpl,
             "erc721 bridge impl"
         );
+    }
+
+    function _expected(
+        SystemDeploy.DeployOutput memory _output,
+        SystemDeploy.DeployInput memory _input,
+        bool _expectCannon,
+        bool _expectCannonKona,
+        Claim _cannonPrestate,
+        Claim _cannonKonaPrestate
+    )
+        internal
+        pure
+        returns (StandardSystemAssertions.Expected memory expected_)
+    {
+        expected_ = StandardSystemAssertions.Expected({
+            systemConfig: _output.opChain.systemConfigProxy,
+            superchainConfig: _output.superchain.superchainConfigProxy,
+            implementations: _output.implementationOutput.implementations,
+            ethLockbox: _output.opChain.ethLockboxProxy,
+            proxyAdminOwner: _input.opChainInput.roles.opChainProxyAdminOwner,
+            challenger: _input.opChainInput.roles.challenger,
+            proposer: _input.opChainInput.roles.proposer,
+            l2ChainId: _input.opChainInput.l2ChainId,
+            permissionedCannonPrestate: _input.opChainInput.disputeAbsolutePrestate,
+            cannonPrestate: _cannonPrestate,
+            cannonKonaPrestate: _cannonKonaPrestate,
+            expectCannon: _expectCannon,
+            expectCannonKona: _expectCannonKona,
+            withdrawalDelaySeconds: _input.implementationsInput.withdrawalDelaySeconds,
+            minProposalSizeBytes: _input.implementationsInput.minProposalSizeBytes,
+            challengePeriodSeconds: _input.implementationsInput.challengePeriodSeconds,
+            mipsVersion: _input.implementationsInput.mipsVersion,
+            disputeMaxGameDepth: _input.opChainInput.disputeMaxGameDepth,
+            disputeSplitDepth: _input.opChainInput.disputeSplitDepth,
+            disputeClockExtension: _input.opChainInput.disputeClockExtension,
+            disputeMaxClockDuration: _input.opChainInput.disputeMaxClockDuration
+        });
     }
 }

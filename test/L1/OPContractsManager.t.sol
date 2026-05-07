@@ -36,8 +36,7 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import {
     IOPContractsManager,
     IOPContractsManagerGameTypeAdder,
-    IOPContractsManagerUpgrader,
-    IOPContractsManagerStandardValidator
+    IOPContractsManagerUpgrader
 } from "interfaces/L1/IOPContractsManager.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IBigStepper } from "interfaces/L1/proofs/IBigStepper.sol";
@@ -48,8 +47,7 @@ import {
     OPContractsManagerGameTypeAdder,
     OPContractsManagerDeployer,
     OPContractsManagerUpgrader,
-    OPContractsManagerContractsContainer,
-    OPContractsManagerStandardValidator
+    OPContractsManagerContractsContainer
 } from "src/L1/OPContractsManager.sol";
 import { DisputeGames } from "../setup/DisputeGames.sol";
 import { IProxy } from "../../interfaces/universal/IProxy.sol";
@@ -62,10 +60,9 @@ contract OPContractsManager_Harness is OPContractsManager {
         OPContractsManagerGameTypeAdder _opcmGameTypeAdder,
         OPContractsManagerDeployer _opcmDeployer,
         OPContractsManagerUpgrader _opcmUpgrader,
-        OPContractsManagerStandardValidator _opcmStandardValidator,
         ISuperchainConfig _superchainConfig
     )
-        OPContractsManager(_opcmGameTypeAdder, _opcmDeployer, _opcmUpgrader, _opcmStandardValidator, _superchainConfig)
+        OPContractsManager(_opcmGameTypeAdder, _opcmDeployer, _opcmUpgrader, _superchainConfig)
     { }
 
     function chainIdToBatchInboxAddress_exposed(uint256 l2ChainId) public view returns (address) {
@@ -245,48 +242,6 @@ contract OPContractsManager_Upgrade_Harness is CommonTest, DisputeGames {
             return;
         }
 
-        // Create validationOverrides
-        IOPContractsManagerStandardValidator.ValidationOverrides memory validationOverrides =
-            IOPContractsManagerStandardValidator.ValidationOverrides({
-                l1PAOMultisig: opChainConfigs[0].systemConfigProxy.proxyAdmin().owner(), challenger: initialChallenger
-            });
-
-        // Grab the validator before we do the error assertion because otherwise the assertion will
-        // try to apply to this function call instead.
-        IOPContractsManagerStandardValidator validator = _opcm.opcmStandardValidator();
-
-        // If the absolute prestate is zero, we will always get a PDDG-40,PLDG-40 error here in the
-        // standard validator. This happens because an absolute prestate of zero means that the
-        // user is requesting to use the existing prestate. We could avoid the error by grabbing
-        // the prestate from the actual contracts, but that doesn't actually give us any valuable
-        // checks. Easier to just expect the error in this case.
-        // We add the prefix of OVERRIDES-L1PAOMULTISIG,OVERRIDES-CHALLENGER because we use validationOverrides.
-        if (opChainConfigs[0].cannonPrestate.raw() == bytes32(0)) {
-            if (opChainConfigs[0].cannonKonaPrestate.raw() == bytes32(0)) {
-                vm.expectRevert(
-                    "OPContractsManagerStandardValidator: OVERRIDES-L1PAOMULTISIG,OVERRIDES-CHALLENGER,PDDG-40,PLDG-40,CKDG-10"
-                );
-            } else {
-                vm.expectRevert(
-                    "OPContractsManagerStandardValidator: OVERRIDES-L1PAOMULTISIG,OVERRIDES-CHALLENGER,PDDG-40,PLDG-40"
-                );
-            }
-        } else if (opChainConfigs[0].cannonKonaPrestate.raw() == bytes32(0)) {
-            vm.expectRevert("OPContractsManagerStandardValidator: OVERRIDES-L1PAOMULTISIG,OVERRIDES-CHALLENGER,CKDG-10");
-        }
-
-        // Run the StandardValidator checks.
-        validator.validateWithOverrides(
-            IOPContractsManagerStandardValidator.ValidationInputDev({
-                sysCfg: opChainConfigs[0].systemConfigProxy,
-                cannonPrestate: opChainConfigs[0].cannonPrestate.raw(),
-                cannonKonaPrestate: opChainConfigs[0].cannonKonaPrestate.raw(),
-                l2ChainID: l2ChainId,
-                proposer: initialProposer
-            }),
-            false,
-            validationOverrides
-        );
         _runPostUpgradeSmokeTests(_opcm, opChainConfigs[0], initialChallenger, initialProposer);
     }
 
@@ -510,11 +465,9 @@ abstract contract OPContractsManager_TestInit is CommonTest, DisputeGames {
 /// @dev These tests use the harness which exposes internal functions for testing.
 contract OPContractsManager_ChainIdToBatchInboxAddress_Test is Test, FeatureFlags {
     OPContractsManager_Harness opcmHarness;
-    address challenger = makeAddr("challenger");
 
     function setUp() public {
         ISuperchainConfig superchainConfigProxy = ISuperchainConfig(makeAddr("superchainConfig"));
-        IProxyAdmin superchainProxyAdmin = IProxyAdmin(makeAddr("superchainProxyAdmin"));
         OPContractsManager.Blueprints memory emptyBlueprints;
         OPContractsManager.Implementations memory emptyImpls;
         vm.etch(address(superchainConfigProxy), hex"01");
@@ -522,19 +475,10 @@ contract OPContractsManager_ChainIdToBatchInboxAddress_Test is Test, FeatureFlag
         OPContractsManagerContractsContainer container =
             new OPContractsManagerContractsContainer(emptyBlueprints, emptyImpls, devFeatureBitmap);
 
-        OPContractsManager.Implementations memory __opcmImplementations = container.implementations();
-        OPContractsManagerStandardValidator.Implementations memory opcmImplementations;
-        assembly {
-            opcmImplementations := __opcmImplementations
-        }
-
         opcmHarness = new OPContractsManager_Harness({
             _opcmGameTypeAdder: new OPContractsManagerGameTypeAdder(container),
             _opcmDeployer: new OPContractsManagerDeployer(container),
             _opcmUpgrader: new OPContractsManagerUpgrader(container),
-            _opcmStandardValidator: new OPContractsManagerStandardValidator(
-                opcmImplementations, superchainConfigProxy, address(superchainProxyAdmin), challenger, 100, bytes32(0)
-            ),
             _superchainConfig: superchainConfigProxy
         });
     }

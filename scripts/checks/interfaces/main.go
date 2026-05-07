@@ -41,7 +41,7 @@ var excludeSourceContracts = []string{
 	"CrossDomainMessengerLegacySpacer0", "CrossDomainMessengerLegacySpacer1",
 
 	// Errors because they should be in their own contracts but are in a shared one
-	"OPContractsManagerDeployer", "OPContractsManagerUpgrader", "OPContractsManagerBase", "OPContractsManagerContractsContainer", "OPContractsManagerGameTypeAdder", "OPContractsManagerStandardValidator",
+	"OPContractsManagerDeployer", "OPContractsManagerUpgrader", "OPContractsManagerBase", "OPContractsManagerContractsContainer", "OPContractsManagerGameTypeAdder",
 
 	// FIXME
 	"WETH", "MIPS64",

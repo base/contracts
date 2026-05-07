@@ -436,7 +436,9 @@ contract SystemDeploy is Script {
             _l2ChainId: _config.systemConfigProxy.l2ChainId(),
             _disputeGame: permissionedGame,
             _newDelayedWeth: _getWETH(disputeGameFactory, permissionedGame, GameTypes.PERMISSIONED_CANNON),
-            _newAnchorStateRegistryProxy: _getAnchorStateRegistryFromGame(permissionedGame),
+            _newAnchorStateRegistryProxy: _getAnchorStateRegistry(
+                disputeGameFactory, permissionedGame, GameTypes.PERMISSIONED_CANNON
+            ),
             _opChainConfig: _config
         });
 
@@ -456,7 +458,7 @@ contract SystemDeploy is Script {
         IAnchorStateRegistry cannonAnchorStateRegistry;
         if (address(cannonGame) != address(0)) {
             cannonWeth = _getWETH(_disputeGameFactory, cannonGame, GameTypes.CANNON);
-            cannonAnchorStateRegistry = _getAnchorStateRegistryFromGame(cannonGame);
+            cannonAnchorStateRegistry = _getAnchorStateRegistry(_disputeGameFactory, cannonGame, GameTypes.CANNON);
 
             Claim cannonPrestate = _config.cannonPrestate.raw() != bytes32(0)
                 ? _config.cannonPrestate
@@ -486,7 +488,7 @@ contract SystemDeploy is Script {
                     : _getWETH(_disputeGameFactory, cannonKonaGame, GameTypes.CANNON_KONA);
                 IAnchorStateRegistry cannonKonaAnchorStateRegistry = address(cannonGame) != address(0)
                     ? cannonAnchorStateRegistry
-                    : _getAnchorStateRegistryFromGame(cannonKonaGame);
+                    : _getAnchorStateRegistry(_disputeGameFactory, cannonKonaGame, GameTypes.CANNON_KONA);
 
                 _setNewPermissionlessGameImplV2({
                     _impls: _impls,
@@ -1012,7 +1014,19 @@ contract SystemDeploy is Script {
         return IDelayedWETH(payable(LibGameArgs.decode(gameArgsBytes).weth));
     }
 
-    function _getAnchorStateRegistryFromGame(IDisputeGame _disputeGame) internal view returns (IAnchorStateRegistry) {
+    function _getAnchorStateRegistry(
+        IDisputeGameFactory _disputeGameFactory,
+        IDisputeGame _disputeGame,
+        GameType _gameType
+    )
+        internal
+        view
+        returns (IAnchorStateRegistry)
+    {
+        bytes memory gameArgsBytes = _disputeGameFactory.gameArgs(_gameType);
+        if (gameArgsBytes.length != 0) {
+            return IAnchorStateRegistry(LibGameArgs.decode(gameArgsBytes).anchorStateRegistry);
+        }
         return IFaultDisputeGameV2(address(_disputeGame)).anchorStateRegistry();
     }
 
