@@ -80,6 +80,29 @@ function_name_validation = [
     "test/libraries/Encoding.t.sol",           # Function 'decodeSuperRootProof' is internal, not in ABI
 ]
 
+# PATHS EXCLUDED FROM TEST NAME VALIDATION:
+# These files predate the stricter naming convention or cover integration/helper surfaces that
+# do not map cleanly to the enforced <unit>_<condition>_<outcome> naming scheme.
+test_name_validation = [
+    "test/CommonTest.t.sol",
+    "test/MockERC20.t.sol",
+    "test/L1/BalanceTracker.t.sol",
+    "test/L1/proofs/AggregateVerifier.t.sol",
+    "test/L1/proofs/BaseTest.t.sol",
+    "test/L1/proofs/Challenge.t.sol",
+    "test/L1/proofs/NitroEnclaveVerifier.t.sol",
+    "test/L1/proofs/Nullify.t.sol",
+    "test/L1/proofs/PermissionedDisputeGame.t.sol",
+    "test/L1/proofs/TEEProverRegistry.t.sol",
+    "test/L1/proofs/TEEVerifier.t.sol",
+    "test/L2/FeeDisburser.t.sol",
+    "test/universal/MultisigScript.t.sol",
+    "test/universal/MultisigScriptDeposit.t.sol",
+    "test/universal/MultisigScriptDoubleNested.t.sol",
+    "test/universal/MultisigScriptNested.t.sol",
+    "test/utils/CBMulticall.t.sol",
+]
+
 [excluded_tests]
 # Specific test contract names that should be excluded from validation
 # These are individual test contracts that don't follow the standard patterns
