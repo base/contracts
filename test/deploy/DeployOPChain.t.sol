@@ -11,7 +11,6 @@ import { DeployOPChain } from "scripts/deploy/DeployOPChain.s.sol";
 import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
-import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
 import { Claim, Duration, GameType, GameTypes } from "src/libraries/bridge/Types.sol";
 import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
@@ -36,7 +35,7 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
     uint256 disputeGameFinalityDelaySeconds = 500;
 
     // DeployOPChain default inputs.
-    // - opcm is set during `setUp` since it is an output of DeployImplementations.
+    // - implementations are set during `setUp` since they are outputs of DeployImplementations.
     address opChainProxyAdminOwner = makeAddr("opChainProxyAdminOwner");
     address systemConfigOwner = makeAddr("systemConfigOwner");
     address batcher = makeAddr("batcher");
@@ -55,7 +54,8 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
     uint256 disputeSplitDepth = 30;
     Duration disputeClockExtension = Duration.wrap(3 hours);
     Duration disputeMaxClockDuration = Duration.wrap(3.5 days);
-    IOPContractsManager opcm;
+    Types.Implementations implementations;
+    DeploySuperchain.Output superchainOutput;
 
     event Deployed(uint256 indexed l2ChainId, address indexed deployer, bytes deployOutput);
 
@@ -65,7 +65,7 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
         deployOPChain = new DeployOPChain();
 
         // 1) DeploySuperchain
-        DeploySuperchain.Output memory dso = deploySuperchain.run(
+        superchainOutput = deploySuperchain.run(
             DeploySuperchain.Input({
                 superchainProxyAdminOwner: superchainProxyAdminOwner,
                 guardian: guardian,
@@ -74,7 +74,7 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
             })
         );
 
-        // 2) DeployImplementations (produces OPCM)
+        // 2) DeployImplementations
         DeployImplementations.Output memory dio = deployImplementations.run(
             DeployImplementations.Input({
                 withdrawalDelaySeconds: withdrawalDelaySeconds,
@@ -88,15 +88,19 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
                 faultGameV2ClockExtension: 10800,
                 faultGameV2MaxClockDuration: 302400,
                 teeImageHash: bytes32(uint256(1)),
+                zkRangeHash: bytes32(0),
+                zkAggregationHash: bytes32(0),
                 multiproofConfigHash: bytes32(0),
                 multiproofGameType: 621,
                 nitroEnclaveVerifier: address(0),
                 l2ChainID: 8453,
                 multiproofBlockInterval: 100,
                 multiproofIntermediateBlockInterval: 10,
-                superchainConfigProxy: dso.superchainConfigProxy,
-                superchainProxyAdmin: dso.superchainProxyAdmin,
-                l1ProxyAdminOwner: dso.superchainProxyAdmin.owner(),
+                teeProposer: proposer,
+                teeChallenger: challenger,
+                superchainConfigProxy: superchainOutput.superchainConfigProxy,
+                superchainProxyAdmin: superchainOutput.superchainProxyAdmin,
+                l1ProxyAdminOwner: superchainOutput.superchainProxyAdmin.owner(),
                 challenger: challenger,
                 devFeatureBitmap: devFeatureBitmap,
                 guardian: guardian,
@@ -104,8 +108,7 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
                 sp1Verifier: ISP1Verifier(sp1Verifier)
             })
         );
-        opcm = dio.opcm;
-        vm.label(address(opcm), "opcm");
+        implementations = implementationsFromOutput(dio);
 
         // 3) Build DeployOPChainInput struct
         deployOPChainInput = Types.DeployOPChainInput({
@@ -118,7 +121,8 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
             basefeeScalar: basefeeScalar,
             blobBaseFeeScalar: blobBaseFeeScalar,
             l2ChainId: l2ChainId,
-            opcm: address(opcm),
+            superchainConfigProxy: superchainOutput.superchainConfigProxy,
+            implementations: implementations,
             saltMixer: saltMixer,
             gasLimit: gasLimit,
             disputeGameType: disputeGameType,
@@ -130,6 +134,33 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
             allowCustomDisputeParameters: false,
             operatorFeeScalar: 0,
             operatorFeeConstant: 0
+        });
+    }
+
+    function implementationsFromOutput(DeployImplementations.Output memory _output)
+        internal
+        pure
+        returns (Types.Implementations memory)
+    {
+        return Types.Implementations({
+            superchainConfigImpl: address(_output.superchainConfigImpl),
+            l1ERC721BridgeImpl: address(_output.l1ERC721BridgeImpl),
+            optimismPortalImpl: address(_output.optimismPortalImpl),
+            ethLockboxImpl: address(_output.ethLockboxImpl),
+            systemConfigImpl: address(_output.systemConfigImpl),
+            optimismMintableERC20FactoryImpl: address(_output.optimismMintableERC20FactoryImpl),
+            l1CrossDomainMessengerImpl: address(_output.l1CrossDomainMessengerImpl),
+            l1StandardBridgeImpl: address(_output.l1StandardBridgeImpl),
+            disputeGameFactoryImpl: address(_output.disputeGameFactoryImpl),
+            anchorStateRegistryImpl: address(_output.anchorStateRegistryImpl),
+            delayedWETHImpl: address(_output.delayedWETHImpl),
+            mipsImpl: address(_output.mipsSingleton),
+            faultDisputeGameV2Impl: address(_output.faultDisputeGameV2Impl),
+            permissionedDisputeGameV2Impl: address(_output.permissionedDisputeGameV2Impl),
+            aggregateVerifierImpl: address(0),
+            teeProverRegistryImpl: address(0),
+            teeVerifierImpl: address(0),
+            zkVerifierImpl: address(0)
         });
     }
 }
@@ -164,6 +195,11 @@ contract DeployOPChain_Test is DeployOPChain_TestBase {
             false,
             "SystemConfig CUSTOM_GAS_TOKEN feature"
         );
+        assertEq(
+            doo.systemConfigProxy.batchInbox(),
+            Types.chainIdToBatchInboxAddress(deployOPChainInput.l2ChainId),
+            "SystemConfig batch inbox"
+        );
     }
 
     function testFuzz_run_memory_succeeds(bytes32 _seed) public {
@@ -185,8 +221,7 @@ contract DeployOPChain_Test is DeployOPChain_TestBase {
 
         // Check dispute game deployments
         // Validate permissionedDisputeGame (PDG) address
-        IOPContractsManager.Implementations memory impls = opcm.implementations();
-        address expectedPDGAddress = impls.permissionedDisputeGameV2Impl;
+        address expectedPDGAddress = implementations.permissionedDisputeGameV2Impl;
         address actualPDGAddress = address(doo.disputeGameFactoryProxy.gameImpls(GameTypes.PERMISSIONED_CANNON));
         assertNotEq(actualPDGAddress, address(0), "PDG address should be non-zero");
         assertEq(actualPDGAddress, expectedPDGAddress, "PDG address should match expected address");

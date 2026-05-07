@@ -302,16 +302,18 @@ contract Initializer_Test is CommonTest {
         // AggregateVerifier uses a custom `bool initialized` instead of OpenZeppelin's `_initialized`
         // uint8, so it cannot be tested by this framework. It is excluded below.
 
-        // TEEProverRegistryImpl
-        contracts.push(
-            InitializeableContract({
-                name: "TEEProverRegistryImpl",
-                target: address(teeProverRegistry),
-                initCalldata: abi.encodeCall(
-                    TEEProverRegistry.initialize, (address(0), address(0), new address[](0), GameType.wrap(0))
-                )
-            })
-        );
+        if (address(teeProverRegistry) != address(0)) {
+            // TEEProverRegistryImpl
+            contracts.push(
+                InitializeableContract({
+                    name: "TEEProverRegistryImpl",
+                    target: address(teeProverRegistry),
+                    initCalldata: abi.encodeCall(
+                        TEEProverRegistry.initialize, (address(0), address(0), new address[](0), GameType.wrap(0))
+                    )
+                })
+            );
+        }
     }
 
     /// @notice Tests that:
@@ -328,13 +330,8 @@ contract Initializer_Test is CommonTest {
         //       label the FaultDisputeGame, PermissionedDisputeGame
         //       contracts and instead simply deploys them anonymously. Means that functions like "getInitializedSlot"
         //       don't work properly. Remove these exclusions once the deployment script is fixed.
-        excludes[j++] = "src/L1/proofs/FaultDisputeGame.sol";
         excludes[j++] = "src/L1/proofs/v2/FaultDisputeGameV2.sol";
         excludes[j++] = "src/L1/proofs/v2/PermissionedDisputeGameV2.sol";
-        excludes[j++] = "src/L1/proofs/PermissionedDisputeGame.sol";
-        excludes[j++] = "src/L1/proofs/zk/OPSuccinctFaultDisputeGame.sol";
-        // TODO: Eventually remove this exclusion. Same reason as above dispute contracts.
-        excludes[j++] = "src/L1/OPContractsManager.sol";
         // L2 contract initialization is tested in Predeploys.t.sol
         excludes[j++] = "src/L2/*";
         // Contract is not deployed as part of the standard deployment script.
@@ -344,6 +341,10 @@ contract Initializer_Test is CommonTest {
         // ETHLockbox is only deployed when interop is enabled.
         if (address(ethLockbox) == address(0)) {
             excludes[j++] = "src/L1/ETHLockbox.sol";
+        }
+        // TEEProverRegistry is only deployed when multiproof is enabled.
+        if (address(teeProverRegistry) == address(0)) {
+            excludes[j++] = "src/L1/proofs/tee/TEEProverRegistry.sol";
         }
 
         // Get all contract names in the src directory, minus the excluded contracts.

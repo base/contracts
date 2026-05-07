@@ -10,7 +10,7 @@ import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 // Scripts
 import { Deploy } from "scripts/deploy/Deploy.s.sol";
 import { ForkLive } from "test/setup/ForkLive.s.sol";
-import { Fork, LATEST_FORK } from "scripts/libraries/Config.sol";
+import { LATEST_FORK } from "scripts/libraries/Config.sol";
 import { L2Genesis } from "scripts/L2Genesis.s.sol";
 import { Fork, ForkUtils } from "scripts/libraries/Config.sol";
 import { Artifacts } from "scripts/Artifacts.s.sol";
@@ -24,7 +24,6 @@ import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
 import { Chains } from "scripts/libraries/Chains.sol";
 
 // Interfaces
-import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
@@ -109,7 +108,6 @@ abstract contract Setup is FeatureFlags {
     IL1ERC721Bridge l1ERC721Bridge;
     IOptimismMintableERC20Factory l1OptimismMintableERC20Factory;
     ISuperchainConfig superchainConfig;
-    IOPContractsManager opcm;
     IBigStepper mips;
 
     // L2 contracts
@@ -261,14 +259,13 @@ abstract contract Setup is FeatureFlags {
         anchorStateRegistry = IAnchorStateRegistry(artifacts.mustGetAddress("AnchorStateRegistryProxy"));
         disputeGameFactory = IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
         delayedWeth = IDelayedWETH(artifacts.mustGetAddress("DelayedWETHProxy"));
-        opcm = IOPContractsManager(artifacts.mustGetAddress("OPContractsManager"));
         proxyAdmin = IProxyAdmin(artifacts.mustGetAddress("ProxyAdmin"));
         proxyAdminOwner = proxyAdmin.owner();
         superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
         superchainProxyAdminOwner = superchainProxyAdmin.owner();
         mips = IBigStepper(artifacts.mustGetAddress("MipsSingleton"));
-        aggregateVerifier = IVerifier(artifacts.mustGetAddress("AggregateVerifier"));
-        teeProverRegistry = TEEProverRegistry(artifacts.mustGetAddress("TEEProverRegistry"));
+        aggregateVerifier = IVerifier(artifacts.getAddress("AggregateVerifier"));
+        teeProverRegistry = TEEProverRegistry(artifacts.getAddress("TEEProverRegistry"));
 
         console.log("Setup: registered L1 deployments");
 

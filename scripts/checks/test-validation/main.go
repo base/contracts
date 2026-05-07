@@ -9,8 +9,8 @@ import (
 	"unicode"
 
 	"github.com/BurntSushi/toml"
-	"github.com/ethereum-optimism/optimism/op-chain-ops/solc"
 	"github.com/base/contracts/scripts/checks/common"
+	"github.com/ethereum-optimism/optimism/op-chain-ops/solc"
 )
 
 // Main entry point

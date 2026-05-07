@@ -34,6 +34,8 @@ contract DeployImplementations_Test is Test, FeatureFlags {
     ISP1Verifier sp1Verifier = ISP1Verifier(makeAddr("sp1Verifier"));
     address l1ProxyAdminOwner = makeAddr("l1ProxyAdminOwner");
     address challenger = makeAddr("challenger");
+    address teeProposer = makeAddr("teeProposer");
+    address teeChallenger = makeAddr("teeChallenger");
 
     function setUp() public virtual {
         // We'll need to store some code on these two addresses so that the deployment script checks pass
@@ -103,7 +105,6 @@ contract DeployImplementations_Test is Test, FeatureFlags {
         assertEq(address(output1.mipsSingleton), address(output2.mipsSingleton), "900");
         assertEq(address(output1.disputeGameFactoryImpl), address(output2.disputeGameFactoryImpl), "1000");
         assertEq(address(output1.anchorStateRegistryImpl), address(output2.anchorStateRegistryImpl), "1100");
-        assertEq(address(output1.opcm), address(output2.opcm), "1200");
         assertEq(address(output1.ethLockboxImpl), address(output2.ethLockboxImpl), "1300");
         assertEq(address(output1.faultDisputeGameV2Impl), address(output2.faultDisputeGameV2Impl), "1400");
         assertEq(address(output1.permissionedDisputeGameV2Impl), address(output2.permissionedDisputeGameV2Impl), "1500");
@@ -175,6 +176,8 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             _faultGameV2ClockExtension, // faultGameV2ClockExtension (bounded)
             _faultGameV2MaxClockDuration, // faultGameV2MaxClockDuration (bounded)
             bytes32(uint256(1)), // teeImageHash
+            bytes32(0), // zkRangeHash
+            bytes32(0), // zkAggregationHash
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
             address(0), // nitroEnclaveVerifier
@@ -182,6 +185,8 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             100, // multiproofBlockInterval
             10, // multiproofIntermediateBlockInterval
             sp1Verifier,
+            teeProposer,
+            teeChallenger,
             superchainConfigProxy,
             superchainProxyAdmin,
             l1ProxyAdminOwner,
@@ -201,11 +206,6 @@ contract DeployImplementations_Test is Test, FeatureFlags {
         assertNotEq(address(output.l1ERC721BridgeImpl), address(0), "500");
         assertNotEq(address(output.l1StandardBridgeImpl), address(0), "600");
         assertNotEq(address(output.mipsSingleton), address(0), "700");
-        assertNotEq(address(output.opcm), address(0), "800");
-        assertNotEq(address(output.opcmContractsContainer), address(0), "900");
-        assertNotEq(address(output.opcmDeployer), address(0), "1000");
-        assertNotEq(address(output.opcmGameTypeAdder), address(0), "1100");
-
         assertNotEq(address(output.faultDisputeGameV2Impl), address(0), "V2 should be deployed when enabled");
         assertNotEq(address(output.permissionedDisputeGameV2Impl), address(0), "V2 should be deployed when enabled");
 
@@ -247,11 +247,6 @@ contract DeployImplementations_Test is Test, FeatureFlags {
         assertNotEq(address(output.l1ERC721BridgeImpl).code, empty, "1700");
         assertNotEq(address(output.l1StandardBridgeImpl).code, empty, "1800");
         assertNotEq(address(output.mipsSingleton).code, empty, "1900");
-        assertNotEq(address(output.opcm).code, empty, "2000");
-        assertNotEq(address(output.opcmContractsContainer).code, empty, "2100");
-        assertNotEq(address(output.opcmDeployer).code, empty, "2200");
-        assertNotEq(address(output.opcmGameTypeAdder).code, empty, "2300");
-
         assertNotEq(address(output.faultDisputeGameV2Impl).code, empty, "V2 FDG should have code when enabled");
         assertNotEq(address(output.permissionedDisputeGameV2Impl).code, empty, "V2 PDG should have code when enabled");
 
@@ -399,6 +394,8 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             10800, // faultGameV2ClockExtension
             302400, // faultGameV2MaxClockDuration
             bytes32(uint256(1)), // teeImageHash
+            bytes32(0), // zkRangeHash
+            bytes32(0), // zkAggregationHash
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
             address(0), // nitroEnclaveVerifier
@@ -406,6 +403,8 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             100, // multiproofBlockInterval
             10, // multiproofIntermediateBlockInterval
             sp1Verifier,
+            teeProposer,
+            teeChallenger,
             superchainConfigProxy,
             superchainProxyAdmin,
             l1ProxyAdminOwner,
