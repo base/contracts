@@ -26,10 +26,14 @@ pragma solidity 0.8.15;
  * SIGNER REGISTRATION (SIMPLIFIED)
  * ─────────────────────────────────────────────────────────────────────────────────
  *
- * After deployment, register a signer with a single call:
+ * After deployment, register one dev Nitro signer and one dev TDX signer:
  *
  *   cast send $TEE_PROVER_REGISTRY \
- *     "addDevSigner(address,bytes32)" $SIGNER_ADDRESS $TEE_IMAGE_HASH \
+ *     "addDevSigner(address,bytes32)" $NITRO_SIGNER_ADDRESS $TEE_NITRO_IMAGE_HASH \
+ *     --private-key $OWNER_KEY --rpc-url $RPC_URL
+ *
+ *   cast send $TEE_PROVER_REGISTRY \
+ *     "addDevTDXSigner(address,bytes32)" $TDX_SIGNER_ADDRESS $TEE_TDX_IMAGE_HASH \
  *     --private-key $OWNER_KEY --rpc-url $RPC_URL
  *
  * No attestation, PCR0 registration, or certificate validation required.
@@ -72,6 +76,7 @@ import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
+import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 
 import { MinimalProxyAdmin } from "./mocks/MinimalProxyAdmin.sol";
@@ -89,6 +94,7 @@ contract DeployDevNoNitro is Script {
     DeployConfig public constant cfg =
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
 
+    address public tdxVerifierAddr;
     address public teeProverRegistryProxy;
     address public teeVerifier;
     address public disputeGameFactory;
@@ -99,6 +105,7 @@ contract DeployDevNoNitro is Script {
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
         cfg.read(Config.deployConfigPath());
+        tdxVerifierAddr = cfg.tdxVerifier();
     }
 
     function run() public {
@@ -110,8 +117,10 @@ contract DeployDevNoNitro is Script {
         console.log("TEE Proposer:", cfg.teeProposer());
         console.log("TEE Challenger:", cfg.teeChallenger());
         console.log("Game Type:", cfg.multiproofGameType());
+        console.log("TDXVerifier:", tdxVerifierAddr);
         console.log("");
         console.log("NOTE: Using DevTEEProverRegistry - NO attestation required.");
+        require(tdxVerifierAddr != address(0), "tdxVerifier must be set in config");
 
         vm.startBroadcast();
 
@@ -128,7 +137,11 @@ contract DeployDevNoNitro is Script {
     function _deployTEEContracts(GameType gameType) internal {
         address owner = cfg.finalSystemOwner();
         address teeRegistryImpl = address(
-            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(disputeGameFactory))
+            new DevTEEProverRegistry(
+                INitroEnclaveVerifier(address(0)),
+                ITDXVerifier(tdxVerifierAddr),
+                IDisputeGameFactory(disputeGameFactory)
+            )
         );
         address[] memory initialProposers = new address[](2);
         initialProposers[0] = cfg.teeProposer();
@@ -177,7 +190,7 @@ contract DeployDevNoNitro is Script {
                 IDelayedWETH(payable(mockDelayedWETH)),
                 IVerifier(teeVerifier),
                 IVerifier(zkVerifier),
-                cfg.teeImageHash(),
+                AggregateVerifier.TeeHashes(cfg.teeNitroImageHash(), cfg.teeTdxImageHash()),
                 zkHashes,
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainID(),
@@ -197,6 +210,7 @@ contract DeployDevNoNitro is Script {
         console.log("========================================");
         console.log("\nTEE Contracts:");
         console.log("  DevTEEProverRegistry:", teeProverRegistryProxy);
+        console.log("  TDXVerifier:", tdxVerifierAddr);
         console.log("  TEEVerifier:", teeVerifier);
         console.log("\nInfrastructure:");
         console.log("  DisputeGameFactory:", disputeGameFactory);
@@ -205,13 +219,18 @@ contract DeployDevNoNitro is Script {
         console.log("\nGame:");
         console.log("  AggregateVerifier:", aggregateVerifier);
         console.log("  Game Type:", cfg.multiproofGameType());
-        console.log("  TEE Image Hash:", vm.toString(cfg.teeImageHash()));
+        console.log("  Nitro Image Hash:", vm.toString(cfg.teeNitroImageHash()));
+        console.log("  TDX Image Hash:", vm.toString(cfg.teeTdxImageHash()));
         console.log("  Config Hash:", vm.toString(cfg.multiproofConfigHash()));
         console.log("========================================");
-        console.log("\n>>> NEXT STEP - Register dev signer (NO ATTESTATION NEEDED) <<<");
+        console.log("\n>>> NEXT STEP - Register dev Nitro and TDX signers (NO ATTESTATION NEEDED) <<<");
         console.log("\ncast send", teeProverRegistryProxy);
-        console.log('  "addDevSigner(address,bytes32)" <SIGNER_ADDRESS>');
-        console.log(" ", vm.toString(cfg.teeImageHash()));
+        console.log('  "addDevSigner(address,bytes32)" <NITRO_SIGNER_ADDRESS>');
+        console.log(" ", vm.toString(cfg.teeNitroImageHash()));
+        console.log("  --private-key <OWNER_KEY> --rpc-url <RPC>");
+        console.log("\ncast send", teeProverRegistryProxy);
+        console.log('  "addDevTDXSigner(address,bytes32)" <TDX_SIGNER_ADDRESS>');
+        console.log(" ", vm.toString(cfg.teeTdxImageHash()));
         console.log("  --private-key <OWNER_KEY> --rpc-url <RPC>");
         console.log("\n========================================\n");
     }
@@ -219,6 +238,7 @@ contract DeployDevNoNitro is Script {
     function _writeOutput() internal {
         string memory key = "deployment";
         vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
+        vm.serializeAddress(key, "TDXVerifier", tdxVerifierAddr);
         vm.serializeAddress(key, "TEEVerifier", teeVerifier);
         vm.serializeAddress(key, "DisputeGameFactory", disputeGameFactory);
         vm.serializeAddress(key, "AnchorStateRegistry", address(mockAnchorRegistry));

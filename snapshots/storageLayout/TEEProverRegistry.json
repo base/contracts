@@ -75,5 +75,12 @@
     "offset": 0,
     "slot": "105",
     "type": "struct EnumerableSetLib.AddressSet"
+  },
+  {
+    "bytes": "32",
+    "label": "signerTEEType",
+    "offset": 0,
+    "slot": "106",
+    "type": "mapping(address => enum TEEProverRegistry.TEEType)"
   }
 ]

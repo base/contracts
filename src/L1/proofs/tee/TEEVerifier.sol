@@ -10,19 +10,23 @@ import { TEEProverRegistry } from "./TEEProverRegistry.sol";
 import { Verifier } from "../Verifier.sol";
 
 /// @title TEEVerifier
-/// @notice Stateless TEE proof verifier that validates signatures against registered signers.
+/// @notice Stateless TEE proof verifier that validates Nitro and TDX signatures against registered signers.
 /// @dev This contract is designed to be used as the TEE_VERIFIER in the AggregateVerifier.
-///      It verifies that proofs are signed by enclave addresses registered in TEEProverRegistry
-///      via AWS Nitro attestation. PCR0 (enclave image hash) enforcement is handled by
-///      AggregateVerifier, which bakes TEE_IMAGE_HASH into the journal that the enclave signs.
+///      It verifies one TEE signature at a time against a registered Nitro or TDX signer.
 ///      The contract is intentionally stateless - all state related to output proposals and
 ///      L1 origin verification is managed by the calling contract (e.g., AggregateVerifier).
 contract TEEVerifier is Verifier, ISemver {
     /// @notice The TEEProverRegistry contract that manages valid TEE signers.
-    /// @dev Signers are registered via AWS Nitro attestation in TEEProverRegistry.
+    /// @dev Signers are registered via Nitro or TDX attestation in TEEProverRegistry.
     TEEProverRegistry public immutable TEE_PROVER_REGISTRY;
 
-    /// @notice Thrown when the recovered signer is not a valid registered signer.
+    /// @notice Size of an ECDSA signature in bytes.
+    uint256 internal constant SIGNATURE_SIZE = 65;
+
+    /// @notice Size of a TEE proof: proposer(20) + signature(65).
+    uint256 internal constant TEE_PROOF_SIZE = 20 + SIGNATURE_SIZE;
+
+    /// @notice Thrown when a recovered signer is not a valid registered signer.
     error InvalidSigner(address signer);
 
     /// @notice Thrown when the signer's registered image hash does not match the claimed imageId.
@@ -50,8 +54,7 @@ contract TEEVerifier is Verifier, ISemver {
 
     /// @notice Verifies a TEE proof for a state transition.
     /// @param proofBytes The proof: proposer(20) + signature(65) = 85 bytes.
-    /// @param imageId The claimed TEE image hash (from the calling AggregateVerifier's TEE_IMAGE_HASH).
-    ///        Validated against the signer's registered image hash to prevent cross-game-type attacks.
+    /// @param imageId The TEE image hash expected for the recovered signer.
     /// @param journal The keccak256 hash of the proof's public inputs.
     /// @return valid Whether the proof is valid.
     function verify(
@@ -65,42 +68,44 @@ contract TEEVerifier is Verifier, ISemver {
         notNullified
         returns (bool)
     {
-        if (proofBytes.length < 85) revert InvalidProofFormat();
+        if (proofBytes.length != TEE_PROOF_SIZE) revert InvalidProofFormat();
 
         address proposer = address(bytes20(proofBytes[0:20]));
-        bytes calldata signature = proofBytes[20:85];
-
-        // Recover the signer from the signature
-        // The signature should be over the journal hash directly (not eth-signed-message prefixed)
-        (address signer, ECDSA.RecoverError err) = ECDSA.tryRecover(journal, signature);
-
-        if (err != ECDSA.RecoverError.NoError) {
-            revert InvalidSignature();
-        }
-
         if (!TEE_PROVER_REGISTRY.isValidProposer(proposer)) {
             revert InvalidProposer(proposer);
         }
 
-        // Check that the signer is registered
-        if (!TEE_PROVER_REGISTRY.isRegisteredSigner(signer)) {
-            revert InvalidSigner(signer);
-        }
+        bytes calldata signature = proofBytes[20:TEE_PROOF_SIZE];
+        address signer = _recoverSigner(journal, signature);
+        _validateSigner(signer, imageId);
 
-        // Check that the signer's registered image hash matches the calling AggregateVerifier's imageId.
-        // This prevents a signer registered under one enclave image from being used in a game
+        return true;
+    }
+
+    function _recoverSigner(bytes32 journal, bytes calldata signature) internal pure returns (address signer) {
+        // The signature should be over the journal hash directly (not eth-signed-message prefixed).
+        ECDSA.RecoverError err;
+        (signer, err) = ECDSA.tryRecover(journal, signature);
+        if (err != ECDSA.RecoverError.NoError) revert InvalidSignature();
+    }
+
+    function _validateSigner(address signer, bytes32 imageId) internal view {
+        // A registered signer always has a non-NONE TEE type, so this single read also
+        // serves as the registration check (saves an SLOAD versus calling isRegisteredSigner).
+        TEEProverRegistry.TEEType signerTEEType = TEE_PROVER_REGISTRY.signerTEEType(signer);
+        if (signerTEEType == TEEProverRegistry.TEEType.NONE) revert InvalidSigner(signer);
+
+        // Prevents a signer registered under one enclave image from being used in a game
         // that expects a different image (e.g., after an upgrade or across game types).
         bytes32 registeredImageHash = TEE_PROVER_REGISTRY.signerImageHash(signer);
         if (registeredImageHash != imageId) {
             revert ImageIdMismatch(registeredImageHash, imageId);
         }
-
-        return true;
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.2.0
+    /// @custom:semver 0.3.0
     function version() public pure virtual returns (string memory) {
-        return "0.2.0";
+        return "0.3.0";
     }
 }

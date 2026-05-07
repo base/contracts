@@ -45,6 +45,7 @@ import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { GameType } from "src/libraries/bridge/Types.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
+import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 
 contract DeployImplementations is Script {
     struct Input {
@@ -61,10 +62,12 @@ contract DeployImplementations is Script {
         uint256 faultGameV2ClockExtension;
         uint256 faultGameV2MaxClockDuration;
         // Multiproof parameters
-        bytes32 teeImageHash;
+        bytes32 teeNitroImageHash;
+        bytes32 teeTdxImageHash;
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
         address nitroEnclaveVerifier;
+        address tdxVerifier;
         uint256 l2ChainID;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
@@ -615,7 +618,9 @@ contract DeployImplementations is Script {
         address teeVerifierImpl;
         {
             TEEProverRegistry scgImpl = new TEEProverRegistry(
-                INitroEnclaveVerifier(_input.nitroEnclaveVerifier), IDisputeGameFactory(address(1))
+                INitroEnclaveVerifier(_input.nitroEnclaveVerifier),
+                ITDXVerifier(_input.tdxVerifier),
+                IDisputeGameFactory(address(1))
             );
             vm.label(address(scgImpl), "TEEProverRegistryImpl");
             _output.teeProverRegistryImpl = scgImpl;
@@ -630,7 +635,7 @@ contract DeployImplementations is Script {
                     _output.delayedWETHImpl,
                     IVerifier(teeVerifierImpl),
                     IVerifier(zkVerifier),
-                    _input.teeImageHash,
+                    AggregateVerifier.TeeHashes(_input.teeNitroImageHash, _input.teeTdxImageHash),
                     AggregateVerifier.ZkHashes(bytes32(0), bytes32(0)),
                     _input.multiproofConfigHash,
                     _input.l2ChainID,
@@ -680,6 +685,7 @@ contract DeployImplementations is Script {
             "DeployImplementations: disputeGameFinalityDelaySeconds not set"
         );
         require(_input.mipsVersion != 0, "DeployImplementations: mipsVersion not set");
+        require(_input.tdxVerifier != address(0), "DeployImplementations: tdxVerifier not set");
         require(
             address(_input.superchainConfigProxy) != address(0), "DeployImplementations: superchainConfigProxy not set"
         );

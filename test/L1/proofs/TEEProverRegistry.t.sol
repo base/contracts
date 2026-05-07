@@ -9,6 +9,7 @@ import {
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { GameType } from "src/libraries/bridge/Types.sol";
 
@@ -17,12 +18,14 @@ import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
-/// @notice Mock AggregateVerifier that returns a configurable TEE_IMAGE_HASH.
+/// @notice Mock AggregateVerifier that returns configurable TEE image hashes.
 contract MockAggregateVerifierForRegistry {
-    bytes32 public TEE_IMAGE_HASH;
+    bytes32 public TEE_NITRO_IMAGE_HASH;
+    bytes32 public TEE_TDX_IMAGE_HASH;
 
     constructor(bytes32 imageHash) {
-        TEE_IMAGE_HASH = imageHash;
+        TEE_NITRO_IMAGE_HASH = imageHash;
+        TEE_TDX_IMAGE_HASH = imageHash;
     }
 }
 
@@ -77,8 +80,9 @@ contract TEEProverRegistryTest is Test {
         mockFactory.setImpl(TEST_GAME_TYPE, address(mockVerifier));
 
         // Deploy implementation (using DevTEEProverRegistry for test flexibility)
-        DevTEEProverRegistry impl =
-            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(mockFactory)));
+        DevTEEProverRegistry impl = new DevTEEProverRegistry(
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(address(mockFactory))
+        );
 
         // Deploy proxy admin
         proxyAdmin = new ProxyAdmin(address(this));
@@ -100,15 +104,16 @@ contract TEEProverRegistryTest is Test {
     function testInitialization() public view {
         assertEq(teeProverRegistry.owner(), owner);
         assertEq(teeProverRegistry.manager(), manager);
-        assertEq(teeProverRegistry.version(), "0.5.0");
+        assertEq(teeProverRegistry.version(), "0.7.0");
     }
 
     function testInitializationWithProposers() public {
         address proposer1 = makeAddr("proposer1");
         address proposer2 = makeAddr("proposer2");
         address proposer3 = makeAddr("proposer3");
-        DevTEEProverRegistry impl2 =
-            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(1)));
+        DevTEEProverRegistry impl2 = new DevTEEProverRegistry(
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(address(1))
+        );
         ProxyAdmin proxyAdmin2 = new ProxyAdmin(address(this));
         address[] memory proposers = new address[](3);
         proposers[0] = proposer1;
@@ -215,6 +220,35 @@ contract TEEProverRegistryTest is Test {
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
 
         assertTrue(teeProverRegistry.isValidSigner(signer));
+        assertEq(uint8(teeProverRegistry.signerTEEType(signer)), uint8(TEEProverRegistry.TEEType.NITRO));
+    }
+
+    function testAddDevTDXSigner() public {
+        address signer = makeAddr("dev-tdx-signer");
+
+        vm.prank(owner);
+        teeProverRegistry.addDevTDXSigner(signer, TEST_IMAGE_HASH);
+
+        assertTrue(teeProverRegistry.isValidSigner(signer));
+        assertEq(uint8(teeProverRegistry.signerTEEType(signer)), uint8(TEEProverRegistry.TEEType.TDX));
+    }
+
+    function testRegisteringSameSignerWithDifferentTEETypeFails() public {
+        address signer = makeAddr("dev-signer");
+
+        vm.prank(owner);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
+
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TEEProverRegistry.SignerTEETypeMismatch.selector,
+                signer,
+                TEEProverRegistry.TEEType.NITRO,
+                TEEProverRegistry.TEEType.TDX
+            )
+        );
+        teeProverRegistry.addDevTDXSigner(signer, TEST_IMAGE_HASH);
     }
 
     // ============ MAX_AGE Tests ============

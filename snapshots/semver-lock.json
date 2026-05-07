@@ -36,8 +36,8 @@
     "sourceCodeHash": "0xf122a50487efe9bd5a620262ba20ef4adbca14eeec2af7fd32e6e16739001596"
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0x10bb6a60f21de103d1da9ff310a38f571c53a8113d04a029087648debf3f0341",
-    "sourceCodeHash": "0xa9866fb867598e444846f2ce1a3460efc1d784751831f0c41c110f33b7ec844d"
+    "initCodeHash": "0x6e50ad8219dfc59503395bf63d2a4d91c002bd21a1df7c902debedea9c2e13eb",
+    "sourceCodeHash": "0x802a3645c05ae98232b091f779f6321f60230dd22f536b00dcbacccde6af4d3a"
   },
   "src/L1/proofs/AnchorStateRegistry.sol:AnchorStateRegistry": {
     "initCodeHash": "0x6f3afd2d0ef97a82ca3111976322b99343a270e54cd4a405028f2f29c75f7fb1",
@@ -55,13 +55,17 @@
     "initCodeHash": "0x82f42b4d578bfcf9dc35eaa2c4ada04a45e1eca63021bceceb2ec794b12a9dd6",
     "sourceCodeHash": "0x5b2938048ff85baceb963c54138ce209890d77c63ce8791b48f36c5fda5c81e5"
   },
+  "src/L1/proofs/tee/TDXVerifier.sol:TDXVerifier": {
+    "initCodeHash": "0xab68cfaae62a40d02a7d096bf1c81ec8ac2c106b19859ffa772a22b477a55af2",
+    "sourceCodeHash": "0x82a3eff9a7566e483b5f015dc97a88d90bdc4d9d7d49794556106bfc86d55ea0"
+  },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0xfd1942e1c2f59b0aa72b33d698a948a53b6e4cf1040106f173fb5d89f63f57b0",
-    "sourceCodeHash": "0x410542b3899800d884a2281ef234a28d2dbb707576f2ad7d21f2d36de6290ca1"
+    "initCodeHash": "0x4b2fb8ba42668b1b9a8ebb99518fc0552703dfda190acde45d771847b450ac65",
+    "sourceCodeHash": "0x3e763a25f5353756c2ab52f6ae003f8cc7c1da2965aa2fd8b6ec6a0ac0ae6720"
   },
   "src/L1/proofs/tee/TEEVerifier.sol:TEEVerifier": {
-    "initCodeHash": "0x655576cc21cc5c603d55fb4dd2a2f0ef57b11deeaabd3e539b0a70a5f7e2c9af",
-    "sourceCodeHash": "0x6c1d839e48cc8497af7b0d74a9566e76000599b14d7db7b3163a69e774a91bb3"
+    "initCodeHash": "0x5f42455c6d41c0a49e05681a6fa7dbf21eb22c89705fd11b6030952b3227e559",
+    "sourceCodeHash": "0xcd8358734ff27b0c17af73713b7f3d2b0f348ba0646efc356345bad9fa8d6a8c"
   },
   "src/L1/proofs/v2/FaultDisputeGameV2.sol:FaultDisputeGameV2": {
     "initCodeHash": "0x6fc59e2da083c9e2093e42b0fda705e8215cc216e4dcedbf728c08f69ec2d3bd",

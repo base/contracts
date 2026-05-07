@@ -7,6 +7,11 @@
         "type": "address"
       },
       {
+        "internalType": "contract ITDXVerifier",
+        "name": "tdxVerifier",
+        "type": "address"
+      },
+      {
         "internalType": "contract IDisputeGameFactory",
         "name": "factory",
         "type": "address"
@@ -55,6 +60,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "TDX_VERIFIER",
+    "outputs": [
+      {
+        "internalType": "contract ITDXVerifier",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -82,7 +100,20 @@
   },
   {
     "inputs": [],
-    "name": "getExpectedImageHash",
+    "name": "getExpectedNitroImageHash",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getExpectedTDXImageHash",
     "outputs": [
       {
         "internalType": "bytes32",
@@ -236,6 +267,24 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "bytes",
+        "name": "output",
+        "type": "bytes"
+      },
+      {
+        "internalType": "bytes",
+        "name": "proofBytes",
+        "type": "bytes"
+      }
+    ],
+    "name": "registerTDXSigner",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "renounceManagement",
     "outputs": [],
@@ -294,6 +343,25 @@
         "internalType": "bytes32",
         "name": "",
         "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "signerTEEType",
+    "outputs": [
+      {
+        "internalType": "enum TEEProverRegistry.TEEType",
+        "name": "",
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -448,6 +516,31 @@
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "imageHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "reportDataSuffix",
+        "type": "bytes32"
+      }
+    ],
+    "name": "TDXSignerRegistered",
+    "type": "event"
+  },
+  {
     "inputs": [],
     "name": "AttestationTooOld",
     "type": "error"
@@ -479,7 +572,38 @@
   },
   {
     "inputs": [],
+    "name": "InvalidTEEType",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "PCR0NotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "enum TEEProverRegistry.TEEType",
+        "name": "existingTEEType",
+        "type": "uint8"
+      },
+      {
+        "internalType": "enum TEEProverRegistry.TEEType",
+        "name": "newTEEType",
+        "type": "uint8"
+      }
+    ],
+    "name": "SignerTEETypeMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "TDXVerifierNotSet",
     "type": "error"
   }
 ]

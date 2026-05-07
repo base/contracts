@@ -174,10 +174,12 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             _faultGameV2SplitDepth, // faultGameV2SplitDepth (bounded)
             _faultGameV2ClockExtension, // faultGameV2ClockExtension (bounded)
             _faultGameV2MaxClockDuration, // faultGameV2MaxClockDuration (bounded)
-            bytes32(uint256(1)), // teeImageHash
+            bytes32(uint256(1)), // teeNitroImageHash
+            bytes32(uint256(2)), // teeTdxImageHash
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
             address(0), // nitroEnclaveVerifier
+            address(1), // tdxVerifier
             8453, // l2ChainID
             100, // multiproofBlockInterval
             10, // multiproofIntermediateBlockInterval
@@ -316,6 +318,11 @@ contract DeployImplementations_Test is Test, FeatureFlags {
         deployImplementations.run(input);
 
         input = defaultInput();
+        input.tdxVerifier = address(0);
+        vm.expectRevert("DeployImplementations: tdxVerifier not set");
+        deployImplementations.run(input);
+
+        input = defaultInput();
         input.superchainConfigProxy = ISuperchainConfig(address(0));
         vm.expectRevert("DeployImplementations: superchainConfigProxy not set");
         deployImplementations.run(input);
@@ -398,10 +405,12 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             30, // faultGameV2SplitDepth
             10800, // faultGameV2ClockExtension
             302400, // faultGameV2MaxClockDuration
-            bytes32(uint256(1)), // teeImageHash
+            bytes32(uint256(1)), // teeNitroImageHash
+            bytes32(uint256(2)), // teeTdxImageHash
             bytes32(0), // multiproofConfigHash
             621, // multiproofGameType
             address(0), // nitroEnclaveVerifier
+            address(1), // tdxVerifier
             8453, // l2ChainID
             100, // multiproofBlockInterval
             10, // multiproofIntermediateBlockInterval

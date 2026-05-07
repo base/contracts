@@ -27,9 +27,21 @@
         "type": "address"
       },
       {
-        "internalType": "bytes32",
-        "name": "teeImageHash",
-        "type": "bytes32"
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "nitroHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "tdxHash",
+            "type": "bytes32"
+          }
+        ],
+        "internalType": "struct AggregateVerifier.TeeHashes",
+        "name": "teeHashes",
+        "type": "tuple"
       },
       {
         "components": [
@@ -230,7 +242,20 @@
   },
   {
     "inputs": [],
-    "name": "TEE_IMAGE_HASH",
+    "name": "TEE_NITRO_IMAGE_HASH",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "TEE_TDX_IMAGE_HASH",
     "outputs": [
       {
         "internalType": "bytes32",

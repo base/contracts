@@ -2,45 +2,22 @@
 pragma solidity 0.8.15;
 
 /**
- * @title DeployDevWithNitro
- * @notice Development deployment WITH AWS Nitro attestation validation.
+ * @title DeployDevWithTDX
+ * @notice Development deployment using the TDX signer-registration path.
  *
- * ══════════════════════════════════════════════════════════════════════════════════
- *                            DEPLOYMENT TYPE: DEV (WITH NITRO)
- * ══════════════════════════════════════════════════════════════════════════════════
- *
- * This script deploys infrastructure using the REAL TEEProverRegistry, which
- * REQUIRES a ZK proof of a valid AWS Nitro attestation for signer registration.
- * You cannot use addDevSigner() - you must go through the full registerSigner() flow.
- *
- * PREREQUISITES:
- *   1. Deploy the RISC Zero verifier stack AND NitroEnclaveVerifier using
- *      DeployRiscZeroStack.s.sol (required because NitroEnclaveVerifier and its
- *      dependencies need Solidity ^0.8.20, while this script is pinned to =0.8.15).
- *   2. Set `nitroEnclaveVerifier` in the deploy config to the deployed address.
- *
- * ─────────────────────────────────────────────────────────────────────────────────
- * SIGNER REGISTRATION FLOW
- * ─────────────────────────────────────────────────────────────────────────────────
- *
- * After deployment, register a signer by generating a RISC Zero ZK proof of a
- * valid AWS Nitro attestation document and calling:
- *
- *   cast send $TEE_PROVER_REGISTRY \
- *     "registerSigner(bytes,bytes)" $ZK_OUTPUT $ZK_PROOF_BYTES \
- *     --private-key $OWNER_OR_MANAGER_KEY --rpc-url $RPC_URL
- *
- * IMPORTANT: The attestation is only valid for 60 minutes! Generate the proof
- * and submit the transaction within that window.
- *
- * ══════════════════════════════════════════════════════════════════════════════════
+ * This deploys the same local multiproof testing infrastructure as the existing
+ * dev scripts, but configures TEEProverRegistry for TDX signer registration. Deploy
+ * TDXVerifier first with DeployTDXVerifier.s.sol and pass its address to run().
+ * The NitroEnclaveVerifier in the deploy config must also already be deployed.
+ * The default run(address) entrypoint configures DEFAULT_TDX_REGISTRATION_MANAGER
+ * as the registry manager so it can submit TDX signer registrations.
  */
 
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { Proxy } from "src/universal/Proxy.sol";
-import { Script } from "lib/forge-std/src/Script.sol";
-import { console2 as console } from "lib/forge-std/src/console2.sol";
+import { Script } from "forge-std/Script.sol";
+import { console2 as console } from "forge-std/console2.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
@@ -62,45 +39,59 @@ import { MinimalProxyAdmin } from "./mocks/MinimalProxyAdmin.sol";
 import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";
 import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 
-/// @title DeployDevWithNitro
-/// @notice Development deployment WITH AWS Nitro attestation validation.
-/// @dev Uses real TEEProverRegistry which requires registerSigner() with valid attestation.
-///      NitroEnclaveVerifier must be pre-deployed via DeployRiscZeroStack.s.sol.
-contract DeployDevWithNitro is Script {
-    uint256 public constant BLOCK_INTERVAL = 600;
-    uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
+contract DeployDevWithTDX is Script {
     uint256 public constant INIT_BOND = 0.00001 ether;
+    address public constant DEFAULT_TDX_REGISTRATION_MANAGER = 0x93900CB7eCdB5994352b19DfD8a900Cd4fa437B7;
 
     DeployConfig public constant cfg =
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
 
     address public nitroEnclaveVerifierAddr;
     address public tdxVerifierAddr;
+    address public tdxRegistrationManager;
     address public teeProverRegistryProxy;
     address public teeVerifier;
     address public disputeGameFactory;
     IAnchorStateRegistry public mockAnchorRegistry;
     address public mockDelayedWETH;
     address public aggregateVerifier;
+    Hash public startingAnchorRoot;
+    uint256 public startingAnchorBlockNumber;
 
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
         cfg.read(Config.deployConfigPath());
     }
 
-    function run() public {
+    function run(address tdxVerifier) public {
+        run(tdxVerifier, DEFAULT_TDX_REGISTRATION_MANAGER);
+    }
+
+    function run(address tdxVerifier, address registrationManager) public {
+        run(tdxVerifier, registrationManager, cfg.multiproofGenesisOutputRoot(), cfg.multiproofGenesisBlockNumber());
+    }
+
+    function run(
+        address tdxVerifier,
+        address registrationManager,
+        bytes32 asrStartingOutputRoot,
+        uint256 asrStartingBlockNumber
+    )
+        public
+    {
+        nitroEnclaveVerifierAddr = cfg.nitroEnclaveVerifier();
+        require(tdxVerifier != address(0), "tdxVerifier must be non-zero");
+        require(nitroEnclaveVerifierAddr != address(0), "nitroEnclaveVerifier must be set in config");
+        require(registrationManager != address(0), "registrationManager must be non-zero");
+        require(asrStartingOutputRoot != bytes32(0), "asrStartingOutputRoot must be non-zero");
+        tdxVerifierAddr = tdxVerifier;
+        tdxRegistrationManager = registrationManager;
+        startingAnchorRoot = Hash.wrap(asrStartingOutputRoot);
+        startingAnchorBlockNumber = asrStartingBlockNumber;
+
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
 
-        // NitroEnclaveVerifier must be pre-deployed (via DeployRiscZeroStack.s.sol)
-        nitroEnclaveVerifierAddr = cfg.nitroEnclaveVerifier();
-        tdxVerifierAddr = cfg.tdxVerifier();
-        require(
-            nitroEnclaveVerifierAddr != address(0),
-            "nitroEnclaveVerifier must be set in config (deploy via DeployRiscZeroStack.s.sol first)"
-        );
-        require(tdxVerifierAddr != address(0), "tdxVerifier must be set in config");
-
-        console.log("=== Deploying Dev Infrastructure (WITH NITRO) ===");
+        console.log("=== Deploying Dev Infrastructure (WITH TDX) ===");
         console.log("Chain ID:", block.chainid);
         console.log("Owner:", cfg.finalSystemOwner());
         console.log("TEE Proposer:", cfg.teeProposer());
@@ -108,13 +99,16 @@ contract DeployDevWithNitro is Script {
         console.log("Game Type:", cfg.multiproofGameType());
         console.log("NitroEnclaveVerifier:", nitroEnclaveVerifierAddr);
         console.log("TDXVerifier:", tdxVerifierAddr);
+        console.log("TDX Registration Manager:", tdxRegistrationManager);
+        console.log("ASR Starting Output Root:", vm.toString(startingAnchorRoot.raw()));
+        console.log("ASR Starting L2 Block:", startingAnchorBlockNumber);
         console.log("");
-        console.log("NOTE: Using REAL TEEProverRegistry - ZK attestation proof REQUIRED.");
+        console.log("NOTE: TDXVerifier and NitroEnclaveVerifier owners must be the broadcaster/finalSystemOwner.");
 
         vm.startBroadcast();
 
         _deployInfrastructure(gameType);
-        _deployTEEContracts(gameType);
+        _deployTDXContracts(gameType);
         _deployAggregateVerifier(gameType);
 
         vm.stopBroadcast();
@@ -123,24 +117,30 @@ contract DeployDevWithNitro is Script {
         _writeOutput();
     }
 
-    function _deployTEEContracts(GameType gameType) internal {
+    function _deployTDXContracts(GameType gameType) internal {
         address owner = cfg.finalSystemOwner();
-        address teeRegistryImpl = address(
+        address registryImpl = address(
             new TEEProverRegistry(
                 INitroEnclaveVerifier(nitroEnclaveVerifierAddr),
                 ITDXVerifier(tdxVerifierAddr),
                 IDisputeGameFactory(disputeGameFactory)
             )
         );
+
         address[] memory initialProposers = new address[](2);
         initialProposers[0] = cfg.teeProposer();
         initialProposers[1] = cfg.teeChallenger();
-        Proxy teeProxy = new Proxy(msg.sender);
-        teeProxy.upgradeToAndCall(
-            teeRegistryImpl, abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, initialProposers, gameType))
+
+        Proxy registryProxy = new Proxy(msg.sender);
+        registryProxy.upgradeToAndCall(
+            registryImpl,
+            abi.encodeCall(TEEProverRegistry.initialize, (owner, tdxRegistrationManager, initialProposers, gameType))
         );
-        teeProxy.changeAdmin(address(0xdead));
-        teeProverRegistryProxy = address(teeProxy);
+        registryProxy.changeAdmin(address(0xdead));
+        teeProverRegistryProxy = address(registryProxy);
+
+        ITDXVerifier(tdxVerifierAddr).setProofSubmitter(teeProverRegistryProxy);
+        INitroEnclaveVerifier(nitroEnclaveVerifierAddr).setProofSubmitter(teeProverRegistryProxy);
 
         teeVerifier = address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), mockAnchorRegistry));
     }
@@ -157,12 +157,7 @@ contract DeployDevWithNitro is Script {
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
         mockAnchorRegistry = IAnchorStateRegistry(address(asr));
-        asr.initialize(
-            disputeGameFactory,
-            Hash.wrap(cfg.multiproofGenesisOutputRoot()),
-            cfg.multiproofGenesisBlockNumber(),
-            gameType
-        );
+        asr.initialize(disputeGameFactory, startingAnchorRoot, startingAnchorBlockNumber, gameType);
     }
 
     function _deployAggregateVerifier(GameType gameType) internal {
@@ -183,8 +178,8 @@ contract DeployDevWithNitro is Script {
                 zkHashes,
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainID(),
-                BLOCK_INTERVAL,
-                INTERMEDIATE_BLOCK_INTERVAL
+                cfg.multiproofBlockInterval(),
+                cfg.multiproofIntermediateBlockInterval()
             )
         );
 
@@ -195,16 +190,19 @@ contract DeployDevWithNitro is Script {
 
     function _printSummary() internal view {
         console.log("\n========================================");
-        console.log("   DEV DEPLOYMENT COMPLETE (WITH NITRO)");
+        console.log("      DEV DEPLOYMENT COMPLETE (TDX)");
         console.log("========================================");
-        console.log("\nTEE Contracts:");
+        console.log("\nTDX Contracts:");
         console.log("  NitroEnclaveVerifier:", nitroEnclaveVerifierAddr);
         console.log("  TDXVerifier:", tdxVerifierAddr);
         console.log("  TEEProverRegistry:", teeProverRegistryProxy);
+        console.log("  TDX Registration Manager:", tdxRegistrationManager);
         console.log("  TEEVerifier:", teeVerifier);
         console.log("\nInfrastructure:");
         console.log("  DisputeGameFactory:", disputeGameFactory);
         console.log("  AnchorStateRegistry (mock):", address(mockAnchorRegistry));
+        console.log("  ASR Starting Output Root:", vm.toString(startingAnchorRoot.raw()));
+        console.log("  ASR Starting L2 Block:", startingAnchorBlockNumber);
         console.log("  DelayedWETH (mock):", mockDelayedWETH);
         console.log("\nGame:");
         console.log("  AggregateVerifier:", aggregateVerifier);
@@ -218,23 +216,26 @@ contract DeployDevWithNitro is Script {
         console.log('    "registerSigner(bytes,bytes)" <NITRO_OUTPUT> <NITRO_PROOF_BYTES>');
         console.log("    --private-key <OWNER_OR_MANAGER_KEY> --rpc-url <RPC>");
         console.log("\n  cast send", teeProverRegistryProxy);
-        console.log('    "registerTDXSigner(bytes,bytes)" <TDX_OUTPUT> <TDX_PROOF_BYTES>');
+        console.log('    "registerTDXSigner(bytes,bytes)" <TDX_OUTPUT> <PROOF_BYTES>');
         console.log("    --private-key <OWNER_OR_MANAGER_KEY> --rpc-url <RPC>");
         console.log("\n========================================\n");
     }
 
     function _writeOutput() internal {
         string memory key = "deployment";
-        vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
-        vm.serializeAddress(key, "TEEVerifier", teeVerifier);
         vm.serializeAddress(key, "NitroEnclaveVerifier", nitroEnclaveVerifierAddr);
         vm.serializeAddress(key, "TDXVerifier", tdxVerifierAddr);
+        vm.serializeAddress(key, "TDXRegistrationManager", tdxRegistrationManager);
+        vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
+        vm.serializeAddress(key, "TEEVerifier", teeVerifier);
         vm.serializeAddress(key, "DisputeGameFactory", disputeGameFactory);
         vm.serializeAddress(key, "AnchorStateRegistry", address(mockAnchorRegistry));
+        vm.serializeBytes32(key, "ASRStartingOutputRoot", startingAnchorRoot.raw());
+        vm.serializeUint(key, "ASRStartingBlockNumber", startingAnchorBlockNumber);
         vm.serializeAddress(key, "DelayedWETH", mockDelayedWETH);
         string memory json = vm.serializeAddress(key, "AggregateVerifier", aggregateVerifier);
 
-        string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-dev-with-nitro.json");
+        string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-dev-with-tdx.json");
         vm.writeJson(json, outPath);
         console.log("Deployment saved to:", outPath);
     }

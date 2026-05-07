@@ -80,7 +80,7 @@ contract ChallengeTest is BaseTest {
         );
 
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
-        bytes memory teeProof2 = _generateProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
+        bytes memory teeProof2 = _generateProposalProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
 
         vm.expectRevert(AggregateVerifier.InvalidProofType.selector);
         game1.challenge(teeProof2, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
@@ -170,7 +170,7 @@ contract ChallengeTest is BaseTest {
         );
 
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
-        bytes memory teeProof2 = _generateProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
+        bytes memory teeProof2 = _generateProposalProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
 
         game.nullify(teeProof2, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
 
@@ -284,7 +284,7 @@ contract ChallengeTest is BaseTest {
             _createAggregateVerifierGame(TEE_PROVER, rootClaimB, currentL2BlockNumber, address(gameA), teeProofB);
 
         Claim rootNullifyB = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee-nullify-b")));
-        bytes memory teeNullifyB = _generateProof("tee-nullify-b", AggregateVerifier.ProofType.TEE);
+        bytes memory teeNullifyB = _generateProposalProof("tee-nullify-b", AggregateVerifier.ProofType.TEE);
         uint256 lastIdx = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1;
         gameB.nullify(teeNullifyB, lastIdx, rootNullifyB.raw());
         assertTrue(teeVerifier.nullified());
