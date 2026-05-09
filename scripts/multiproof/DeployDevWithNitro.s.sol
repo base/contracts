@@ -14,8 +14,8 @@ pragma solidity 0.8.15;
  * You cannot use addDevSigner() - you must go through the full registerSigner() flow.
  *
  * PREREQUISITES:
- *   1. Deploy the RISC Zero verifier stack AND NitroEnclaveVerifier using
- *      DeployRiscZeroStack.s.sol (required because NitroEnclaveVerifier and its
+ *   1. Deploy the RISC Zero verifier route AND NitroEnclaveVerifier using
+ *      DeployNitroVerifier.s.sol (required because NitroEnclaveVerifier and its
  *      dependencies need Solidity ^0.8.20, while this script is pinned to =0.8.15).
  *   2. Set `nitroEnclaveVerifier` in the deploy config to the deployed address.
  *
@@ -65,7 +65,7 @@ import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 /// @title DeployDevWithNitro
 /// @notice Development deployment WITH AWS Nitro attestation validation.
 /// @dev Uses real TEEProverRegistry which requires registerSigner() with valid attestation.
-///      NitroEnclaveVerifier must be pre-deployed via DeployRiscZeroStack.s.sol.
+///      NitroEnclaveVerifier must be pre-deployed via DeployNitroVerifier.s.sol.
 contract DeployDevWithNitro is Script {
     uint256 public constant BLOCK_INTERVAL = 600;
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
@@ -91,12 +91,12 @@ contract DeployDevWithNitro is Script {
     function run() public {
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
 
-        // NitroEnclaveVerifier must be pre-deployed (via DeployRiscZeroStack.s.sol)
+        // NitroEnclaveVerifier must be pre-deployed (via DeployNitroVerifier.s.sol)
         nitroEnclaveVerifierAddr = cfg.nitroEnclaveVerifier();
         tdxVerifierAddr = cfg.tdxVerifier();
         require(
             nitroEnclaveVerifierAddr != address(0),
-            "nitroEnclaveVerifier must be set in config (deploy via DeployRiscZeroStack.s.sol first)"
+            "nitroEnclaveVerifier must be set in config (deploy via DeployNitroVerifier.s.sol first)"
         );
         require(tdxVerifierAddr != address(0), "tdxVerifier must be set in config");
 

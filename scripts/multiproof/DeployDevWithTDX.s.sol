@@ -8,7 +8,8 @@ pragma solidity 0.8.15;
  * This deploys the same local multiproof testing infrastructure as the existing
  * dev scripts, but configures TEEProverRegistry for TDX signer registration. Deploy
  * TDXVerifier first with DeployTDXVerifier.s.sol and pass its address to run().
- * The NitroEnclaveVerifier in the deploy config must also already be deployed.
+ * The NitroEnclaveVerifier can either come from the deploy config or be passed
+ * explicitly to the five-argument run() overload.
  * The default run(address) entrypoint configures DEFAULT_TDX_REGISTRATION_MANAGER
  * as the registry manager so it can submit TDX signer registrations.
  */
@@ -79,9 +80,21 @@ contract DeployDevWithTDX is Script {
     )
         public
     {
-        nitroEnclaveVerifierAddr = cfg.nitroEnclaveVerifier();
+        run(cfg.nitroEnclaveVerifier(), tdxVerifier, registrationManager, asrStartingOutputRoot, asrStartingBlockNumber);
+    }
+
+    function run(
+        address nitroEnclaveVerifier,
+        address tdxVerifier,
+        address registrationManager,
+        bytes32 asrStartingOutputRoot,
+        uint256 asrStartingBlockNumber
+    )
+        public
+    {
+        nitroEnclaveVerifierAddr = nitroEnclaveVerifier;
         require(tdxVerifier != address(0), "tdxVerifier must be non-zero");
-        require(nitroEnclaveVerifierAddr != address(0), "nitroEnclaveVerifier must be set in config");
+        require(nitroEnclaveVerifierAddr != address(0), "nitroEnclaveVerifier must be non-zero");
         require(registrationManager != address(0), "registrationManager must be non-zero");
         require(asrStartingOutputRoot != bytes32(0), "asrStartingOutputRoot must be non-zero");
         tdxVerifierAddr = tdxVerifier;

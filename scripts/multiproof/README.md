@@ -174,36 +174,63 @@ The quote's TDREPORT `REPORTDATA` must put `keccak256(x || y)` in the first 32 b
 
 > **PoC boundary:** this repo now contains the production-shaped Solidity path and policy checks. The remaining off-chain piece is the actual RISC Zero/SP1 TDX DCAP guest that emits `TDXVerifierJournal` after verifying Intel collateral.
 
-### Step 1: Deploy `TDXVerifier`
+### Step 1: Deploy verifier policy contracts
 
-`TDXVerifier` is deployed separately because it depends on verifier interfaces that require Solidity `^0.8.20`, while the rest of the multiproof deployment stack is pinned to Solidity `0.8.15`.
+`NitroEnclaveVerifier` and `TDXVerifier` are deployed separately from the main multiproof stack because they depend on verifier interfaces that require Solidity `^0.8.20`, while the rest of the multiproof deployment stack is pinned to Solidity `0.8.15`.
 
 For Sepolia TDX testing, `scripts/multiproof/justfile` defaults to:
 
 ```bash
-RISC0_VERIFIER_ROUTER=0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187
-TDX_VERIFIER_ID=0x1f1bc81fae82605af46a4c9a20f641922b7542befd9219644c7e6c59ccdeccab
+NITRO_RISC0_VERIFIER_ROUTER=0xB121B667dd2cf27F95f9F5107137696F56f188f6
+TDX_RISC0_VERIFIER_ROUTER=0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187
+RISC0_SET_BUILDER_IMAGE_ID=0x70909b25db0db00f1d4b4016aeb876f53568a3e5a8e6397cb562d79947a02cc9
+TDX_VERIFIER_ID=0xb9681d1f76f5dbf70da84ad06b5b20befa392638060e947965269b6f63ebbf3b
 INTEL_ROOT_CA_HASH=0xa1acc73eb45794fa1734f14d882e91925b6006f79d3bb2460df9d01b333d7009
-TDX_IMAGE_HASH=0xa227306080459e4bcf1324b229b344af4469846f9861aa8aff450f35046df9d6
-TDX_SIGNER=0x6A1f38f20044e8e69EAC755144F14f973e7b8d6E
-TDX_REGISTRATION_MANAGER=0x93900CB7eCdB5994352b19DfD8a900Cd4fa437B7
+TDX_IMAGE_HASH=0x4cb35ee476a8098c4e567098714c65f5afe25236fc460b38487a356e14e7db66
+TDX_REGISTRATION_MANAGER=0x44E999A5859c2D12378a349882fAe5805DCE71b9
 ```
 
-`deploy-config/sepolia.json` uses the same `RISC0_VERIFIER_ROUTER` and `TDX_IMAGE_HASH`. The `TEEProverRegistry`
+`deploy-config/sepolia.json` uses the same TDX RISC Zero verifier router and `TDX_IMAGE_HASH`. The `TEEProverRegistry`
 constructor also requires a non-zero `tdxVerifier`; for config-driven deployments, set `tdxVerifier` in the deploy
 config to the deployed `TDXVerifier` address.
+
+Deploy both TEE verifier policy contracts with one command:
+
+```bash
+just --justfile scripts/multiproof/justfile deploy-tee-verifiers $NITRO_ROOT_CERT $NITRO_VERIFIER_ID
+```
+
+This saves output to `deployments/<chainId>-tee-verifiers.json`.
+
+To deploy a fresh Nitro verifier, a fresh TDX verifier, and then the TDX
+multiproof stack against those exact verifier addresses without editing
+`deploy-config/sepolia.json`, use:
+
+```bash
+just --justfile scripts/multiproof/justfile deploy-tdx-system $NITRO_ROOT_CERT $NITRO_VERIFIER_ID
+```
+
+To deploy Nitro separately:
+
+```bash
+just --justfile scripts/multiproof/justfile deploy-nitro-verifier $NITRO_ROOT_CERT $NITRO_VERIFIER_ID
+```
+
+This saves output to `deployments/<chainId>-nitro-verifier.json`.
+
+To deploy TDX separately:
 
 ```bash
 just --justfile scripts/multiproof/justfile deploy-tdx-verifier
 ```
 
-To override any verifier input manually, pass all three verifier args:
+To override any TDX verifier input manually, pass all three verifier args:
 
 ```bash
 forge script scripts/multiproof/DeployTDXVerifier.s.sol:DeployTDXVerifier \
   --sig "run(address,address,bytes32,bytes32)" \
   $OWNER \
-  $RISC0_VERIFIER_ROUTER \
+  $TDX_RISC0_VERIFIER_ROUTER \
   $TDX_VERIFIER_ID \
   $INTEL_ROOT_CA_HASH \
   --rpc-url $L1_RPC_URL \
@@ -212,6 +239,23 @@ forge script scripts/multiproof/DeployTDXVerifier.s.sol:DeployTDXVerifier \
 ```
 
 The script saves output to `deployments/<chainId>-tdx-verifier.json`.
+
+To override Nitro inputs manually:
+
+```bash
+forge script scripts/multiproof/DeployNitroVerifier.s.sol:DeployNitroVerifier \
+  --sig "run(address,address,bytes32,bytes32,bytes32)" \
+  $OWNER \
+  $NITRO_RISC0_VERIFIER_ROUTER \
+  $RISC0_SET_BUILDER_IMAGE_ID \
+  $NITRO_ROOT_CERT \
+  $NITRO_VERIFIER_ID \
+  --rpc-url $L1_RPC_URL \
+  --broadcast \
+  --private-key $PRIVATE_KEY
+```
+
+Use `DeployTEEVerifiers.s.sol` with `run(address,address,address,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)` to override all Nitro and TDX inputs while still deploying both in one broadcast.
 
 ### Step 2: Deploy the TDX multiproof test stack
 
@@ -223,6 +267,13 @@ The `deploy-tdx-stack` recipe resolves a recent L2 output root before invoking `
 
 ```bash
 just --justfile scripts/multiproof/justfile deploy-tdx-stack $TDX_VERIFIER
+```
+
+If the Nitro verifier in `deploy-config/sepolia.json` is owned by another account, do not edit the shared Sepolia deploy
+config. Pass both verifier addresses explicitly instead:
+
+```bash
+just --justfile scripts/multiproof/justfile deploy-tdx-stack-with-verifiers $NITRO_VERIFIER $TDX_VERIFIER
 ```
 
 To override the manager manually, use:
