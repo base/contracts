@@ -3,7 +3,7 @@
 # contracts
 
 This repo contains contracts and scripts for Base.
-Note that Base primarily utilizes Optimism's bedrock contracts located in Optimism's repo [here](https://github.com/ethereum-optimism/optimism/tree/develop/packages/contracts-bedrock).
+Note that Base's core protocol contracts are maintained in the [base/base](https://github.com/base/base).
 For contract deployment artifacts, see [base-org/contract-deployments](https://github.com/base-org/contract-deployments).
 
 <!-- Badge row 1 - status -->
