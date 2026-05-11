@@ -149,7 +149,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
         // We allow attestations up to MAX_AGE old. This means a cert may be expired between when
         // the attestation is generated and when it is submitted to this contract.
-        if (journal.timestamp / MS_PER_SECOND + MAX_AGE <= block.timestamp) revert AttestationTooOld();
+        if (journal.timestamp / MS_PER_SECOND + MAX_AGE < block.timestamp) revert AttestationTooOld();
 
         // Extract the attestation's PCR0 and store it for TEEVerifier to check at
         // proof-submission time. No comparison against the current TEE_IMAGE_HASH

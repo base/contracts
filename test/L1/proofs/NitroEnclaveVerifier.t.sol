@@ -642,6 +642,58 @@ contract NitroEnclaveVerifierTest is Test {
         assertEq(uint8(result.result), uint8(VerificationResult.InvalidTimestamp));
     }
 
+    function testVerifyJournalTimestampEqualToBlockTimestamp() public {
+        _setUpRiscZeroConfig();
+
+        VerifierJournal memory journal = _createSuccessJournal();
+        // Set timestamp exactly equal to block.timestamp (in ms) — should be accepted
+        journal.timestamp = uint64(block.timestamp) * 1000;
+        bytes memory output = abi.encode(journal);
+        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+
+        vm.prank(submitter);
+        VerifierJournal memory result = verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+
+        assertEq(uint8(result.result), uint8(VerificationResult.Success));
+    }
+
+    function testVerifyJournalTimestampAtMaxTimeDiffBoundary() public {
+        _setUpRiscZeroConfig();
+
+        VerifierJournal memory journal = _createSuccessJournal();
+        // Set timestamp exactly maxTimeDiff seconds in the past (in ms) — should be accepted
+        journal.timestamp = uint64(block.timestamp - MAX_TIME_DIFF) * 1000;
+        bytes memory output = abi.encode(journal);
+        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+
+        vm.prank(submitter);
+        VerifierJournal memory result = verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+
+        assertEq(uint8(result.result), uint8(VerificationResult.Success));
+    }
+
+    function testVerifyJournalTimestampSubSecondTruncation() public {
+        _setUpRiscZeroConfig();
+
+        VerifierJournal memory journal = _createSuccessJournal();
+        // Set timestamp to block.timestamp * 1000 + 999 — sub-second offset that truncates
+        // to block.timestamp, should be accepted
+        journal.timestamp = uint64(block.timestamp) * 1000 + 999;
+        bytes memory output = abi.encode(journal);
+        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+
+        vm.prank(submitter);
+        VerifierJournal memory result = verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+
+        assertEq(uint8(result.result), uint8(VerificationResult.Success));
+    }
+
     function testVerifyCachesNewCerts() public {
         _setUpRiscZeroConfig();
 
