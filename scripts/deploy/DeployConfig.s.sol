@@ -173,15 +173,13 @@ contract DeployConfig is Script {
     function l1StartingBlockTag() public returns (bytes32) {
         try vm.parseJsonBytes32(_json, "$.l1StartingBlockTag") returns (bytes32 tag_) {
             return tag_;
-        } catch {
-            try vm.parseJsonString(_json, "$.l1StartingBlockTag") returns (string memory tag_) {
-                return _getBlockByTag(tag_);
-            } catch {
-                try vm.parseJsonUint(_json, "$.l1StartingBlockTag") returns (uint256 tag_) {
-                    return _getBlockByTag(vm.toString(tag_));
-                } catch { }
-            }
-        }
+        } catch { }
+        try vm.parseJsonString(_json, "$.l1StartingBlockTag") returns (string memory tag_) {
+            return _getBlockByTag(tag_);
+        } catch { }
+        try vm.parseJsonUint(_json, "$.l1StartingBlockTag") returns (uint256 tag_) {
+            return _getBlockByTag(vm.toString(tag_));
+        } catch { }
         revert(
             "DeployConfig: l1StartingBlockTag must be a bytes32, string or uint256 or cannot fetch l1StartingBlockTag"
         );
