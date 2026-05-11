@@ -83,38 +83,6 @@ library ChainAssertions {
         require(config.optimismMintableERC20Factory() == address(0), "CHECK-SCFG-430");
     }
 
-    /// @notice Asserts that the SystemConfig is setup correctly
-    function checkSystemConfigProxies(
-        Types.ContractSet memory _contracts,
-        Types.DeployOPChainInput memory _doi
-    )
-        internal
-        view
-    {
-        ISystemConfig config = ISystemConfig(_contracts.SystemConfig);
-        console.log("Running chain assertions on the SystemConfig proxy at %s", address(config));
-
-        // Check that the contract is initialized
-        DeployUtils.assertInitialized({ _contractAddress: address(config), _isProxy: true, _slot: 0, _offset: 0 });
-
-        require(config.owner() == _doi.systemConfigOwner, "CHECK-SCFG-10");
-        require(config.basefeeScalar() == _doi.basefeeScalar, "CHECK-SCFG-20");
-        require(config.blobbasefeeScalar() == _doi.blobBaseFeeScalar, "CHECK-SCFG-30");
-        require(config.batcherHash() == bytes32(uint256(uint160(_doi.batcher))), "CHECK-SCFG-40");
-        require(config.gasLimit() == uint64(_doi.gasLimit), "CHECK-SCFG-50");
-        require(config.unsafeBlockSigner() == _doi.unsafeBlockSigner, "CHECK-SCFG-60");
-        require(config.scalar() >> 248 == 1, "CHECK-SCFG-70");
-        // Depends on start block being set to 0 in `initialize`
-        require(config.startBlock() == block.number, "CHECK-SCFG-140");
-        require(config.batchInbox() == Types.chainIdToBatchInboxAddress(_doi.l2ChainId), "CHECK-SCFG-150");
-        // Check _addresses
-        require(config.l1CrossDomainMessenger() == _contracts.L1CrossDomainMessenger, "CHECK-SCFG-160");
-        require(config.l1ERC721Bridge() == _contracts.L1ERC721Bridge, "CHECK-SCFG-170");
-        require(config.l1StandardBridge() == _contracts.L1StandardBridge, "CHECK-SCFG-180");
-        require(config.optimismPortal() == _contracts.OptimismPortal, "CHECK-SCFG-200");
-        require(config.optimismMintableERC20Factory() == _contracts.OptimismMintableERC20Factory, "CHECK-SCFG-210");
-    }
-
     /// @notice Asserts that the L1CrossDomainMessenger is setup correctly
     function checkL1CrossDomainMessenger(IL1CrossDomainMessenger _messenger, Vm _vm, bool _isProxy) internal view {
         console.log(
@@ -342,7 +310,7 @@ library ChainAssertions {
         }
     }
 
-    /// @notice Converts variables needed from the DeployConfig to a DeployOPChainInput contract
+    /// @notice Converts implementation deployment output to a contract set.
     function dioToContractSet(DeployImplementations.Output memory _output)
         internal
         pure

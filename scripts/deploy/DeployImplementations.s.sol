@@ -225,7 +225,7 @@ contract DeployImplementations is Script {
     //   Superchain, and are therefore MCP ready for any chain using the Standard Configuration.
     //
     // This script only deploys the shared contracts. The bespoke contracts are deployed by
-    // `DeployOPChain.s.sol`. When the shared contracts are proxied, the contracts deployed here are
+    // `SystemDeploy.s.sol`. When the shared contracts are proxied, the contracts deployed here are
     // "implementations", and when shared contracts are not proxied, they are "singletons". So
     // here we deploy:
     //

@@ -201,7 +201,7 @@ library DeployUtils {
     ///         two. The result is used to etch the input and output contracts to a deterministic
     ///         address based on those two values, where the identifier represents the input or
     ///         output contract, such as `optimism.SystemDeploySuperchainInput` or
-    ///         `optimism.DeployOPChainOutput`.
+    ///         `optimism.SystemDeployOutput`.
     ///         Example: `toIOAddress(msg.sender, "optimism.SystemDeploySuperchainInput")`
     /// @param _sender Address of the sender.
     /// @param _identifier Additional identifier.

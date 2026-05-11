@@ -10,7 +10,6 @@ import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
 import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
@@ -154,35 +153,6 @@ library Types {
         address SystemConfig;
         address L1ERC721Bridge;
         address SuperchainConfig;
-    }
-
-    struct DeployOPChainInput {
-        // Roles
-        address opChainProxyAdminOwner;
-        address systemConfigOwner;
-        address batcher;
-        address unsafeBlockSigner;
-        address proposer;
-        address challenger;
-        // TODO Add fault proofs inputs in a future PR.
-        uint32 basefeeScalar;
-        uint32 blobBaseFeeScalar;
-        uint256 l2ChainId;
-        ISuperchainConfig superchainConfigProxy;
-        Implementations implementations;
-        string saltMixer;
-        uint64 gasLimit;
-        // Configurable dispute game inputs
-        GameType disputeGameType;
-        Claim disputeAbsolutePrestate;
-        uint256 disputeMaxGameDepth;
-        uint256 disputeSplitDepth;
-        Duration disputeClockExtension;
-        Duration disputeMaxClockDuration;
-        bool allowCustomDisputeParameters;
-        // Fee params
-        uint32 operatorFeeScalar;
-        uint64 operatorFeeConstant;
     }
 
     /// @notice Maps an L2 chain ID to the standard L1 batch inbox address.
