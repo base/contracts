@@ -19,7 +19,7 @@ abstract contract OptimismMintableERC721Factory_TestInit is CommonTest {
         returns (address)
     {
         bytes memory constructorArgs =
-            abi.encode(address(l2ERC721Bridge), deploy.cfg().l1ChainID(), _remote, _name, _symbol);
+            abi.encode(address(l2ERC721Bridge), deploy.cfg().l1ChainId(), _remote, _name, _symbol);
         bytes memory bytecode = abi.encodePacked(type(OptimismMintableERC721).creationCode, constructorArgs);
         bytes32 salt = keccak256(abi.encode(_remote, _name, _symbol));
         bytes32 hash = keccak256(
@@ -36,8 +36,8 @@ contract OptimismMintableERC721Factory_Constructor_Test is OptimismMintableERC72
     function test_constructor_succeeds() external view {
         assertEq(l2OptimismMintableERC721Factory.BRIDGE(), address(l2ERC721Bridge));
         assertEq(l2OptimismMintableERC721Factory.bridge(), address(l2ERC721Bridge));
-        assertEq(l2OptimismMintableERC721Factory.REMOTE_CHAIN_ID(), deploy.cfg().l1ChainID());
-        assertEq(l2OptimismMintableERC721Factory.remoteChainID(), deploy.cfg().l1ChainID());
+        assertEq(l2OptimismMintableERC721Factory.REMOTE_CHAIN_ID(), deploy.cfg().l1ChainId());
+        assertEq(l2OptimismMintableERC721Factory.remoteChainID(), deploy.cfg().l1ChainId());
     }
 }
 
@@ -71,7 +71,7 @@ contract OptimismMintableERC721Factory_CreateOptimismMintableERC721_Test is Opti
         assertEq(created.symbol(), "L2T");
         assertEq(created.REMOTE_TOKEN(), remote);
         assertEq(created.BRIDGE(), address(l2ERC721Bridge));
-        assertEq(created.REMOTE_CHAIN_ID(), deploy.cfg().l1ChainID());
+        assertEq(created.REMOTE_CHAIN_ID(), deploy.cfg().l1ChainId());
     }
 
     /// @notice Tests that the `createOptimismMintableERC721` function reverts if the same token is

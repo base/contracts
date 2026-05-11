@@ -175,7 +175,7 @@ contract DeployDevWithNitro is Script {
                 cfg.teeImageHash(),
                 zkHashes,
                 cfg.multiproofConfigHash(),
-                cfg.l2ChainID(),
+                cfg.l2ChainId(),
                 BLOCK_INTERVAL,
                 INTERMEDIATE_BLOCK_INTERVAL
             )

@@ -284,8 +284,8 @@ abstract contract Setup is FeatureFlags {
         console.log("Setup: creating L2 genesis with fork %s", l2Fork.toString());
         l2Genesis.run(
             L2Genesis.Input({
-                l1ChainID: deploy.cfg().l1ChainID(),
-                l2ChainID: deploy.cfg().l2ChainID(),
+                l1ChainID: deploy.cfg().l1ChainId(),
+                l2ChainID: deploy.cfg().l2ChainId(),
                 l1CrossDomainMessengerProxy: payable(address(l1CrossDomainMessenger)),
                 l1StandardBridgeProxy: payable(address(l1StandardBridge)),
                 l1ERC721BridgeProxy: payable(address(l1ERC721Bridge)),

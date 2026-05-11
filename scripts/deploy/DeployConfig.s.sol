@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 import { Script } from "lib/forge-std/src/Script.sol";
-import { console2 as console } from "lib/forge-std/src/console2.sol";
+import { console } from "lib/forge-std/src/console.sol";
 import { stdJson } from "lib/forge-std/src/StdJson.sol";
 import { Process } from "scripts/libraries/Process.sol";
 
@@ -13,83 +13,80 @@ contract DeployConfig is Script {
 
     string internal _json;
 
-    address public finalSystemOwner;
-    address public superchainConfigGuardian;
-    address public superchainConfigIncidentResponder;
-    uint256 public l1ChainID;
-    uint256 public l2ChainID;
-    address public p2pSequencerAddress;
+    address public baseFeeVaultRecipient;
     address public batchInboxAddress;
     address public batchSenderAddress;
-    int256 internal _l2OutputOracleStartingTimestamp;
-    uint256 public l2OutputOracleStartingBlockNumber;
+    address public chainFeesRecipient;
+    address public finalSystemOwner;
+    address public governanceTokenOwner;
+    address public l1FeesDepositor;
+    address public l1FeeVaultRecipient;
     address public l2OutputOracleProposer;
     address public l2OutputOracleChallenger;
-    bool public fundDevAccounts;
-    address public proxyAdminOwner;
-    address public baseFeeVaultRecipient;
-    uint256 public baseFeeVaultMinimumWithdrawalAmount;
-    uint256 public baseFeeVaultWithdrawalNetwork;
-    address public l1FeeVaultRecipient;
-    uint256 public l1FeeVaultMinimumWithdrawalAmount;
-    uint256 public l1FeeVaultWithdrawalNetwork;
-    address public sequencerFeeVaultRecipient;
-    uint256 public sequencerFeeVaultMinimumWithdrawalAmount;
-    uint256 public sequencerFeeVaultWithdrawalNetwork;
-    address public operatorFeeVaultRecipient;
-    uint256 public operatorFeeVaultMinimumWithdrawalAmount;
-    uint256 public operatorFeeVaultWithdrawalNetwork;
-    address public governanceTokenOwner;
-    uint256 public l2GenesisBlockGasLimit;
-    uint32 public basefeeScalar;
-    uint32 public blobbasefeeScalar;
-    bool public enableGovernance;
-    uint256 public faultGameAbsolutePrestate;
-    uint256 public faultGameGenesisBlock;
-    bytes32 public faultGameGenesisOutputRoot;
-    uint256 public faultGameMaxDepth;
-    uint256 public faultGameSplitDepth;
-    uint256 public faultGameClockExtension;
-    uint256 public faultGameMaxClockDuration;
-    uint256 public faultGameWithdrawalDelay;
-    uint256 public preimageOracleMinProposalSize;
-    uint256 public preimageOracleChallengePeriod;
-    uint256 public systemConfigStartBlock;
-    uint256 public proofMaturityDelaySeconds;
-    uint256 public disputeGameFinalityDelaySeconds;
-    uint256 public respectedGameType;
-
-    uint256 public faultGameV2MaxGameDepth;
-    uint256 public faultGameV2SplitDepth;
-    uint256 public faultGameV2ClockExtension;
-    uint256 public faultGameV2MaxClockDuration;
-
-    bytes32 public teeImageHash;
-    bytes32 public multiproofConfigHash;
-    uint256 public multiproofGameType;
-    address public teeProposer;
-    address public teeChallenger;
-    bytes32 public zkRangeHash;
-    bytes32 public zkAggregationHash;
     address public nitroEnclaveVerifier;
-    bytes32 public multiproofGenesisOutputRoot;
-    uint256 public multiproofGenesisBlockNumber;
-    uint256 public multiproofBlockInterval;
-    uint256 public multiproofIntermediateBlockInterval;
+    address public operatorFeeVaultRecipient;
+    address public p2pSequencerAddress;
+    address public proxyAdminOwner;
+    address public sequencerFeeVaultRecipient;
     address public sp1Verifier;
+    address public superchainConfigGuardian;
+    address public superchainConfigIncidentResponder;
+    address public teeChallenger;
+    address public teeProposer;
 
+    bool public enableGovernance;
+    bool public fundDevAccounts;
     bool public useInterop;
     bool public useUpgradedFork;
+
     bytes32 public devFeatureBitmap;
+    bytes32 public faultGameGenesisOutputRoot;
+    bytes32 public multiproofConfigHash;
+    bytes32 public multiproofGenesisOutputRoot;
+    bytes32 public teeImageHash;
+    bytes32 public zkAggregationHash;
+    bytes32 public zkRangeHash;
 
-    address public chainFeesRecipient;
-    address public l1FeesDepositor;
+    int256 internal _l2OutputOracleStartingTimestamp;
 
-    bytes32 internal _l1StartingBlockTagCache;
-    bool internal _l1StartingBlockTagCached;
+    uint32 public basefeeScalar;
+    uint32 public blobbasefeeScalar;
+
+    uint256 public baseFeeVaultMinimumWithdrawalAmount;
+    uint256 public baseFeeVaultWithdrawalNetwork;
+    uint256 public disputeGameFinalityDelaySeconds;
+    uint256 public faultGameAbsolutePrestate;
+    uint256 public faultGameClockExtension;
+    uint256 public faultGameGenesisBlock;
+    uint256 public faultGameMaxClockDuration;
+    uint256 public faultGameMaxDepth;
+    uint256 public faultGameSplitDepth;
+    uint256 public faultGameV2ClockExtension;
+    uint256 public faultGameV2MaxClockDuration;
+    uint256 public faultGameV2MaxGameDepth;
+    uint256 public faultGameV2SplitDepth;
+    uint256 public faultGameWithdrawalDelay;
+    uint256 public l1ChainId;
+    uint256 public l1FeeVaultMinimumWithdrawalAmount;
+    uint256 public l1FeeVaultWithdrawalNetwork;
+    uint256 public l2ChainId;
+    uint256 public l2GenesisBlockGasLimit;
+    uint256 public l2OutputOracleStartingBlockNumber;
+    uint256 public multiproofBlockInterval;
+    uint256 public multiproofGameType;
+    uint256 public multiproofGenesisBlockNumber;
+    uint256 public multiproofIntermediateBlockInterval;
+    uint256 public operatorFeeVaultMinimumWithdrawalAmount;
+    uint256 public operatorFeeVaultWithdrawalNetwork;
+    uint256 public preimageOracleChallengePeriod;
+    uint256 public preimageOracleMinProposalSize;
+    uint256 public proofMaturityDelaySeconds;
+    uint256 public respectedGameType;
+    uint256 public sequencerFeeVaultMinimumWithdrawalAmount;
+    uint256 public sequencerFeeVaultWithdrawalNetwork;
+    uint256 public systemConfigStartBlock;
 
     function read(string memory _path) public {
-        _l1StartingBlockTagCached = false;
         console.log("DeployConfig: reading file %s", _path);
         try vm.readFile(_path) returns (string memory data_) {
             _json = data_;
@@ -97,106 +94,90 @@ contract DeployConfig is Script {
             revert(string.concat("DeployConfig: cannot find deploy config file at ", _path));
         }
 
-        finalSystemOwner = _json.readAddress("$.finalSystemOwner");
-        superchainConfigGuardian = _json.readAddress("$.superchainConfigGuardian");
-        superchainConfigIncidentResponder = _json.readAddressOr("$.superchainConfigIncidentResponder", address(0));
-        l1ChainID = _json.readUint("$.l1ChainID");
-        l2ChainID = _json.readUint("$.l2ChainID");
-
-        p2pSequencerAddress = _json.readAddress("$.p2pSequencerAddress");
+        baseFeeVaultRecipient = _json.readAddress("$.baseFeeVaultRecipient");
         batchInboxAddress = _json.readAddress("$.batchInboxAddress");
         batchSenderAddress = _json.readAddress("$.batchSenderAddress");
-        _l2OutputOracleStartingTimestamp = _json.readInt("$.l2OutputOracleStartingTimestamp");
-        l2OutputOracleStartingBlockNumber = _json.readUint("$.l2OutputOracleStartingBlockNumber");
-        l2OutputOracleProposer = _json.readAddress("$.l2OutputOracleProposer");
-        l2OutputOracleChallenger = _json.readAddress("$.l2OutputOracleChallenger");
-        fundDevAccounts = _json.readBoolOr("$.fundDevAccounts", false);
-        proxyAdminOwner = _json.readAddress("$.proxyAdminOwner");
-        baseFeeVaultRecipient = _json.readAddress("$.baseFeeVaultRecipient");
-        baseFeeVaultMinimumWithdrawalAmount = _json.readUint("$.baseFeeVaultMinimumWithdrawalAmount");
-        baseFeeVaultWithdrawalNetwork = _json.readUint("$.baseFeeVaultWithdrawalNetwork");
-        l1FeeVaultRecipient = _json.readAddress("$.l1FeeVaultRecipient");
-        l1FeeVaultMinimumWithdrawalAmount = _json.readUint("$.l1FeeVaultMinimumWithdrawalAmount");
-        l1FeeVaultWithdrawalNetwork = _json.readUint("$.l1FeeVaultWithdrawalNetwork");
-        sequencerFeeVaultRecipient = _json.readAddress("$.sequencerFeeVaultRecipient");
-        sequencerFeeVaultMinimumWithdrawalAmount = _json.readUint("$.sequencerFeeVaultMinimumWithdrawalAmount");
-        sequencerFeeVaultWithdrawalNetwork = _json.readUint("$.sequencerFeeVaultWithdrawalNetwork");
-        operatorFeeVaultRecipient = _json.readAddress("$.operatorFeeVaultRecipient");
-        operatorFeeVaultMinimumWithdrawalAmount = _json.readUint("$.operatorFeeVaultMinimumWithdrawalAmount");
-        operatorFeeVaultWithdrawalNetwork = _json.readUint("$.operatorFeeVaultWithdrawalNetwork");
+        chainFeesRecipient = _json.readAddress("$.chainFeesRecipient");
+        finalSystemOwner = _json.readAddress("$.finalSystemOwner");
         governanceTokenOwner = _json.readAddress("$.governanceTokenOwner");
-        l2GenesisBlockGasLimit = _json.readUint("$.l2GenesisBlockGasLimit");
+        l1FeesDepositor = _json.readAddress("$.l1FeesDepositor");
+        l1FeeVaultRecipient = _json.readAddress("$.l1FeeVaultRecipient");
+        l2OutputOracleChallenger = _json.readAddress("$.l2OutputOracleChallenger");
+        l2OutputOracleProposer = _json.readAddress("$.l2OutputOracleProposer");
+        nitroEnclaveVerifier = _json.readAddress("$.nitroEnclaveVerifier");
+        operatorFeeVaultRecipient = _json.readAddress("$.operatorFeeVaultRecipient");
+        p2pSequencerAddress = _json.readAddress("$.p2pSequencerAddress");
+        proxyAdminOwner = _json.readAddress("$.proxyAdminOwner");
+        sequencerFeeVaultRecipient = _json.readAddress("$.sequencerFeeVaultRecipient");
+        sp1Verifier = _json.readAddress("$.sp1Verifier");
+        superchainConfigGuardian = _json.readAddress("$.superchainConfigGuardian");
+        superchainConfigIncidentResponder = _json.readAddress("$.superchainConfigIncidentResponder");
+        teeChallenger = _json.readAddress("$.teeChallenger");
+        teeProposer = _json.readAddress("$.teeProposer");
+
+        enableGovernance = _json.readBoolOr("$.enableGovernance", false);
+        fundDevAccounts = _json.readBoolOr("$.fundDevAccounts", false);
+        useInterop = _json.readBoolOr("$.useInterop", false);
+
+        devFeatureBitmap = _json.readBytes32Or("$.devFeatureBitmap", bytes32(0));
+        faultGameGenesisOutputRoot = _json.readBytes32("$.faultGameGenesisOutputRoot");
+        multiproofConfigHash = _json.readBytes32("$.multiproofConfigHash");
+        multiproofGenesisOutputRoot = _json.readBytes32("$.multiproofGenesisOutputRoot");
+        teeImageHash = _json.readBytes32("$.teeImageHash");
+        zkAggregationHash = _json.readBytes32("$.zkAggregationHash");
+        zkRangeHash = _json.readBytes32("$.zkRangeHash");
+
+        _l2OutputOracleStartingTimestamp = _json.readInt("$.l2OutputOracleStartingTimestamp");
+
         basefeeScalar = uint32(_json.readUintOr("$.gasPriceOracleBaseFeeScalar", 1368));
         blobbasefeeScalar = uint32(_json.readUintOr("$.gasPriceOracleBlobBaseFeeScalar", 810949));
 
-        enableGovernance = _json.readBoolOr("$.enableGovernance", false);
-        systemConfigStartBlock = _json.readUint("$.systemConfigStartBlock");
-
-        proofMaturityDelaySeconds = _json.readUintOr("$.proofMaturityDelaySeconds", 0);
-        disputeGameFinalityDelaySeconds = _json.readUintOr("$.disputeGameFinalityDelaySeconds", 0);
-        respectedGameType = _json.readUintOr("$.respectedGameType", 0);
-
+        baseFeeVaultMinimumWithdrawalAmount = _json.readUint("$.baseFeeVaultMinimumWithdrawalAmount");
+        baseFeeVaultWithdrawalNetwork = _json.readUint("$.baseFeeVaultWithdrawalNetwork");
+        disputeGameFinalityDelaySeconds = _json.readUint("$.disputeGameFinalityDelaySeconds");
         faultGameAbsolutePrestate = _json.readUint("$.faultGameAbsolutePrestate");
+        faultGameClockExtension = _json.readUint("$.faultGameClockExtension");
+        faultGameGenesisBlock = _json.readUint("$.faultGameGenesisBlock");
+        faultGameMaxClockDuration = _json.readUint("$.faultGameMaxClockDuration");
         faultGameMaxDepth = _json.readUint("$.faultGameMaxDepth");
         faultGameSplitDepth = _json.readUint("$.faultGameSplitDepth");
-        faultGameClockExtension = _json.readUint("$.faultGameClockExtension");
-        faultGameMaxClockDuration = _json.readUint("$.faultGameMaxClockDuration");
-        faultGameGenesisBlock = _json.readUint("$.faultGameGenesisBlock");
-        faultGameGenesisOutputRoot = _json.readBytes32("$.faultGameGenesisOutputRoot");
-        faultGameWithdrawalDelay = _json.readUint("$.faultGameWithdrawalDelay");
-
-        preimageOracleMinProposalSize = _json.readUint("$.preimageOracleMinProposalSize");
-        preimageOracleChallengePeriod = _json.readUint("$.preimageOracleChallengePeriod");
-
-        useInterop = _json.readBoolOr("$.useInterop", false);
-        devFeatureBitmap = _json.readBytes32Or("$.devFeatureBitmap", bytes32(0));
-        chainFeesRecipient = _json.readAddressOr("$.chainFeesRecipient", address(0));
-        l1FeesDepositor = _json.readAddressOr("$.l1FeesDepositor", address(0));
-        faultGameV2MaxGameDepth = _json.readUintOr("$.faultGameV2MaxGameDepth", 73);
-        faultGameV2SplitDepth = _json.readUintOr("$.faultGameV2SplitDepth", 30);
         faultGameV2ClockExtension = _json.readUintOr("$.faultGameV2ClockExtension", 10800);
         faultGameV2MaxClockDuration = _json.readUintOr("$.faultGameV2MaxClockDuration", 302400);
-        teeImageHash = _json.readBytes32Or("$.teeImageHash", bytes32(0));
-        multiproofConfigHash = _json.readBytes32Or("$.multiproofConfigHash", bytes32(0));
-        multiproofGameType = _json.readUintOr("$.multiproofGameType", 621);
-        teeProposer = _json.readAddressOr("$.teeProposer", address(0));
-        teeChallenger = _json.readAddressOr("$.teeChallenger", address(0));
-        zkRangeHash = _json.readBytes32Or("$.zkRangeHash", bytes32(0));
-        zkAggregationHash = _json.readBytes32Or("$.zkAggregationHash", bytes32(0));
-        nitroEnclaveVerifier = _json.readAddressOr("$.nitroEnclaveVerifier", address(0));
-        multiproofGenesisOutputRoot = _json.readBytes32Or("$.multiproofGenesisOutputRoot", bytes32(uint256(1)));
-        multiproofGenesisBlockNumber = _json.readUintOr("$.multiproofGenesisBlockNumber", 0);
+        faultGameV2MaxGameDepth = _json.readUintOr("$.faultGameV2MaxGameDepth", 73);
+        faultGameV2SplitDepth = _json.readUintOr("$.faultGameV2SplitDepth", 30);
+        faultGameWithdrawalDelay = _json.readUint("$.faultGameWithdrawalDelay");
+        l1ChainId = _json.readUint("$.l1ChainId");
+        l1FeeVaultMinimumWithdrawalAmount = _json.readUint("$.l1FeeVaultMinimumWithdrawalAmount");
+        l1FeeVaultWithdrawalNetwork = _json.readUint("$.l1FeeVaultWithdrawalNetwork");
+        l2ChainId = _json.readUint("$.l2ChainId");
+        l2GenesisBlockGasLimit = _json.readUint("$.l2GenesisBlockGasLimit");
+        l2OutputOracleStartingBlockNumber = _json.readUint("$.l2OutputOracleStartingBlockNumber");
         multiproofBlockInterval = _json.readUintOr("$.multiproofBlockInterval", 100);
+        multiproofGameType = _json.readUintOr("$.multiproofGameType", 621);
+        multiproofGenesisBlockNumber = _json.readUintOr("$.multiproofGenesisBlockNumber", 0);
         multiproofIntermediateBlockInterval = _json.readUintOr("$.multiproofIntermediateBlockInterval", 10);
-        sp1Verifier = _json.readAddressOr("$.sp1Verifier", address(0));
+        operatorFeeVaultMinimumWithdrawalAmount = _json.readUint("$.operatorFeeVaultMinimumWithdrawalAmount");
+        operatorFeeVaultWithdrawalNetwork = _json.readUint("$.operatorFeeVaultWithdrawalNetwork");
+        preimageOracleChallengePeriod = _json.readUint("$.preimageOracleChallengePeriod");
+        preimageOracleMinProposalSize = _json.readUint("$.preimageOracleMinProposalSize");
+        proofMaturityDelaySeconds = _json.readUintOr("$.proofMaturityDelaySeconds", 0);
+        respectedGameType = _json.readUintOr("$.respectedGameType", 0);
+        sequencerFeeVaultMinimumWithdrawalAmount = _json.readUint("$.sequencerFeeVaultMinimumWithdrawalAmount");
+        sequencerFeeVaultWithdrawalNetwork = _json.readUint("$.sequencerFeeVaultWithdrawalNetwork");
+        systemConfigStartBlock = _json.readUint("$.systemConfigStartBlock");
     }
 
     function l1StartingBlockTag() public returns (bytes32) {
-        if (_l1StartingBlockTagCached) return _l1StartingBlockTagCache;
-
-        bytes32 result;
-        bool resolved;
         try vm.parseJsonBytes32(_json, "$.l1StartingBlockTag") returns (bytes32 tag_) {
-            result = tag_;
-            resolved = true;
+            return tag_;
         } catch { }
-        if (!resolved) {
-            try vm.parseJsonString(_json, "$.l1StartingBlockTag") returns (string memory tag_) {
-                result = _getBlockByTag(tag_);
-                resolved = true;
-            } catch { }
-        }
-        if (!resolved) {
-            try vm.parseJsonUint(_json, "$.l1StartingBlockTag") returns (uint256 tag_) {
-                result = _getBlockByTag(vm.toString(tag_));
-                resolved = true;
-            } catch { }
-        }
-        require(resolved, "DeployConfig: l1StartingBlockTag missing or not a bytes32/string/uint256");
-
-        _l1StartingBlockTagCache = result;
-        _l1StartingBlockTagCached = true;
-        return result;
+        try vm.parseJsonString(_json, "$.l1StartingBlockTag") returns (string memory tag_) {
+            return _getBlockByTag(tag_);
+        } catch { }
+        try vm.parseJsonUint(_json, "$.l1StartingBlockTag") returns (uint256 tag_) {
+            return _getBlockByTag(vm.toString(tag_));
+        } catch { }
+        revert("DeployConfig: l1StartingBlockTag missing or not a bytes32/string/uint256");
     }
 
     function l2OutputOracleStartingTimestamp() public returns (uint256) {

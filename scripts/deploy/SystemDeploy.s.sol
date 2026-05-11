@@ -336,7 +336,7 @@ contract SystemDeploy is Script {
             multiproofConfigHash: cfg.multiproofConfigHash(),
             multiproofGameType: cfg.multiproofGameType(),
             nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
-            l2ChainID: cfg.l2ChainID(),
+            l2ChainID: cfg.l2ChainId(),
             multiproofBlockInterval: cfg.multiproofBlockInterval(),
             multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
             sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
@@ -365,7 +365,7 @@ contract SystemDeploy is Script {
             }),
             basefeeScalar: cfg.basefeeScalar(),
             blobBasefeeScalar: cfg.blobbasefeeScalar(),
-            l2ChainId: cfg.l2ChainID(),
+            l2ChainId: cfg.l2ChainId(),
             startingAnchorRoot: abi.encode(
                 Proposal({
                     root: Hash.wrap(cfg.faultGameGenesisOutputRoot()), l2SequenceNumber: cfg.faultGameGenesisBlock()
