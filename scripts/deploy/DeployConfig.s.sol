@@ -82,10 +82,7 @@ contract DeployConfig is Script {
     bool public useUpgradedFork;
     bytes32 public devFeatureBitmap;
 
-    bool public useRevenueShare;
     address public chainFeesRecipient;
-    /// @notice This is not read from JSON because it is hardcoded in the deployer. It is overwritten with its setter
-    ///         for testing.
     address public l1FeesDepositor;
 
     function read(string memory _path) public {
@@ -149,7 +146,6 @@ contract DeployConfig is Script {
 
         useInterop = _json.readBoolOr("$.useInterop", false);
         devFeatureBitmap = _json.readBytes32Or("$.devFeatureBitmap", bytes32(0));
-        useRevenueShare = _json.readBoolOr("$.useRevenueShare", false);
         chainFeesRecipient = _json.readAddressOr("$.chainFeesRecipient", address(0));
         faultGameV2MaxGameDepth = _json.readUintOr("$.faultGameV2MaxGameDepth", 73);
         faultGameV2SplitDepth = _json.readUintOr("$.faultGameV2SplitDepth", 30);
@@ -180,9 +176,7 @@ contract DeployConfig is Script {
         try vm.parseJsonUint(_json, "$.l1StartingBlockTag") returns (uint256 tag_) {
             return _getBlockByTag(vm.toString(tag_));
         } catch { }
-        revert(
-            "DeployConfig: l1StartingBlockTag must be a bytes32, string or uint256 or cannot fetch l1StartingBlockTag"
-        );
+        revert("DeployConfig: l1StartingBlockTag missing or not a bytes32/string/uint256");
     }
 
     function l2OutputOracleStartingTimestamp() public returns (uint256) {
@@ -197,18 +191,6 @@ contract DeployConfig is Script {
 
     function setUseInterop(bool _useInterop) public {
         useInterop = _useInterop;
-    }
-
-    function setUseRevenueShare(bool _useRevenueShare) public {
-        useRevenueShare = _useRevenueShare;
-    }
-
-    function setL1FeesDepositor(address _l1FeesDepositor) public {
-        l1FeesDepositor = _l1FeesDepositor;
-    }
-
-    function setChainFeesRecipient(address _chainFeesRecipient) public {
-        chainFeesRecipient = _chainFeesRecipient;
     }
 
     function setDevFeatureBitmap(bytes32 _devFeatureBitmap) public {
@@ -227,8 +209,7 @@ contract DeployConfig is Script {
     }
 
     function _getBlockByTag(string memory _tag) internal returns (bytes32) {
-        string memory cmd = string.concat("cast block ", _tag, " --json | jq -r .hash");
-        bytes memory res = bytes(Process.bash(cmd));
-        return abi.decode(res, (bytes32));
+        string memory cmd = string.concat("cast block ", _tag, " --json | jq .hash");
+        return stdJson.readBytes32(Process.bash(cmd), "");
     }
 }
