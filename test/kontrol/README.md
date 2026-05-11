@@ -144,7 +144,6 @@ As described in [Execute Proofs](#execute-proofs), there's a `script` mode for s
 ### Assumptions
 
 1. A critical invariant of the generated deployment summary is that it stays in sync with the config-driven `SystemDeploy.s.sol` entrypoint.
-   A more rigorous approach may be to leverage the `ChainAssertions` library, but more investigation is required to determine if this is feasible without large changes to the deploy script.
 
 2. Size of `bytes[]` arguments. In [`OptimismPortal.k.sol`](./proofs/OptimismPortal.k.sol), the `prove_proveWithdrawalTransaction_paused` proof is broken down into 11 different proofs, each corresponding to a different size of the `_withdrawalProof` argument, which is of type `bytes[]`. We execute the same logic for lengths of `_withdrawalProof` ranging from 0 to 10, setting the length of each symbolic `bytes` element to 600.
     - The reason for a max length of 10 is that it provides a conservative upper bound based on [historical data](https://dune.com/queries/3433954/5768623) for proof sizes.

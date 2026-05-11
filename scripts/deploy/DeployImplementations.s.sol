@@ -5,7 +5,6 @@ import { Script } from "lib/forge-std/src/Script.sol";
 
 // Libraries
 import { Chains } from "scripts/libraries/Chains.sol";
-import { Types } from "scripts/libraries/Types.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
@@ -17,18 +16,19 @@ import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.
 import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
 import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
-import { Duration } from "src/libraries/bridge/Types.sol";
+import { Duration, GameTypes, Hash } from "src/libraries/bridge/Types.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
+import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
+import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
-import { ChainAssertions } from "scripts/deploy/ChainAssertions.sol";
 
 contract DeployImplementations is Script {
     struct Input {
@@ -448,7 +448,7 @@ contract DeployImplementations is Script {
         return _input.multiproofConfigHash != bytes32(0);
     }
 
-    function assertValidOutput(Input memory _input, Output memory _output) private {
+    function assertValidOutput(Input memory _input, Output memory _output) private view {
         // With many addresses, we'd get a stack too deep error if we tried to do this inline as a
         // single call to `Solarray.addresses`. So we split it into two calls.
         address[] memory addrs1 = Solarray.addresses(
@@ -474,27 +474,149 @@ contract DeployImplementations is Script {
 
         DeployUtils.assertValidContractAddresses(Solarray.extend(addrs1, addrs2));
 
-        Types.ContractSet memory impls = ChainAssertions.dioToContractSet(_output);
+        checkDelayedWETHImpl(_output.delayedWETHImpl, _input.withdrawalDelaySeconds);
+        checkDisputeGameFactoryImpl(_output.disputeGameFactoryImpl);
+        checkL1CrossDomainMessengerImpl(_output.l1CrossDomainMessengerImpl);
+        checkL1ERC721BridgeImpl(_output.l1ERC721BridgeImpl);
+        checkL1StandardBridgeImpl(_output.l1StandardBridgeImpl);
+        checkMIPS(_output.mipsSingleton, _output.preimageOracleSingleton);
+        checkOptimismMintableERC20FactoryImpl(_output.optimismMintableERC20FactoryImpl);
+        checkOptimismPortal2Impl(_output.optimismPortalImpl);
+        checkETHLockboxImpl(_output.ethLockboxImpl, _output.optimismPortalImpl);
+        checkSystemConfigImpl(_output.systemConfigImpl);
+        checkAnchorStateRegistryImpl(_output.anchorStateRegistryImpl);
+    }
 
-        ChainAssertions.checkDelayedWETHImpl(_output.delayedWETHImpl, _input.withdrawalDelaySeconds);
-        ChainAssertions.checkDisputeGameFactory(_output.disputeGameFactoryImpl, address(0), address(0), false);
+    function checkProxyAdminCallFails(address _contract, bytes4 _errorSelector) private view returns (bool) {
+        (bool success, bytes memory data) =
+            address(_contract).staticcall(abi.encodeCall(IProxyAdminOwnedBase.proxyAdmin, ()));
+        return !success && data.length == 4 && bytes4(data) == _errorSelector;
+    }
+
+    function checkSystemConfigImpl(ISystemConfig _config) private view {
+        DeployUtils.assertInitialized({ _contractAddress: address(_config), _isProxy: false, _slot: 0, _offset: 0 });
+
+        IResourceMetering.ResourceConfig memory resourceConfig = _config.resourceConfig();
+
+        require(_config.owner() == address(0), "CHECK-SCFG-220");
+        require(_config.overhead() == 0, "CHECK-SCFG-230");
+        require(_config.scalar() == 0, "CHECK-SCFG-240");
+        require(_config.basefeeScalar() == 0, "CHECK-SCFG-250");
+        require(_config.blobbasefeeScalar() == 0, "CHECK-SCFG-260");
+        require(_config.batcherHash() == bytes32(0), "CHECK-SCFG-270");
+        require(_config.gasLimit() == 0, "CHECK-SCFG-280");
+        require(_config.unsafeBlockSigner() == address(0), "CHECK-SCFG-290");
+        require(resourceConfig.maxResourceLimit == 0, "CHECK-SCFG-300");
+        require(resourceConfig.elasticityMultiplier == 0, "CHECK-SCFG-310");
+        require(resourceConfig.baseFeeMaxChangeDenominator == 0, "CHECK-SCFG-320");
+        require(resourceConfig.systemTxMaxGas == 0, "CHECK-SCFG-330");
+        require(resourceConfig.minimumBaseFee == 0, "CHECK-SCFG-340");
+        require(resourceConfig.maximumBaseFee == 0, "CHECK-SCFG-350");
+        require(_config.startBlock() == type(uint256).max, "CHECK-SCFG-360");
+        require(_config.batchInbox() == address(0), "CHECK-SCFG-370");
+        require(_config.l1CrossDomainMessenger() == address(0), "CHECK-SCFG-380");
+        require(_config.l1ERC721Bridge() == address(0), "CHECK-SCFG-390");
+        require(_config.l1StandardBridge() == address(0), "CHECK-SCFG-400");
+        require(_config.optimismPortal() == address(0), "CHECK-SCFG-420");
+        require(_config.optimismMintableERC20Factory() == address(0), "CHECK-SCFG-430");
+    }
+
+    function checkL1CrossDomainMessengerImpl(IL1CrossDomainMessenger _messenger) private view {
+        require(address(_messenger) != address(0), "CHECK-L1XDM-10");
+        DeployUtils.assertInitialized({ _contractAddress: address(_messenger), _isProxy: false, _slot: 0, _offset: 20 });
+
+        require(address(_messenger.OTHER_MESSENGER()) == address(0), "CHECK-L1XDM-80");
+        require(address(_messenger.otherMessenger()) == address(0), "CHECK-L1XDM-90");
+        require(address(_messenger.PORTAL()) == address(0), "CHECK-L1XDM-100");
+        require(address(_messenger.portal()) == address(0), "CHECK-L1XDM-110");
+        require(address(_messenger.systemConfig()) == address(0), "CHECK-L1XDM-120");
+        require(
+            checkProxyAdminCallFails(
+                address(_messenger), IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotResolvedDelegateProxy.selector
+            ),
+            "CHECK-L1XDM-130"
+        );
+    }
+
+    function checkL1StandardBridgeImpl(IL1StandardBridge _bridge) private view {
+        require(address(_bridge) != address(0), "CHECK-L1SB-10");
+        DeployUtils.assertInitialized({ _contractAddress: address(_bridge), _isProxy: false, _slot: 0, _offset: 0 });
+
+        require(address(_bridge.MESSENGER()) == address(0), "CHECK-L1SB-70");
+        require(address(_bridge.messenger()) == address(0), "CHECK-L1SB-80");
+        require(address(_bridge.OTHER_BRIDGE()) == address(0), "CHECK-L1SB-90");
+        require(address(_bridge.otherBridge()) == address(0), "CHECK-L1SB-100");
+        require(address(_bridge.systemConfig()) == address(0), "CHECK-L1SB-110");
+    }
+
+    function checkDisputeGameFactoryImpl(IDisputeGameFactory _factory) private view {
+        require(address(_factory) != address(0), "CHECK-DG-10");
+        DeployUtils.assertInitialized({ _contractAddress: address(_factory), _isProxy: false, _slot: 0, _offset: 0 });
+
+        require(address(_factory.gameImpls(GameTypes.PERMISSIONED_CANNON)) == address(0), "CHECK-DG-20");
+        require(_factory.owner() == address(0), "CHECK-DG-30");
+    }
+
+    function checkMIPS(IMIPS64 _mips, IPreimageOracle _oracle) private view {
+        require(address(_mips) != address(0), "CHECK-MIPS-10");
+        require(_mips.oracle() == _oracle, "CHECK-MIPS-20");
+    }
+
+    function checkDelayedWETHImpl(IDelayedWETH _weth, uint256 _faultGameWithdrawalDelay) private view {
+        require(address(_weth) != address(0), "CHECK-DWETH-10");
+        DeployUtils.assertInitialized({ _contractAddress: address(_weth), _isProxy: false, _slot: 0, _offset: 0 });
+
+        require(_weth.delay() == _faultGameWithdrawalDelay, "CHECK-DWETH-50");
+    }
+
+    function checkOptimismMintableERC20FactoryImpl(IOptimismMintableERC20Factory _factory) private view {
+        DeployUtils.assertInitialized({ _contractAddress: address(_factory), _isProxy: false, _slot: 0, _offset: 0 });
+
+        require(_factory.BRIDGE() == address(0), "CHECK-MERC20F-30");
+        require(_factory.bridge() == address(0), "CHECK-MERC20F-40");
+    }
+
+    function checkL1ERC721BridgeImpl(IL1ERC721Bridge _bridge) private view {
+        DeployUtils.assertInitialized({ _contractAddress: address(_bridge), _isProxy: false, _slot: 0, _offset: 0 });
+
+        require(address(_bridge.OTHER_BRIDGE()) == address(0), "CHECK-L1ERC721B-60");
+        require(address(_bridge.otherBridge()) == address(0), "CHECK-L1ERC721B-70");
+        require(address(_bridge.MESSENGER()) == address(0), "CHECK-L1ERC721B-80");
+        require(address(_bridge.messenger()) == address(0), "CHECK-L1ERC721B-90");
+        require(address(_bridge.systemConfig()) == address(0), "CHECK-L1ERC721B-100");
+        require(
+            checkProxyAdminCallFails(
+                address(_bridge), IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotResolvedDelegateProxy.selector
+            ),
+            "CHECK-L1XDM-130"
+        );
+    }
+
+    function checkOptimismPortal2Impl(IOptimismPortal _portal) private view {
+        require(address(_portal) != address(0), "CHECK-OP2-10");
+        DeployUtils.assertInitialized({ _contractAddress: address(_portal), _isProxy: false, _slot: 0, _offset: 0 });
+
+        require(address(_portal.anchorStateRegistry()) == address(0), "CHECK-OP2-80");
+        require(address(_portal.systemConfig()) == address(0), "CHECK-OP2-90");
+        require(_portal.l2Sender() == address(0), "CHECK-OP2-110");
+        require(address(_portal.ethLockbox()) == address(0), "CHECK-OP2-120");
+        require(vm.load(address(_portal), bytes32(uint256(61))) == bytes32(0), "CHECK-OP2-130");
+    }
+
+    function checkETHLockboxImpl(IETHLockbox _ethLockbox, IOptimismPortal _portal) private view {
+        DeployUtils.assertInitialized({ _contractAddress: address(_ethLockbox), _isProxy: false, _slot: 0, _offset: 0 });
+
+        require(address(_ethLockbox.systemConfig()) == address(0), "CHECK-ELB-50");
+        require(_ethLockbox.authorizedPortals(_portal) == false, "CHECK-ELB-60");
+    }
+
+    function checkAnchorStateRegistryImpl(IAnchorStateRegistry _anchorStateRegistry) private view {
+        DeployUtils.assertValidContractAddress(address(_anchorStateRegistry));
         DeployUtils.assertInitialized({
-            _contractAddress: address(_output.anchorStateRegistryImpl), _isProxy: false, _slot: 0, _offset: 0
+            _contractAddress: address(_anchorStateRegistry), _isProxy: false, _slot: 0, _offset: 0
         });
-        ChainAssertions.checkL1CrossDomainMessenger(IL1CrossDomainMessenger(impls.L1CrossDomainMessenger), vm, false);
-        ChainAssertions.checkL1ERC721BridgeImpl(_output.l1ERC721BridgeImpl);
-        ChainAssertions.checkL1StandardBridgeImpl(_output.l1StandardBridgeImpl);
-        ChainAssertions.checkMIPS(_output.mipsSingleton, _output.preimageOracleSingleton);
 
-        ChainAssertions.checkOptimismMintableERC20FactoryImpl(_output.optimismMintableERC20FactoryImpl);
-        ChainAssertions.checkOptimismPortal2({
-            _contracts: impls,
-            _superchainConfig: ISuperchainConfig(address(_input.superchainConfigProxy)),
-            _opChainProxyAdminOwner: address(0),
-            _isProxy: false
-        });
-        ChainAssertions.checkETHLockboxImpl(_output.ethLockboxImpl, _output.optimismPortalImpl);
-        ChainAssertions.checkSystemConfigImpls(impls);
-        ChainAssertions.checkAnchorStateRegistryProxy(IAnchorStateRegistry(impls.AnchorStateRegistry), false);
+        (Hash actualRoot,) = _anchorStateRegistry.anchors(GameTypes.PERMISSIONED_CANNON);
+        require(Hash.unwrap(actualRoot) == bytes32(0), "ANCHORP-40");
     }
 }
