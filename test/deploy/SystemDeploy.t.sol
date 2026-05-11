@@ -5,7 +5,6 @@ import { Test } from "lib/forge-std/src/Test.sol";
 
 import { Artifacts } from "scripts/Artifacts.s.sol";
 import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
-import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Types } from "scripts/libraries/Types.sol";
 import { StandardSystemAssertions } from "test/setup/StandardSystemAssertions.sol";
@@ -37,6 +36,7 @@ contract MockSP1Verifier {
 contract SystemDeploy_Test is Test, StandardSystemAssertions {
     Artifacts internal constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
+    uint256 internal constant STANDARD_MIPS_VERSION = 8;
 
     SystemDeploy internal systemDeploy;
 
@@ -284,7 +284,7 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
             challengePeriodSeconds: 300,
             proofMaturityDelaySeconds: 400,
             disputeGameFinalityDelaySeconds: 500,
-            mipsVersion: StandardConstants.MIPS_VERSION,
+            mipsVersion: STANDARD_MIPS_VERSION,
             devFeatureBitmap: bytes32(0),
             faultGameV2MaxGameDepth: 73,
             faultGameV2SplitDepth: 30,

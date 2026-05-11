@@ -8,7 +8,6 @@ import "../setup/FeatureFlags.sol";
 // Libraries
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Chains } from "scripts/libraries/Chains.sol";
-import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
@@ -20,6 +19,8 @@ import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.so
 
 contract DeployImplementations_Test is Test, FeatureFlags {
     using stdStorage for StdStorage;
+
+    uint256 internal constant STANDARD_MIPS_VERSION = 8;
 
     DeployImplementations deployImplementations;
 
@@ -169,7 +170,7 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             uint256(_challengePeriodSeconds),
             _proofMaturityDelaySeconds,
             _disputeGameFinalityDelaySeconds,
-            StandardConstants.MIPS_VERSION, // mipsVersion
+            STANDARD_MIPS_VERSION, // mipsVersion
             _devFeatureBitmap, // devFeatureBitmap (fuzzed)
             _faultGameV2MaxGameDepth, // faultGameV2MaxGameDepth (bounded)
             _faultGameV2SplitDepth, // faultGameV2SplitDepth (bounded)
@@ -387,7 +388,7 @@ contract DeployImplementations_Test is Test, FeatureFlags {
             challengePeriodSeconds,
             proofMaturityDelaySeconds,
             disputeGameFinalityDelaySeconds,
-            StandardConstants.MIPS_VERSION, // mipsVersion
+            STANDARD_MIPS_VERSION, // mipsVersion
             devFeatureBitmap,
             73, // faultGameV2MaxGameDepth
             30, // faultGameV2SplitDepth

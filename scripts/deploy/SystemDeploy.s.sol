@@ -7,7 +7,6 @@ import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { Chains } from "scripts/libraries/Chains.sol";
 import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
 import { Deployer } from "scripts/deploy/Deployer.sol";
-import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { StateDiff } from "scripts/libraries/StateDiff.sol";
@@ -52,6 +51,8 @@ import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 /// @title SystemDeploy
 /// @notice Script-level API for deploying or upgrading a complete OP Stack L1 system.
 contract SystemDeploy is Deployer {
+    uint256 internal constant STANDARD_MIPS_VERSION = 8;
+
     struct SuperchainInput {
         address guardian;
         address incidentResponder;
@@ -266,7 +267,7 @@ contract SystemDeploy is Deployer {
             challengePeriodSeconds: cfg.preimageOracleChallengePeriod(),
             proofMaturityDelaySeconds: cfg.proofMaturityDelaySeconds(),
             disputeGameFinalityDelaySeconds: cfg.disputeGameFinalityDelaySeconds(),
-            mipsVersion: StandardConstants.MIPS_VERSION,
+            mipsVersion: STANDARD_MIPS_VERSION,
             devFeatureBitmap: cfg.devFeatureBitmap(),
             faultGameV2MaxGameDepth: cfg.faultGameV2MaxGameDepth(),
             faultGameV2SplitDepth: cfg.faultGameV2SplitDepth(),
