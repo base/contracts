@@ -3,11 +3,15 @@ pragma solidity 0.8.15;
 
 import { VmSafe } from "lib/forge-std/src/Vm.sol";
 import { console2 as console } from "lib/forge-std/src/console2.sol";
+import { Script } from "lib/forge-std/src/Script.sol";
 
+import { Artifacts } from "scripts/Artifacts.s.sol";
 import { Chains } from "scripts/libraries/Chains.sol";
+import { Config } from "scripts/libraries/Config.sol";
+import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
 import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
-import { Deployer } from "scripts/deploy/Deployer.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
+import { Process } from "scripts/libraries/Process.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { StateDiff } from "scripts/libraries/StateDiff.sol";
 import { Types } from "scripts/libraries/Types.sol";
@@ -50,7 +54,13 @@ import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 
 /// @title SystemDeploy
 /// @notice Script-level API for deploying or upgrading a complete OP Stack L1 system.
-contract SystemDeploy is Deployer {
+contract SystemDeploy is Script {
+    DeployConfig public constant cfg =
+        DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
+
+    Artifacts internal constant artifacts =
+        Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
+
     uint256 internal constant STANDARD_MIPS_VERSION = 8;
 
     struct SuperchainInput {
@@ -135,6 +145,22 @@ contract SystemDeploy is Deployer {
     error SuperchainConfigNeedsUpgrade(uint256 index);
 
     bytes32 internal constant _SALT = keccak256("op-stack-contract-impls-salt-v0");
+
+    /// @notice Sets up the shared deployment config and artifact registry.
+    function setUp() public virtual {
+        DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(artifacts), _cname: "Artifacts" });
+        artifacts.setUp();
+
+        console.log("Commit hash: %s", gitCommitHash());
+
+        DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
+        cfg.read(Config.deployConfigPath());
+    }
+
+    /// @notice Returns the commit hash of HEAD, or the packaged .gitcommit file when no git repository is available.
+    function gitCommitHash() internal returns (string memory) {
+        return Process.bash("cast abi-encode 'f(string)' $(git rev-parse HEAD || cat .gitcommit)");
+    }
 
     /// @notice Records the deployment state diff to `snapshots/state-diff/<chainid>.json`.
     modifier stateDiff() {

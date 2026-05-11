@@ -2,12 +2,14 @@
 pragma solidity ^0.8.0;
 
 import { console2 as console } from "lib/forge-std/src/console2.sol";
+import { Script } from "lib/forge-std/src/Script.sol";
 import { StdAssertions } from "lib/forge-std/src/StdAssertions.sol";
 
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 
 // Scripts
-import { Deployer } from "scripts/deploy/Deployer.sol";
+import { Artifacts } from "scripts/Artifacts.s.sol";
+import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
 import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
 
@@ -40,7 +42,13 @@ import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 ///         `forkSystemAddresses`.
 ///         This contract must not have constructor logic because it is set into state using `etch`.
 
-contract ForkLive is Deployer, StdAssertions, FeatureFlags {
+contract ForkLive is Script, StdAssertions, FeatureFlags {
+    DeployConfig internal constant cfg =
+        DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
+
+    Artifacts internal constant artifacts =
+        Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
+
     bool public useOpsRepo;
 
     struct SystemAddresses {

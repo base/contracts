@@ -76,7 +76,7 @@ abstract contract Setup is FeatureFlags {
     ForkLive internal constant forkLive =
         ForkLive(address(uint160(uint256(keccak256(abi.encode("optimism.forklive"))))));
 
-    /// @notice The address of the Artifacts contract. Set into state by Deployer.setUp() with `etch` to avoid
+    /// @notice The address of the Artifacts contract. Set into state by SystemDeploy.setUp() with `etch` to avoid
     ///         mutating any nonces. MUST not have constructor logic.
     Artifacts public constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
@@ -166,7 +166,6 @@ abstract contract Setup is FeatureFlags {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(forkLive), _cname: "ForkLive" });
 
         deploy.setUp();
-        forkLive.setUp();
 
         deploy.cfg().setDevFeatureBitmap(devFeatureBitmap);
 
