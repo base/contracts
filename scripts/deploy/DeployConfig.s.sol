@@ -85,7 +85,11 @@ contract DeployConfig is Script {
     address public chainFeesRecipient;
     address public l1FeesDepositor;
 
+    bytes32 internal _l1StartingBlockTagCache;
+    bool internal _l1StartingBlockTagCached;
+
     function read(string memory _path) public {
+        _l1StartingBlockTagCached = false;
         console.log("DeployConfig: reading file %s", _path);
         try vm.readFile(_path) returns (string memory data_) {
             _json = data_;
@@ -168,16 +172,31 @@ contract DeployConfig is Script {
     }
 
     function l1StartingBlockTag() public returns (bytes32) {
+        if (_l1StartingBlockTagCached) return _l1StartingBlockTagCache;
+
+        bytes32 result;
+        bool resolved;
         try vm.parseJsonBytes32(_json, "$.l1StartingBlockTag") returns (bytes32 tag_) {
-            return tag_;
+            result = tag_;
+            resolved = true;
         } catch { }
-        try vm.parseJsonString(_json, "$.l1StartingBlockTag") returns (string memory tag_) {
-            return _getBlockByTag(tag_);
-        } catch { }
-        try vm.parseJsonUint(_json, "$.l1StartingBlockTag") returns (uint256 tag_) {
-            return _getBlockByTag(vm.toString(tag_));
-        } catch { }
-        revert("DeployConfig: l1StartingBlockTag missing or not a bytes32/string/uint256");
+        if (!resolved) {
+            try vm.parseJsonString(_json, "$.l1StartingBlockTag") returns (string memory tag_) {
+                result = _getBlockByTag(tag_);
+                resolved = true;
+            } catch { }
+        }
+        if (!resolved) {
+            try vm.parseJsonUint(_json, "$.l1StartingBlockTag") returns (uint256 tag_) {
+                result = _getBlockByTag(vm.toString(tag_));
+                resolved = true;
+            } catch { }
+        }
+        require(resolved, "DeployConfig: l1StartingBlockTag missing or not a bytes32/string/uint256");
+
+        _l1StartingBlockTagCache = result;
+        _l1StartingBlockTagCached = true;
+        return result;
     }
 
     function l2OutputOracleStartingTimestamp() public returns (uint256) {
