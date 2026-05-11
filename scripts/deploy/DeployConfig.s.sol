@@ -147,6 +147,7 @@ contract DeployConfig is Script {
         useInterop = _json.readBoolOr("$.useInterop", false);
         devFeatureBitmap = _json.readBytes32Or("$.devFeatureBitmap", bytes32(0));
         chainFeesRecipient = _json.readAddressOr("$.chainFeesRecipient", address(0));
+        l1FeesDepositor = _json.readAddressOr("$.l1FeesDepositor", address(0));
         faultGameV2MaxGameDepth = _json.readUintOr("$.faultGameV2MaxGameDepth", 73);
         faultGameV2SplitDepth = _json.readUintOr("$.faultGameV2SplitDepth", 30);
         faultGameV2ClockExtension = _json.readUintOr("$.faultGameV2ClockExtension", 10800);
