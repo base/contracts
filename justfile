@@ -50,7 +50,7 @@ forge-build *ARGS:
   @# - Providing a signature/args is not required for compilation; compilation happens before
   @#   argument validation and before execution. We still use `--skip-simulation` to guarantee
   @#   nothing runs in any case.
-  @forge script "scripts/deploy/Deploy.s.sol" \
+  @forge script "scripts/deploy/SystemDeploy.s.sol:SystemDeploy" \
     --skip "/**/test/**" \
     --sig "idonotexist()" \
     --skip-simulation \

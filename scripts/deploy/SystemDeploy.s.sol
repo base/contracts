@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Script } from "lib/forge-std/src/Script.sol";
+import { VmSafe } from "lib/forge-std/src/Vm.sol";
+import { console2 as console } from "lib/forge-std/src/console2.sol";
 
-import { Artifacts } from "scripts/Artifacts.s.sol";
 import { Chains } from "scripts/libraries/Chains.sol";
 import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
 import { DeploySuperchain } from "scripts/deploy/DeploySuperchain.s.sol";
+import { Deployer } from "scripts/deploy/Deployer.sol";
+import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
+import { StateDiff } from "scripts/libraries/StateDiff.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
 import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
@@ -39,18 +42,16 @@ import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { SemverComp } from "src/libraries/SemverComp.sol";
-import { Claim, Duration, GameType, GameTypes, Proposal } from "src/libraries/bridge/Types.sol";
+import { Claim, Duration, GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 
 /// @title SystemDeploy
 /// @notice Script-level API for deploying or upgrading a complete OP Stack L1 system.
-contract SystemDeploy is Script {
-    Artifacts internal constant artifacts =
-        Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
-
+contract SystemDeploy is Deployer {
     struct DeployInput {
         bool deploySuperchain;
         bool deployImplementations;
@@ -121,6 +122,196 @@ contract SystemDeploy is Script {
     error SuperchainConfigNeedsUpgrade(uint256 index);
 
     bytes32 internal constant _SALT = keccak256("op-stack-contract-impls-salt-v0");
+
+    /// @notice Records the deployment state diff to `snapshots/state-diff/<chainid>.json`.
+    modifier stateDiff() {
+        vm.startStateDiffRecording();
+        _;
+        VmSafe.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
+        console.log(
+            "Writing %d state diff account accesses to snapshots/state-diff/%s.json",
+            accesses.length,
+            vm.toString(block.chainid)
+        );
+        string memory json = StateDiff.encodeAccountAccesses(accesses);
+        string memory statediffPath =
+            string.concat(vm.projectRoot(), "/snapshots/state-diff/", vm.toString(block.chainid), ".json");
+        vm.writeJson({ json: json, path: statediffPath });
+    }
+
+    /// @notice Deploys a fresh OP Stack from the active deploy config.
+    function run() public {
+        console.log("Deploying a fresh OP Stack including SuperchainConfig");
+        _runConfigured();
+    }
+
+    /// @notice Deploys a fresh OP Stack and writes the state diff for Kontrol summaries.
+    function runWithStateDiff() public stateDiff {
+        _runConfigured();
+    }
+
+    /// @notice Deploys implementation contracts from the active deploy config and saves their artifact names.
+    function deployImplementations(bool _isInterop) public returns (ImplementationOutput memory output_) {
+        require(_isInterop == cfg.useInterop(), "SystemDeploy: Interop setting mismatch.");
+
+        ISuperchainConfig superchainConfigProxy = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
+        IProxyAdmin superchainProxyAdmin = _erc1967Admin(address(superchainConfigProxy));
+
+        output_ = _deployImplementations(_configuredImplementationsInput(superchainConfigProxy, superchainProxyAdmin));
+        _saveUpgradeArtifacts(output_.implementations);
+        _saveIfSet("PreimageOracle", address(output_.preimageOracleSingleton));
+    }
+
+    /// @notice Returns the latest implementation set saved by `deployImplementations` or `run`.
+    function getImplementations() public view returns (Types.Implementations memory) {
+        return Types.Implementations({
+            superchainConfigImpl: artifacts.mustGetAddress("SuperchainConfigImpl"),
+            l1ERC721BridgeImpl: artifacts.mustGetAddress("L1ERC721BridgeImpl"),
+            optimismPortalImpl: artifacts.mustGetAddress("OptimismPortalImpl"),
+            ethLockboxImpl: artifacts.mustGetAddress("ETHLockboxImpl"),
+            systemConfigImpl: artifacts.mustGetAddress("SystemConfigImpl"),
+            optimismMintableERC20FactoryImpl: artifacts.mustGetAddress("OptimismMintableERC20FactoryImpl"),
+            l1CrossDomainMessengerImpl: artifacts.mustGetAddress("L1CrossDomainMessengerImpl"),
+            l1StandardBridgeImpl: artifacts.mustGetAddress("L1StandardBridgeImpl"),
+            disputeGameFactoryImpl: artifacts.mustGetAddress("DisputeGameFactoryImpl"),
+            anchorStateRegistryImpl: artifacts.mustGetAddress("AnchorStateRegistryImpl"),
+            delayedWETHImpl: artifacts.mustGetAddress("DelayedWETHImpl"),
+            mipsImpl: artifacts.mustGetAddress("MipsSingleton"),
+            faultDisputeGameV2Impl: artifacts.mustGetAddress("FaultDisputeGame"),
+            permissionedDisputeGameV2Impl: artifacts.mustGetAddress("PermissionedDisputeGame"),
+            aggregateVerifierImpl: artifacts.getAddress("AggregateVerifier"),
+            teeProverRegistryImpl: artifacts.getAddress("TEEProverRegistryImpl"),
+            teeVerifierImpl: artifacts.getAddress("TEEVerifier"),
+            zkVerifierImpl: artifacts.getAddress("ZKVerifier")
+        });
+    }
+
+    function _runConfigured() internal returns (DeployOutput memory output_) {
+        output_ = deploy(_deployInput());
+
+        vm.startPrank(ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy")).guardian());
+        IAnchorStateRegistry(artifacts.mustGetAddress("AnchorStateRegistryProxy"))
+            .setRespectedGameType(GameType.wrap(uint32(cfg.respectedGameType())));
+        vm.stopPrank();
+
+        console.log("set up op chain!");
+    }
+
+    function _deployInput() internal view returns (DeployInput memory input_) {
+        input_ = DeployInput({
+            deploySuperchain: true,
+            deployImplementations: true,
+            saveArtifacts: true,
+            superchainInput: DeploySuperchain.Input({
+                guardian: cfg.superchainConfigGuardian(),
+                incidentResponder: cfg.superchainConfigIncidentResponder(),
+                superchainProxyAdminOwner: cfg.finalSystemOwner(),
+                paused: false
+            }),
+            superchainConfigProxy: ISuperchainConfig(address(0)),
+            implementationsInput: _configuredImplementationsInput(
+                ISuperchainConfig(address(0)), IProxyAdmin(address(0))
+            ),
+            implementations: Types.Implementations({
+                superchainConfigImpl: address(0),
+                l1ERC721BridgeImpl: address(0),
+                optimismPortalImpl: address(0),
+                ethLockboxImpl: address(0),
+                systemConfigImpl: address(0),
+                optimismMintableERC20FactoryImpl: address(0),
+                l1CrossDomainMessengerImpl: address(0),
+                l1StandardBridgeImpl: address(0),
+                disputeGameFactoryImpl: address(0),
+                anchorStateRegistryImpl: address(0),
+                delayedWETHImpl: address(0),
+                mipsImpl: address(0),
+                faultDisputeGameV2Impl: address(0),
+                permissionedDisputeGameV2Impl: address(0),
+                aggregateVerifierImpl: address(0),
+                teeProverRegistryImpl: address(0),
+                teeVerifierImpl: address(0),
+                zkVerifierImpl: address(0)
+            }),
+            opChainInput: _configuredOPChainInput()
+        });
+    }
+
+    function _configuredImplementationsInput(
+        ISuperchainConfig _superchainConfigProxy,
+        IProxyAdmin _superchainProxyAdmin
+    )
+        internal
+        view
+        returns (DeployImplementations.Input memory input_)
+    {
+        input_ = DeployImplementations.Input({
+            withdrawalDelaySeconds: cfg.faultGameWithdrawalDelay(),
+            minProposalSizeBytes: cfg.preimageOracleMinProposalSize(),
+            challengePeriodSeconds: cfg.preimageOracleChallengePeriod(),
+            proofMaturityDelaySeconds: cfg.proofMaturityDelaySeconds(),
+            disputeGameFinalityDelaySeconds: cfg.disputeGameFinalityDelaySeconds(),
+            mipsVersion: StandardConstants.MIPS_VERSION,
+            devFeatureBitmap: cfg.devFeatureBitmap(),
+            faultGameV2MaxGameDepth: cfg.faultGameV2MaxGameDepth(),
+            faultGameV2SplitDepth: cfg.faultGameV2SplitDepth(),
+            faultGameV2ClockExtension: cfg.faultGameV2ClockExtension(),
+            faultGameV2MaxClockDuration: cfg.faultGameV2MaxClockDuration(),
+            teeImageHash: cfg.teeImageHash(),
+            zkRangeHash: cfg.zkRangeHash(),
+            zkAggregationHash: cfg.zkAggregationHash(),
+            multiproofConfigHash: cfg.multiproofConfigHash(),
+            multiproofGameType: cfg.multiproofGameType(),
+            nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
+            l2ChainID: cfg.l2ChainID(),
+            multiproofBlockInterval: cfg.multiproofBlockInterval(),
+            multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
+            sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
+            teeProposer: cfg.teeProposer(),
+            teeChallenger: cfg.teeChallenger(),
+            superchainConfigProxy: _superchainConfigProxy,
+            superchainProxyAdmin: _superchainProxyAdmin,
+            l1ProxyAdminOwner: address(_superchainProxyAdmin) == address(0)
+                ? address(0)
+                : _superchainProxyAdmin.owner(),
+            challenger: cfg.l2OutputOracleChallenger(),
+            guardian: cfg.superchainConfigGuardian(),
+            incidentResponder: cfg.superchainConfigIncidentResponder()
+        });
+    }
+
+    function _configuredOPChainInput() internal view returns (Types.DeployInput memory input_) {
+        input_ = Types.DeployInput({
+            roles: Types.Roles({
+                opChainProxyAdminOwner: cfg.finalSystemOwner(),
+                systemConfigOwner: cfg.finalSystemOwner(),
+                batcher: cfg.batchSenderAddress(),
+                unsafeBlockSigner: cfg.p2pSequencerAddress(),
+                proposer: cfg.l2OutputOracleProposer(),
+                challenger: cfg.l2OutputOracleChallenger()
+            }),
+            basefeeScalar: cfg.basefeeScalar(),
+            blobBasefeeScalar: cfg.blobbasefeeScalar(),
+            l2ChainId: cfg.l2ChainID(),
+            startingAnchorRoot: abi.encode(
+                Proposal({
+                    root: Hash.wrap(cfg.faultGameGenesisOutputRoot()), l2SequenceNumber: cfg.faultGameGenesisBlock()
+                })
+            ),
+            saltMixer: "salt mixer",
+            gasLimit: uint64(cfg.l2GenesisBlockGasLimit()),
+            disputeGameType: GameTypes.PERMISSIONED_CANNON,
+            disputeAbsolutePrestate: Claim.wrap(bytes32(cfg.faultGameAbsolutePrestate())),
+            disputeMaxGameDepth: cfg.faultGameMaxDepth(),
+            disputeSplitDepth: cfg.faultGameSplitDepth(),
+            disputeClockExtension: Duration.wrap(uint64(cfg.faultGameClockExtension())),
+            disputeMaxClockDuration: Duration.wrap(uint64(cfg.faultGameMaxClockDuration()))
+        });
+    }
+
+    function _erc1967Admin(address _proxy) internal view returns (IProxyAdmin) {
+        bytes32 adminSlot = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
+        return IProxyAdmin(address(uint160(uint256(vm.load(_proxy, adminSlot)))));
+    }
 
     function deploy(DeployInput memory _input) public returns (DeployOutput memory output_) {
         _assertValidDeployInput(_input);
