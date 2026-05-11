@@ -5,7 +5,6 @@ import { Script } from "lib/forge-std/src/Script.sol";
 import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { stdJson } from "lib/forge-std/src/StdJson.sol";
 import { Process } from "scripts/libraries/Process.sol";
-import { Config, Fork, ForkUtils } from "scripts/libraries/Config.sol";
 
 /// @title DeployConfig
 /// @notice Represents the configuration required to deploy the system. It is expected
@@ -13,10 +12,6 @@ import { Config, Fork, ForkUtils } from "scripts/libraries/Config.sol";
 ///         values if they are not defined in the JSON themselves.
 contract DeployConfig is Script {
     using stdJson for string;
-    using ForkUtils for Fork;
-
-    /// @notice Represents an unset offset value, as opposed to 0, which denotes no-offset.
-    uint256 constant NULL_OFFSET = type(uint256).max;
 
     string internal _json;
 
@@ -25,12 +20,6 @@ contract DeployConfig is Script {
     address public superchainConfigIncidentResponder;
     uint256 public l1ChainID;
     uint256 public l2ChainID;
-    uint256 public l2GenesisDeltaTimeOffset;
-    uint256 public l2GenesisEcotoneTimeOffset;
-    uint256 public l2GenesisFjordTimeOffset;
-    uint256 public l2GenesisGraniteTimeOffset;
-    uint256 public l2GenesisHoloceneTimeOffset;
-    uint256 public l2GenesisJovianTimeOffset;
     address public p2pSequencerAddress;
     address public batchInboxAddress;
     address public batchSenderAddress;
@@ -71,11 +60,6 @@ contract DeployConfig is Script {
     uint256 public proofMaturityDelaySeconds;
     uint256 public disputeGameFinalityDelaySeconds;
     uint256 public respectedGameType;
-    string public daCommitmentType;
-    uint256 public daChallengeWindow;
-    uint256 public daResolveWindow;
-    uint256 public daBondSize;
-    uint256 public daResolverRefundPercentage;
 
     // V2 Dispute Game Configuration
     uint256 public faultGameV2MaxGameDepth;
@@ -97,14 +81,6 @@ contract DeployConfig is Script {
     uint256 public multiproofBlockInterval;
     uint256 public multiproofIntermediateBlockInterval;
     address public sp1Verifier;
-
-    // RISC Zero / NitroEnclaveVerifier Configuration (reference values; DeployRiscZeroStack takes these as CLI args)
-    bytes32 public risc0SetBuilderImageId;
-    bytes32 public nitroRootCert;
-    bytes32 public nitroVerifierId;
-    bytes32 public nitroVerifierProofId;
-    address public nitroProofSubmitter;
-    address public risc0VerifierRouter;
 
     bool public useInterop;
     bool public useUpgradedFork;
@@ -129,13 +105,6 @@ contract DeployConfig is Script {
         superchainConfigIncidentResponder = _readOr(_json, "$.superchainConfigIncidentResponder", address(0));
         l1ChainID = stdJson.readUint(_json, "$.l1ChainID");
         l2ChainID = stdJson.readUint(_json, "$.l2ChainID");
-
-        l2GenesisDeltaTimeOffset = _readOr(_json, "$.l2GenesisDeltaTimeOffset", NULL_OFFSET);
-        l2GenesisEcotoneTimeOffset = _readOr(_json, "$.l2GenesisEcotoneTimeOffset", NULL_OFFSET);
-        l2GenesisFjordTimeOffset = _readOr(_json, "$.l2GenesisFjordTimeOffset", NULL_OFFSET);
-        l2GenesisGraniteTimeOffset = _readOr(_json, "$.l2GenesisGraniteTimeOffset", NULL_OFFSET);
-        l2GenesisHoloceneTimeOffset = _readOr(_json, "$.l2GenesisHoloceneTimeOffset", NULL_OFFSET);
-        l2GenesisJovianTimeOffset = _readOr(_json, "$.l2GenesisJovianTimeOffset", NULL_OFFSET);
 
         p2pSequencerAddress = stdJson.readAddress(_json, "$.p2pSequencerAddress");
         batchInboxAddress = stdJson.readAddress(_json, "$.batchInboxAddress");
@@ -182,15 +151,8 @@ contract DeployConfig is Script {
         preimageOracleMinProposalSize = stdJson.readUint(_json, "$.preimageOracleMinProposalSize");
         preimageOracleChallengePeriod = stdJson.readUint(_json, "$.preimageOracleChallengePeriod");
 
-        daCommitmentType = _readOr(_json, "$.daCommitmentType", "KeccakCommitment");
-        daChallengeWindow = _readOr(_json, "$.daChallengeWindow", 1000);
-        daResolveWindow = _readOr(_json, "$.daResolveWindow", 1000);
-        daBondSize = _readOr(_json, "$.daBondSize", 1000000000);
-        daResolverRefundPercentage = _readOr(_json, "$.daResolverRefundPercentage", 0);
-
         useInterop = _readOr(_json, "$.useInterop", false);
         devFeatureBitmap = bytes32(_readOr(_json, "$.devFeatureBitmap", 0));
-        useUpgradedFork;
         useRevenueShare = _readOr(_json, "$.useRevenueShare", false);
         chainFeesRecipient = _readOr(_json, "$.chainFeesRecipient", address(0));
         faultGameV2MaxGameDepth = _readOr(_json, "$.faultGameV2MaxGameDepth", 73);
@@ -210,25 +172,6 @@ contract DeployConfig is Script {
         multiproofBlockInterval = _readOr(_json, "$.multiproofBlockInterval", 100);
         multiproofIntermediateBlockInterval = _readOr(_json, "$.multiproofIntermediateBlockInterval", 10);
         sp1Verifier = _readOr(_json, "$.sp1Verifier", address(0));
-
-        risc0SetBuilderImageId = bytes32(_readOr(_json, "$.risc0SetBuilderImageId", 0));
-        nitroRootCert = bytes32(_readOr(_json, "$.nitroRootCert", 0));
-        nitroVerifierId = bytes32(_readOr(_json, "$.nitroVerifierId", 0));
-        nitroVerifierProofId = bytes32(_readOr(_json, "$.nitroVerifierProofId", 0));
-        nitroProofSubmitter = _readOr(_json, "$.nitroProofSubmitter", address(0));
-        risc0VerifierRouter = _readOr(_json, "$.risc0VerifierRouter", address(0));
-    }
-
-    function fork() public view returns (Fork fork_) {
-        // let env var take precedence
-        fork_ = Config.fork();
-        if (fork_ == Fork.NONE) {
-            // Will revert if no deploy config can be found either.
-            fork_ = latestGenesisFork();
-            console.log("DeployConfig: using deploy config fork: %s", fork_.toString());
-        } else {
-            console.log("DeployConfig: using env var fork: %s", fork_.toString());
-        }
     }
 
     function l1StartingBlockTag() public returns (bytes32) {
@@ -278,11 +221,6 @@ contract DeployConfig is Script {
         chainFeesRecipient = _chainFeesRecipient;
     }
 
-    /// @notice Allow the `fundDevAccounts` config to be overridden.
-    function setFundDevAccounts(bool _fundDevAccounts) public {
-        fundDevAccounts = _fundDevAccounts;
-    }
-
     /// @notice Allow the `devFeatureBitmap` config to be overridden in testing environments
     function setDevFeatureBitmap(bytes32 _devFeatureBitmap) public {
         devFeatureBitmap = _devFeatureBitmap;
@@ -297,43 +235,6 @@ contract DeployConfig is Script {
     ///      system be deployed in setUp().
     function setUseUpgradedFork(bool _useUpgradedFork) public {
         useUpgradedFork = _useUpgradedFork;
-    }
-
-    /// @notice Allow the `baseFeeVaultWithdrawalNetwork` config to be overridden in testing environments
-    function setBaseFeeVaultWithdrawalNetwork(uint256 _baseFeeVaultWithdrawalNetwork) public {
-        baseFeeVaultWithdrawalNetwork = _baseFeeVaultWithdrawalNetwork;
-    }
-
-    /// @notice Allow the `l1FeeVaultWithdrawalNetwork` config to be overridden in testing environments
-    function setL1FeeVaultWithdrawalNetwork(uint256 _l1FeeVaultWithdrawalNetwork) public {
-        l1FeeVaultWithdrawalNetwork = _l1FeeVaultWithdrawalNetwork;
-    }
-
-    /// @notice Allow the `sequencerFeeVaultWithdrawalNetwork` config to be overridden in testing environments
-    function setSequencerFeeVaultWithdrawalNetwork(uint256 _sequencerFeeVaultWithdrawalNetwork) public {
-        sequencerFeeVaultWithdrawalNetwork = _sequencerFeeVaultWithdrawalNetwork;
-    }
-
-    /// @notice Allow the `operatorFeeVaultWithdrawalNetwork` config to be overridden in testing environments
-    function setOperatorFeeVaultWithdrawalNetwork(uint256 _operatorFeeVaultWithdrawalNetwork) public {
-        operatorFeeVaultWithdrawalNetwork = _operatorFeeVaultWithdrawalNetwork;
-    }
-
-    function latestGenesisFork() internal view returns (Fork) {
-        if (l2GenesisJovianTimeOffset == 0) {
-            return Fork.JOVIAN;
-        } else if (l2GenesisHoloceneTimeOffset == 0) {
-            return Fork.HOLOCENE;
-        } else if (l2GenesisGraniteTimeOffset == 0) {
-            return Fork.GRANITE;
-        } else if (l2GenesisFjordTimeOffset == 0) {
-            return Fork.FJORD;
-        } else if (l2GenesisEcotoneTimeOffset == 0) {
-            return Fork.ECOTONE;
-        } else if (l2GenesisDeltaTimeOffset == 0) {
-            return Fork.DELTA;
-        }
-        revert("DeployConfig: no supported fork active at genesis");
     }
 
     function _getBlockByTag(string memory _tag) internal returns (bytes32) {
@@ -365,17 +266,5 @@ contract DeployConfig is Script {
     function _isNull(string memory _jsonInp, string memory _key) internal pure returns (bool) {
         string memory value = _jsonInp.readString(_key);
         return (keccak256(bytes(value)) == keccak256(bytes("null")));
-    }
-
-    function _readOr(
-        string memory _jsonInp,
-        string memory _key,
-        string memory _defaultValue
-    )
-        internal
-        view
-        returns (string memory)
-    {
-        return _jsonInp.readStringOr(_key, _defaultValue);
     }
 }
