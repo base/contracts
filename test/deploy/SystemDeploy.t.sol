@@ -4,7 +4,6 @@ pragma solidity 0.8.15;
 import { Test } from "lib/forge-std/src/Test.sol";
 
 import { Artifacts } from "scripts/Artifacts.s.sol";
-import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
 import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Types } from "scripts/libraries/Types.sol";
 import { StandardSystemAssertions } from "test/setup/StandardSystemAssertions.sol";
@@ -278,7 +277,7 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
         input_.superchainInput = SystemDeploy.SuperchainInput({
             guardian: guardian, incidentResponder: incidentResponder, superchainProxyAdminOwner: owner
         });
-        input_.implementationsInput = DeployImplementations.Input({
+        input_.implementationsInput = SystemDeploy.ImplementationInput({
             withdrawalDelaySeconds: 100,
             minProposalSizeBytes: 200,
             challengePeriodSeconds: 300,

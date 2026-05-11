@@ -9,7 +9,6 @@ import { Artifacts } from "scripts/Artifacts.s.sol";
 import { Chains } from "scripts/libraries/Chains.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
-import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Process } from "scripts/libraries/Process.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
@@ -75,13 +74,45 @@ contract SystemDeploy is Script {
         IProxyAdmin superchainProxyAdmin;
     }
 
+    struct ImplementationInput {
+        uint256 withdrawalDelaySeconds;
+        uint256 minProposalSizeBytes;
+        uint256 challengePeriodSeconds;
+        uint256 proofMaturityDelaySeconds;
+        uint256 disputeGameFinalityDelaySeconds;
+        uint256 mipsVersion;
+        bytes32 devFeatureBitmap;
+        uint256 faultGameV2MaxGameDepth;
+        uint256 faultGameV2SplitDepth;
+        uint256 faultGameV2ClockExtension;
+        uint256 faultGameV2MaxClockDuration;
+        bytes32 teeImageHash;
+        bytes32 zkRangeHash;
+        bytes32 zkAggregationHash;
+        bytes32 multiproofConfigHash;
+        uint256 multiproofGameType;
+        address nitroEnclaveVerifier;
+        uint256 l2ChainID;
+        uint256 multiproofBlockInterval;
+        uint256 multiproofIntermediateBlockInterval;
+        ISP1Verifier sp1Verifier;
+        address teeProposer;
+        address teeChallenger;
+        ISuperchainConfig superchainConfigProxy;
+        IProxyAdmin superchainProxyAdmin;
+        address l1ProxyAdminOwner;
+        address challenger;
+        address guardian;
+        address incidentResponder;
+    }
+
     struct DeployInput {
         bool deploySuperchain;
         bool deployImplementations;
         bool saveArtifacts;
         SuperchainInput superchainInput;
         ISuperchainConfig superchainConfigProxy;
-        DeployImplementations.Input implementationsInput;
+        ImplementationInput implementationsInput;
         Types.Implementations implementations;
         Types.DeployInput opChainInput;
     }
@@ -285,9 +316,9 @@ contract SystemDeploy is Script {
     )
         internal
         view
-        returns (DeployImplementations.Input memory input_)
+        returns (ImplementationInput memory input_)
     {
-        input_ = DeployImplementations.Input({
+        input_ = ImplementationInput({
             withdrawalDelaySeconds: cfg.faultGameWithdrawalDelay(),
             minProposalSizeBytes: cfg.preimageOracleMinProposalSize(),
             challengePeriodSeconds: cfg.preimageOracleChallengePeriod(),
@@ -427,7 +458,7 @@ contract SystemDeploy is Script {
     )
         internal
         view
-        returns (DeployImplementations.Input memory input_)
+        returns (ImplementationInput memory input_)
     {
         input_ = _input.implementationsInput;
         input_.superchainConfigProxy = _superchain.superchainConfigProxy;
@@ -521,7 +552,7 @@ contract SystemDeploy is Script {
         require(_output.superchainConfigImpl.guardian() == _input.guardian, "SUPCON-50");
     }
 
-    function _deployImplementations(DeployImplementations.Input memory _input)
+    function _deployImplementations(ImplementationInput memory _input)
         internal
         returns (ImplementationOutput memory output_)
     {
@@ -560,7 +591,7 @@ contract SystemDeploy is Script {
         Types.DeployInput memory _input,
         ISuperchainConfig _superchainConfig,
         Types.Implementations memory _impls,
-        DeployImplementations.Input memory _implementationsInput
+        ImplementationInput memory _implementationsInput
     )
         internal
         returns (Types.DeployOutput memory output_, Types.Implementations memory impls_)
@@ -1080,10 +1111,7 @@ contract SystemDeploy is Script {
         IAddressManager(_target).transferOwnership(_newOwner);
     }
 
-    function _deploySuperchainConfigImpl(DeployImplementations.Input memory _input)
-        internal
-        returns (ISuperchainConfig)
-    {
+    function _deploySuperchainConfigImpl(ImplementationInput memory _input) internal returns (ISuperchainConfig) {
         return _deploySuperchainConfigImpl(_input.guardian, _input.incidentResponder);
     }
 
@@ -1155,7 +1183,7 @@ contract SystemDeploy is Script {
         );
     }
 
-    function _deployOptimismPortalImpl(DeployImplementations.Input memory _input) internal returns (IOptimismPortal) {
+    function _deployOptimismPortalImpl(ImplementationInput memory _input) internal returns (IOptimismPortal) {
         return IOptimismPortal(
             DeployUtils.createDeterministic({
                 _name: "OptimismPortal2",
@@ -1177,7 +1205,7 @@ contract SystemDeploy is Script {
         );
     }
 
-    function _deployDelayedWETHImpl(DeployImplementations.Input memory _input) internal returns (IDelayedWETH) {
+    function _deployDelayedWETHImpl(ImplementationInput memory _input) internal returns (IDelayedWETH) {
         return IDelayedWETH(
             DeployUtils.createDeterministic({
                 _name: "DelayedWETH",
@@ -1189,10 +1217,7 @@ contract SystemDeploy is Script {
         );
     }
 
-    function _deployPreimageOracleSingleton(DeployImplementations.Input memory _input)
-        internal
-        returns (IPreimageOracle)
-    {
+    function _deployPreimageOracleSingleton(ImplementationInput memory _input) internal returns (IPreimageOracle) {
         return IPreimageOracle(
             DeployUtils.createDeterministic({
                 _name: "PreimageOracle",
@@ -1207,7 +1232,7 @@ contract SystemDeploy is Script {
     }
 
     function _deployMipsSingleton(
-        DeployImplementations.Input memory _input,
+        ImplementationInput memory _input,
         IPreimageOracle _preimageOracle
     )
         internal
@@ -1238,10 +1263,7 @@ contract SystemDeploy is Script {
         );
     }
 
-    function _deployAnchorStateRegistryImpl(DeployImplementations.Input memory _input)
-        internal
-        returns (IAnchorStateRegistry)
-    {
+    function _deployAnchorStateRegistryImpl(ImplementationInput memory _input) internal returns (IAnchorStateRegistry) {
         return IAnchorStateRegistry(
             DeployUtils.createDeterministic({
                 _name: "AnchorStateRegistry",
@@ -1253,10 +1275,7 @@ contract SystemDeploy is Script {
         );
     }
 
-    function _deployFaultDisputeGameV2Impl(DeployImplementations.Input memory _input)
-        internal
-        returns (IFaultDisputeGameV2)
-    {
+    function _deployFaultDisputeGameV2Impl(ImplementationInput memory _input) internal returns (IFaultDisputeGameV2) {
         IFaultDisputeGameV2.GameConstructorParams memory params = _gameConstructorParams(_input);
         return IFaultDisputeGameV2(
             DeployUtils.createDeterministic({
@@ -1267,7 +1286,7 @@ contract SystemDeploy is Script {
         );
     }
 
-    function _deployPermissionedDisputeGameV2Impl(DeployImplementations.Input memory _input)
+    function _deployPermissionedDisputeGameV2Impl(ImplementationInput memory _input)
         internal
         returns (IPermissionedDisputeGameV2)
     {
@@ -1285,7 +1304,7 @@ contract SystemDeploy is Script {
 
     function _deployMultiproofContracts(
         Types.DeployInput memory _opChainInput,
-        DeployImplementations.Input memory _input,
+        ImplementationInput memory _input,
         Types.DeployOutput memory _output
     )
         internal
@@ -1380,7 +1399,7 @@ contract SystemDeploy is Script {
         );
     }
 
-    function _gameConstructorParams(DeployImplementations.Input memory _input)
+    function _gameConstructorParams(ImplementationInput memory _input)
         internal
         pure
         returns (IFaultDisputeGameV2.GameConstructorParams memory params_)
@@ -1494,7 +1513,7 @@ contract SystemDeploy is Script {
         }
     }
 
-    function _assertValidImplementationInput(DeployImplementations.Input memory _input) internal pure {
+    function _assertValidImplementationInput(ImplementationInput memory _input) internal pure {
         require(
             _input.faultGameV2MaxGameDepth > 0 && _input.faultGameV2MaxGameDepth <= 125,
             "SystemDeploy: faultGameV2MaxGameDepth out of range"
@@ -1537,13 +1556,13 @@ contract SystemDeploy is Script {
         require(_input.l1ProxyAdminOwner != address(0), "SystemDeploy: l1ProxyAdminOwner not set");
     }
 
-    function _multiproofEnabled(DeployImplementations.Input memory _input) internal pure returns (bool) {
+    function _multiproofEnabled(ImplementationInput memory _input) internal pure returns (bool) {
         return _input.multiproofConfigHash != bytes32(0);
     }
 
     function _assertValidMultiproofInput(
         Types.DeployInput memory _opChainInput,
-        DeployImplementations.Input memory _input
+        ImplementationInput memory _input
     )
         internal
         view
