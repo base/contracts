@@ -247,9 +247,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice Thrown when there are not enough proofs to resolve the game.
     error NotEnoughProofs();
 
-    /// @notice Thrown when the proof threshold is not positive.
-    error InvalidProofThreshold();
-
     /// @param gameType_ The game type.
     /// @param anchorStateRegistry_ The anchor state registry.
     /// @param delayedWETH The delayed WETH contract.

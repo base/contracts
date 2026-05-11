@@ -1013,11 +1013,6 @@
   },
   {
     "inputs": [],
-    "name": "InvalidProofThreshold",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "InvalidProofType",
     "type": "error"
   },
