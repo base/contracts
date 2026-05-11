@@ -7,9 +7,7 @@ import { stdJson } from "lib/forge-std/src/StdJson.sol";
 import { Process } from "scripts/libraries/Process.sol";
 
 /// @title DeployConfig
-/// @notice Represents the configuration required to deploy the system. It is expected
-///         to read the file from JSON. A future improvement would be to have fallback
-///         values if they are not defined in the JSON themselves.
+/// @notice Represents the configuration required to deploy the system, read from a JSON file.
 contract DeployConfig is Script {
     using stdJson for string;
 
@@ -61,13 +59,11 @@ contract DeployConfig is Script {
     uint256 public disputeGameFinalityDelaySeconds;
     uint256 public respectedGameType;
 
-    // V2 Dispute Game Configuration
     uint256 public faultGameV2MaxGameDepth;
     uint256 public faultGameV2SplitDepth;
     uint256 public faultGameV2ClockExtension;
     uint256 public faultGameV2MaxClockDuration;
 
-    // Multiproof Configuration
     bytes32 public teeImageHash;
     bytes32 public multiproofConfigHash;
     uint256 public multiproofGameType;
@@ -97,81 +93,81 @@ contract DeployConfig is Script {
         try vm.readFile(_path) returns (string memory data_) {
             _json = data_;
         } catch {
-            require(false, string.concat("DeployConfig: cannot find deploy config file at ", _path));
+            revert(string.concat("DeployConfig: cannot find deploy config file at ", _path));
         }
 
-        finalSystemOwner = stdJson.readAddress(_json, "$.finalSystemOwner");
-        superchainConfigGuardian = stdJson.readAddress(_json, "$.superchainConfigGuardian");
-        superchainConfigIncidentResponder = _readOr(_json, "$.superchainConfigIncidentResponder", address(0));
-        l1ChainID = stdJson.readUint(_json, "$.l1ChainID");
-        l2ChainID = stdJson.readUint(_json, "$.l2ChainID");
+        finalSystemOwner = _json.readAddress("$.finalSystemOwner");
+        superchainConfigGuardian = _json.readAddress("$.superchainConfigGuardian");
+        superchainConfigIncidentResponder = _json.readAddressOr("$.superchainConfigIncidentResponder", address(0));
+        l1ChainID = _json.readUint("$.l1ChainID");
+        l2ChainID = _json.readUint("$.l2ChainID");
 
-        p2pSequencerAddress = stdJson.readAddress(_json, "$.p2pSequencerAddress");
-        batchInboxAddress = stdJson.readAddress(_json, "$.batchInboxAddress");
-        batchSenderAddress = stdJson.readAddress(_json, "$.batchSenderAddress");
-        _l2OutputOracleStartingTimestamp = stdJson.readInt(_json, "$.l2OutputOracleStartingTimestamp");
-        l2OutputOracleStartingBlockNumber = stdJson.readUint(_json, "$.l2OutputOracleStartingBlockNumber");
-        l2OutputOracleProposer = stdJson.readAddress(_json, "$.l2OutputOracleProposer");
-        l2OutputOracleChallenger = stdJson.readAddress(_json, "$.l2OutputOracleChallenger");
-        fundDevAccounts = _readOr(_json, "$.fundDevAccounts", false);
-        proxyAdminOwner = stdJson.readAddress(_json, "$.proxyAdminOwner");
-        baseFeeVaultRecipient = stdJson.readAddress(_json, "$.baseFeeVaultRecipient");
-        baseFeeVaultMinimumWithdrawalAmount = stdJson.readUint(_json, "$.baseFeeVaultMinimumWithdrawalAmount");
-        baseFeeVaultWithdrawalNetwork = stdJson.readUint(_json, "$.baseFeeVaultWithdrawalNetwork");
-        l1FeeVaultRecipient = stdJson.readAddress(_json, "$.l1FeeVaultRecipient");
-        l1FeeVaultMinimumWithdrawalAmount = stdJson.readUint(_json, "$.l1FeeVaultMinimumWithdrawalAmount");
-        l1FeeVaultWithdrawalNetwork = stdJson.readUint(_json, "$.l1FeeVaultWithdrawalNetwork");
-        sequencerFeeVaultRecipient = stdJson.readAddress(_json, "$.sequencerFeeVaultRecipient");
-        sequencerFeeVaultMinimumWithdrawalAmount = stdJson.readUint(_json, "$.sequencerFeeVaultMinimumWithdrawalAmount");
-        sequencerFeeVaultWithdrawalNetwork = stdJson.readUint(_json, "$.sequencerFeeVaultWithdrawalNetwork");
-        operatorFeeVaultRecipient = stdJson.readAddress(_json, "$.operatorFeeVaultRecipient");
-        operatorFeeVaultMinimumWithdrawalAmount = stdJson.readUint(_json, "$.operatorFeeVaultMinimumWithdrawalAmount");
-        operatorFeeVaultWithdrawalNetwork = stdJson.readUint(_json, "$.operatorFeeVaultWithdrawalNetwork");
-        governanceTokenOwner = stdJson.readAddress(_json, "$.governanceTokenOwner");
-        l2GenesisBlockGasLimit = stdJson.readUint(_json, "$.l2GenesisBlockGasLimit");
-        basefeeScalar = uint32(_readOr(_json, "$.gasPriceOracleBaseFeeScalar", 1368));
-        blobbasefeeScalar = uint32(_readOr(_json, "$.gasPriceOracleBlobBaseFeeScalar", 810949));
+        p2pSequencerAddress = _json.readAddress("$.p2pSequencerAddress");
+        batchInboxAddress = _json.readAddress("$.batchInboxAddress");
+        batchSenderAddress = _json.readAddress("$.batchSenderAddress");
+        _l2OutputOracleStartingTimestamp = _json.readInt("$.l2OutputOracleStartingTimestamp");
+        l2OutputOracleStartingBlockNumber = _json.readUint("$.l2OutputOracleStartingBlockNumber");
+        l2OutputOracleProposer = _json.readAddress("$.l2OutputOracleProposer");
+        l2OutputOracleChallenger = _json.readAddress("$.l2OutputOracleChallenger");
+        fundDevAccounts = _json.readBoolOr("$.fundDevAccounts", false);
+        proxyAdminOwner = _json.readAddress("$.proxyAdminOwner");
+        baseFeeVaultRecipient = _json.readAddress("$.baseFeeVaultRecipient");
+        baseFeeVaultMinimumWithdrawalAmount = _json.readUint("$.baseFeeVaultMinimumWithdrawalAmount");
+        baseFeeVaultWithdrawalNetwork = _json.readUint("$.baseFeeVaultWithdrawalNetwork");
+        l1FeeVaultRecipient = _json.readAddress("$.l1FeeVaultRecipient");
+        l1FeeVaultMinimumWithdrawalAmount = _json.readUint("$.l1FeeVaultMinimumWithdrawalAmount");
+        l1FeeVaultWithdrawalNetwork = _json.readUint("$.l1FeeVaultWithdrawalNetwork");
+        sequencerFeeVaultRecipient = _json.readAddress("$.sequencerFeeVaultRecipient");
+        sequencerFeeVaultMinimumWithdrawalAmount = _json.readUint("$.sequencerFeeVaultMinimumWithdrawalAmount");
+        sequencerFeeVaultWithdrawalNetwork = _json.readUint("$.sequencerFeeVaultWithdrawalNetwork");
+        operatorFeeVaultRecipient = _json.readAddress("$.operatorFeeVaultRecipient");
+        operatorFeeVaultMinimumWithdrawalAmount = _json.readUint("$.operatorFeeVaultMinimumWithdrawalAmount");
+        operatorFeeVaultWithdrawalNetwork = _json.readUint("$.operatorFeeVaultWithdrawalNetwork");
+        governanceTokenOwner = _json.readAddress("$.governanceTokenOwner");
+        l2GenesisBlockGasLimit = _json.readUint("$.l2GenesisBlockGasLimit");
+        basefeeScalar = uint32(_json.readUintOr("$.gasPriceOracleBaseFeeScalar", 1368));
+        blobbasefeeScalar = uint32(_json.readUintOr("$.gasPriceOracleBlobBaseFeeScalar", 810949));
 
-        enableGovernance = _readOr(_json, "$.enableGovernance", false);
-        systemConfigStartBlock = stdJson.readUint(_json, "$.systemConfigStartBlock");
+        enableGovernance = _json.readBoolOr("$.enableGovernance", false);
+        systemConfigStartBlock = _json.readUint("$.systemConfigStartBlock");
 
-        proofMaturityDelaySeconds = _readOr(_json, "$.proofMaturityDelaySeconds", 0);
-        disputeGameFinalityDelaySeconds = _readOr(_json, "$.disputeGameFinalityDelaySeconds", 0);
-        respectedGameType = _readOr(_json, "$.respectedGameType", 0);
+        proofMaturityDelaySeconds = _json.readUintOr("$.proofMaturityDelaySeconds", 0);
+        disputeGameFinalityDelaySeconds = _json.readUintOr("$.disputeGameFinalityDelaySeconds", 0);
+        respectedGameType = _json.readUintOr("$.respectedGameType", 0);
 
-        faultGameAbsolutePrestate = stdJson.readUint(_json, "$.faultGameAbsolutePrestate");
-        faultGameMaxDepth = stdJson.readUint(_json, "$.faultGameMaxDepth");
-        faultGameSplitDepth = stdJson.readUint(_json, "$.faultGameSplitDepth");
-        faultGameClockExtension = stdJson.readUint(_json, "$.faultGameClockExtension");
-        faultGameMaxClockDuration = stdJson.readUint(_json, "$.faultGameMaxClockDuration");
-        faultGameGenesisBlock = stdJson.readUint(_json, "$.faultGameGenesisBlock");
-        faultGameGenesisOutputRoot = stdJson.readBytes32(_json, "$.faultGameGenesisOutputRoot");
-        faultGameWithdrawalDelay = stdJson.readUint(_json, "$.faultGameWithdrawalDelay");
+        faultGameAbsolutePrestate = _json.readUint("$.faultGameAbsolutePrestate");
+        faultGameMaxDepth = _json.readUint("$.faultGameMaxDepth");
+        faultGameSplitDepth = _json.readUint("$.faultGameSplitDepth");
+        faultGameClockExtension = _json.readUint("$.faultGameClockExtension");
+        faultGameMaxClockDuration = _json.readUint("$.faultGameMaxClockDuration");
+        faultGameGenesisBlock = _json.readUint("$.faultGameGenesisBlock");
+        faultGameGenesisOutputRoot = _json.readBytes32("$.faultGameGenesisOutputRoot");
+        faultGameWithdrawalDelay = _json.readUint("$.faultGameWithdrawalDelay");
 
-        preimageOracleMinProposalSize = stdJson.readUint(_json, "$.preimageOracleMinProposalSize");
-        preimageOracleChallengePeriod = stdJson.readUint(_json, "$.preimageOracleChallengePeriod");
+        preimageOracleMinProposalSize = _json.readUint("$.preimageOracleMinProposalSize");
+        preimageOracleChallengePeriod = _json.readUint("$.preimageOracleChallengePeriod");
 
-        useInterop = _readOr(_json, "$.useInterop", false);
-        devFeatureBitmap = bytes32(_readOr(_json, "$.devFeatureBitmap", 0));
-        useRevenueShare = _readOr(_json, "$.useRevenueShare", false);
-        chainFeesRecipient = _readOr(_json, "$.chainFeesRecipient", address(0));
-        faultGameV2MaxGameDepth = _readOr(_json, "$.faultGameV2MaxGameDepth", 73);
-        faultGameV2SplitDepth = _readOr(_json, "$.faultGameV2SplitDepth", 30);
-        faultGameV2ClockExtension = _readOr(_json, "$.faultGameV2ClockExtension", 10800);
-        faultGameV2MaxClockDuration = _readOr(_json, "$.faultGameV2MaxClockDuration", 302400);
-        teeImageHash = bytes32(_readOr(_json, "$.teeImageHash", 0));
-        multiproofConfigHash = bytes32(_readOr(_json, "$.multiproofConfigHash", 0));
-        multiproofGameType = _readOr(_json, "$.multiproofGameType", 621);
-        teeProposer = _readOr(_json, "$.teeProposer", address(0));
-        teeChallenger = _readOr(_json, "$.teeChallenger", address(0));
-        zkRangeHash = bytes32(_readOr(_json, "$.zkRangeHash", 0));
-        zkAggregationHash = bytes32(_readOr(_json, "$.zkAggregationHash", 0));
-        nitroEnclaveVerifier = _readOr(_json, "$.nitroEnclaveVerifier", address(0));
-        multiproofGenesisOutputRoot = bytes32(_readOr(_json, "$.multiproofGenesisOutputRoot", uint256(1)));
-        multiproofGenesisBlockNumber = _readOr(_json, "$.multiproofGenesisBlockNumber", 0);
-        multiproofBlockInterval = _readOr(_json, "$.multiproofBlockInterval", 100);
-        multiproofIntermediateBlockInterval = _readOr(_json, "$.multiproofIntermediateBlockInterval", 10);
-        sp1Verifier = _readOr(_json, "$.sp1Verifier", address(0));
+        useInterop = _json.readBoolOr("$.useInterop", false);
+        devFeatureBitmap = _json.readBytes32Or("$.devFeatureBitmap", bytes32(0));
+        useRevenueShare = _json.readBoolOr("$.useRevenueShare", false);
+        chainFeesRecipient = _json.readAddressOr("$.chainFeesRecipient", address(0));
+        faultGameV2MaxGameDepth = _json.readUintOr("$.faultGameV2MaxGameDepth", 73);
+        faultGameV2SplitDepth = _json.readUintOr("$.faultGameV2SplitDepth", 30);
+        faultGameV2ClockExtension = _json.readUintOr("$.faultGameV2ClockExtension", 10800);
+        faultGameV2MaxClockDuration = _json.readUintOr("$.faultGameV2MaxClockDuration", 302400);
+        teeImageHash = _json.readBytes32Or("$.teeImageHash", bytes32(0));
+        multiproofConfigHash = _json.readBytes32Or("$.multiproofConfigHash", bytes32(0));
+        multiproofGameType = _json.readUintOr("$.multiproofGameType", 621);
+        teeProposer = _json.readAddressOr("$.teeProposer", address(0));
+        teeChallenger = _json.readAddressOr("$.teeChallenger", address(0));
+        zkRangeHash = _json.readBytes32Or("$.zkRangeHash", bytes32(0));
+        zkAggregationHash = _json.readBytes32Or("$.zkAggregationHash", bytes32(0));
+        nitroEnclaveVerifier = _json.readAddressOr("$.nitroEnclaveVerifier", address(0));
+        multiproofGenesisOutputRoot = _json.readBytes32Or("$.multiproofGenesisOutputRoot", bytes32(uint256(1)));
+        multiproofGenesisBlockNumber = _json.readUintOr("$.multiproofGenesisBlockNumber", 0);
+        multiproofBlockInterval = _json.readUintOr("$.multiproofBlockInterval", 100);
+        multiproofIntermediateBlockInterval = _json.readUintOr("$.multiproofIntermediateBlockInterval", 10);
+        sp1Verifier = _json.readAddressOr("$.sp1Verifier", address(0));
     }
 
     function l1StartingBlockTag() public returns (bytes32) {
@@ -201,27 +197,22 @@ contract DeployConfig is Script {
         return uint256(_l2OutputOracleStartingTimestamp);
     }
 
-    /// @notice Allow the `useInterop` config to be overridden in testing environments
     function setUseInterop(bool _useInterop) public {
         useInterop = _useInterop;
     }
 
-    /// @notice Allow the `useRevenueShare` config to be overridden in testing environments
     function setUseRevenueShare(bool _useRevenueShare) public {
         useRevenueShare = _useRevenueShare;
     }
 
-    /// @notice Allow the `l1FeesDepositor` config to be overridden in testing environments
     function setL1FeesDepositor(address _l1FeesDepositor) public {
         l1FeesDepositor = _l1FeesDepositor;
     }
 
-    /// @notice Allow the `chainFeesRecipient` config to be overridden in testing environments
     function setChainFeesRecipient(address _chainFeesRecipient) public {
         chainFeesRecipient = _chainFeesRecipient;
     }
 
-    /// @notice Allow the `devFeatureBitmap` config to be overridden in testing environments
     function setDevFeatureBitmap(bytes32 _devFeatureBitmap) public {
         devFeatureBitmap = _devFeatureBitmap;
     }
@@ -241,30 +232,5 @@ contract DeployConfig is Script {
         string memory cmd = string.concat("cast block ", _tag, " --json | jq -r .hash");
         bytes memory res = bytes(Process.bash(cmd));
         return abi.decode(res, (bytes32));
-    }
-
-    function _readOr(string memory _jsonInp, string memory _key, bool _defaultValue) internal view returns (bool) {
-        return _jsonInp.readBoolOr(_key, _defaultValue);
-    }
-
-    function _readOr(string memory _jsonInp, string memory _key, uint256 _defaultValue)
-        internal
-        view
-        returns (uint256)
-    {
-        return (vm.keyExistsJson(_jsonInp, _key) && !_isNull(_json, _key)) ? _jsonInp.readUint(_key) : _defaultValue;
-    }
-
-    function _readOr(string memory _jsonInp, string memory _key, address _defaultValue)
-        internal
-        view
-        returns (address)
-    {
-        return _jsonInp.readAddressOr(_key, _defaultValue);
-    }
-
-    function _isNull(string memory _jsonInp, string memory _key) internal pure returns (bool) {
-        string memory value = _jsonInp.readString(_key);
-        return (keccak256(bytes(value)) == keccak256(bytes("null")));
     }
 }
