@@ -57,7 +57,7 @@ contract DeployImplementations is Script {
         ISP1Verifier sp1Verifier;
         address teeProposer;
         address teeChallenger;
-        // Outputs from DeploySuperchain.s.sol.
+        // Outputs from the shared superchain deployment.
         ISuperchainConfig superchainConfigProxy;
         IProxyAdmin superchainProxyAdmin;
         address l1ProxyAdminOwner;

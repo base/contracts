@@ -5,10 +5,10 @@ import { Test } from "lib/forge-std/src/Test.sol";
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 import { Features } from "src/libraries/Features.sol";
 
-import { DeploySuperchain } from "scripts/deploy/DeploySuperchain.s.sol";
 import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
 import { DeployOPChain } from "scripts/deploy/DeployOPChain.s.sol";
 import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
+import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
 import { Claim, Duration, GameType, GameTypes } from "src/libraries/bridge/Types.sol";
@@ -16,18 +16,16 @@ import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissione
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 
 contract DeployOPChain_TestBase is Test, FeatureFlags {
-    DeploySuperchain deploySuperchain;
     DeployImplementations deployImplementations;
     DeployOPChain deployOPChain;
     Types.DeployOPChainInput deployOPChainInput;
 
-    // DeploySuperchain default inputs.
+    // Superchain default inputs.
     address superchainProxyAdminOwner = makeAddr("superchainProxyAdminOwner");
     address guardian = makeAddr("guardian");
-    bool paused = false;
 
     // DeployImplementations default inputs.
-    // - superchainConfigProxy is set during `setUp` since it's an output of DeploySuperchain.
+    // - superchainConfigProxy is set during `setUp` since it's an output of the superchain deployment.
     uint256 withdrawalDelaySeconds = 100;
     uint256 minProposalSizeBytes = 200;
     uint256 challengePeriodSeconds = 300;
@@ -55,22 +53,18 @@ contract DeployOPChain_TestBase is Test, FeatureFlags {
     Duration disputeClockExtension = Duration.wrap(3 hours);
     Duration disputeMaxClockDuration = Duration.wrap(3.5 days);
     Types.Implementations implementations;
-    DeploySuperchain.Output superchainOutput;
+    SystemDeploy.SuperchainOutput superchainOutput;
 
     event Deployed(uint256 indexed l2ChainId, address indexed deployer, bytes deployOutput);
 
     function setUp() public virtual {
-        deploySuperchain = new DeploySuperchain();
         deployImplementations = new DeployImplementations();
         deployOPChain = new DeployOPChain();
 
-        // 1) DeploySuperchain
-        superchainOutput = deploySuperchain.run(
-            DeploySuperchain.Input({
-                superchainProxyAdminOwner: superchainProxyAdminOwner,
-                guardian: guardian,
-                incidentResponder: address(0),
-                paused: paused
+        // 1) Deploy the shared superchain contracts.
+        superchainOutput = deployOPChain.deploySuperchain(
+            SystemDeploy.SuperchainInput({
+                superchainProxyAdminOwner: superchainProxyAdminOwner, guardian: guardian, incidentResponder: address(0)
             })
         );
 

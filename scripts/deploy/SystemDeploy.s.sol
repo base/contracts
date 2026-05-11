@@ -6,10 +6,10 @@ import { console2 as console } from "lib/forge-std/src/console2.sol";
 
 import { Chains } from "scripts/libraries/Chains.sol";
 import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
-import { DeploySuperchain } from "scripts/deploy/DeploySuperchain.s.sol";
 import { Deployer } from "scripts/deploy/Deployer.sol";
 import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
+import { Solarray } from "scripts/libraries/Solarray.sol";
 import { StateDiff } from "scripts/libraries/StateDiff.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
@@ -52,11 +52,23 @@ import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 /// @title SystemDeploy
 /// @notice Script-level API for deploying or upgrading a complete OP Stack L1 system.
 contract SystemDeploy is Deployer {
+    struct SuperchainInput {
+        address guardian;
+        address incidentResponder;
+        address superchainProxyAdminOwner;
+    }
+
+    struct SuperchainOutput {
+        ISuperchainConfig superchainConfigImpl;
+        ISuperchainConfig superchainConfigProxy;
+        IProxyAdmin superchainProxyAdmin;
+    }
+
     struct DeployInput {
         bool deploySuperchain;
         bool deployImplementations;
         bool saveArtifacts;
-        DeploySuperchain.Input superchainInput;
+        SuperchainInput superchainInput;
         ISuperchainConfig superchainConfigProxy;
         DeployImplementations.Input implementationsInput;
         Types.Implementations implementations;
@@ -70,7 +82,7 @@ contract SystemDeploy is Deployer {
     }
 
     struct DeployOutput {
-        DeploySuperchain.Output superchain;
+        SuperchainOutput superchain;
         ImplementationOutput implementationOutput;
         Types.DeployOutput opChain;
     }
@@ -162,6 +174,11 @@ contract SystemDeploy is Deployer {
         _saveIfSet("PreimageOracle", address(output_.preimageOracleSingleton));
     }
 
+    /// @notice Deploys the shared Superchain proxy admin and SuperchainConfig proxy.
+    function deploySuperchain(SuperchainInput memory _input) public returns (SuperchainOutput memory output_) {
+        output_ = _deploySuperchain(_input);
+    }
+
     /// @notice Returns the latest implementation set saved by `deployImplementations` or `run`.
     function getImplementations() public view returns (Types.Implementations memory) {
         return Types.Implementations({
@@ -202,11 +219,10 @@ contract SystemDeploy is Deployer {
             deploySuperchain: true,
             deployImplementations: true,
             saveArtifacts: true,
-            superchainInput: DeploySuperchain.Input({
+            superchainInput: SuperchainInput({
                 guardian: cfg.superchainConfigGuardian(),
                 incidentResponder: cfg.superchainConfigIncidentResponder(),
-                superchainProxyAdminOwner: cfg.finalSystemOwner(),
-                paused: false
+                superchainProxyAdminOwner: cfg.finalSystemOwner()
             }),
             superchainConfigProxy: ISuperchainConfig(address(0)),
             implementationsInput: _configuredImplementationsInput(
@@ -368,13 +384,9 @@ contract SystemDeploy is Deployer {
         }
     }
 
-    function _deployOrLoadSuperchain(DeployInput memory _input)
-        internal
-        returns (DeploySuperchain.Output memory output_)
-    {
+    function _deployOrLoadSuperchain(DeployInput memory _input) internal returns (SuperchainOutput memory output_) {
         if (_input.deploySuperchain) {
-            DeploySuperchain deploySuperchainScript = new DeploySuperchain();
-            output_ = deploySuperchainScript.run(_input.superchainInput);
+            output_ = _deploySuperchain(_input.superchainInput);
         } else {
             _assertValidContractAddress(address(_input.superchainConfigProxy));
             output_.superchainConfigProxy = _input.superchainConfigProxy;
@@ -384,7 +396,7 @@ contract SystemDeploy is Deployer {
 
     function _withSuperchainImplementationsInput(
         DeployInput memory _input,
-        DeploySuperchain.Output memory _superchain
+        SuperchainOutput memory _superchain
     )
         internal
         view
@@ -396,6 +408,90 @@ contract SystemDeploy is Deployer {
         if (input_.l1ProxyAdminOwner == address(0)) {
             input_.l1ProxyAdminOwner = _superchain.superchainProxyAdmin.owner();
         }
+    }
+
+    function _deploySuperchain(SuperchainInput memory _input) internal returns (SuperchainOutput memory output_) {
+        _assertValidSuperchainInput(_input);
+
+        _deploySuperchainProxyAdmin(output_);
+        output_.superchainConfigImpl = _deploySuperchainConfigImpl(_input.guardian, _input.incidentResponder);
+        _deploySuperchainConfigProxy(output_);
+        _transferSuperchainProxyAdminOwnership(_input, output_);
+
+        _assertValidSuperchainOutput(_input, output_);
+    }
+
+    function _deploySuperchainProxyAdmin(SuperchainOutput memory _output) private {
+        vm.broadcast(msg.sender);
+        IProxyAdmin superchainProxyAdmin = IProxyAdmin(
+            DeployUtils.create1({
+                _name: "ProxyAdmin",
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxyAdmin.__constructor__, (msg.sender)))
+            })
+        );
+
+        vm.label(address(superchainProxyAdmin), "SuperchainProxyAdmin");
+        _output.superchainProxyAdmin = superchainProxyAdmin;
+    }
+
+    function _deploySuperchainConfigProxy(SuperchainOutput memory _output) private {
+        vm.startBroadcast(msg.sender);
+        ISuperchainConfig superchainConfigProxy = ISuperchainConfig(
+            DeployUtils.create1({
+                _name: "src/universal/Proxy.sol:Proxy",
+                _args: DeployUtils.encodeConstructor(
+                    abi.encodeCall(IProxy.__constructor__, (address(_output.superchainProxyAdmin)))
+                )
+            })
+        );
+        _output.superchainProxyAdmin
+            .upgrade(payable(address(superchainConfigProxy)), address(_output.superchainConfigImpl));
+        vm.stopBroadcast();
+
+        vm.label(address(superchainConfigProxy), "SuperchainConfigProxy");
+        _output.superchainConfigProxy = superchainConfigProxy;
+    }
+
+    function _transferSuperchainProxyAdminOwnership(
+        SuperchainInput memory _input,
+        SuperchainOutput memory _output
+    )
+        private
+    {
+        _assertValidContractAddress(address(_output.superchainProxyAdmin));
+
+        vm.broadcast(msg.sender);
+        _output.superchainProxyAdmin.transferOwnership(_input.superchainProxyAdminOwner);
+    }
+
+    function _assertValidSuperchainInput(SuperchainInput memory _input) internal pure {
+        if (_input.superchainProxyAdminOwner == address(0)) revert InvalidRoleAddress("superchainProxyAdminOwner");
+        if (_input.guardian == address(0)) revert InvalidRoleAddress("guardian");
+    }
+
+    function _assertValidSuperchainOutput(SuperchainInput memory _input, SuperchainOutput memory _output) internal {
+        address[] memory addrs = Solarray.addresses(
+            address(_output.superchainProxyAdmin),
+            address(_output.superchainConfigImpl),
+            address(_output.superchainConfigProxy)
+        );
+        DeployUtils.assertValidContractAddresses(addrs);
+
+        vm.startPrank(address(0));
+        require(
+            IProxy(payable(address(_output.superchainConfigProxy))).implementation()
+                == address(_output.superchainConfigImpl),
+            "SUPCON-30"
+        );
+        require(
+            IProxy(payable(address(_output.superchainConfigProxy))).admin() == address(_output.superchainProxyAdmin),
+            "SUPCON-40"
+        );
+        vm.stopPrank();
+
+        require(_output.superchainProxyAdmin.owner() == _input.superchainProxyAdminOwner, "SPA-10");
+        require(_output.superchainConfigProxy.guardian() == _input.guardian, "SUPCON-10");
+        require(_output.superchainConfigImpl.guardian() == _input.guardian, "SUPCON-50");
     }
 
     function _deployImplementations(DeployImplementations.Input memory _input)
@@ -961,11 +1057,21 @@ contract SystemDeploy is Deployer {
         internal
         returns (ISuperchainConfig)
     {
+        return _deploySuperchainConfigImpl(_input.guardian, _input.incidentResponder);
+    }
+
+    function _deploySuperchainConfigImpl(
+        address _guardian,
+        address _incidentResponder
+    )
+        internal
+        returns (ISuperchainConfig)
+    {
         return ISuperchainConfig(
             DeployUtils.createDeterministic({
                 _name: "SuperchainConfig",
                 _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(ISuperchainConfig.__constructor__, (_input.guardian, _input.incidentResponder))
+                    abi.encodeCall(ISuperchainConfig.__constructor__, (_guardian, _incidentResponder))
                 ),
                 _salt: _SALT
             })

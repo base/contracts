@@ -200,9 +200,9 @@ library DeployUtils {
     /// @notice Takes a sender and an identifier and returns a deterministic address based on the
     ///         two. The result is used to etch the input and output contracts to a deterministic
     ///         address based on those two values, where the identifier represents the input or
-    ///         output contract, such as `optimism.DeploySuperchainInput` or
+    ///         output contract, such as `optimism.SystemDeploySuperchainInput` or
     ///         `optimism.DeployOPChainOutput`.
-    ///         Example: `toIOAddress(msg.sender, "optimism.DeploySuperchainInput")`
+    ///         Example: `toIOAddress(msg.sender, "optimism.SystemDeploySuperchainInput")`
     /// @param _sender Address of the sender.
     /// @param _identifier Additional identifier.
     /// @return Deterministic address.

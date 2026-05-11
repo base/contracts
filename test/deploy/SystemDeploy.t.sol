@@ -5,7 +5,6 @@ import { Test } from "lib/forge-std/src/Test.sol";
 
 import { Artifacts } from "scripts/Artifacts.s.sol";
 import { DeployImplementations } from "scripts/deploy/DeployImplementations.s.sol";
-import { DeploySuperchain } from "scripts/deploy/DeploySuperchain.s.sol";
 import { StandardConstants } from "scripts/deploy/StandardConstants.sol";
 import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Types } from "scripts/libraries/Types.sol";
@@ -14,6 +13,7 @@ import { StandardSystemAssertions } from "test/setup/StandardSystemAssertions.so
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
+import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
@@ -57,6 +57,70 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
         systemDeploy = new SystemDeploy();
         nitroEnclaveVerifier = new MockNitroEnclaveVerifier();
         sp1Verifier = new MockSP1Verifier();
+    }
+
+    function testFuzz_deploySuperchain_succeeds(
+        address _superchainProxyAdminOwner,
+        address _guardian,
+        address _incidentResponder
+    )
+        public
+    {
+        vm.assume(_superchainProxyAdminOwner != address(0));
+        vm.assume(_guardian != address(0));
+
+        SystemDeploy.SuperchainOutput memory output = systemDeploy.deploySuperchain(
+            SystemDeploy.SuperchainInput({
+                guardian: _guardian,
+                incidentResponder: _incidentResponder,
+                superchainProxyAdminOwner: _superchainProxyAdminOwner
+            })
+        );
+
+        assertEq(output.superchainProxyAdmin.owner(), _superchainProxyAdminOwner, "proxy admin owner");
+        assertEq(output.superchainConfigProxy.guardian(), _guardian, "proxy guardian");
+        assertEq(output.superchainConfigImpl.guardian(), _guardian, "impl guardian");
+
+        vm.startPrank(address(0));
+        assertEq(
+            IProxy(payable(address(output.superchainConfigProxy))).implementation(),
+            address(output.superchainConfigImpl),
+            "implementation"
+        );
+        assertEq(
+            IProxy(payable(address(output.superchainConfigProxy))).admin(),
+            address(output.superchainProxyAdmin),
+            "admin"
+        );
+        vm.stopPrank();
+    }
+
+    function test_deploySuperchain_nullInput_reverts() public {
+        SystemDeploy.SuperchainInput memory input = SystemDeploy.SuperchainInput({
+            guardian: guardian, incidentResponder: address(0), superchainProxyAdminOwner: owner
+        });
+
+        input.superchainProxyAdminOwner = address(0);
+        vm.expectRevert(abi.encodeWithSelector(SystemDeploy.InvalidRoleAddress.selector, "superchainProxyAdminOwner"));
+        systemDeploy.deploySuperchain(input);
+
+        input = SystemDeploy.SuperchainInput({
+            guardian: address(0), incidentResponder: address(0), superchainProxyAdminOwner: owner
+        });
+        vm.expectRevert(abi.encodeWithSelector(SystemDeploy.InvalidRoleAddress.selector, "guardian"));
+        systemDeploy.deploySuperchain(input);
+    }
+
+    function test_deploySuperchain_reuseAddresses_succeeds() public {
+        SystemDeploy.SuperchainInput memory input = SystemDeploy.SuperchainInput({
+            guardian: guardian, incidentResponder: address(0), superchainProxyAdminOwner: owner
+        });
+
+        SystemDeploy.SuperchainOutput memory output0 = systemDeploy.deploySuperchain(input);
+        SystemDeploy.SuperchainOutput memory output1 = systemDeploy.deploySuperchain(input);
+
+        assertEq(address(output0.superchainConfigImpl), address(output1.superchainConfigImpl), "implementation");
+        assertNotEq(address(output0.superchainConfigProxy), address(output1.superchainConfigProxy), "proxy");
     }
 
     function test_deploy_withoutManagerAddress_succeeds() public {
@@ -211,8 +275,8 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
         input_.deploySuperchain = true;
         input_.deployImplementations = true;
         input_.saveArtifacts = false;
-        input_.superchainInput = DeploySuperchain.Input({
-            guardian: guardian, incidentResponder: incidentResponder, superchainProxyAdminOwner: owner, paused: false
+        input_.superchainInput = SystemDeploy.SuperchainInput({
+            guardian: guardian, incidentResponder: incidentResponder, superchainProxyAdminOwner: owner
         });
         input_.implementationsInput = DeployImplementations.Input({
             withdrawalDelaySeconds: 100,
