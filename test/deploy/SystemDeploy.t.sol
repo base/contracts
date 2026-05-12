@@ -284,7 +284,6 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
             proofMaturityDelaySeconds: 400,
             disputeGameFinalityDelaySeconds: 500,
             mipsVersion: STANDARD_MIPS_VERSION,
-            devFeatureBitmap: bytes32(0),
             faultGameV2MaxGameDepth: 73,
             faultGameV2SplitDepth: 30,
             faultGameV2ClockExtension: 10_800,

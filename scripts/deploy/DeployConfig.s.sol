@@ -16,10 +16,7 @@ contract DeployConfig is Script {
     address public baseFeeVaultRecipient;
     address public batchInboxAddress;
     address public batchSenderAddress;
-    address public chainFeesRecipient;
     address public finalSystemOwner;
-    address public governanceTokenOwner;
-    address public l1FeesDepositor;
     address public l1FeeVaultRecipient;
     address public l2OutputOracleProposer;
     address public l2OutputOracleChallenger;
@@ -34,12 +31,9 @@ contract DeployConfig is Script {
     address public teeChallenger;
     address public teeProposer;
 
-    bool public enableGovernance;
     bool public fundDevAccounts;
-    bool public useInterop;
     bool public useUpgradedFork;
 
-    bytes32 public devFeatureBitmap;
     bytes32 public faultGameGenesisOutputRoot;
     bytes32 public multiproofConfigHash;
     bytes32 public multiproofGenesisOutputRoot;
@@ -97,10 +91,7 @@ contract DeployConfig is Script {
         baseFeeVaultRecipient = _json.readAddress("$.baseFeeVaultRecipient");
         batchInboxAddress = _json.readAddress("$.batchInboxAddress");
         batchSenderAddress = _json.readAddress("$.batchSenderAddress");
-        chainFeesRecipient = _json.readAddress("$.chainFeesRecipient");
         finalSystemOwner = _json.readAddress("$.finalSystemOwner");
-        governanceTokenOwner = _json.readAddress("$.governanceTokenOwner");
-        l1FeesDepositor = _json.readAddress("$.l1FeesDepositor");
         l1FeeVaultRecipient = _json.readAddress("$.l1FeeVaultRecipient");
         l2OutputOracleChallenger = _json.readAddress("$.l2OutputOracleChallenger");
         l2OutputOracleProposer = _json.readAddress("$.l2OutputOracleProposer");
@@ -115,11 +106,8 @@ contract DeployConfig is Script {
         teeChallenger = _json.readAddress("$.teeChallenger");
         teeProposer = _json.readAddress("$.teeProposer");
 
-        enableGovernance = _json.readBoolOr("$.enableGovernance", false);
         fundDevAccounts = _json.readBoolOr("$.fundDevAccounts", false);
-        useInterop = _json.readBoolOr("$.useInterop", false);
 
-        devFeatureBitmap = _json.readBytes32Or("$.devFeatureBitmap", bytes32(0));
         faultGameGenesisOutputRoot = _json.readBytes32("$.faultGameGenesisOutputRoot");
         multiproofConfigHash = _json.readBytes32("$.multiproofConfigHash");
         multiproofGenesisOutputRoot = _json.readBytes32("$.multiproofGenesisOutputRoot");
@@ -129,8 +117,8 @@ contract DeployConfig is Script {
 
         _l2OutputOracleStartingTimestamp = _json.readInt("$.l2OutputOracleStartingTimestamp");
 
-        basefeeScalar = uint32(_json.readUintOr("$.gasPriceOracleBaseFeeScalar", 1368));
-        blobbasefeeScalar = uint32(_json.readUintOr("$.gasPriceOracleBlobBaseFeeScalar", 810949));
+        basefeeScalar = uint32(_json.readUint("$.gasPriceOracleBaseFeeScalar"));
+        blobbasefeeScalar = uint32(_json.readUint("$.gasPriceOracleBlobBaseFeeScalar"));
 
         baseFeeVaultMinimumWithdrawalAmount = _json.readUint("$.baseFeeVaultMinimumWithdrawalAmount");
         baseFeeVaultWithdrawalNetwork = _json.readUint("$.baseFeeVaultWithdrawalNetwork");
@@ -188,14 +176,6 @@ contract DeployConfig is Script {
             return stdJson.readUint(res, "");
         }
         return uint256(_l2OutputOracleStartingTimestamp);
-    }
-
-    function setUseInterop(bool _useInterop) public {
-        useInterop = _useInterop;
-    }
-
-    function setDevFeatureBitmap(bytes32 _devFeatureBitmap) public {
-        devFeatureBitmap = _devFeatureBitmap;
     }
 
     /// @notice Allow the `useUpgradedFork` config to be overridden in testing environments

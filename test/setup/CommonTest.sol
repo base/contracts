@@ -32,8 +32,6 @@ abstract contract CommonTest is Test, Setup, Events {
 
     FFIInterface constant ffi = FFIInterface(address(uint160(uint256(keccak256(abi.encode("optimism.ffi"))))));
 
-    bool useInteropOverride;
-
     /// @dev This value is only used in forked tests. During forked tests, the default is to perform the upgrade before
     ///      running the tests.
     ///      This value should only be set to false in forked tests which are specifically testing the upgrade path
@@ -63,19 +61,11 @@ abstract contract CommonTest is Test, Setup, Events {
         vm.deal(bob, 10000 ether);
 
         // Override the config after the deploy script initialized the config
-        if (useInteropOverride) {
-            deploy.cfg().setUseInterop(true);
-        }
         if (useUpgradedFork) {
             deploy.cfg().setUseUpgradedFork(true);
         }
 
-        if (isForkTest()) {
-            // Skip any test suite which uses a nonstandard configuration.
-            if (useInteropOverride) {
-                vm.skip(true);
-            }
-        } else {
+        if (!isForkTest()) {
             // Modifying these values on a fork test causes issues.
             vm.warp(deploy.cfg().l2OutputOracleStartingTimestamp() + 1);
             vm.roll(deploy.cfg().l2OutputOracleStartingBlockNumber() + 1);
@@ -163,12 +153,6 @@ abstract contract CommonTest is Test, Setup, Events {
             );
         }
         console.log("CommonTest: enabling", _feature);
-    }
-
-    /// @dev Enables interoperability mode for testing
-    function enableInterop() public {
-        _checkNotDeployed("interop");
-        useInteropOverride = true;
     }
 
     /// @dev Disables upgrade mode for testing. By default the fork testing env will be upgraded to the latest

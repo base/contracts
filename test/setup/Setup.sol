@@ -167,8 +167,6 @@ abstract contract Setup is FeatureFlags {
 
         deploy.setUp();
 
-        deploy.cfg().setDevFeatureBitmap(devFeatureBitmap);
-
         console.log("Setup: L1 setup done!");
 
         if (isForkTest()) {
@@ -302,12 +300,8 @@ abstract contract Setup is FeatureFlags {
                 operatorFeeVaultRecipient: deploy.cfg().operatorFeeVaultRecipient(),
                 operatorFeeVaultMinimumWithdrawalAmount: deploy.cfg().operatorFeeVaultMinimumWithdrawalAmount(),
                 operatorFeeVaultWithdrawalNetwork: deploy.cfg().operatorFeeVaultWithdrawalNetwork(),
-                governanceTokenOwner: deploy.cfg().governanceTokenOwner(),
                 fork: uint256(l2Fork),
-                enableGovernance: deploy.cfg().enableGovernance(),
-                fundDevAccounts: deploy.cfg().fundDevAccounts(),
-                chainFeesRecipient: deploy.cfg().chainFeesRecipient(),
-                l1FeesDepositor: deploy.cfg().l1FeesDepositor()
+                fundDevAccounts: deploy.cfg().fundDevAccounts()
             })
         );
 

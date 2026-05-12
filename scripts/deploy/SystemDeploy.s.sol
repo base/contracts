@@ -81,7 +81,6 @@ contract SystemDeploy is Script {
         uint256 proofMaturityDelaySeconds;
         uint256 disputeGameFinalityDelaySeconds;
         uint256 mipsVersion;
-        bytes32 devFeatureBitmap;
         uint256 faultGameV2MaxGameDepth;
         uint256 faultGameV2SplitDepth;
         uint256 faultGameV2ClockExtension;
@@ -221,9 +220,7 @@ contract SystemDeploy is Script {
     }
 
     /// @notice Deploys implementation contracts from the active deploy config and saves their artifact names.
-    function deployImplementations(bool _isInterop) public returns (ImplementationOutput memory output_) {
-        require(_isInterop == cfg.useInterop(), "SystemDeploy: Interop setting mismatch.");
-
+    function deployImplementations() public returns (ImplementationOutput memory output_) {
         ISuperchainConfig superchainConfigProxy = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
         IProxyAdmin superchainProxyAdmin = _erc1967Admin(address(superchainConfigProxy));
 
@@ -325,7 +322,6 @@ contract SystemDeploy is Script {
             proofMaturityDelaySeconds: cfg.proofMaturityDelaySeconds(),
             disputeGameFinalityDelaySeconds: cfg.disputeGameFinalityDelaySeconds(),
             mipsVersion: STANDARD_MIPS_VERSION,
-            devFeatureBitmap: cfg.devFeatureBitmap(),
             faultGameV2MaxGameDepth: cfg.faultGameV2MaxGameDepth(),
             faultGameV2SplitDepth: cfg.faultGameV2SplitDepth(),
             faultGameV2ClockExtension: cfg.faultGameV2ClockExtension(),

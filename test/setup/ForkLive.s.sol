@@ -199,7 +199,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
     /// environment, and deploys new implementations.
     function _deployNewImplementations() internal {
         SystemDeploy deploy = SystemDeploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
-        deploy.deployImplementations({ _isInterop: false });
+        deploy.deployImplementations();
     }
 
     /// @notice Performs a script-level upgrade without a manager delegatecall.

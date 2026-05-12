@@ -61,12 +61,8 @@ contract L2Genesis is Script {
         address operatorFeeVaultRecipient;
         uint256 operatorFeeVaultMinimumWithdrawalAmount;
         uint256 operatorFeeVaultWithdrawalNetwork;
-        address governanceTokenOwner;
         uint256 fork;
-        bool enableGovernance;
         bool fundDevAccounts;
-        address chainFeesRecipient;
-        address l1FeesDepositor;
     }
 
     using ForkUtils for Fork;
