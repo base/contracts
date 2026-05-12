@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import { Vm } from "lib/forge-std/src/Vm.sol";
 import { stdJson } from "lib/forge-std/src/StdJson.sol";
-import { LibString } from "lib/solady/src/utils/LibString.sol";
 
 /// @notice Contains information about a storage slot. Mirrors the layout of the storage
 ///         slot object in Forge artifacts so that we can deserialize JSON into this struct.
@@ -65,14 +64,7 @@ library ForgeArtifacts {
         // contract. We should consider determining whether a contract is proxied based on the
         // deployment script since it's the source of truth for that. Current deployment script
         // does not make this easy but an updated script should likely make this possible.
-        string memory res = _bash(
-            string.concat(
-                "jq -r '.rawMetadata' ",
-                _getForgeArtifactPath(_name),
-                " | jq -r '.output.devdoc' | jq -r 'has(\"custom:proxied\")'"
-            )
-        );
-        out_ = stdJson.readBool(res, "");
+        out_ = _hasDevdocTag(_name, "custom:proxied");
     }
 
     /// @notice Returns whether or not a contract is predeployed.
@@ -81,14 +73,19 @@ library ForgeArtifacts {
     function isPredeployedContract(string memory _name) internal returns (bool out_) {
         // TODO: Similar to the above, using the `@custom:predeployed` tag is not reliable but
         // functional for now. Deployment script should make this easier to determine.
+        out_ = _hasDevdocTag(_name, "custom:predeploy");
+    }
+
+    function _hasDevdocTag(string memory _name, string memory _tag) private returns (bool) {
         string memory res = _bash(
             string.concat(
-                "jq -r '.rawMetadata' ",
-                _getForgeArtifactPath(_name),
-                " | jq -r '.output.devdoc' | jq -r 'has(\"custom:predeploy\")'"
+                "jq -r '.rawMetadata | fromjson | .output.devdoc | has(\"",
+                _tag,
+                "\")' ",
+                _getForgeArtifactPath(_name)
             )
         );
-        out_ = stdJson.readBool(res, "");
+        return stdJson.readBool(res, "");
     }
 
     function _getForgeArtifactDirectory(string memory _name) internal returns (string memory dir_) {
@@ -113,38 +110,6 @@ library ForgeArtifacts {
         out_ = string.concat(directory, "/", files[0]);
     }
 
-    /// @notice Pulls the `_initialized` storage slot information from the Forge artifacts for a given contract.
-    function getInitializedSlot(string memory _contractName) internal returns (StorageSlot memory slot_) {
-        // FaultDisputeGame, PermissionedDisputeGame, and AggregateVerifier use a different name for the initialized
-        // storage slot.
-        string memory slotName = "_initialized";
-        string memory slotType = "t_uint8";
-        if (
-            LibString.eq(_contractName, "FaultDisputeGame") || LibString.eq(_contractName, "PermissionedDisputeGame")
-                || LibString.eq(_contractName, "AggregateVerifier")
-        ) {
-            slotName = "initialized";
-            slotType = "t_bool";
-        }
-
-        string memory storageLayout = getStorageLayout(_contractName);
-        bytes memory rawSlot = vm.parseJson(
-            _bash(
-                string.concat(
-                    "echo '",
-                    storageLayout,
-                    "' | jq '.storage[] | select(.label == \"",
-                    slotName,
-                    "\" and .type == \"",
-                    slotType,
-                    "\")'"
-                )
-            )
-        );
-        ForgeStorageSlot memory slot = abi.decode(rawSlot, (ForgeStorageSlot));
-        slot_ = StorageSlot({ offset: slot.offset, slot: vm.parseUint(slot.slot) });
-    }
-
     /// @notice Returns the storage slot for a given contract and slot name
     function getSlot(string memory _contractName, string memory _slotName) internal returns (StorageSlot memory slot_) {
         string memory storageLayout = getStorageLayout(_contractName);
@@ -158,7 +123,7 @@ library ForgeArtifacts {
     /// @notice Returns whether or not a contract is initialized.
     ///         Needs the name to get the storage layout.
     function isInitialized(string memory _name, address _address) internal returns (bool initialized_) {
-        StorageSlot memory slot = ForgeArtifacts.getInitializedSlot(_name);
+        StorageSlot memory slot = getSlot(_name, "_initialized");
         bytes32 slotVal = vm.load(_address, bytes32(slot.slot));
         initialized_ = uint8((uint256(slotVal) >> (slot.offset * 8)) & 0xFF) != 0;
     }
