@@ -339,8 +339,7 @@ contract SystemDeploy is Script {
             blobBasefeeScalar: cfg.blobbasefeeScalar(),
             l2ChainId: cfg.l2ChainId(),
             startingAnchorRoot: Proposal({
-                root: Hash.wrap(cfg.faultGameGenesisOutputRoot()),
-                l2SequenceNumber: cfg.faultGameGenesisBlock()
+                root: Hash.wrap(cfg.faultGameGenesisOutputRoot()), l2SequenceNumber: cfg.faultGameGenesisBlock()
             }),
             saltMixer: "salt mixer",
             gasLimit: uint64(cfg.l2GenesisBlockGasLimit()),

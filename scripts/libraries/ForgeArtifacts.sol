@@ -69,10 +69,7 @@ library ForgeArtifacts {
     function _hasDevdocTag(string memory _name, string memory _tag) private returns (bool) {
         string memory res = _bash(
             string.concat(
-                "jq -r '.rawMetadata | fromjson | .output.devdoc | has(\"",
-                _tag,
-                "\")' ",
-                _getForgeArtifactPath(_name)
+                "jq -r '.rawMetadata | fromjson | .output.devdoc | has(\"", _tag, "\")' ", _getForgeArtifactPath(_name)
             )
         );
         return stdJson.readBool(res, "");
@@ -92,7 +89,14 @@ library ForgeArtifacts {
     }
 
     /// @notice Returns the storage slot for a given contract and slot name.
-    function getSlot(string memory _contractName, string memory _slotName) internal view returns (StorageSlot memory slot_) {
+    function getSlot(
+        string memory _contractName,
+        string memory _slotName
+    )
+        internal
+        view
+        returns (StorageSlot memory slot_)
+    {
         string memory artifact = vm.readFile(_getForgeArtifactPath(_contractName));
         bytes memory raw = vm.parseJson(artifact, ".storageLayout.storage");
         ForgeStorageSlot[] memory slots = abi.decode(raw, (ForgeStorageSlot[]));
@@ -114,7 +118,8 @@ library ForgeArtifacts {
 
     /// @notice Returns whether or not a contract is initialized using the OZ v5 namespaced
     ///         Initializable storage slot:
-    ///         keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Initializable")) - 1)) & ~bytes32(uint256(0xff))
+    ///         keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Initializable")) - 1)) &
+    /// ~bytes32(uint256(0xff))
     function isInitializedV5(address _addr) internal view returns (bool) {
         bytes32 INITIALIZABLE_STORAGE_SLOT = 0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00;
         bytes32 slotVal = vm.load(_addr, INITIALIZABLE_STORAGE_SLOT);
