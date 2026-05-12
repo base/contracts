@@ -13,10 +13,6 @@ library DeployUtils {
 
     bytes32 internal constant DEFAULT_SALT = keccak256("op-stack-contract-impls-salt-v0");
 
-    /// @notice Deploys a contract with the given name and arguments via CREATE.
-    /// @param _name Name of the contract to deploy.
-    /// @param _args ABI-encoded constructor arguments.
-    /// @return addr_ Address of the deployed contract.
     function create1(string memory _name, bytes memory _args) internal returns (address payable addr_) {
         bytes memory bytecode = abi.encodePacked(vm.getCode(_name), _args);
         assembly {
@@ -39,8 +35,6 @@ library DeployUtils {
 
     /// @notice Deploys a contract with the given name using CREATE2. If the contract is already deployed, this method
     /// does nothing.
-    /// @param _name Name of the contract to deploy.
-    /// @param _args ABI-encoded constructor arguments.
     function createDeterministic(
         string memory _name,
         bytes memory _args,
@@ -68,8 +62,6 @@ library DeployUtils {
         encodedData_ = Bytes.slice(_data, 4);
     }
 
-    /// @notice Asserts that the given address is a valid contract address.
-    /// @param _who Address to check.
     function assertValidContractAddress(address _who) internal view {
         // Foundry will set returned address to address(1) whenever a contract creation fails
         // inside of a test. If this is the case then let Foundry handle the error itself and don't
@@ -79,10 +71,7 @@ library DeployUtils {
         require(_who.code.length > 0, string.concat("DeployUtils: no code at ", LibString.toHexStringChecksummed(_who)));
     }
 
-    /// @notice Asserts that the given list of addresses does not contain duplicates.
-    /// @param _addrs Addresses to check.
     function assertUniqueAddresses(address[] memory _addrs) internal pure {
-        // All addresses should be unique.
         for (uint256 i = 0; i < _addrs.length; i++) {
             for (uint256 j = i + 1; j < _addrs.length; j++) {
                 require(
@@ -95,17 +84,10 @@ library DeployUtils {
         }
     }
 
-    /// @notice Asserts that the given addresses are valid contract addresses.
-    /// @param _addrs Addresses to check.
     function assertValidContractAddresses(address[] memory _addrs) internal view {
-        // Assert that all addresses are non-zero and have code.
-        // We use LibString to avoid the need for adding cheatcodes to this contract.
         for (uint256 i = 0; i < _addrs.length; i++) {
-            address who = _addrs[i];
-            assertValidContractAddress(who);
+            assertValidContractAddress(_addrs[i]);
         }
-
-        // All addresses should be unique.
         assertUniqueAddresses(_addrs);
     }
 
