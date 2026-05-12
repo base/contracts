@@ -99,8 +99,6 @@ contract SystemDeploy is Script {
         address teeChallenger;
         ISuperchainConfig superchainConfigProxy;
         IProxyAdmin superchainProxyAdmin;
-        address l1ProxyAdminOwner;
-        address challenger;
         address guardian;
         address incidentResponder;
     }
@@ -173,8 +171,6 @@ contract SystemDeploy is Script {
     error MissingImplementations();
     error PrestateNotSet();
     error SuperchainConfigNeedsUpgrade(uint256 index);
-
-    bytes32 internal constant _SALT = keccak256("op-stack-contract-impls-salt-v0");
 
     /// @notice Sets up the shared deployment config and artifact registry.
     function setUp() public virtual {
@@ -270,6 +266,7 @@ contract SystemDeploy is Script {
     }
 
     function _deployInput() internal view returns (DeployInput memory input_) {
+        Types.Implementations memory emptyImpls;
         input_ = DeployInput({
             deploySuperchain: true,
             deployImplementations: true,
@@ -283,26 +280,7 @@ contract SystemDeploy is Script {
             implementationsInput: _configuredImplementationsInput(
                 ISuperchainConfig(address(0)), IProxyAdmin(address(0))
             ),
-            implementations: Types.Implementations({
-                superchainConfigImpl: address(0),
-                l1ERC721BridgeImpl: address(0),
-                optimismPortalImpl: address(0),
-                ethLockboxImpl: address(0),
-                systemConfigImpl: address(0),
-                optimismMintableERC20FactoryImpl: address(0),
-                l1CrossDomainMessengerImpl: address(0),
-                l1StandardBridgeImpl: address(0),
-                disputeGameFactoryImpl: address(0),
-                anchorStateRegistryImpl: address(0),
-                delayedWETHImpl: address(0),
-                mipsImpl: address(0),
-                faultDisputeGameV2Impl: address(0),
-                permissionedDisputeGameV2Impl: address(0),
-                aggregateVerifierImpl: address(0),
-                teeProverRegistryImpl: address(0),
-                teeVerifierImpl: address(0),
-                zkVerifierImpl: address(0)
-            }),
+            implementations: emptyImpls,
             opChainInput: _configuredOPChainInput()
         });
     }
@@ -340,10 +318,6 @@ contract SystemDeploy is Script {
             teeChallenger: cfg.teeChallenger(),
             superchainConfigProxy: _superchainConfigProxy,
             superchainProxyAdmin: _superchainProxyAdmin,
-            l1ProxyAdminOwner: address(_superchainProxyAdmin) == address(0)
-                ? address(0)
-                : _superchainProxyAdmin.owner(),
-            challenger: cfg.l2OutputOracleChallenger(),
             guardian: cfg.superchainConfigGuardian(),
             incidentResponder: cfg.superchainConfigIncidentResponder()
         });
@@ -453,69 +427,58 @@ contract SystemDeploy is Script {
         SuperchainOutput memory _superchain
     )
         internal
-        view
+        pure
         returns (ImplementationInput memory input_)
     {
         input_ = _input.implementationsInput;
         input_.superchainConfigProxy = _superchain.superchainConfigProxy;
         input_.superchainProxyAdmin = _superchain.superchainProxyAdmin;
-        if (input_.l1ProxyAdminOwner == address(0)) {
-            input_.l1ProxyAdminOwner = _superchain.superchainProxyAdmin.owner();
-        }
     }
 
     function _deploySuperchain(SuperchainInput memory _input) internal returns (SuperchainOutput memory output_) {
         _assertValidSuperchainInput(_input);
 
-        _deploySuperchainProxyAdmin(output_);
+        output_.superchainProxyAdmin = _deploySuperchainProxyAdmin();
         output_.superchainConfigImpl = _deploySuperchainConfigImpl(_input.guardian, _input.incidentResponder);
-        _deploySuperchainConfigProxy(output_);
-        _transferSuperchainProxyAdminOwnership(_input, output_);
+        output_.superchainConfigProxy =
+            _deploySuperchainConfigProxy(output_.superchainProxyAdmin, output_.superchainConfigImpl);
+
+        _assertValidContractAddress(address(output_.superchainProxyAdmin));
+        vm.broadcast(msg.sender);
+        output_.superchainProxyAdmin.transferOwnership(_input.superchainProxyAdminOwner);
 
         _assertValidSuperchainOutput(_input, output_);
     }
 
-    function _deploySuperchainProxyAdmin(SuperchainOutput memory _output) private {
+    function _deploySuperchainProxyAdmin() internal returns (IProxyAdmin proxyAdmin_) {
         vm.broadcast(msg.sender);
-        IProxyAdmin superchainProxyAdmin = IProxyAdmin(
+        proxyAdmin_ = IProxyAdmin(
             DeployUtils.create1({
                 _name: "ProxyAdmin",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxyAdmin.__constructor__, (msg.sender)))
             })
         );
-
-        vm.label(address(superchainProxyAdmin), "SuperchainProxyAdmin");
-        _output.superchainProxyAdmin = superchainProxyAdmin;
+        vm.label(address(proxyAdmin_), "SuperchainProxyAdmin");
     }
 
-    function _deploySuperchainConfigProxy(SuperchainOutput memory _output) private {
+    function _deploySuperchainConfigProxy(
+        IProxyAdmin _proxyAdmin,
+        ISuperchainConfig _impl
+    )
+        internal
+        returns (ISuperchainConfig proxy_)
+    {
         vm.startBroadcast(msg.sender);
-        ISuperchainConfig superchainConfigProxy = ISuperchainConfig(
+        proxy_ = ISuperchainConfig(
             DeployUtils.create1({
                 _name: "src/universal/Proxy.sol:Proxy",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(IProxy.__constructor__, (address(_output.superchainProxyAdmin)))
-                )
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxy.__constructor__, (address(_proxyAdmin))))
             })
         );
-        _output.superchainProxyAdmin
-            .upgrade(payable(address(superchainConfigProxy)), address(_output.superchainConfigImpl));
+        _proxyAdmin.upgrade(payable(address(proxy_)), address(_impl));
         vm.stopBroadcast();
 
-        vm.label(address(superchainConfigProxy), "SuperchainConfigProxy");
-        _output.superchainConfigProxy = superchainConfigProxy;
-    }
-
-    function _transferSuperchainProxyAdminOwnership(
-        SuperchainInput memory _input,
-        SuperchainOutput memory _output
-    )
-        private
-    {
-        _assertValidContractAddress(address(_output.superchainProxyAdmin));
-
-        vm.broadcast(msg.sender);
-        _output.superchainProxyAdmin.transferOwnership(_input.superchainProxyAdminOwner);
+        vm.label(address(proxy_), "SuperchainConfigProxy");
     }
 
     function _assertValidSuperchainInput(SuperchainInput memory _input) internal pure {
@@ -554,7 +517,8 @@ contract SystemDeploy is Script {
     {
         _assertValidImplementationInput(_input);
 
-        output_.implementations.superchainConfigImpl = address(_deploySuperchainConfigImpl(_input));
+        output_.implementations.superchainConfigImpl =
+            address(_deploySuperchainConfigImpl(_input.guardian, _input.incidentResponder));
         output_.implementations.systemConfigImpl = address(_deploySystemConfigImpl());
         output_.implementations.l1CrossDomainMessengerImpl = address(_deployL1CrossDomainMessengerImpl());
         output_.implementations.l1ERC721BridgeImpl = address(_deployL1ERC721BridgeImpl());
@@ -810,10 +774,7 @@ contract SystemDeploy is Script {
             _impls: _impls,
             _l2ChainId: _config.systemConfigProxy.l2ChainId(),
             _disputeGame: permissionedGame,
-            _newDelayedWeth: _getWETH(disputeGameFactory, permissionedGame, GameTypes.PERMISSIONED_CANNON),
-            _newAnchorStateRegistryProxy: _getAnchorStateRegistry(
-                disputeGameFactory, permissionedGame, GameTypes.PERMISSIONED_CANNON
-            ),
+            _disputeGameFactory: disputeGameFactory,
             _opChainConfig: _config
         });
 
@@ -828,59 +789,59 @@ contract SystemDeploy is Script {
     )
         internal
     {
+        uint256 l2ChainId = _config.systemConfigProxy.l2ChainId();
         IDisputeGame cannonGame = _disputeGameFactory.gameImpls(GameTypes.CANNON);
-        IDelayedWETH cannonWeth;
-        IAnchorStateRegistry cannonAnchorStateRegistry;
-        if (address(cannonGame) != address(0)) {
-            cannonWeth = _getWETH(_disputeGameFactory, cannonGame, GameTypes.CANNON);
-            cannonAnchorStateRegistry = _getAnchorStateRegistry(_disputeGameFactory, cannonGame, GameTypes.CANNON);
+        bool cannonExists = address(cannonGame) != address(0);
 
+        LibGameArgs.GameArgs memory cannonParams;
+        if (cannonExists) {
+            cannonParams = _resolveGameParams(_disputeGameFactory, cannonGame, GameTypes.CANNON);
             Claim cannonPrestate = _config.cannonPrestate.raw() != bytes32(0)
                 ? _config.cannonPrestate
-                : _getAbsolutePrestate(_disputeGameFactory, address(cannonGame), GameTypes.CANNON);
+                : Claim.wrap(cannonParams.absolutePrestate);
             _setNewPermissionlessGameImplV2({
                 _impls: _impls,
-                _l2ChainId: _config.systemConfigProxy.l2ChainId(),
+                _l2ChainId: l2ChainId,
                 _newAbsolutePrestate: cannonPrestate,
-                _newDelayedWeth: cannonWeth,
-                _newAnchorStateRegistryProxy: cannonAnchorStateRegistry,
+                _newDelayedWeth: IDelayedWETH(payable(cannonParams.weth)),
+                _newAnchorStateRegistryProxy: IAnchorStateRegistry(cannonParams.anchorStateRegistry),
                 _gameType: GameTypes.CANNON,
                 _disputeGameFactory: _disputeGameFactory
             });
         }
 
         IDisputeGame cannonKonaGame = _disputeGameFactory.gameImpls(GameTypes.CANNON_KONA);
-        if (address(cannonKonaGame) != address(0) || address(cannonGame) != address(0)) {
-            Claim cannonKonaPrestate = _config.cannonKonaPrestate.raw() != bytes32(0)
-                ? _config.cannonKonaPrestate
-                : address(cannonKonaGame) != address(0)
-                    ? _getAbsolutePrestate(_disputeGameFactory, address(cannonKonaGame), GameTypes.CANNON_KONA)
-                    : Claim.wrap(bytes32(0));
+        bool konaExists = address(cannonKonaGame) != address(0);
+        if (!cannonExists && !konaExists) return;
 
-            if (cannonKonaPrestate.raw() != bytes32(0)) {
-                IDelayedWETH cannonKonaWeth = address(cannonGame) != address(0)
-                    ? cannonWeth
-                    : _getWETH(_disputeGameFactory, cannonKonaGame, GameTypes.CANNON_KONA);
-                IAnchorStateRegistry cannonKonaAnchorStateRegistry = address(cannonGame) != address(0)
-                    ? cannonAnchorStateRegistry
-                    : _getAnchorStateRegistry(_disputeGameFactory, cannonKonaGame, GameTypes.CANNON_KONA);
+        LibGameArgs.GameArgs memory konaParams = cannonExists
+            ? cannonParams
+            : _resolveGameParams(_disputeGameFactory, cannonKonaGame, GameTypes.CANNON_KONA);
 
-                _setNewPermissionlessGameImplV2({
-                    _impls: _impls,
-                    _l2ChainId: _config.systemConfigProxy.l2ChainId(),
-                    _newAbsolutePrestate: cannonKonaPrestate,
-                    _newDelayedWeth: cannonKonaWeth,
-                    _newAnchorStateRegistryProxy: cannonKonaAnchorStateRegistry,
-                    _gameType: GameTypes.CANNON_KONA,
-                    _disputeGameFactory: _disputeGameFactory
-                });
+        Claim cannonKonaPrestate = _config.cannonKonaPrestate;
+        if (cannonKonaPrestate.raw() == bytes32(0) && konaExists) {
+            cannonKonaPrestate = Claim.wrap(
+                cannonExists
+                    ? _resolveGameParams(_disputeGameFactory, cannonKonaGame, GameTypes.CANNON_KONA).absolutePrestate
+                    : konaParams.absolutePrestate
+            );
+        }
+        if (cannonKonaPrestate.raw() == bytes32(0)) return;
 
-                uint256 cannonInitBond = _disputeGameFactory.initBonds(GameTypes.CANNON);
-                if (cannonInitBond != 0) {
-                    vm.broadcast(msg.sender);
-                    _disputeGameFactory.setInitBond(GameTypes.CANNON_KONA, cannonInitBond);
-                }
-            }
+        _setNewPermissionlessGameImplV2({
+            _impls: _impls,
+            _l2ChainId: l2ChainId,
+            _newAbsolutePrestate: cannonKonaPrestate,
+            _newDelayedWeth: IDelayedWETH(payable(konaParams.weth)),
+            _newAnchorStateRegistryProxy: IAnchorStateRegistry(konaParams.anchorStateRegistry),
+            _gameType: GameTypes.CANNON_KONA,
+            _disputeGameFactory: _disputeGameFactory
+        });
+
+        uint256 cannonInitBond = _disputeGameFactory.initBonds(GameTypes.CANNON);
+        if (cannonInitBond != 0) {
+            vm.broadcast(msg.sender);
+            _disputeGameFactory.setInitBond(GameTypes.CANNON_KONA, cannonInitBond);
         }
     }
 
@@ -970,33 +931,32 @@ contract SystemDeploy is Script {
         Types.Implementations memory _impls,
         uint256 _l2ChainId,
         IDisputeGame _disputeGame,
-        IDelayedWETH _newDelayedWeth,
-        IAnchorStateRegistry _newAnchorStateRegistryProxy,
+        IDisputeGameFactory _disputeGameFactory,
         Types.OpChainConfig memory _opChainConfig
     )
         internal
     {
-        IDisputeGameFactory disputeGameFactory =
-            IDisputeGameFactory(_opChainConfig.systemConfigProxy.disputeGameFactory());
+        LibGameArgs.GameArgs memory existing =
+            _resolveGameParams(_disputeGameFactory, _disputeGame, GameTypes.PERMISSIONED_CANNON);
         Claim absolutePrestate = _opChainConfig.cannonPrestate.raw() != bytes32(0)
             ? _opChainConfig.cannonPrestate
-            : _getAbsolutePrestate(disputeGameFactory, address(_disputeGame), GameTypes.PERMISSIONED_CANNON);
+            : Claim.wrap(existing.absolutePrestate);
         if (absolutePrestate.raw() == bytes32(0)) revert PrestateNotSet();
 
         bytes memory gameArgs = LibGameArgs.encode(
             LibGameArgs.GameArgs({
                 absolutePrestate: absolutePrestate.raw(),
                 vm: _impls.mipsImpl,
-                anchorStateRegistry: address(_newAnchorStateRegistryProxy),
-                weth: address(_newDelayedWeth),
+                anchorStateRegistry: existing.anchorStateRegistry,
+                weth: existing.weth,
                 l2ChainId: _l2ChainId,
-                proposer: _getProposer(disputeGameFactory, _disputeGame, GameTypes.PERMISSIONED_CANNON),
-                challenger: _getChallenger(disputeGameFactory, _disputeGame, GameTypes.PERMISSIONED_CANNON)
+                proposer: existing.proposer,
+                challenger: existing.challenger
             })
         );
 
         vm.broadcast(msg.sender);
-        disputeGameFactory.setImplementation(
+        _disputeGameFactory.setImplementation(
             GameTypes.PERMISSIONED_CANNON, IDisputeGame(_impls.permissionedDisputeGameV2Impl), gameArgs
         );
     }
@@ -1107,10 +1067,6 @@ contract SystemDeploy is Script {
         IAddressManager(_target).transferOwnership(_newOwner);
     }
 
-    function _deploySuperchainConfigImpl(ImplementationInput memory _input) internal returns (ISuperchainConfig) {
-        return _deploySuperchainConfigImpl(_input.guardian, _input.incidentResponder);
-    }
-
     function _deploySuperchainConfigImpl(
         address _guardian,
         address _incidentResponder
@@ -1124,7 +1080,7 @@ contract SystemDeploy is Script {
                 _args: DeployUtils.encodeConstructor(
                     abi.encodeCall(ISuperchainConfig.__constructor__, (_guardian, _incidentResponder))
                 ),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1134,7 +1090,7 @@ contract SystemDeploy is Script {
             DeployUtils.createDeterministic({
                 _name: "SystemConfig",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(ISystemConfig.__constructor__, ())),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1144,7 +1100,7 @@ contract SystemDeploy is Script {
             DeployUtils.createDeterministic({
                 _name: "L1CrossDomainMessenger",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IL1CrossDomainMessenger.__constructor__, ())),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1154,7 +1110,7 @@ contract SystemDeploy is Script {
             DeployUtils.createDeterministic({
                 _name: "L1ERC721Bridge",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IL1ERC721Bridge.__constructor__, ())),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1164,7 +1120,7 @@ contract SystemDeploy is Script {
             DeployUtils.createDeterministic({
                 _name: "L1StandardBridge",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IL1StandardBridge.__constructor__, ())),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1174,7 +1130,7 @@ contract SystemDeploy is Script {
             DeployUtils.createDeterministic({
                 _name: "OptimismMintableERC20Factory",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IOptimismMintableERC20Factory.__constructor__, ())),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1186,7 +1142,7 @@ contract SystemDeploy is Script {
                 _args: DeployUtils.encodeConstructor(
                     abi.encodeCall(IOptimismPortal.__constructor__, (_input.proofMaturityDelaySeconds))
                 ),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1196,7 +1152,7 @@ contract SystemDeploy is Script {
             DeployUtils.createDeterministic({
                 _name: "ETHLockbox",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IETHLockbox.__constructor__, ())),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1208,7 +1164,7 @@ contract SystemDeploy is Script {
                 _args: DeployUtils.encodeConstructor(
                     abi.encodeCall(IDelayedWETH.__constructor__, (_input.withdrawalDelaySeconds))
                 ),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1222,7 +1178,7 @@ contract SystemDeploy is Script {
                         IPreimageOracle.__constructor__, (_input.minProposalSizeBytes, _input.challengePeriodSeconds)
                     )
                 ),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1254,7 +1210,7 @@ contract SystemDeploy is Script {
             DeployUtils.createDeterministic({
                 _name: "DisputeGameFactory",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IDisputeGameFactory.__constructor__, ())),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1266,7 +1222,7 @@ contract SystemDeploy is Script {
                 _args: DeployUtils.encodeConstructor(
                     abi.encodeCall(IAnchorStateRegistry.__constructor__, (_input.disputeGameFinalityDelaySeconds))
                 ),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1277,7 +1233,7 @@ contract SystemDeploy is Script {
             DeployUtils.createDeterministic({
                 _name: "FaultDisputeGameV2",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IFaultDisputeGameV2.__constructor__, (params))),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1293,7 +1249,7 @@ contract SystemDeploy is Script {
                 _args: DeployUtils.encodeConstructor(
                     abi.encodeCall(IPermissionedDisputeGameV2.__constructor__, (params))
                 ),
-                _salt: _SALT
+                _salt: DeployUtils.DEFAULT_SALT
             })
         );
     }
@@ -1317,9 +1273,7 @@ contract SystemDeploy is Script {
 
         output_.teeProverRegistryProxy =
             TEEProverRegistry(_deployProxy(_opChainInput, _output.opChainProxyAdmin, "TEEProverRegistry"));
-        address[] memory initialProposers = new address[](2);
-        initialProposers[0] = _input.teeProposer;
-        initialProposers[1] = _input.teeChallenger;
+        address[] memory initialProposers = Solarray.addresses(_input.teeProposer, _input.teeChallenger);
         _upgradeToAndCall(
             _output.opChainProxyAdmin,
             address(output_.teeProverRegistryProxy),
@@ -1406,84 +1360,29 @@ contract SystemDeploy is Script {
         params_.maxClockDuration = Duration.wrap(uint64(_input.faultGameV2MaxClockDuration));
     }
 
-    function _getAbsolutePrestate(
+    /// @notice Resolves a game's stored args, falling back to direct reads on the deployed game.
+    function _resolveGameParams(
         IDisputeGameFactory _dgf,
-        address _disputeGame,
+        IDisputeGame _disputeGame,
         GameType _gameType
     )
         internal
         view
-        returns (Claim)
+        returns (LibGameArgs.GameArgs memory params_)
     {
         bytes memory gameArgsBytes = _dgf.gameArgs(_gameType);
-        if (gameArgsBytes.length == 0) {
-            return IFaultDisputeGameV2(_disputeGame).absolutePrestate();
-        }
-        return Claim.wrap(LibGameArgs.decode(gameArgsBytes).absolutePrestate);
-    }
-
-    function _getWETH(
-        IDisputeGameFactory _disputeGameFactory,
-        IDisputeGame _disputeGame,
-        GameType _gameType
-    )
-        internal
-        view
-        returns (IDelayedWETH)
-    {
-        bytes memory gameArgsBytes = _disputeGameFactory.gameArgs(_gameType);
-        if (gameArgsBytes.length == 0) {
-            return IFaultDisputeGameV2(address(_disputeGame)).weth();
-        }
-        return IDelayedWETH(payable(LibGameArgs.decode(gameArgsBytes).weth));
-    }
-
-    function _getAnchorStateRegistry(
-        IDisputeGameFactory _disputeGameFactory,
-        IDisputeGame _disputeGame,
-        GameType _gameType
-    )
-        internal
-        view
-        returns (IAnchorStateRegistry)
-    {
-        bytes memory gameArgsBytes = _disputeGameFactory.gameArgs(_gameType);
         if (gameArgsBytes.length != 0) {
-            return IAnchorStateRegistry(LibGameArgs.decode(gameArgsBytes).anchorStateRegistry);
+            return LibGameArgs.decode(gameArgsBytes);
         }
-        return IFaultDisputeGameV2(address(_disputeGame)).anchorStateRegistry();
-    }
-
-    function _getProposer(
-        IDisputeGameFactory _disputeGameFactory,
-        IDisputeGame _disputeGame,
-        GameType _gameType
-    )
-        internal
-        view
-        returns (address)
-    {
-        bytes memory gameArgsBytes = _disputeGameFactory.gameArgs(_gameType);
-        if (gameArgsBytes.length == 0) {
-            return IPermissionedDisputeGameV2(address(_disputeGame)).proposer();
+        IFaultDisputeGameV2 fault = IFaultDisputeGameV2(address(_disputeGame));
+        params_.absolutePrestate = fault.absolutePrestate().raw();
+        params_.weth = address(fault.weth());
+        params_.anchorStateRegistry = address(fault.anchorStateRegistry());
+        if (_gameType.raw() == GameTypes.PERMISSIONED_CANNON.raw()) {
+            IPermissionedDisputeGameV2 perm = IPermissionedDisputeGameV2(address(_disputeGame));
+            params_.proposer = perm.proposer();
+            params_.challenger = perm.challenger();
         }
-        return LibGameArgs.decode(gameArgsBytes).proposer;
-    }
-
-    function _getChallenger(
-        IDisputeGameFactory _disputeGameFactory,
-        IDisputeGame _disputeGame,
-        GameType _gameType
-    )
-        internal
-        view
-        returns (address)
-    {
-        bytes memory gameArgsBytes = _disputeGameFactory.gameArgs(_gameType);
-        if (gameArgsBytes.length == 0) {
-            return IPermissionedDisputeGameV2(address(_disputeGame)).challenger();
-        }
-        return LibGameArgs.decode(gameArgsBytes).challenger;
     }
 
     function _assertValidDeployInput(DeployInput memory _input) internal pure {
@@ -1532,24 +1431,8 @@ contract SystemDeploy is Script {
         require(_input.proofMaturityDelaySeconds != 0, "SystemDeploy: proofMaturityDelaySeconds not set");
         require(_input.disputeGameFinalityDelaySeconds != 0, "SystemDeploy: finality delay not set");
         require(_input.mipsVersion != 0, "SystemDeploy: mipsVersion not set");
-        if (_multiproofEnabled(_input)) {
-            require(_input.multiproofGameType != 0, "SystemDeploy: multiproofGameType not set");
-            require(_input.l2ChainID != 0, "SystemDeploy: multiproof l2ChainID not set");
-            require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
-            require(
-                _input.multiproofIntermediateBlockInterval != 0,
-                "SystemDeploy: multiproof intermediate interval not set"
-            );
-            require(
-                _input.multiproofBlockInterval % _input.multiproofIntermediateBlockInterval == 0,
-                "SystemDeploy: invalid multiproof block intervals"
-            );
-            require(_input.teeProposer != address(0), "SystemDeploy: teeProposer not set");
-            require(_input.teeChallenger != address(0), "SystemDeploy: teeChallenger not set");
-        }
         require(address(_input.superchainConfigProxy) != address(0), "SystemDeploy: superchainConfigProxy not set");
         require(address(_input.superchainProxyAdmin) != address(0), "SystemDeploy: superchainProxyAdmin not set");
-        require(_input.l1ProxyAdminOwner != address(0), "SystemDeploy: l1ProxyAdminOwner not set");
     }
 
     function _multiproofEnabled(ImplementationInput memory _input) internal pure returns (bool) {
@@ -1613,52 +1496,31 @@ contract SystemDeploy is Script {
     }
 
     function _saveDeployArtifacts(DeployOutput memory _output) internal {
+        _saveUpgradeArtifacts(_output.implementationOutput.implementations);
+
         artifacts.save("SuperchainProxyAdmin", address(_output.superchain.superchainProxyAdmin));
         artifacts.save("SuperchainConfigProxy", address(_output.superchain.superchainConfigProxy));
-        artifacts.save("SuperchainConfigImpl", _output.implementationOutput.implementations.superchainConfigImpl);
-        artifacts.save("SystemConfigImpl", _output.implementationOutput.implementations.systemConfigImpl);
-        artifacts.save(
-            "L1CrossDomainMessengerImpl", _output.implementationOutput.implementations.l1CrossDomainMessengerImpl
-        );
-        artifacts.save("L1ERC721BridgeImpl", _output.implementationOutput.implementations.l1ERC721BridgeImpl);
-        artifacts.save("L1StandardBridgeImpl", _output.implementationOutput.implementations.l1StandardBridgeImpl);
-        artifacts.save(
-            "OptimismMintableERC20FactoryImpl",
-            _output.implementationOutput.implementations.optimismMintableERC20FactoryImpl
-        );
-        artifacts.save("OptimismPortalImpl", _output.implementationOutput.implementations.optimismPortalImpl);
-        artifacts.save("ETHLockboxImpl", _output.implementationOutput.implementations.ethLockboxImpl);
-        artifacts.save("DisputeGameFactoryImpl", _output.implementationOutput.implementations.disputeGameFactoryImpl);
-        artifacts.save("AnchorStateRegistryImpl", _output.implementationOutput.implementations.anchorStateRegistryImpl);
-        artifacts.save("MipsSingleton", address(_output.implementationOutput.mipsSingleton));
-        artifacts.save("FaultDisputeGame", _output.implementationOutput.implementations.faultDisputeGameV2Impl);
         _saveIfSet("PreimageOracle", address(_output.implementationOutput.preimageOracleSingleton));
-        artifacts.save(
-            "PermissionedDisputeGame", _output.implementationOutput.implementations.permissionedDisputeGameV2Impl
-        );
-        artifacts.save("DelayedWETHImpl", _output.implementationOutput.implementations.delayedWETHImpl);
-        artifacts.save("ProxyAdmin", address(_output.opChain.opChainProxyAdmin));
-        artifacts.save("AddressManager", address(_output.opChain.addressManager));
-        artifacts.save("L1ERC721BridgeProxy", address(_output.opChain.l1ERC721BridgeProxy));
-        artifacts.save("SystemConfigProxy", address(_output.opChain.systemConfigProxy));
-        artifacts.save("OptimismMintableERC20FactoryProxy", address(_output.opChain.optimismMintableERC20FactoryProxy));
-        artifacts.save("L1StandardBridgeProxy", address(_output.opChain.l1StandardBridgeProxy));
-        artifacts.save("L1CrossDomainMessengerProxy", address(_output.opChain.l1CrossDomainMessengerProxy));
-        artifacts.save("ETHLockboxProxy", address(_output.opChain.ethLockboxProxy));
-        artifacts.save("DisputeGameFactoryProxy", address(_output.opChain.disputeGameFactoryProxy));
-        artifacts.save("PermissionedDelayedWETHProxy", address(_output.opChain.delayedWETHPermissionedGameProxy));
-        artifacts.save("DelayedWETHProxy", address(_output.opChain.delayedWETHPermissionlessGameProxy));
-        artifacts.save("AnchorStateRegistryProxy", address(_output.opChain.anchorStateRegistryProxy));
-        artifacts.save("OptimismPortalProxy", address(_output.opChain.optimismPortalProxy));
-        artifacts.save("OptimismPortal2Proxy", address(_output.opChain.optimismPortalProxy));
-        _saveIfSet("AggregateVerifier", _output.implementationOutput.implementations.aggregateVerifierImpl);
-        _saveIfSet("TEEProverRegistryProxy", address(_output.opChain.teeProverRegistryProxy));
-        _saveIfSet("TEEProverRegistry", address(_output.opChain.teeProverRegistryProxy));
-        _saveIfSet("TEEProverRegistryImpl", _output.implementationOutput.implementations.teeProverRegistryImpl);
-        _saveIfSet("TEEVerifier", _output.implementationOutput.implementations.teeVerifierImpl);
-        _saveIfSet("ZKVerifier", _output.implementationOutput.implementations.zkVerifierImpl);
-        _saveIfSet("NitroEnclaveVerifier", address(_output.opChain.nitroEnclaveVerifier));
-        _saveIfSet("SP1Verifier", address(_output.opChain.sp1Verifier));
+
+        Types.DeployOutput memory chain = _output.opChain;
+        artifacts.save("ProxyAdmin", address(chain.opChainProxyAdmin));
+        artifacts.save("AddressManager", address(chain.addressManager));
+        artifacts.save("L1ERC721BridgeProxy", address(chain.l1ERC721BridgeProxy));
+        artifacts.save("SystemConfigProxy", address(chain.systemConfigProxy));
+        artifacts.save("OptimismMintableERC20FactoryProxy", address(chain.optimismMintableERC20FactoryProxy));
+        artifacts.save("L1StandardBridgeProxy", address(chain.l1StandardBridgeProxy));
+        artifacts.save("L1CrossDomainMessengerProxy", address(chain.l1CrossDomainMessengerProxy));
+        artifacts.save("ETHLockboxProxy", address(chain.ethLockboxProxy));
+        artifacts.save("DisputeGameFactoryProxy", address(chain.disputeGameFactoryProxy));
+        artifacts.save("PermissionedDelayedWETHProxy", address(chain.delayedWETHPermissionedGameProxy));
+        artifacts.save("DelayedWETHProxy", address(chain.delayedWETHPermissionlessGameProxy));
+        artifacts.save("AnchorStateRegistryProxy", address(chain.anchorStateRegistryProxy));
+        artifacts.save("OptimismPortalProxy", address(chain.optimismPortalProxy));
+        artifacts.save("OptimismPortal2Proxy", address(chain.optimismPortalProxy));
+        _saveIfSet("TEEProverRegistryProxy", address(chain.teeProverRegistryProxy));
+        _saveIfSet("TEEProverRegistry", address(chain.teeProverRegistryProxy));
+        _saveIfSet("NitroEnclaveVerifier", address(chain.nitroEnclaveVerifier));
+        _saveIfSet("SP1Verifier", address(chain.sp1Verifier));
     }
 
     function _saveIfSet(string memory _name, address _addr) internal {

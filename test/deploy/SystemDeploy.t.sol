@@ -302,8 +302,6 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
             teeChallenger: challenger,
             superchainConfigProxy: ISuperchainConfig(address(0)),
             superchainProxyAdmin: IProxyAdmin(address(0)),
-            l1ProxyAdminOwner: owner,
-            challenger: challenger,
             guardian: guardian,
             incidentResponder: incidentResponder
         });
