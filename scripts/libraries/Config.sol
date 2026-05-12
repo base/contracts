@@ -9,8 +9,6 @@ enum Fork {
     DELTA,
     ECOTONE,
     FJORD,
-    GRANITE,
-    HOLOCENE,
     ISTHMUS,
     JOVIAN,
     INTEROP
@@ -20,25 +18,8 @@ Fork constant LATEST_FORK = Fork.INTEROP;
 
 library ForkUtils {
     function toString(Fork _fork) internal pure returns (string memory) {
-        if (_fork == Fork.NONE) {
-            return "none";
-        } else if (_fork == Fork.DELTA) {
-            return "delta";
-        } else if (_fork == Fork.ECOTONE) {
-            return "ecotone";
-        } else if (_fork == Fork.FJORD) {
-            return "fjord";
-        } else if (_fork == Fork.GRANITE) {
-            return "granite";
-        } else if (_fork == Fork.HOLOCENE) {
-            return "holocene";
-        } else if (_fork == Fork.ISTHMUS) {
-            return "isthmus";
-        } else if (_fork == Fork.JOVIAN) {
-            return "jovian";
-        } else {
-            return "unknown";
-        }
+        string[7] memory names = ["none", "delta", "ecotone", "fjord", "isthmus", "jovian", "interop"];
+        return names[uint8(_fork)];
     }
 }
 
