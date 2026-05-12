@@ -1,22 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Grab the directory of the contracts-bedrock package.
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
-
-# Load semver-utils.
-# shellcheck source=/dev/null
-source "$SCRIPT_DIR/utils/semver-utils.sh"
-
-# Path to semver-lock.json.
 SEMVER_LOCK="snapshots/semver-lock.json"
 
-# Define excluded contracts.
 EXCLUDED_CONTRACTS=(
   "src/vendor/asterisc/RISCV.sol"
 )
 
-# Helper function to check if a contract is excluded.
+extract_version() {
+  local file=$1
+  local version
+
+  version=$(grep -o 'string.*constant.*version.*=.*"[^"]*"' "$file" | sed 's/.*"\([^"]*\)".*/\1/' || true)
+  if [ -z "$version" ]; then
+    version=$(sed -n '/function.*version()/,/return/p' "$file" | grep -o '"[^"]*"' | sed 's/"//g' || true)
+  fi
+  echo "$version"
+}
+
 is_excluded() {
   local contract="$1"
   for excluded in "${EXCLUDED_CONTRACTS[@]}"; do
