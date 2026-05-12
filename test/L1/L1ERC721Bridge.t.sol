@@ -106,7 +106,7 @@ contract L1ERC721Bridge_Initialize_Test is L1ERC721Bridge_TestInit {
     /// @notice Tests that the initializer value is correct. Trivial test for normal
     ///         initialization but confirms that the initValue is not incremented incorrectly if
     ///         an upgrade function is not present.
-    function test_initialize_correctInitializerValue_succeeds() public {
+    function test_initialize_correctInitializerValue_succeeds() public view {
         // Get the slot for _initialized.
         StorageSlot memory slot = ForgeArtifacts.getSlot("L1ERC721Bridge", "_initialized");
 

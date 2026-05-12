@@ -6,6 +6,7 @@ import { stdJson } from "lib/forge-std/src/StdJson.sol";
 
 /// @notice Contains information about a storage slot. Mirrors the layout of the storage
 ///         slot object in Forge artifacts so that we can deserialize JSON into this struct.
+///         Field order matches the alphabetical JSON key order produced by `vm.parseJson`.
 struct ForgeStorageSlot {
     uint256 astId;
     string _contract;
@@ -27,18 +28,16 @@ library ForgeArtifacts {
     /// @notice Foundry cheatcode VM.
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    /// @notice Removes the semantic versioning from a contract name. The semver will exist if the contract is compiled
-    /// more than once with different versions of the compiler.
-    function _stripSemver(string memory _name) internal returns (string memory out_) {
-        out_ = _bash(string.concat("echo ", _name, " | sed -E 's/[.][0-9]+\\.[0-9]+\\.[0-9]+//g'"));
+    /// @notice Forge artifact output directory. Must match `out` in foundry.toml.
+    string private constant OUT_DIR = "forge-artifacts";
+
+    /// @notice Removes the semantic versioning suffix from a contract name. The semver appears
+    ///         when the contract is compiled more than once with different solc versions.
+    function _stripSemver(string memory _name) internal pure returns (string memory) {
+        return vm.split(_name, ".")[0];
     }
 
-    /// @notice Returns the storage layout for a deployed contract.
-    function getStorageLayout(string memory _name) internal returns (string memory layout_) {
-        layout_ = _bash(string.concat("jq -r '.storageLayout' < ", _getForgeArtifactPath(_name)));
-    }
-
-    /// @notice Returns the abi from a the forge artifact
+    /// @notice Returns the abi from the forge artifact.
     function getAbi(string memory _name) internal returns (string memory abi_) {
         abi_ = _bash(string.concat("jq -r '.abi' < ", _getForgeArtifactPath(_name)));
     }
@@ -88,41 +87,39 @@ library ForgeArtifacts {
         return stdJson.readBool(res, "");
     }
 
-    function _getForgeArtifactDirectory(string memory _name) internal returns (string memory dir_) {
-        string memory res = _bash("forge config --json | jq -r .out");
-        string memory contractName = _stripSemver(_name);
-        dir_ = string.concat(vm.projectRoot(), "/", string(res), "/", contractName, ".sol");
+    function _getForgeArtifactDirectory(string memory _name) internal view returns (string memory dir_) {
+        dir_ = string.concat(vm.projectRoot(), "/", OUT_DIR, "/", _stripSemver(_name), ".sol");
     }
 
     /// @notice Returns the filesystem path to the artifact path. If the contract was compiled
-    ///         with multiple solidity versions then return the first one based on the result of `ls`.
-    function _getForgeArtifactPath(string memory _name) internal returns (string memory out_) {
+    ///         with multiple solidity versions then return the first entry in the directory.
+    function _getForgeArtifactPath(string memory _name) internal view returns (string memory out_) {
         string memory directory = _getForgeArtifactDirectory(_name);
         string memory path = string.concat(directory, "/", _name, ".json");
         if (vm.exists(path)) {
             return path;
         }
-
-        string memory res = _bash(
-            string.concat("ls -1 --color=never ", directory, " | jq -R -s -c 'split(\"\n\") | map(select(length > 0))'")
-        );
-        string[] memory files = stdJson.readStringArray(res, "");
-        out_ = string.concat(directory, "/", files[0]);
+        Vm.DirEntry[] memory entries = vm.readDir(directory);
+        out_ = entries[0].path;
     }
 
-    /// @notice Returns the storage slot for a given contract and slot name
-    function getSlot(string memory _contractName, string memory _slotName) internal returns (StorageSlot memory slot_) {
-        string memory storageLayout = getStorageLayout(_contractName);
-        bytes memory rawSlot = vm.parseJson(
-            _bash(string.concat("echo '", storageLayout, "' | jq '.storage[] | select(.label == \"", _slotName, "\")'"))
-        );
-        ForgeStorageSlot memory slot = abi.decode(rawSlot, (ForgeStorageSlot));
-        slot_ = StorageSlot({ offset: slot.offset, slot: vm.parseUint(slot.slot) });
+    /// @notice Returns the storage slot for a given contract and slot name.
+    function getSlot(string memory _contractName, string memory _slotName) internal view returns (StorageSlot memory slot_) {
+        string memory artifact = vm.readFile(_getForgeArtifactPath(_contractName));
+        bytes memory raw = vm.parseJson(artifact, ".storageLayout.storage");
+        ForgeStorageSlot[] memory slots = abi.decode(raw, (ForgeStorageSlot[]));
+        bytes32 wantHash = keccak256(bytes(_slotName));
+        for (uint256 i = 0; i < slots.length; i++) {
+            if (keccak256(bytes(slots[i].label)) == wantHash) {
+                return StorageSlot({ offset: slots[i].offset, slot: vm.parseUint(slots[i].slot) });
+            }
+        }
+        revert(string.concat("ForgeArtifacts: slot not found for ", _contractName, ".", _slotName));
     }
 
     /// @notice Returns whether or not a contract is initialized.
     ///         Needs the name to get the storage layout.
-    function isInitialized(string memory _name, address _address) internal returns (bool initialized_) {
+    function isInitialized(string memory _name, address _address) internal view returns (bool initialized_) {
         StorageSlot memory slot = getSlot(_name, "_initialized");
         bytes32 slotVal = vm.load(_address, bytes32(slot.slot));
         initialized_ = uint8((uint256(slotVal) >> (slot.offset * 8)) & 0xFF) != 0;
@@ -151,10 +148,8 @@ library ForgeArtifacts {
     {
         string memory pathExcludesPat;
         for (uint256 i = 0; i < _pathExcludes.length; i++) {
+            if (i > 0) pathExcludesPat = string.concat(pathExcludesPat, " -o ");
             pathExcludesPat = string.concat(pathExcludesPat, " -path \"", _pathExcludes[i], "\"");
-            if (i != _pathExcludes.length - 1) {
-                pathExcludesPat = string.concat(pathExcludesPat, " -o ");
-            }
         }
 
         contractNames_ = abi.decode(
@@ -176,11 +171,11 @@ library ForgeArtifacts {
     ///         exists for the file to live in.
     function ensurePath(string memory _path) internal {
         string[] memory outputs = vm.split(_path, "/");
-        string memory path = "";
+        string memory dir = "";
         for (uint256 i = 0; i < outputs.length - 1; i++) {
-            path = string.concat(path, outputs[i], "/");
+            dir = string.concat(dir, outputs[i], "/");
         }
-        vm.createDir(path, true);
+        vm.createDir(dir, true);
     }
 
     function _bash(string memory _command) private returns (string memory stdout_) {
