@@ -11,6 +11,7 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { Fork } from "scripts/libraries/Config.sol";
 
 // Libraries
+import { Constants } from "src/libraries/Constants.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Preinstalls } from "src/libraries/Preinstalls.sol";
 import { Types } from "src/libraries/Types.sol";
@@ -24,7 +25,6 @@ import { IStandardBridge } from "interfaces/universal/IStandardBridge.sol";
 import { ICrossDomainMessenger } from "interfaces/universal/ICrossDomainMessenger.sol";
 import { IL2CrossDomainMessenger } from "interfaces/L2/IL2CrossDomainMessenger.sol";
 import { IGasPriceOracle } from "interfaces/L2/IGasPriceOracle.sol";
-import { IL1Block } from "interfaces/L2/IL1Block.sol";
 import { IFeeVault } from "interfaces/L2/IFeeVault.sol";
 
 /// @title L2Genesis
@@ -137,7 +137,7 @@ contract L2Genesis is Script {
     ///         should have their implementations set.
     ///         Warning: the predeploy accounts have contract code, but 0 nonce value, contrary
     ///         to the expected nonce of 1 per EIP-161. This is because the legacy go genesis
-    //          script didn't set the nonce and we didn't want to change that behavior when
+    ///         script didn't set the nonce and we didn't want to change that behavior when
     ///         migrating genesis generation to Solidity.
     function setPredeployProxies() internal {
         bytes memory code = vm.getDeployedCode("src/universal/Proxy.sol:Proxy");
@@ -187,12 +187,10 @@ contract L2Genesis is Script {
         // Note the ProxyAdmin implementation itself is behind a proxy that owns itself.
         address impl = _setImplementationCode(Predeploys.PROXY_ADMIN);
 
-        bytes32 _ownerSlot = bytes32(0);
-
         // there is no initialize() function, so we just set the storage manually.
-        vm.store(Predeploys.PROXY_ADMIN, _ownerSlot, bytes32(uint256(uint160(_input.opChainProxyAdminOwner))));
+        vm.store(Predeploys.PROXY_ADMIN, bytes32(0), bytes32(uint256(uint160(_input.opChainProxyAdminOwner))));
         // update the proxy to not be uninitialized (although not standard initialize pattern)
-        vm.store(impl, _ownerSlot, bytes32(uint256(uint160(_input.opChainProxyAdminOwner))));
+        vm.store(impl, bytes32(0), bytes32(uint256(uint160(_input.opChainProxyAdminOwner))));
     }
 
     function setL2ToL1MessagePasser() internal {
@@ -314,18 +312,11 @@ contract L2Genesis is Script {
         _setImplementationCode(Predeploys.SCHEMA_REGISTRY);
     }
 
-    /// @notice This predeploy is following the safety invariant #2,
-    ///         It uses low level create to deploy the contract due to the code
-    ///         having immutables and being a different compiler version.
+    /// @notice This predeploy is following the safety invariant #2.
+    ///         Deployed via CREATE because the contract has immutables and is on a different compiler version.
     function setEAS() internal {
         string memory cname = Predeploys.getName(Predeploys.EAS);
-        bytes memory code = vm.getCode(string.concat(cname, ".sol:", cname));
-
-        address eas;
-        assembly {
-            eas := create(0, add(code, 0x20), mload(code))
-        }
-
+        address eas = DeployUtils.create1({ _name: string.concat(cname, ".sol:", cname), _args: "" });
         _etchAndCleanup(Predeploys.predeployToCodeNamespace(Predeploys.EAS), eas);
     }
 
@@ -340,22 +331,22 @@ contract L2Genesis is Script {
     /// @notice Activate Ecotone network upgrade.
     function activateEcotone() internal {
         require(Preinstalls.BeaconBlockRoots.code.length > 0, "L2Genesis: must have beacon-block-roots contract");
-        vm.prank(IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES).DEPOSITOR_ACCOUNT());
+        vm.prank(Constants.DEPOSITOR_ACCOUNT);
         IGasPriceOracle(Predeploys.GAS_PRICE_ORACLE).setEcotone();
     }
 
     function activateFjord() internal {
-        vm.prank(IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES).DEPOSITOR_ACCOUNT());
+        vm.prank(Constants.DEPOSITOR_ACCOUNT);
         IGasPriceOracle(Predeploys.GAS_PRICE_ORACLE).setFjord();
     }
 
     function activateIsthmus() internal {
-        vm.prank(IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES).DEPOSITOR_ACCOUNT());
+        vm.prank(Constants.DEPOSITOR_ACCOUNT);
         IGasPriceOracle(Predeploys.GAS_PRICE_ORACLE).setIsthmus();
     }
 
     function activateJovian() internal {
-        vm.prank(IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES).DEPOSITOR_ACCOUNT());
+        vm.prank(Constants.DEPOSITOR_ACCOUNT);
         IGasPriceOracle(Predeploys.GAS_PRICE_ORACLE).setJovian();
     }
 
