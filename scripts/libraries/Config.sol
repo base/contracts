@@ -29,8 +29,6 @@ library ForkUtils {
 library Config {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    /// @notice Returns the path on the local filesystem where the deployment artifact is
-    ///         written to disk after doing a deployment.
     function deploymentOutfile() internal view returns (string memory) {
         return vm.envOr(
             "DEPLOYMENT_OUTFILE",
@@ -38,9 +36,7 @@ library Config {
         );
     }
 
-    /// @notice Returns the path on the local filesystem where the deploy config is read from.
-    ///         In test contexts, defaults to deploy-config/local.json; otherwise reads
-    ///         DEPLOY_CONFIG_PATH and requires it to be set.
+    /// @dev In test contexts, defaults to deploy-config/local.json; otherwise DEPLOY_CONFIG_PATH must be set.
     function deployConfigPath() internal view returns (string memory) {
         if (vm.isContext(VmSafe.ForgeContext.TestGroup)) {
             return string.concat(vm.projectRoot(), "/deploy-config/local.json");
@@ -50,14 +46,10 @@ library Config {
         return path;
     }
 
-    /// @notice Returns the chainid from the EVM context or the value of the CHAIN_ID env var as
-    ///         an override.
     function chainID() internal view returns (uint256) {
         return vm.envOr("CHAIN_ID", block.chainid);
     }
 
-    /// @notice Returns the string identifier of the OP chain use for forking.
-    ///         If not set, "op" is returned.
     function forkOpChain() internal view returns (string memory) {
         return vm.envOr("FORK_OP_CHAIN", string("op"));
     }
@@ -70,8 +62,6 @@ library Config {
         return vm.envUint("FORK_BLOCK_NUMBER");
     }
 
-    /// @notice Returns the profile to use for the foundry commands.
-    ///         If not set, "default" is returned.
     function foundryProfile() internal view returns (string memory) {
         return vm.envOr("FOUNDRY_PROFILE", string("default"));
     }
