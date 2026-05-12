@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IBigStepper } from "interfaces/L1/proofs/IBigStepper.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
@@ -108,51 +107,6 @@ library Types {
         ISystemConfig systemConfigProxy;
         Claim cannonPrestate;
         Claim cannonKonaPrestate;
-    }
-
-    /// @notice The input required to identify a chain for updating prestates.
-    struct UpdatePrestateInput {
-        ISystemConfig systemConfigProxy;
-        Claim cannonPrestate;
-        Claim cannonKonaPrestate;
-    }
-
-    struct AddGameInput {
-        string saltMixer;
-        ISystemConfig systemConfig;
-        IDelayedWETH delayedWETH;
-        GameType disputeGameType;
-        Claim disputeAbsolutePrestate;
-        uint256 disputeMaxGameDepth;
-        uint256 disputeSplitDepth;
-        Duration disputeClockExtension;
-        Duration disputeMaxClockDuration;
-        uint256 initialBond;
-        IBigStepper vm;
-        bool permissioned;
-    }
-
-    struct AddGameOutput {
-        IDelayedWETH delayedWETH;
-        IFaultDisputeGameV2 faultDisputeGame;
-    }
-
-    /// @notice Represents a set of L1 contracts. Used to represent a set of proxies.
-    /// This is not an exhaustive list of all contracts on L1, but rather a subset.
-    struct ContractSet {
-        address L1CrossDomainMessenger;
-        address L1StandardBridge;
-        address L2OutputOracle;
-        address DisputeGameFactory;
-        address DelayedWETH;
-        address PermissionedDelayedWETH;
-        address AnchorStateRegistry;
-        address OptimismMintableERC20Factory;
-        address OptimismPortal;
-        address ETHLockbox;
-        address SystemConfig;
-        address L1ERC721Bridge;
-        address SuperchainConfig;
     }
 
     /// @notice Maps an L2 chain ID to the standard L1 batch inbox address.
