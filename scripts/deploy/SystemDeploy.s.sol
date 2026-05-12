@@ -9,7 +9,6 @@ import { Artifacts } from "scripts/Artifacts.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
-import { Solarray } from "scripts/libraries/Solarray.sol";
 import { StateDiff } from "scripts/libraries/StateDiff.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
@@ -485,11 +484,10 @@ contract SystemDeploy is Script {
     }
 
     function _assertValidSuperchainOutput(SuperchainInput memory _input, SuperchainOutput memory _output) internal {
-        address[] memory addrs = Solarray.addresses(
-            address(_output.superchainProxyAdmin),
-            address(_output.superchainConfigImpl),
-            address(_output.superchainConfigProxy)
-        );
+        address[] memory addrs = new address[](3);
+        addrs[0] = address(_output.superchainProxyAdmin);
+        addrs[1] = address(_output.superchainConfigImpl);
+        addrs[2] = address(_output.superchainConfigProxy);
         DeployUtils.assertValidContractAddresses(addrs);
 
         vm.startPrank(address(0));
@@ -1273,7 +1271,9 @@ contract SystemDeploy is Script {
 
         output_.teeProverRegistryProxy =
             TEEProverRegistry(_deployProxy(_opChainInput, _output.opChainProxyAdmin, "TEEProverRegistry"));
-        address[] memory initialProposers = Solarray.addresses(_input.teeProposer, _input.teeChallenger);
+        address[] memory initialProposers = new address[](2);
+        initialProposers[0] = _input.teeProposer;
+        initialProposers[1] = _input.teeChallenger;
         _upgradeToAndCall(
             _output.opChainProxyAdmin,
             address(output_.teeProverRegistryProxy),
