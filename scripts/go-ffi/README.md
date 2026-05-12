@@ -15,7 +15,7 @@ To build, run `just build-go-ffi` from the `contract-bedrock` package.
 
 ### In a Forge Test
 
-To use `go-ffi` in a forge test, simply invoke the binary using the solidity `Process` library's `run` method.
+To use `go-ffi` in a forge test, invoke the binary with Foundry's `vm.ffi` cheatcode.
 
 ```solidity
 function myFFITest() public {
@@ -23,7 +23,7 @@ function myFFITest() public {
     commands[0] = "./scripts/go-ffi/go-ffi";
     commands[1] = "trie";
     commands[2] = "valid";
-    bytes memory result = Process.run(commands);
+    bytes memory result = vm.ffi(commands);
 
     // Do something with the result of the command
 }

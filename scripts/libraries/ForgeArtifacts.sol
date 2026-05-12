@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import { Vm } from "lib/forge-std/src/Vm.sol";
 import { stdJson } from "lib/forge-std/src/StdJson.sol";
 import { LibString } from "lib/solady/src/utils/LibString.sol";
-import { Process } from "scripts/libraries/Process.sol";
 
 /// @notice Contains information about a storage slot. Mirrors the layout of the storage
 ///         slot object in Forge artifacts so that we can deserialize JSON into this struct.
@@ -32,24 +31,24 @@ library ForgeArtifacts {
     /// @notice Removes the semantic versioning from a contract name. The semver will exist if the contract is compiled
     /// more than once with different versions of the compiler.
     function _stripSemver(string memory _name) internal returns (string memory out_) {
-        out_ = Process.bash(string.concat("echo ", _name, " | sed -E 's/[.][0-9]+\\.[0-9]+\\.[0-9]+//g'"));
+        out_ = _bash(string.concat("echo ", _name, " | sed -E 's/[.][0-9]+\\.[0-9]+\\.[0-9]+//g'"));
     }
 
     /// @notice Returns the storage layout for a deployed contract.
     function getStorageLayout(string memory _name) internal returns (string memory layout_) {
-        layout_ = Process.bash(string.concat("jq -r '.storageLayout' < ", _getForgeArtifactPath(_name)));
+        layout_ = _bash(string.concat("jq -r '.storageLayout' < ", _getForgeArtifactPath(_name)));
     }
 
     /// @notice Returns the abi from a the forge artifact
     function getAbi(string memory _name) internal returns (string memory abi_) {
-        abi_ = Process.bash(string.concat("jq -r '.abi' < ", _getForgeArtifactPath(_name)));
+        abi_ = _bash(string.concat("jq -r '.abi' < ", _getForgeArtifactPath(_name)));
     }
 
     /// @notice Returns the kind of contract (i.e. library, contract, or interface).
     /// @param _name The name of the contract to get the kind of.
     /// @return kind_ The kind of contract ("library", "contract", or "interface").
     function getContractKind(string memory _name) internal returns (string memory kind_) {
-        kind_ = Process.bash(
+        kind_ = _bash(
             string.concat(
                 "jq -r '.ast.nodes[] | select(.nodeType == \"ContractDefinition\") | .contractKind' < ",
                 _getForgeArtifactPath(_name)
@@ -66,7 +65,7 @@ library ForgeArtifacts {
         // contract. We should consider determining whether a contract is proxied based on the
         // deployment script since it's the source of truth for that. Current deployment script
         // does not make this easy but an updated script should likely make this possible.
-        string memory res = Process.bash(
+        string memory res = _bash(
             string.concat(
                 "jq -r '.rawMetadata' ",
                 _getForgeArtifactPath(_name),
@@ -82,7 +81,7 @@ library ForgeArtifacts {
     function isPredeployedContract(string memory _name) internal returns (bool out_) {
         // TODO: Similar to the above, using the `@custom:predeployed` tag is not reliable but
         // functional for now. Deployment script should make this easier to determine.
-        string memory res = Process.bash(
+        string memory res = _bash(
             string.concat(
                 "jq -r '.rawMetadata' ",
                 _getForgeArtifactPath(_name),
@@ -93,7 +92,7 @@ library ForgeArtifacts {
     }
 
     function _getForgeArtifactDirectory(string memory _name) internal returns (string memory dir_) {
-        string memory res = Process.bash("forge config --json | jq -r .out");
+        string memory res = _bash("forge config --json | jq -r .out");
         string memory contractName = _stripSemver(_name);
         dir_ = string.concat(vm.projectRoot(), "/", string(res), "/", contractName, ".sol");
     }
@@ -107,7 +106,7 @@ library ForgeArtifacts {
             return path;
         }
 
-        string memory res = Process.bash(
+        string memory res = _bash(
             string.concat("ls -1 --color=never ", directory, " | jq -R -s -c 'split(\"\n\") | map(select(length > 0))'")
         );
         string[] memory files = stdJson.readStringArray(res, "");
@@ -130,7 +129,7 @@ library ForgeArtifacts {
 
         string memory storageLayout = getStorageLayout(_contractName);
         bytes memory rawSlot = vm.parseJson(
-            Process.bash(
+            _bash(
                 string.concat(
                     "echo '",
                     storageLayout,
@@ -150,9 +149,7 @@ library ForgeArtifacts {
     function getSlot(string memory _contractName, string memory _slotName) internal returns (StorageSlot memory slot_) {
         string memory storageLayout = getStorageLayout(_contractName);
         bytes memory rawSlot = vm.parseJson(
-            Process.bash(
-                string.concat("echo '", storageLayout, "' | jq '.storage[] | select(.label == \"", _slotName, "\")'")
-            )
+            _bash(string.concat("echo '", storageLayout, "' | jq '.storage[] | select(.label == \"", _slotName, "\")'"))
         );
         ForgeStorageSlot memory slot = abi.decode(rawSlot, (ForgeStorageSlot));
         slot_ = StorageSlot({ offset: slot.offset, slot: vm.parseUint(slot.slot) });
@@ -197,7 +194,7 @@ library ForgeArtifacts {
 
         contractNames_ = abi.decode(
             vm.parseJson(
-                Process.bash(
+                _bash(
                     string.concat(
                         "find ",
                         _path,
@@ -219,5 +216,13 @@ library ForgeArtifacts {
             path = string.concat(path, outputs[i], "/");
         }
         vm.createDir(path, true);
+    }
+
+    function _bash(string memory _command) private returns (string memory stdout_) {
+        string[] memory command = new string[](3);
+        command[0] = "bash";
+        command[1] = "-c";
+        command[2] = _command;
+        stdout_ = string(vm.ffi(command));
     }
 }

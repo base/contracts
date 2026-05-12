@@ -9,7 +9,6 @@ import { Artifacts } from "scripts/Artifacts.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
-import { Process } from "scripts/libraries/Process.sol";
 import { Solarray } from "scripts/libraries/Solarray.sol";
 import { StateDiff } from "scripts/libraries/StateDiff.sol";
 import { Types } from "scripts/libraries/Types.sol";
@@ -185,7 +184,11 @@ contract SystemDeploy is Script {
 
     /// @notice Returns the commit hash of HEAD, or the packaged .gitcommit file when no git repository is available.
     function gitCommitHash() internal returns (string memory) {
-        return Process.bash("cast abi-encode 'f(string)' $(git rev-parse HEAD || cat .gitcommit)");
+        string[] memory command = new string[](3);
+        command[0] = "bash";
+        command[1] = "-c";
+        command[2] = "cast abi-encode 'f(string)' $(git rev-parse HEAD || cat .gitcommit)";
+        return string(vm.ffi(command));
     }
 
     /// @notice Records the deployment state diff to `snapshots/state-diff/<chainid>.json`.
