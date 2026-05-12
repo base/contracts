@@ -2,13 +2,10 @@ package main
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 
-	"github.com/ethereum-optimism/optimism/op-chain-ops/solc"
 	"github.com/base/contracts/scripts/checks/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -36,7 +33,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create the output map
 	output := make(map[string]SemverLockOutput)
 	for _, result := range results {
 		if result == nil {
@@ -45,25 +41,7 @@ func main() {
 		output[result.ContractKey] = result.SemverLockOutput
 	}
 
-	// Get and sort the keys
-	keys := make([]string, 0, len(output))
-	for k := range output {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	// Create a sorted map for output
-	sortedOutput := make(map[string]SemverLockOutput)
-	for _, k := range keys {
-		sortedOutput[k] = output[k]
-	}
-
-	// Write to JSON file
-	jsonData, err := json.MarshalIndent(sortedOutput, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	if err := os.WriteFile(semverLockFile, jsonData, 0644); err != nil {
+	if err := common.WriteJSON(output, semverLockFile); err != nil {
 		panic(err)
 	}
 
@@ -116,7 +94,6 @@ func processFile(file string) (*SemverLockResult, []error) {
 			if subNode.Documentation == nil {
 				continue
 			}
-			// Handle documentation based on its actual type
 			var docText string
 			switch doc := subNode.Documentation.(type) {
 			case string:
@@ -125,10 +102,6 @@ func processFile(file string) (*SemverLockResult, []error) {
 				if text, ok := doc["text"].(string); ok {
 					docText = text
 				}
-			case solc.AstDocumentation:
-				docText = doc.Text
-			case *solc.AstDocumentation:
-				docText = doc.Text
 			}
 			if strings.Contains(docText, "@custom:semver") {
 				hasSemverTag = true
@@ -143,13 +116,11 @@ func processFile(file string) (*SemverLockResult, []error) {
 		return nil, nil
 	}
 
-	// Extract the init code from the artifact.
 	initCodeBytes, err := hex.DecodeString(strings.TrimPrefix(artifact.Bytecode.Object, "0x"))
 	if err != nil {
 		return nil, []error{fmt.Errorf("failed to decode hex: %w", err)}
 	}
 
-	// Extract the source contents from the AST.
 	sourceCode, err := os.ReadFile(sourceFilePath)
 	if err != nil {
 		return nil, []error{fmt.Errorf("failed to read source file: %w", err)}
