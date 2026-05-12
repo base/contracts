@@ -142,19 +142,6 @@ contract DeployConfig is Script {
         sequencerFeeVaultWithdrawalNetwork = _json.readUint("$.sequencerFeeVaultWithdrawalNetwork");
     }
 
-    function l1StartingBlockTag() public returns (bytes32) {
-        try vm.parseJsonBytes32(_json, "$.l1StartingBlockTag") returns (bytes32 tag_) {
-            return tag_;
-        } catch { }
-        try vm.parseJsonString(_json, "$.l1StartingBlockTag") returns (string memory tag_) {
-            return _getBlockByTag(tag_);
-        } catch { }
-        try vm.parseJsonUint(_json, "$.l1StartingBlockTag") returns (uint256 tag_) {
-            return _getBlockByTag(vm.toString(tag_));
-        } catch { }
-        revert("DeployConfig: l1StartingBlockTag missing or not a bytes32/string/uint256");
-    }
-
     /// @notice Allow the `useUpgradedFork` config to be overridden in testing environments
     /// @dev When true, the forked system WILL be upgraded in setUp().
     ///      When false, the forked system WILL NOT be upgraded in setUp().
@@ -164,10 +151,5 @@ contract DeployConfig is Script {
     ///      system be deployed in setUp().
     function setUseUpgradedFork(bool _useUpgradedFork) public {
         useUpgradedFork = _useUpgradedFork;
-    }
-
-    function _getBlockByTag(string memory _tag) internal returns (bytes32) {
-        string memory cmd = string.concat("cast block ", _tag, " --json | jq .hash");
-        return stdJson.readBytes32(Process.bash(cmd), "");
     }
 }
