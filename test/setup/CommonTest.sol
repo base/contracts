@@ -9,14 +9,9 @@ import { Setup } from "test/setup/Setup.sol";
 import { Events } from "test/setup/Events.sol";
 import { FFIInterface } from "test/setup/FFIInterface.sol";
 
-// Scripts
-import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
-
 // Contracts
 import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-// Libraries
-import { Config } from "scripts/libraries/Config.sol";
 import { console } from "lib/forge-std/src/console.sol";
 
 // Interfaces

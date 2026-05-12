@@ -8,8 +8,6 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 // Libraries
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
-import { Fork } from "scripts/libraries/Config.sol";
-import { Features } from "src/libraries/Features.sol";
 
 /// @title Predeploys_TestInit
 /// @notice Reusable test initialization for `Predeploys` tests.
