@@ -167,7 +167,6 @@ contract SystemDeploy is Script {
     error InvalidChainId();
     error InvalidRoleAddress(string role);
     error InvalidStartingAnchorRoot();
-    error AddressHasNoCode(address who);
     error MissingImplementations();
     error PrestateNotSet();
     error SuperchainConfigNeedsUpgrade(uint256 index);
@@ -218,7 +217,7 @@ contract SystemDeploy is Script {
     /// @notice Deploys implementation contracts from the active deploy config and saves their artifact names.
     function deployImplementations() public returns (ImplementationOutput memory output_) {
         ISuperchainConfig superchainConfigProxy = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
-        IProxyAdmin superchainProxyAdmin = _erc1967Admin(address(superchainConfigProxy));
+        IProxyAdmin superchainProxyAdmin = superchainConfigProxy.proxyAdmin();
 
         output_ = _deployImplementations(_configuredImplementationsInput(superchainConfigProxy, superchainProxyAdmin));
         _saveUpgradeArtifacts(output_.implementations);
@@ -352,11 +351,6 @@ contract SystemDeploy is Script {
         });
     }
 
-    function _erc1967Admin(address _proxy) internal view returns (IProxyAdmin) {
-        bytes32 adminSlot = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
-        return IProxyAdmin(address(uint160(uint256(vm.load(_proxy, adminSlot)))));
-    }
-
     function deploy(DeployInput memory _input) public returns (DeployOutput memory output_) {
         _assertValidDeployInput(_input);
 
@@ -394,7 +388,7 @@ contract SystemDeploy is Script {
 
         for (uint256 i = 0; i < _input.opChainConfigs.length; i++) {
             Types.OpChainConfig memory config = _input.opChainConfigs[i];
-            _assertValidContractAddress(address(config.systemConfigProxy));
+            DeployUtils.assertValidContractAddress(address(config.systemConfigProxy));
 
             ISuperchainConfig superchainConfig = config.systemConfigProxy.superchainConfig();
             if (SemverComp.lt(
@@ -416,7 +410,7 @@ contract SystemDeploy is Script {
         if (_input.deploySuperchain) {
             output_ = _deploySuperchain(_input.superchainInput);
         } else {
-            _assertValidContractAddress(address(_input.superchainConfigProxy));
+            DeployUtils.assertValidContractAddress(address(_input.superchainConfigProxy));
             output_.superchainConfigProxy = _input.superchainConfigProxy;
             output_.superchainProxyAdmin = _input.superchainConfigProxy.proxyAdmin();
         }
@@ -443,7 +437,7 @@ contract SystemDeploy is Script {
         output_.superchainConfigProxy =
             _deploySuperchainConfigProxy(output_.superchainProxyAdmin, output_.superchainConfigImpl);
 
-        _assertValidContractAddress(address(output_.superchainProxyAdmin));
+        DeployUtils.assertValidContractAddress(address(output_.superchainProxyAdmin));
         vm.broadcast(msg.sender);
         output_.superchainProxyAdmin.transferOwnership(_input.superchainProxyAdminOwner);
 
@@ -749,6 +743,7 @@ contract SystemDeploy is Script {
 
     function _upgradeOPChain(Types.OpChainConfig memory _config, Types.Implementations memory _impls) internal {
         IProxyAdmin proxyAdmin = _config.systemConfigProxy.proxyAdmin();
+        uint256 l2ChainId = _config.systemConfigProxy.l2ChainId();
 
         _upgradeTo(proxyAdmin, address(_config.systemConfigProxy), _impls.systemConfigImpl);
 
@@ -772,24 +767,24 @@ contract SystemDeploy is Script {
         IDisputeGame permissionedGame = disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON);
         _setNewPermissionedGameImplV2({
             _impls: _impls,
-            _l2ChainId: _config.systemConfigProxy.l2ChainId(),
+            _l2ChainId: l2ChainId,
             _disputeGame: permissionedGame,
             _disputeGameFactory: disputeGameFactory,
             _opChainConfig: _config
         });
 
-        _upgradePermissionlessGames(_config, _impls, disputeGameFactory);
-        emit Upgraded(_config.systemConfigProxy.l2ChainId(), _config.systemConfigProxy, msg.sender);
+        _upgradePermissionlessGames(_config, _impls, disputeGameFactory, l2ChainId);
+        emit Upgraded(l2ChainId, _config.systemConfigProxy, msg.sender);
     }
 
     function _upgradePermissionlessGames(
         Types.OpChainConfig memory _config,
         Types.Implementations memory _impls,
-        IDisputeGameFactory _disputeGameFactory
+        IDisputeGameFactory _disputeGameFactory,
+        uint256 l2ChainId
     )
         internal
     {
-        uint256 l2ChainId = _config.systemConfigProxy.l2ChainId();
         IDisputeGame cannonGame = _disputeGameFactory.gameImpls(GameTypes.CANNON);
         bool cannonExists = address(cannonGame) != address(0);
 
@@ -1028,13 +1023,13 @@ contract SystemDeploy is Script {
     )
         internal
     {
-        _assertValidContractAddress(_implementation);
+        DeployUtils.assertValidContractAddress(_implementation);
         vm.broadcast(msg.sender);
         _proxyAdmin.upgradeAndCall(payable(_target), _implementation, _data);
     }
 
     function _upgradeTo(IProxyAdmin _proxyAdmin, address _target, address _implementation) internal {
-        _assertValidContractAddress(_implementation);
+        DeployUtils.assertValidContractAddress(_implementation);
         vm.broadcast(msg.sender);
         _proxyAdmin.upgrade(payable(_target), _implementation);
     }
@@ -1453,8 +1448,8 @@ contract SystemDeploy is Script {
         require(_input.multiproofGameType != 0, "SystemDeploy: multiproofGameType not set");
         require(_input.nitroEnclaveVerifier != address(0), "SystemDeploy: nitroEnclaveVerifier not set");
         require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
-        _assertValidContractAddress(_input.nitroEnclaveVerifier);
-        _assertValidContractAddress(address(_input.sp1Verifier));
+        DeployUtils.assertValidContractAddress(_input.nitroEnclaveVerifier);
+        DeployUtils.assertValidContractAddress(address(_input.sp1Verifier));
         require(_input.l2ChainID == _opChainInput.l2ChainId, "SystemDeploy: multiproof l2ChainID mismatch");
         require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
         require(
@@ -1470,24 +1465,20 @@ contract SystemDeploy is Script {
 
     function _assertValidImplementations(Types.Implementations memory _impls) internal view {
         if (_implementationsEmpty(_impls)) revert MissingImplementations();
-        _assertValidContractAddress(_impls.superchainConfigImpl);
-        _assertValidContractAddress(_impls.l1ERC721BridgeImpl);
-        _assertValidContractAddress(_impls.optimismPortalImpl);
-        _assertValidContractAddress(_impls.ethLockboxImpl);
-        _assertValidContractAddress(_impls.systemConfigImpl);
-        _assertValidContractAddress(_impls.optimismMintableERC20FactoryImpl);
-        _assertValidContractAddress(_impls.l1CrossDomainMessengerImpl);
-        _assertValidContractAddress(_impls.l1StandardBridgeImpl);
-        _assertValidContractAddress(_impls.disputeGameFactoryImpl);
-        _assertValidContractAddress(_impls.anchorStateRegistryImpl);
-        _assertValidContractAddress(_impls.delayedWETHImpl);
-        _assertValidContractAddress(_impls.mipsImpl);
-        _assertValidContractAddress(_impls.faultDisputeGameV2Impl);
-        _assertValidContractAddress(_impls.permissionedDisputeGameV2Impl);
-    }
-
-    function _assertValidContractAddress(address _who) internal view {
-        if (_who.code.length == 0) revert AddressHasNoCode(_who);
+        DeployUtils.assertValidContractAddress(_impls.superchainConfigImpl);
+        DeployUtils.assertValidContractAddress(_impls.l1ERC721BridgeImpl);
+        DeployUtils.assertValidContractAddress(_impls.optimismPortalImpl);
+        DeployUtils.assertValidContractAddress(_impls.ethLockboxImpl);
+        DeployUtils.assertValidContractAddress(_impls.systemConfigImpl);
+        DeployUtils.assertValidContractAddress(_impls.optimismMintableERC20FactoryImpl);
+        DeployUtils.assertValidContractAddress(_impls.l1CrossDomainMessengerImpl);
+        DeployUtils.assertValidContractAddress(_impls.l1StandardBridgeImpl);
+        DeployUtils.assertValidContractAddress(_impls.disputeGameFactoryImpl);
+        DeployUtils.assertValidContractAddress(_impls.anchorStateRegistryImpl);
+        DeployUtils.assertValidContractAddress(_impls.delayedWETHImpl);
+        DeployUtils.assertValidContractAddress(_impls.mipsImpl);
+        DeployUtils.assertValidContractAddress(_impls.faultDisputeGameV2Impl);
+        DeployUtils.assertValidContractAddress(_impls.permissionedDisputeGameV2Impl);
     }
 
     function _implementationsEmpty(Types.Implementations memory _impls) internal pure returns (bool) {
