@@ -107,7 +107,6 @@ contract DeployConfig is Script {
         zkAggregationHash = _json.readBytes32("$.zkAggregationHash");
         zkRangeHash = _json.readBytes32("$.zkRangeHash");
 
-
         basefeeScalar = uint32(_json.readUint("$.gasPriceOracleBaseFeeScalar"));
         blobbasefeeScalar = uint32(_json.readUint("$.gasPriceOracleBlobBaseFeeScalar"));
 
