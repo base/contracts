@@ -22,34 +22,31 @@ func parseVariableLength(variableType string, types map[string]solc.StorageLayou
 		return int(t.NumberOfBytes), nil
 	}
 
-	if strings.HasPrefix(variableType, "t_mapping") {
+	switch {
+	case strings.HasPrefix(variableType, "t_mapping"):
 		return 32, nil
-	} else if strings.HasPrefix(variableType, "t_uint") {
-		matches := uintRegex.FindStringSubmatch(variableType)
-		if len(matches) > 1 {
+	case strings.HasPrefix(variableType, "t_uint"):
+		if matches := uintRegex.FindStringSubmatch(variableType); len(matches) > 1 {
 			bitSize, _ := strconv.Atoi(matches[1])
 			return bitSize / 8, nil
 		}
-	} else if strings.HasPrefix(variableType, "t_bytes_") {
+	case strings.HasPrefix(variableType, "t_bytes_"):
 		return 32, nil
-	} else if strings.HasPrefix(variableType, "t_bytes") {
-		matches := bytesRegex.FindStringSubmatch(variableType)
-		if len(matches) > 1 {
+	case strings.HasPrefix(variableType, "t_bytes"):
+		if matches := bytesRegex.FindStringSubmatch(variableType); len(matches) > 1 {
 			return strconv.Atoi(matches[1])
 		}
-	} else if strings.HasPrefix(variableType, "t_address") {
+	case strings.HasPrefix(variableType, "t_address"):
 		return 20, nil
-	} else if strings.HasPrefix(variableType, "t_bool") {
+	case strings.HasPrefix(variableType, "t_bool"):
 		return 1, nil
-	} else if strings.HasPrefix(variableType, "t_array") {
-		matches := arrayRegex.FindStringSubmatch(variableType)
-		if len(matches) > 2 {
-			innerType := matches[1]
-			size, _ := strconv.Atoi(matches[2])
-			length, err := parseVariableLength(innerType, types)
+	case strings.HasPrefix(variableType, "t_array"):
+		if matches := arrayRegex.FindStringSubmatch(variableType); len(matches) > 2 {
+			length, err := parseVariableLength(matches[1], types)
 			if err != nil {
 				return 0, err
 			}
+			size, _ := strconv.Atoi(matches[2])
 			return length * size, nil
 		}
 	}
