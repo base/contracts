@@ -189,28 +189,6 @@ func TestCompareABIs(t *testing.T) {
 	}
 }
 
-func TestCheckExclusion(t *testing.T) {
-	testExcludes := []string{"IERC20", "IEAS", "IERC721"}
-
-	tests := []struct {
-		name         string
-		contractName string
-		want         bool
-	}{
-		{"Excluded contract", "IERC20", true},
-		{"Non-excluded contract", "IMyContract", false},
-		{"Another excluded contract", "IEAS", true},
-		{"Excluded contract (case-sensitive)", "ierc20", false},
-		{"Excluded contract with prefix", "IERC20Extension", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, checkExclusion(tt.contractName, testExcludes))
-		})
-	}
-}
-
 func TestNormalizeInternalType(t *testing.T) {
 	tests := []struct {
 		name         string
