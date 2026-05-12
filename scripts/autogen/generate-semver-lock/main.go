@@ -55,22 +55,18 @@ func processFile(file string) (*SemverLockResult, []error) {
 		return nil, []error{fmt.Errorf("failed to read artifact: %w", err)}
 	}
 
-	var sourceFilePath, contractName, contractKey string
+	var sourceFilePath, contractName string
 	for path, name := range artifact.Metadata.Settings.CompilationTarget {
-		sourceFilePath = path
-		contractName = name
-		contractKey = sourceFilePath + ":" + name
-		if strings.HasSuffix(file, ".dispute.json") {
-			// We have an additional compiler profile called "dispute".
-			// This can produce different bytecode for certain contracts
-			// and the output will contain 2 jsons: <contract>.sol and
-			// <contract>.dispute.sol. These both produce the same contractKey
-			// since the CompilationTarget is the same. However, this leads to
-			// non-determinstic initCode hashes. Here, we make the contractKey
-			// unique thus guranteeing deterministic hashes.
-			contractKey += ":dispute"
-		}
+		sourceFilePath, contractName = path, name
 		break
+	}
+	contractKey := sourceFilePath + ":" + contractName
+	if strings.HasSuffix(file, ".dispute.json") {
+		// The "dispute" compiler profile can produce different bytecode for
+		// the same source file, so forge emits both <contract>.sol.json and
+		// <contract>.dispute.json with identical CompilationTargets. Suffix
+		// the key to keep initCode hashes deterministic across the pair.
+		contractKey += ":dispute"
 	}
 
 	// Only apply to files in the src directory.
@@ -116,19 +112,23 @@ func hasSemverVersion(artifact *solc.ForgeArtifact, contractName string) bool {
 				subNode.Name != "version" {
 				continue
 			}
-			var docText string
-			switch doc := subNode.Documentation.(type) {
-			case string:
-				docText = doc
-			case map[string]interface{}:
-				if text, ok := doc["text"].(string); ok {
-					docText = text
-				}
-			}
-			if strings.Contains(docText, "@custom:semver") {
+			if strings.Contains(docText(subNode.Documentation), "@custom:semver") {
 				return true
 			}
 		}
+		return false
 	}
 	return false
+}
+
+func docText(doc interface{}) string {
+	switch d := doc.(type) {
+	case string:
+		return d
+	case map[string]interface{}:
+		if text, ok := d["text"].(string); ok {
+			return text
+		}
+	}
+	return ""
 }
