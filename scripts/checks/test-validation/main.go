@@ -138,9 +138,7 @@ func checkTestStructure(artifact *solc.ForgeArtifact) []error {
 			// <ContractName>_Harness
 		case len(parts) == 3 && parts[2] == "Harness":
 			// <ContractName>_<Descriptor>_Harness (e.g. OPContractsManager_Upgrade_Harness)
-		case len(parts) == 3 && parts[2] == "Test":
-			errs = append(errs, checkTestMethodName(artifact, contractName, parts[1])...)
-		case len(parts) == 4 && parts[3] == "Test":
+		case (len(parts) == 3 || len(parts) == 4) && parts[len(parts)-1] == "Test":
 			errs = append(errs, checkTestMethodName(artifact, contractName, parts[1])...)
 		default:
 			errs = append(errs, fmt.Errorf("contract '%s': invalid naming pattern. Expected patterns: <ContractName>_TestInit, <ContractName>_<FunctionName>_Test, or <ContractName>_Uncategorized_Test", contractName))
