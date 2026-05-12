@@ -22,16 +22,11 @@ func normalizeInternalType(internalType string) string {
 
 // excludeContracts is a list of contracts whose interfaces do not need to match perfectly.
 var excludeContracts = []string{
-	// External dependencies
 	"IERC20", "IERC721", "IERC5267", "IERC721Enumerable", "IERC721Upgradeable", "IERC721Metadata",
 	"IERC165", "IERC165Upgradeable", "ERC721TokenReceiver", "ERC1155TokenReceiver",
 	"ERC777TokensRecipient", "Guard", "IProxy", "Vm", "VmSafe", "IMulticall3",
 	"IERC721TokenReceiver", "IProxyCreationCallback", "IBeacon", "IEIP712",
-
-	// Generic interfaces
 	"IHasSuperchainConfig",
-
-	// EAS
 	"IEAS", "ISchemaResolver", "ISchemaRegistry",
 
 	// TODO: Interfaces that need to be fixed
@@ -41,7 +36,6 @@ var excludeContracts = []string{
 
 // excludeSourceContracts is a list of contracts that are allowed to not have interfaces
 var excludeSourceContracts = []string{
-	// Base contracts with no external functions
 	"CrossDomainMessengerLegacySpacer0", "CrossDomainMessengerLegacySpacer1",
 
 	// FIXME
@@ -94,7 +88,7 @@ func main() {
 }
 
 func processFile(artifactPath string) (*common.Void, []error) {
-	contractName := strings.Split(filepath.Base(artifactPath), ".")[0]
+	contractName := strings.TrimSuffix(filepath.Base(artifactPath), ".json")
 	if slices.Contains(excludeContracts, contractName) {
 		return nil, nil
 	}
@@ -132,14 +126,14 @@ func processFile(artifactPath string) (*common.Void, []error) {
 		dirPath := filepath.Dir(strings.TrimPrefix(absPath, "src/"))
 		interfacePath := filepath.Join(cwd, "interfaces", dirPath, "I"+contractName+".sol")
 		if _, err := os.Stat(interfacePath); errors.Is(err, os.ErrNotExist) {
-			return nil, []error{fmt.Errorf("Contract %s in %s does not have a corresponding interface at %s",
+			return nil, []error{fmt.Errorf("%s: contract in %s has no corresponding interface at %s",
 				contractName, absPath, interfacePath)}
 		}
 		return nil, nil
 	}
 
 	if !strings.HasPrefix(contractName, "I") {
-		return nil, []error{fmt.Errorf("%s: Interface does not start with 'I'", contractName)}
+		return nil, []error{fmt.Errorf("%s: interface does not start with 'I'", contractName)}
 	}
 
 	semver, err := getContractSemver(artifact)
@@ -148,7 +142,7 @@ func processFile(artifactPath string) (*common.Void, []error) {
 	}
 
 	if semver != "solidity^0.8.0" {
-		return nil, []error{fmt.Errorf("%s: Interface does not have correct compiler version (MUST be exactly solidity ^0.8.0)", contractName)}
+		return nil, []error{fmt.Errorf("%s: interface does not have correct compiler version (MUST be exactly solidity ^0.8.0)", contractName)}
 	}
 
 	contractBasename := contractName[1:]
@@ -175,12 +169,8 @@ func processFile(artifactPath string) (*common.Void, []error) {
 		return nil, []error{fmt.Errorf("failed to normalize contract ABI: %w", err)}
 	}
 
-	match, err := compareABIs(normalizedInterfaceABI, normalizedContractABI)
-	if err != nil {
-		return nil, []error{fmt.Errorf("failed to compare ABIs: %w", err)}
-	}
-	if !match {
-		return nil, []error{fmt.Errorf("differences found")}
+	if !compareABIs(normalizedInterfaceABI, normalizedContractABI) {
+		return nil, []error{fmt.Errorf("%s: ABI differs from contract", contractName)}
 	}
 
 	return nil, nil
@@ -219,33 +209,37 @@ func getContractSemver(artifact *Artifact) (string, error) {
 	return "", errors.New("semver not found")
 }
 
-func normalizeABI(abi json.RawMessage) (json.RawMessage, error) {
+func normalizeABI(abi json.RawMessage) ([]map[string]interface{}, error) {
 	var abiData []map[string]interface{}
 	if err := json.Unmarshal(abi, &abiData); err != nil {
 		return nil, err
 	}
 
 	hasConstructor := false
-	for i := range abiData {
-		normalizeABIItem(abiData[i])
-		if abiData[i]["type"] == "constructor" {
+	for _, item := range abiData {
+		normalizeInternalTypes(item)
+		if item["type"] == "function" && item["name"] == "__constructor__" {
+			item["type"] = "constructor"
+			delete(item, "name")
+			delete(item, "outputs")
+		}
+		if item["type"] == "constructor" {
 			hasConstructor = true
 		}
 	}
 
 	if !hasConstructor {
-		emptyConstructor := map[string]interface{}{
+		abiData = append(abiData, map[string]interface{}{
 			"type":            "constructor",
 			"stateMutability": "nonpayable",
 			"inputs":          []interface{}{},
-		}
-		abiData = append(abiData, emptyConstructor)
+		})
 	}
 
-	return json.Marshal(abiData)
+	return abiData, nil
 }
 
-func normalizeABIItem(item map[string]interface{}) {
+func normalizeInternalTypes(item map[string]interface{}) {
 	for key, value := range item {
 		switch v := value.(type) {
 		case string:
@@ -253,51 +247,34 @@ func normalizeABIItem(item map[string]interface{}) {
 				item[key] = normalizeInternalType(v)
 			}
 		case map[string]interface{}:
-			normalizeABIItem(v)
+			normalizeInternalTypes(v)
 		case []interface{}:
 			for _, elem := range v {
 				if elemMap, ok := elem.(map[string]interface{}); ok {
-					normalizeABIItem(elemMap)
+					normalizeInternalTypes(elemMap)
 				}
 			}
 		}
 	}
-
-	if item["type"] == "function" && item["name"] == "__constructor__" {
-		item["type"] = "constructor"
-		delete(item, "name")
-		delete(item, "outputs")
-	}
 }
 
-func compareABIs(abi1, abi2 json.RawMessage) (bool, error) {
-	var interfaceABI, contractABI []map[string]interface{}
-
-	if err := json.Unmarshal(abi1, &interfaceABI); err != nil {
-		return false, fmt.Errorf("error unmarshalling interface ABI: %w", err)
-	}
-
-	if err := json.Unmarshal(abi2, &contractABI); err != nil {
-		return false, fmt.Errorf("error unmarshalling contract ABI: %w", err)
-	}
-
-	interfaceItems := make(map[string]map[string]interface{})
-	contractItems := make(map[string]map[string]interface{})
-
+func compareABIs(interfaceABI, contractABI []map[string]interface{}) bool {
 	makeKey := func(item map[string]interface{}) string {
-		itemType := getString(item, "type")
-		itemName := getString(item, "name")
 		inputs, _ := json.Marshal(item["inputs"])
 		outputs, _ := json.Marshal(item["outputs"])
-		return fmt.Sprintf("%s_%s_%s_%s", itemType, itemName, inputs, outputs)
+		return fmt.Sprintf("%s_%s_%s_%s", getString(item, "type"), getString(item, "name"), inputs, outputs)
 	}
 
-	for _, item := range interfaceABI {
-		interfaceItems[makeKey(item)] = item
+	indexBy := func(items []map[string]interface{}) map[string]map[string]interface{} {
+		out := make(map[string]map[string]interface{}, len(items))
+		for _, item := range items {
+			out[makeKey(item)] = item
+		}
+		return out
 	}
-	for _, item := range contractABI {
-		contractItems[makeKey(item)] = item
-	}
+
+	interfaceItems := indexBy(interfaceABI)
+	contractItems := indexBy(contractABI)
 
 	isMatch := true
 	for key, item := range interfaceItems {
@@ -313,7 +290,7 @@ func compareABIs(abi1, abi2 json.RawMessage) (bool, error) {
 		}
 	}
 
-	return isMatch, nil
+	return isMatch
 }
 
 func formatABIItem(item map[string]interface{}) string {

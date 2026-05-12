@@ -124,7 +124,9 @@ func TestNormalizeABI(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := normalizeABI(json.RawMessage(tt.abi))
 			require.NoError(t, err)
-			require.JSONEq(t, tt.want, string(got))
+			gotJSON, err := json.Marshal(got)
+			require.NoError(t, err)
+			require.JSONEq(t, tt.want, string(gotJSON))
 		})
 	}
 }
@@ -182,9 +184,10 @@ func TestCompareABIs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := compareABIs(json.RawMessage(tt.abi1), json.RawMessage(tt.abi2))
-			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			var abi1, abi2 []map[string]interface{}
+			require.NoError(t, json.Unmarshal([]byte(tt.abi1), &abi1))
+			require.NoError(t, json.Unmarshal([]byte(tt.abi2), &abi2))
+			require.Equal(t, tt.want, compareABIs(abi1, abi2))
 		})
 	}
 }
