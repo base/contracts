@@ -2,8 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetContractDefinition(t *testing.T) {
@@ -30,10 +31,7 @@ func TestGetContractDefinition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getContractDefinition(artifact, tt.contractName)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getContractDefinition() = %v, want %v", got, tt.want)
-			}
+			require.Equal(t, tt.want, getContractDefinition(artifact, tt.contractName))
 		})
 	}
 }
@@ -54,11 +52,10 @@ func TestGetContractSemver(t *testing.T) {
 					},
 				},
 			},
-			want:    "solidity^0.8.0",
-			wantErr: false,
+			want: "solidity^0.8.0",
 		},
 		{
-			name: "Multiple pragmas",
+			name: "Returns first pragma directive",
 			artifact: &Artifact{
 				AST: ArtifactAST{
 					Nodes: []ASTNode{
@@ -67,8 +64,7 @@ func TestGetContractSemver(t *testing.T) {
 					},
 				},
 			},
-			want:    "solidity^0.8.0",
-			wantErr: false,
+			want: "solidity^0.8.0",
 		},
 		{
 			name: "No semver",
@@ -79,7 +75,6 @@ func TestGetContractSemver(t *testing.T) {
 					},
 				},
 			},
-			want:    "",
 			wantErr: true,
 		},
 	}
@@ -87,13 +82,12 @@ func TestGetContractSemver(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := getContractSemver(tt.artifact)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getContractSemver() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				require.Error(t, err)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("getContractSemver() = %v, want %v", got, tt.want)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -129,22 +123,8 @@ func TestNormalizeABI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := normalizeABI(json.RawMessage(tt.abi))
-			if err != nil {
-				t.Errorf("normalizeABI() error = %v", err)
-				return
-			}
-			var gotJSON, wantJSON interface{}
-			if err := json.Unmarshal(got, &gotJSON); err != nil {
-				t.Errorf("Error unmarshalling got JSON: %v", err)
-				return
-			}
-			if err := json.Unmarshal([]byte(tt.want), &wantJSON); err != nil {
-				t.Errorf("Error unmarshalling want JSON: %v", err)
-				return
-			}
-			if !reflect.DeepEqual(gotJSON, wantJSON) {
-				t.Errorf("normalizeABI() = %v, want %v", string(got), tt.want)
-			}
+			require.NoError(t, err)
+			require.JSONEq(t, tt.want, string(got))
 		})
 	}
 }
@@ -186,29 +166,31 @@ func TestCompareABIs(t *testing.T) {
 			abi2: `[{"type":"function","name":"test","inputs":[],"outputs":[{"type":"uint128"}]}]`,
 			want: false,
 		},
+		{
+			name: "Interface is strict subset of contract",
+			abi1: `[{"type":"function","name":"a","inputs":[],"outputs":[]}]`,
+			abi2: `[{"type":"function","name":"a","inputs":[],"outputs":[]},{"type":"function","name":"b","inputs":[],"outputs":[]}]`,
+			want: false,
+		},
+		{
+			name: "Contract is strict subset of interface",
+			abi1: `[{"type":"function","name":"a","inputs":[],"outputs":[]},{"type":"function","name":"b","inputs":[],"outputs":[]}]`,
+			abi2: `[{"type":"function","name":"a","inputs":[],"outputs":[]}]`,
+			want: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := compareABIs(json.RawMessage(tt.abi1), json.RawMessage(tt.abi2))
-			if err != nil {
-				t.Errorf("compareABIs() error = %v", err)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("compareABIs() = %v, want %v", got, tt.want)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
 
 func TestCheckExclusion(t *testing.T) {
-	// Fixed test list
-	testExcludes := []string{
-		"IERC20",
-		"IEAS",
-		"IERC721",
-	}
+	testExcludes := []string{"IERC20", "IEAS", "IERC721"}
 
 	tests := []struct {
 		name         string
@@ -224,9 +206,7 @@ func TestCheckExclusion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := checkExclusion(tt.contractName, testExcludes); got != tt.want {
-				t.Errorf("checkExclusion() = %v, want %v", got, tt.want)
-			}
+			require.Equal(t, tt.want, checkExclusion(tt.contractName, testExcludes))
 		})
 	}
 }
@@ -241,14 +221,14 @@ func TestNormalizeInternalType(t *testing.T) {
 		{"Replace enum X", "enum MyEnum", "enum IMyEnum"},
 		{"Replace struct I", "struct Whatever.MyStruct", "struct IWhatever.MyStruct"},
 		{"Don't replace II", "contract IInternet", "contract IInternet"},
+		{"Don't replace already-prefixed enum", "enum IMyEnum", "enum IMyEnum"},
+		{"Don't replace already-prefixed dotted struct", "struct IWhatever.MyStruct", "struct IWhatever.MyStruct"},
 		{"No replacement needed", "uint256", "uint256"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := normalizeInternalType(tt.internalType); got != tt.want {
-				t.Errorf("normalizeInternalType() = %v, want %v", got, tt.want)
-			}
+			require.Equal(t, tt.want, normalizeInternalType(tt.internalType))
 		})
 	}
 }
