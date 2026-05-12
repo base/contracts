@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -69,7 +70,6 @@ func processFile(file string) (*SemverLockResult, []error) {
 		contractKey += ":dispute"
 	}
 
-	// Only apply to files in the src directory.
 	if !strings.HasPrefix(sourceFilePath, "src/") {
 		return nil, nil
 	}
@@ -88,15 +88,13 @@ func processFile(file string) (*SemverLockResult, []error) {
 		return nil, []error{fmt.Errorf("failed to read source file: %w", err)}
 	}
 
-	trimmedSourceCode := []byte(strings.TrimSuffix(string(sourceCode), "\n"))
-	initCodeHash := fmt.Sprintf("0x%x", crypto.Keccak256Hash(initCodeBytes))
-	sourceCodeHash := fmt.Sprintf("0x%x", crypto.Keccak256Hash(trimmedSourceCode))
+	trimmedSourceCode := bytes.TrimSuffix(sourceCode, []byte("\n"))
 
 	return &SemverLockResult{
 		ContractKey: contractKey,
 		SemverLockOutput: SemverLockOutput{
-			InitCodeHash:   initCodeHash,
-			SourceCodeHash: sourceCodeHash,
+			InitCodeHash:   crypto.Keccak256Hash(initCodeBytes).Hex(),
+			SourceCodeHash: crypto.Keccak256Hash(trimmedSourceCode).Hex(),
 		},
 	}, nil
 }
