@@ -17,11 +17,11 @@ const (
 
 func main() {
 	if err := resetDirectory(storageLayoutDir); err != nil {
-		fmt.Printf("failed to reset storage layout directory: %v\n", err)
+		fmt.Printf("Failed to reset storage layout directory: %v\n", err)
 		os.Exit(1)
 	}
 	if err := resetDirectory(abiDir); err != nil {
-		fmt.Printf("failed to reset abi directory: %v\n", err)
+		fmt.Printf("Failed to reset abi directory: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -66,13 +66,11 @@ func processFile(file string) (common.Void, []error) {
 
 	storageLayout := make([]solc.AbiSpecStorageLayoutEntry, 0, len(artifact.StorageLayout.Storage))
 	for _, storageEntry := range artifact.StorageLayout.Storage {
-		// Convert ast-based type to Solidity type.
 		typ, ok := artifact.StorageLayout.Types[storageEntry.Type]
 		if !ok {
 			return common.Void{}, []error{fmt.Errorf("undefined type for %s:%s", contractName, storageEntry.Label)}
 		}
 
-		// Convert to Solidity storage layout entry.
 		storageLayout = append(storageLayout, solc.AbiSpecStorageLayoutEntry{
 			Label:  storageEntry.Label,
 			Bytes:  typ.NumberOfBytes,
