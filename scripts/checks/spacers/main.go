@@ -30,6 +30,8 @@ func parseVariableLength(variableType string, types map[string]solc.StorageLayou
 			bitSize, _ := strconv.Atoi(matches[1])
 			return bitSize / 8, nil
 		}
+	// t_bytes_ (dynamic bytes, 32-byte slot pointer) must precede t_bytes
+	// because HasPrefix("t_bytes") also matches t_bytes_storage.
 	case strings.HasPrefix(variableType, "t_bytes_"):
 		return 32, nil
 	case strings.HasPrefix(variableType, "t_bytes"):
