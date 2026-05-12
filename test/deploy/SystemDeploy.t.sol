@@ -317,7 +317,7 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
             basefeeScalar: 100,
             blobBasefeeScalar: 200,
             l2ChainId: l2ChainId,
-            startingAnchorRoot: abi.encode(Proposal({ root: Hash.wrap(bytes32(uint256(1))), l2SequenceNumber: 0 })),
+            startingAnchorRoot: Proposal({ root: Hash.wrap(bytes32(uint256(1))), l2SequenceNumber: 0 }),
             saltMixer: "system-deploy-test",
             gasLimit: 60_000_000,
             disputeGameType: GameTypes.PERMISSIONED_CANNON,

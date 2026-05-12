@@ -338,11 +338,10 @@ contract SystemDeploy is Script {
             basefeeScalar: cfg.basefeeScalar(),
             blobBasefeeScalar: cfg.blobbasefeeScalar(),
             l2ChainId: cfg.l2ChainId(),
-            startingAnchorRoot: abi.encode(
-                Proposal({
-                    root: Hash.wrap(cfg.faultGameGenesisOutputRoot()), l2SequenceNumber: cfg.faultGameGenesisBlock()
-                })
-            ),
+            startingAnchorRoot: Proposal({
+                root: Hash.wrap(cfg.faultGameGenesisOutputRoot()),
+                l2SequenceNumber: cfg.faultGameGenesisBlock()
+            }),
             saltMixer: "salt mixer",
             gasLimit: uint64(cfg.l2GenesisBlockGasLimit()),
             disputeGameType: GameTypes.PERMISSIONED_CANNON,
@@ -886,13 +885,12 @@ contract SystemDeploy is Script {
         pure
         returns (bytes memory)
     {
-        Proposal memory startingAnchorRoot = abi.decode(_input.startingAnchorRoot, (Proposal));
         return abi.encodeCall(
             IAnchorStateRegistry.initialize,
             (
                 _output.systemConfigProxy,
                 _output.disputeGameFactoryProxy,
-                startingAnchorRoot,
+                _input.startingAnchorRoot,
                 GameTypes.PERMISSIONED_CANNON
             )
         );
@@ -1403,7 +1401,7 @@ contract SystemDeploy is Script {
         if (_input.roles.unsafeBlockSigner == address(0)) revert InvalidRoleAddress("unsafeBlockSigner");
         if (_input.roles.proposer == address(0)) revert InvalidRoleAddress("proposer");
         if (_input.roles.challenger == address(0)) revert InvalidRoleAddress("challenger");
-        if (_input.startingAnchorRoot.length == 0 || bytes32(_input.startingAnchorRoot) == bytes32(0)) {
+        if (Hash.unwrap(_input.startingAnchorRoot.root) == bytes32(0)) {
             revert InvalidStartingAnchorRoot();
         }
     }

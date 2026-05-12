@@ -20,7 +20,7 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 
-import { Claim, Duration, GameType } from "src/libraries/bridge/Types.sol";
+import { Claim, Duration, GameType, Proposal } from "src/libraries/bridge/Types.sol";
 
 library Types {
     /// @notice Represents the roles that can be set when deploying a standard OP Stack chain.
@@ -39,12 +39,9 @@ library Types {
         uint32 basefeeScalar;
         uint32 blobBasefeeScalar;
         uint256 l2ChainId;
-        // The correct type is Proposal memory but OP Deployer does not yet support structs.
-        bytes startingAnchorRoot;
-        // The salt mixer is used as part of making the resulting salt unique.
+        Proposal startingAnchorRoot;
         string saltMixer;
         uint64 gasLimit;
-        // Configurable dispute game parameters.
         GameType disputeGameType;
         Claim disputeAbsolutePrestate;
         uint256 disputeMaxGameDepth;
