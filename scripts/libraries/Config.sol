@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import { Vm, VmSafe } from "lib/forge-std/src/Vm.sol";
 
 /// @notice Enum of forks available for selection when generating genesis allocs.
+/// @dev Keep `ForkUtils.toString` and `LATEST_FORK` in sync with this enum's order and length.
 enum Fork {
     NONE,
     DELTA,
@@ -26,32 +27,33 @@ library ForkUtils {
 /// @title Config
 /// @notice Contains shared env var based config used by scripts and tests.
 library Config {
-    /// @notice Foundry cheatcode VM.
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     /// @notice Returns the path on the local filesystem where the deployment artifact is
     ///         written to disk after doing a deployment.
-    function deploymentOutfile() internal view returns (string memory env_) {
-        env_ = vm.envOr(
+    function deploymentOutfile() internal view returns (string memory) {
+        return vm.envOr(
             "DEPLOYMENT_OUTFILE",
             string.concat(vm.projectRoot(), "/deployments/", vm.toString(block.chainid), "-deploy.json")
         );
     }
 
-    /// @notice Returns the path on the local filesystem where the deploy config is
-    function deployConfigPath() internal view returns (string memory env_) {
+    /// @notice Returns the path on the local filesystem where the deploy config is read from.
+    ///         In test contexts, defaults to deploy-config/local.json; otherwise reads
+    ///         DEPLOY_CONFIG_PATH and requires it to be set.
+    function deployConfigPath() internal view returns (string memory) {
         if (vm.isContext(VmSafe.ForgeContext.TestGroup)) {
-            env_ = string.concat(vm.projectRoot(), "/deploy-config/local.json");
-        } else {
-            env_ = vm.envOr("DEPLOY_CONFIG_PATH", string(""));
-            require(bytes(env_).length > 0, "Config: must set DEPLOY_CONFIG_PATH to filesystem path of deploy config");
+            return string.concat(vm.projectRoot(), "/deploy-config/local.json");
         }
+        string memory path = vm.envOr("DEPLOY_CONFIG_PATH", string(""));
+        require(bytes(path).length > 0, "Config: must set DEPLOY_CONFIG_PATH to filesystem path of deploy config");
+        return path;
     }
 
     /// @notice Returns the chainid from the EVM context or the value of the CHAIN_ID env var as
     ///         an override.
-    function chainID() internal view returns (uint256 env_) {
-        env_ = vm.envOr("CHAIN_ID", block.chainid);
+    function chainID() internal view returns (uint256) {
+        return vm.envOr("CHAIN_ID", block.chainid);
     }
 
     /// @notice Returns the string identifier of the OP chain use for forking.
@@ -60,12 +62,10 @@ library Config {
         return vm.envOr("FORK_OP_CHAIN", string("op"));
     }
 
-    /// @notice Returns the RPC URL to use for forking.
     function forkRpcUrl() internal view returns (string memory) {
         return vm.envString("FORK_RPC_URL");
     }
 
-    /// @notice Returns the block number to use for forking.
     function forkBlockNumber() internal view returns (uint256) {
         return vm.envUint("FORK_BLOCK_NUMBER");
     }
@@ -76,12 +76,10 @@ library Config {
         return vm.envOr("FOUNDRY_PROFILE", string("default"));
     }
 
-    /// @notice Returns the path to the superchain ops allocs.
     function superchainOpsAllocsPath() internal view returns (string memory) {
         return vm.envOr("SUPERCHAIN_OPS_ALLOCS_PATH", string(""));
     }
 
-    /// @notice Returns true if the fork is a test fork.
     function forkTest() internal view returns (bool) {
         return vm.envOr("FORK_TEST", false);
     }
