@@ -16,18 +16,16 @@
 # documented here to avoid false validation failures while maintaining the validation rules
 # for standard contract tests.
 src_validation = [
-    "test/invariants/",                    # Invariant testing framework - no direct src counterpart
-    "test/scripts/",                       # Script tests - test deployment/utility scripts, not contracts
-    "test/integration/",                   # Integration tests - test multiple contracts together
-    "test/cannon/MIPS64Memory.t.sol",      # Tests external MIPS implementation
+    "test/invariants/",                         # Invariant testing framework - no direct src counterpart
+    "test/scripts/",                            # Script tests - test deployment/utility scripts, not contracts
+    "test/cannon/MIPS64Memory.t.sol",           # Tests external MIPS implementation
     "test/libraries/bridge/LibClock.t.sol",     # Tests library utilities
     "test/libraries/bridge/LibGameId.t.sol",    # Tests library utilities
-    "test/libraries/DeployUtils.t.sol",    # Tests library utilities - no direct src counterpart
-    "test/setup/DeployVariations.t.sol",   # Tests deployment variations
-    "test/universal/BenchmarkTest.t.sol",  # Performance benchmarking tests
-    "test/universal/ExtendedPause.t.sol",  # Tests extended functionality
-    "test/vendor/Initializable.t.sol",     # Tests external vendor code
-    "test/vendor/InitializableOZv5.t.sol", # Tests external vendor code
+    "test/libraries/DeployUtils.t.sol",         # Tests library utilities - no direct src counterpart
+    "test/universal/BenchmarkTest.t.sol",       # Performance benchmarking tests
+    "test/universal/ExtendedPause.t.sol",       # Tests extended functionality
+    "test/vendor/Initializable.t.sol",          # Tests external vendor code
+    "test/vendor/InitializableOZv5.t.sol",      # Tests external vendor code
 ]
 
 # PATHS EXCLUDED FROM CONTRACT NAME FILE PATH VALIDATION:
@@ -45,14 +43,12 @@ src_validation = [
 # These naming inconsistencies may indicate the presence of specialized test
 # infrastructure beyond standard harnesses or different setup contracts patterns.
 contract_name_validation = [
-    "test/L1/proofs/FaultDisputeGame.t.sol",                # Contains contracts not matching FaultDisputeGame base name
-    "test/L1/proofs/v2/FaultDisputeGameV2.t.sol",           # Contains contracts not matching FaultDisputeGameV2 base name
-    "test/L1/ResourceMetering.t.sol",                     # Contains contracts not matching ResourceMetering base name
-    "test/L2/GasPriceOracle.t.sol",                       # Contains contracts not matching GasPriceOracle base name
-    "test/universal/StandardBridge.t.sol",                # Contains contracts not matching StandardBridge base name
-	"test/L2/RevenueSharingIntegration.t.sol",            # Contains contracts not matching RevenueSharingIntegration base name
-    "test/libraries/Blueprint.t.sol",                     # Contains helper contracts (BlueprintHarness, ConstructorArgMock)
-    "test/libraries/SafeCall.t.sol",                      # Contains helper contracts (SimpleSafeCaller)
+    "test/L1/proofs/FaultDisputeGame.t.sol", # Contains contracts not matching FaultDisputeGame base name
+    "test/L1/ResourceMetering.t.sol",        # Contains contracts not matching ResourceMetering base name
+    "test/L2/GasPriceOracle.t.sol",          # Contains contracts not matching GasPriceOracle base name
+    "test/universal/StandardBridge.t.sol",   # Contains contracts not matching StandardBridge base name
+    "test/libraries/Blueprint.t.sol",        # Contains helper contracts (BlueprintHarness, ConstructorArgMock)
+    "test/libraries/SafeCall.t.sol",         # Contains helper contracts (SimpleSafeCaller)
 ]
 
 # PATHS EXCLUDED FROM FUNCTION NAME VALIDATION:
@@ -71,10 +67,10 @@ contract_name_validation = [
 # - Fixing misspelled function names in test contracts
 # - Restructuring tests to match actual function signatures
 function_name_validation = [
-    "test/universal/ProxyAdminOwnedBase.t.sol",       # Tests internal functions not in ABI
-    "test/L1/SystemConfig.t.sol",              # Tests internal functions not in ABI
-    "test/libraries/Predeploys.t.sol",         # Function 'uncategorizedInterop' doesn't exist in library
-    "test/libraries/Encoding.t.sol",           # Function 'decodeSuperRootProof' is internal, not in ABI
+    "test/universal/ProxyAdminOwnedBase.t.sol", # Tests internal functions not in ABI
+    "test/L1/SystemConfig.t.sol",               # Tests internal functions not in ABI
+    "test/libraries/Predeploys.t.sol",          # Function 'uncategorizedInterop' doesn't exist in library
+    "test/libraries/Encoding.t.sol",            # Function 'decodeSuperRootProof' is internal, not in ABI
 ]
 
 [excluded_tests]
@@ -82,8 +78,5 @@ function_name_validation = [
 # These are individual test contracts that don't follow the standard patterns
 # for various reasons specific to their implementation or purpose.
 contracts = [
-    "OptimismPortal2_MigrateLiquidity_Test",    # Interop tests hosted in the OptimismPortal2 test file
-    "OptimismPortal2_MigrateToSuperRoots_Test", # Interop tests hosted in the OptimismPortal2 test file
-    "OptimismPortal2_UpgradeInterop_Test",      # Interop tests hosted in the OptimismPortal2 test file
-    "Constants_Test",                           # Invalid naming pattern - doesn't specify function or Uncategorized
+    "Constants_Test", # Invalid naming pattern - doesn't specify function or Uncategorized
 ]
