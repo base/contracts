@@ -8,7 +8,7 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 import { SetPreinstalls } from "scripts/SetPreinstalls.s.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
-import { OutputMode, OutputModeUtils, Fork, ForkUtils } from "scripts/libraries/Config.sol";
+import { Fork } from "scripts/libraries/Config.sol";
 
 // Libraries
 import { Predeploys } from "src/libraries/Predeploys.sol";
@@ -35,13 +35,6 @@ import { IFeeVault } from "interfaces/L2/IFeeVault.sol";
 ///         2. A contract must be deployed using the `new` syntax if there are immutables in the code.
 ///         Any other side effects from the init code besides setting the immutables must be cleaned up afterwards.
 contract L2Genesis is Script {
-    error L2Genesis_ChainFeesRecipientCannotBeZero();
-    error L2Genesis_L1FeesDepositorCannotBeZero();
-    error L2Genesis_MisconfiguredSequencerFeeVault();
-    error L2Genesis_MisconfiguredBaseFeeVault();
-    error L2Genesis_MisconfiguredL1FeeVault();
-    error L2Genesis_MisconfiguredOperatorFeeVault();
-
     struct Input {
         uint256 l1ChainID;
         uint256 l2ChainID;
@@ -65,14 +58,9 @@ contract L2Genesis is Script {
         bool fundDevAccounts;
     }
 
-    using ForkUtils for Fork;
-    using OutputModeUtils for OutputMode;
-
     uint256 internal constant PRECOMPILE_COUNT = 256;
 
     uint80 internal constant DEV_ACCOUNT_FUND_AMT = 10_000 ether;
-    uint32 internal constant WITHDRAWAL_MIN_GAS_LIMIT = 800_000;
-    uint256 internal constant MIN_WITHDRAWAL_AMOUNT_THRESHOLD = 2 ether;
 
     /// @notice Default Anvil dev accounts. Only funded if `cfg.fundDevAccounts == true`.
     /// Also known as "test test test test test test test test test test test junk" mnemonic accounts,
@@ -130,49 +118,10 @@ contract L2Genesis is Script {
 
         Fork _fork = Fork(_input.fork);
 
-        if (forkEquals(_fork, Fork.DELTA)) {
-            return;
-        }
-
-        activateEcotone();
-
-        if (forkEquals(_fork, Fork.ECOTONE)) {
-            return;
-        }
-
-        activateFjord();
-
-        if (forkEquals(_fork, Fork.FJORD)) {
-            return;
-        }
-
-        if (forkEquals(_fork, Fork.GRANITE)) {
-            return;
-        }
-
-        if (forkEquals(_fork, Fork.HOLOCENE)) {
-            return;
-        }
-
-        activateIsthmus();
-
-        if (forkEquals(_fork, Fork.ISTHMUS)) {
-            return;
-        }
-
-        activateJovian();
-
-        if (forkEquals(_fork, Fork.JOVIAN)) {
-            return;
-        }
-
-        if (forkEquals(_fork, Fork.INTEROP)) {
-            return;
-        }
-    }
-
-    function forkEquals(Fork _latest, Fork _current) internal pure returns (bool) {
-        return _latest == _current;
+        if (_fork >= Fork.ECOTONE) activateEcotone();
+        if (_fork >= Fork.FJORD) activateFjord();
+        if (_fork >= Fork.ISTHMUS) activateIsthmus();
+        if (_fork >= Fork.JOVIAN) activateJovian();
     }
 
     /// @notice Give all of the precompiles 1 wei
@@ -233,8 +182,6 @@ contract L2Genesis is Script {
         setSchemaRegistry(); // 20
         setEAS(); // 21
     }
-
-    function setInteropPredeployProxies() internal { }
 
     function setProxyAdmin(Input memory _input) internal {
         // Note the ProxyAdmin implementation itself is behind a proxy that owns itself.
@@ -303,23 +250,16 @@ contract L2Genesis is Script {
 
     /// @notice This predeploy is following the safety invariant #2,
     function setOptimismMintableERC721Factory(Input memory _input) internal {
-        IOptimismMintableERC721Factory factory = IOptimismMintableERC721Factory(
-            DeployUtils.create1({
-                _name: "OptimismMintableERC721Factory",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        IOptimismMintableERC721Factory.__constructor__, (Predeploys.L2_ERC721_BRIDGE, _input.l1ChainID)
-                    )
+        address factory = DeployUtils.create1({
+            _name: "OptimismMintableERC721Factory",
+            _args: DeployUtils.encodeConstructor(
+                abi.encodeCall(
+                    IOptimismMintableERC721Factory.__constructor__, (Predeploys.L2_ERC721_BRIDGE, _input.l1ChainID)
                 )
-            })
-        );
+            )
+        });
 
-        address impl = Predeploys.predeployToCodeNamespace(Predeploys.OPTIMISM_MINTABLE_ERC721_FACTORY);
-        vm.etch(impl, address(factory).code);
-
-        /// Reset so its not included state dump
-        vm.etch(address(factory), "");
-        vm.resetNonce(address(factory));
+        _etchAndCleanup(Predeploys.predeployToCodeNamespace(Predeploys.OPTIMISM_MINTABLE_ERC721_FACTORY), factory);
     }
 
     /// @notice This predeploy is following the safety invariant #1.
@@ -379,7 +319,6 @@ contract L2Genesis is Script {
     ///         having immutables and being a different compiler version.
     function setEAS() internal {
         string memory cname = Predeploys.getName(Predeploys.EAS);
-        address impl = Predeploys.predeployToCodeNamespace(Predeploys.EAS);
         bytes memory code = vm.getCode(string.concat(cname, ".sol:", cname));
 
         address eas;
@@ -387,11 +326,7 @@ contract L2Genesis is Script {
             eas := create(0, add(code, 0x20), mload(code))
         }
 
-        vm.etch(impl, eas.code);
-
-        /// Reset so its not included state dump
-        vm.etch(address(eas), "");
-        vm.resetNonce(address(eas));
+        _etchAndCleanup(Predeploys.predeployToCodeNamespace(Predeploys.EAS), eas);
     }
 
     /// @notice Sets all the preinstalls.
@@ -432,12 +367,15 @@ contract L2Genesis is Script {
         return impl;
     }
 
-    /// @notice Helper function to set up a fee vault predeploy with revenue sharing support.
-    ///         This follows safety invariant #2 (initializable contracts).
-    /// @param _vaultAddr The predeploy address of the fee vault.
-    /// @param _recipient The recipient address (ignored if revenue sharing is enabled).
-    /// @param _minWithdrawalAmount The minimum withdrawal amount (ignored if revenue sharing is enabled).
-    /// @param _withdrawalNetwork The withdrawal network (ignored if revenue sharing is enabled).
+    /// @notice Copies runtime code from a freshly-deployed contract to the predeploy slot,
+    ///         then wipes the deploy site so it isn't included in the state dump.
+    function _etchAndCleanup(address _impl, address _deployed) internal {
+        vm.etch(_impl, _deployed.code);
+        vm.etch(_deployed, "");
+        vm.resetNonce(_deployed);
+    }
+
+    /// @notice Helper to set up a fee vault predeploy. Follows safety invariant #2.
     function _setFeeVault(
         address _vaultAddr,
         address _recipient,
@@ -446,14 +384,6 @@ contract L2Genesis is Script {
     )
         internal
     {
-        address recipient;
-        Types.WithdrawalNetwork network;
-        uint256 minWithdrawalAmount;
-
-        recipient = _recipient;
-        network = _withdrawalNetwork;
-        minWithdrawalAmount = _minWithdrawalAmount;
-
         address impl = _setImplementationCode(_vaultAddr);
 
         /// Initialize the implementation using max value for min withdrawal amount to make it unusable
@@ -461,7 +391,9 @@ contract L2Genesis is Script {
         // Initialize the predeploy
         IFeeVault(payable(_vaultAddr))
             .initialize({
-                _recipient: recipient, _minWithdrawalAmount: minWithdrawalAmount, _withdrawalNetwork: network
+                _recipient: _recipient,
+                _minWithdrawalAmount: _minWithdrawalAmount,
+                _withdrawalNetwork: _withdrawalNetwork
             });
     }
 
