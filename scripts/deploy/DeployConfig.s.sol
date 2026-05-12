@@ -4,21 +4,18 @@ pragma solidity 0.8.15;
 import { Script } from "lib/forge-std/src/Script.sol";
 import { console } from "lib/forge-std/src/console.sol";
 import { stdJson } from "lib/forge-std/src/StdJson.sol";
-import { Process } from "scripts/libraries/Process.sol";
 
 /// @title DeployConfig
 /// @notice Represents the configuration required to deploy the system, read from a JSON file.
 contract DeployConfig is Script {
     using stdJson for string;
 
-    string internal _json;
-
     address public baseFeeVaultRecipient;
     address public batchSenderAddress;
     address public finalSystemOwner;
     address public l1FeeVaultRecipient;
-    address public l2OutputOracleProposer;
     address public l2OutputOracleChallenger;
+    address public l2OutputOracleProposer;
     address public nitroEnclaveVerifier;
     address public operatorFeeVaultRecipient;
     address public p2pSequencerAddress;
@@ -75,11 +72,7 @@ contract DeployConfig is Script {
 
     function read(string memory _path) public {
         console.log("DeployConfig: reading file %s", _path);
-        try vm.readFile(_path) returns (string memory data_) {
-            _json = data_;
-        } catch {
-            revert(string.concat("DeployConfig: cannot find deploy config file at ", _path));
-        }
+        string memory _json = vm.readFile(_path);
 
         baseFeeVaultRecipient = _json.readAddress("$.baseFeeVaultRecipient");
         batchSenderAddress = _json.readAddress("$.batchSenderAddress");
