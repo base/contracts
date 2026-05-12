@@ -43,12 +43,13 @@ type Void struct{}
 
 type FileProcessor[T any] func(path string) (T, []error)
 
-func ProcessFiles[T any](files map[string]string, processor FileProcessor[T]) (map[string]T, error) {
+func ProcessFiles[T any](files []string, processor FileProcessor[T]) (map[string]T, error) {
 	g := errgroup.Group{}
 	g.SetLimit(runtime.NumCPU())
 
 	reporter := NewErrorReporter()
-	results := sync.Map{}
+	results := make(map[string]T, len(files))
+	var mtx sync.Mutex
 
 	for _, path := range files {
 		g.Go(func() error {
@@ -57,29 +58,20 @@ func ProcessFiles[T any](files map[string]string, processor FileProcessor[T]) (m
 				for _, err := range errs {
 					reporter.Fail("%s: %v", path, err)
 				}
-			} else {
-				results.Store(path, result)
+				return nil
 			}
+			mtx.Lock()
+			results[path] = result
+			mtx.Unlock()
 			return nil
 		})
 	}
+	_ = g.Wait()
 
-	err := g.Wait()
-	if err != nil {
-		return nil, fmt.Errorf("processing failed: %w", err)
-	}
 	if reporter.HasError() {
 		return nil, fmt.Errorf("processing failed")
 	}
-
-	// Convert sync.Map to regular map
-	finalResults := make(map[string]T)
-	results.Range(func(key, value any) bool {
-		finalResults[key.(string)] = value.(T)
-		return true
-	})
-
-	return finalResults, nil
+	return results, nil
 }
 
 func ProcessFilesGlob[T any](includes, excludes []string, processor FileProcessor[T]) (map[string]T, error) {
@@ -90,38 +82,37 @@ func ProcessFilesGlob[T any](includes, excludes []string, processor FileProcesso
 	return ProcessFiles(files, processor)
 }
 
-func FindFiles(includes, excludes []string) (map[string]string, error) {
-	included := make(map[string]string)
-	excluded := make(map[string]struct{})
+func FindFiles(includes, excludes []string) ([]string, error) {
+	included, err := globAll(includes)
+	if err != nil {
+		return nil, err
+	}
+	excluded, err := globAll(excludes)
+	if err != nil {
+		return nil, err
+	}
 
-	// Get all included files
-	for _, pattern := range includes {
+	files := make([]string, 0, len(included))
+	for path := range included {
+		if _, skip := excluded[path]; !skip {
+			files = append(files, path)
+		}
+	}
+	return files, nil
+}
+
+func globAll(patterns []string) (map[string]struct{}, error) {
+	out := make(map[string]struct{})
+	for _, pattern := range patterns {
 		matches, err := doublestar.Glob(os.DirFS("."), pattern)
 		if err != nil {
 			return nil, fmt.Errorf("glob pattern error: %w", err)
 		}
 		for _, match := range matches {
-			included[match] = match
+			out[match] = struct{}{}
 		}
 	}
-
-	// Get all excluded files
-	for _, pattern := range excludes {
-		matches, err := doublestar.Glob(os.DirFS("."), pattern)
-		if err != nil {
-			return nil, fmt.Errorf("glob pattern error: %w", err)
-		}
-		for _, match := range matches {
-			excluded[match] = struct{}{}
-		}
-	}
-
-	// Remove excluded files from result
-	for name := range excluded {
-		delete(included, name)
-	}
-
-	return included, nil
+	return out, nil
 }
 
 func ReadForgeArtifact(path string) (*solc.ForgeArtifact, error) {
@@ -143,14 +134,10 @@ func WriteJSON(data any, path string) error {
 	enc := json.NewEncoder(&out)
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
-	err := enc.Encode(data)
-	if err != nil {
+	if err := enc.Encode(data); err != nil {
 		return fmt.Errorf("failed to encode data: %w", err)
 	}
-	jsonData := out.Bytes()
-	if len(jsonData) > 0 && jsonData[len(jsonData)-1] == '\n' { // strip newline
-		jsonData = jsonData[:len(jsonData)-1]
-	}
+	jsonData := bytes.TrimRight(out.Bytes(), "\n")
 	if err := os.WriteFile(path, jsonData, 0644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}

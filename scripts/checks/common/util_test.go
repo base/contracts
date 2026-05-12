@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"testing"
 
@@ -46,10 +47,7 @@ func TestErrorReporter(t *testing.T) {
 func TestProcessFiles(t *testing.T) {
 	suppressErrorReporter(t)
 
-	files := map[string]string{
-		"file1": "path1",
-		"file2": "path2",
-	}
+	files := []string{"path1", "path2"}
 
 	t.Run("void", func(t *testing.T) {
 		_, err := ProcessFiles(files, func(path string) (*Void, []error) {
@@ -133,10 +131,8 @@ func TestFindFiles(t *testing.T) {
 
 	found, err := FindFiles(includes, excludes)
 	require.NoError(t, err)
-	require.Len(t, found, 2)
-	require.Contains(t, found, "test1.txt")
-	require.Contains(t, found, "test2.txt")
-	require.NotContains(t, found, "skip.txt")
+	sort.Strings(found)
+	require.Equal(t, []string{"test1.txt", "test2.txt"}, found)
 }
 
 func TestReadForgeArtifact(t *testing.T) {
