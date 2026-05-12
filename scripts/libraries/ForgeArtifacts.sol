@@ -17,24 +17,10 @@ struct ForgeStorageSlot {
     string _type;
 }
 
-/// @notice Same as ForgeStorageSlot but with the slot field as a uint256 instead of a string.
+/// @notice Minimal storage slot information consumed by tests.
 struct StorageSlot {
-    uint256 astId;
-    string _contract;
-    string label;
     uint256 offset;
     uint256 slot;
-    string _type;
-}
-
-struct AbiEntry {
-    string fnName;
-    bytes4 sel;
-}
-
-struct Abi {
-    string contractName;
-    AbiEntry[] entries;
 }
 
 /// @title ForgeArtifacts
@@ -49,13 +35,6 @@ library ForgeArtifacts {
         out_ = Process.bash(string.concat("echo ", _name, " | sed -E 's/[.][0-9]+\\.[0-9]+\\.[0-9]+//g'"));
     }
 
-    /// @notice Builds the fully qualified name of a contract. Assumes that the
-    ///         file name is the same as the contract name but strips semver for the file name.
-    function _getFullyQualifiedName(string memory _name) internal returns (string memory out_) {
-        string memory sanitized = _stripSemver(_name);
-        out_ = string.concat(sanitized, ".sol:", _name);
-    }
-
     /// @notice Returns the storage layout for a deployed contract.
     function getStorageLayout(string memory _name) internal returns (string memory layout_) {
         layout_ = Process.bash(string.concat("jq -r '.storageLayout' < ", _getForgeArtifactPath(_name)));
@@ -64,15 +43,6 @@ library ForgeArtifacts {
     /// @notice Returns the abi from a the forge artifact
     function getAbi(string memory _name) internal returns (string memory abi_) {
         abi_ = Process.bash(string.concat("jq -r '.abi' < ", _getForgeArtifactPath(_name)));
-    }
-
-    /// @notice Returns the methodIdentifiers from the forge artifact
-    function getMethodIdentifiers(string memory _name) internal returns (string[] memory ids_) {
-        string memory res = Process.bash({
-            _command: string.concat("jq '.methodIdentifiers // {} | keys ' < ", _getForgeArtifactPath(_name)),
-            _allowEmpty: true
-        });
-        ids_ = stdJson.readStringArray(res, "");
     }
 
     /// @notice Returns the kind of contract (i.e. library, contract, or interface).
@@ -144,12 +114,6 @@ library ForgeArtifacts {
         out_ = string.concat(directory, "/", files[0]);
     }
 
-    /// @notice Returns the forge artifact given a contract name.
-    function _getForgeArtifact(string memory _name) internal returns (string memory out_) {
-        string memory forgeArtifactPath = _getForgeArtifactPath(_name);
-        out_ = vm.readFile(forgeArtifactPath);
-    }
-
     /// @notice Pulls the `_initialized` storage slot information from the Forge artifacts for a given contract.
     function getInitializedSlot(string memory _contractName) internal returns (StorageSlot memory slot_) {
         // FaultDisputeGame, PermissionedDisputeGame, and AggregateVerifier use a different name for the initialized
@@ -179,14 +143,7 @@ library ForgeArtifacts {
             )
         );
         ForgeStorageSlot memory slot = abi.decode(rawSlot, (ForgeStorageSlot));
-        slot_ = StorageSlot({
-            astId: slot.astId,
-            _contract: slot._contract,
-            label: slot.label,
-            offset: slot.offset,
-            slot: vm.parseUint(slot.slot),
-            _type: slot._type
-        });
+        slot_ = StorageSlot({ offset: slot.offset, slot: vm.parseUint(slot.slot) });
     }
 
     /// @notice Returns the storage slot for a given contract and slot name
@@ -198,14 +155,7 @@ library ForgeArtifacts {
             )
         );
         ForgeStorageSlot memory slot = abi.decode(rawSlot, (ForgeStorageSlot));
-        slot_ = StorageSlot({
-            astId: slot.astId,
-            _contract: slot._contract,
-            label: slot.label,
-            offset: slot.offset,
-            slot: vm.parseUint(slot.slot),
-            _type: slot._type
-        });
+        slot_ = StorageSlot({ offset: slot.offset, slot: vm.parseUint(slot.slot) });
     }
 
     /// @notice Returns whether or not a contract is initialized.
@@ -258,30 +208,6 @@ library ForgeArtifacts {
             ),
             (string[])
         );
-    }
-
-    /// @notice Returns the function ABIs of all L1 contracts.
-    function getContractFunctionAbis(
-        string memory _path,
-        string[] memory _pathExcludes
-    )
-        internal
-        returns (Abi[] memory abis_)
-    {
-        string[] memory contractNames = getContractNames(_path, _pathExcludes);
-        abis_ = new Abi[](contractNames.length);
-
-        for (uint256 i; i < contractNames.length; i++) {
-            string memory contractName = contractNames[i];
-            string[] memory methodIdentifiers = getMethodIdentifiers(contractName);
-            abis_[i].contractName = contractName;
-            abis_[i].entries = new AbiEntry[](methodIdentifiers.length);
-            for (uint256 j; j < methodIdentifiers.length; j++) {
-                string memory fnName = methodIdentifiers[j];
-                bytes4 sel = bytes4(keccak256(abi.encodePacked(fnName)));
-                abis_[i].entries[j] = AbiEntry({ fnName: fnName, sel: sel });
-            }
-        }
     }
 
     /// @notice Accepts a filepath and then ensures that the directory
