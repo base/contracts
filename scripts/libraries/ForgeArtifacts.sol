@@ -33,7 +33,7 @@ library ForgeArtifacts {
 
     /// @notice Removes the semantic versioning suffix from a contract name. The semver appears
     ///         when the contract is compiled more than once with different solc versions.
-    function _stripSemver(string memory _name) internal pure returns (string memory) {
+    function _stripSemver(string memory _name) private pure returns (string memory) {
         return vm.split(_name, ".")[0];
     }
 
@@ -54,25 +54,16 @@ library ForgeArtifacts {
         );
     }
 
-    /// @notice Returns whether or not a contract is proxied.
-    /// @param _name The name of the contract to check.
-    /// @return out_ Whether or not the contract is proxied.
-    function isProxiedContract(string memory _name) internal returns (bool out_) {
-        // TODO: Using the `@custom:proxied` tag is to determine if a contract is meant to be
-        // proxied is functional but developers can easily forget to add the tag when writing a new
-        // contract. We should consider determining whether a contract is proxied based on the
-        // deployment script since it's the source of truth for that. Current deployment script
-        // does not make this easy but an updated script should likely make this possible.
-        out_ = _hasDevdocTag(_name, "custom:proxied");
+    /// @notice Returns whether or not a contract is proxied. Heuristic based on the
+    ///         custom:proxied devdoc tag; deployment script would be a more reliable source.
+    function isProxiedContract(string memory _name) internal returns (bool) {
+        return _hasDevdocTag(_name, "custom:proxied");
     }
 
-    /// @notice Returns whether or not a contract is predeployed.
-    /// @param _name The name of the contract to check.
-    /// @return out_ Whether or not the contract is predeployed.
-    function isPredeployedContract(string memory _name) internal returns (bool out_) {
-        // TODO: Similar to the above, using the `@custom:predeployed` tag is not reliable but
-        // functional for now. Deployment script should make this easier to determine.
-        out_ = _hasDevdocTag(_name, "custom:predeploy");
+    /// @notice Returns whether or not a contract is predeployed. Heuristic based on the
+    ///         custom:predeploy devdoc tag; deployment script would be a more reliable source.
+    function isPredeployedContract(string memory _name) internal returns (bool) {
+        return _hasDevdocTag(_name, "custom:predeploy");
     }
 
     function _hasDevdocTag(string memory _name, string memory _tag) private returns (bool) {
@@ -87,20 +78,17 @@ library ForgeArtifacts {
         return stdJson.readBool(res, "");
     }
 
-    function _getForgeArtifactDirectory(string memory _name) internal view returns (string memory dir_) {
-        dir_ = string.concat(vm.projectRoot(), "/", OUT_DIR, "/", _stripSemver(_name), ".sol");
+    function _getForgeArtifactDirectory(string memory _name) private view returns (string memory) {
+        return string.concat(vm.projectRoot(), "/", OUT_DIR, "/", _stripSemver(_name), ".sol");
     }
 
     /// @notice Returns the filesystem path to the artifact path. If the contract was compiled
     ///         with multiple solidity versions then return the first entry in the directory.
-    function _getForgeArtifactPath(string memory _name) internal view returns (string memory out_) {
+    function _getForgeArtifactPath(string memory _name) private view returns (string memory) {
         string memory directory = _getForgeArtifactDirectory(_name);
         string memory path = string.concat(directory, "/", _name, ".json");
-        if (vm.exists(path)) {
-            return path;
-        }
-        Vm.DirEntry[] memory entries = vm.readDir(directory);
-        out_ = entries[0].path;
+        if (vm.exists(path)) return path;
+        return vm.readDir(directory)[0].path;
     }
 
     /// @notice Returns the storage slot for a given contract and slot name.
@@ -117,21 +105,19 @@ library ForgeArtifacts {
         revert(string.concat("ForgeArtifacts: slot not found for ", _contractName, ".", _slotName));
     }
 
-    /// @notice Returns whether or not a contract is initialized.
-    ///         Needs the name to get the storage layout.
-    function isInitialized(string memory _name, address _address) internal view returns (bool initialized_) {
+    /// @notice Returns whether or not a contract is initialized (OZ v4 layout).
+    function isInitialized(string memory _name, address _address) internal view returns (bool) {
         StorageSlot memory slot = getSlot(_name, "_initialized");
         bytes32 slotVal = vm.load(_address, bytes32(slot.slot));
-        initialized_ = uint8((uint256(slotVal) >> (slot.offset * 8)) & 0xFF) != 0;
+        return uint8((uint256(slotVal) >> (slot.offset * 8)) & 0xFF) != 0;
     }
 
-    /// @notice Checks if a contract is initialized using OpenZeppelin v5 namespaced storage pattern.
-    ///         OZ v5 storage slot: keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Initializable")) - 1))
-    /// & ~bytes32(uint256(0xff))
+    /// @notice Returns whether or not a contract is initialized using the OZ v5 namespaced
+    ///         Initializable storage slot:
+    ///         keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Initializable")) - 1)) & ~bytes32(uint256(0xff))
     function isInitializedV5(address _addr) internal view returns (bool) {
         bytes32 INITIALIZABLE_STORAGE_SLOT = 0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00;
         bytes32 slotVal = vm.load(_addr, INITIALIZABLE_STORAGE_SLOT);
-        // In OZ v5, byte 0 is _initialized, byte 1 is _initializing
         return uint8(uint256(slotVal) & 0xFF) != 0;
     }
 
