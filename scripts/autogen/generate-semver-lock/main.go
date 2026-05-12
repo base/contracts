@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/base/contracts/scripts/checks/common"
+	"github.com/ethereum-optimism/optimism/op-chain-ops/solc"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -77,42 +78,7 @@ func processFile(file string) (*SemverLockResult, []error) {
 		return nil, nil
 	}
 
-	// Check if the contract has a version function or variable with @custom:semver tag
-	hasSemverTag := false
-	for _, node := range artifact.Ast.Nodes {
-		if node.NodeType != "ContractDefinition" || node.Name != contractName {
-			continue
-		}
-		// Check each node inside the contract
-		for _, subNode := range node.Nodes {
-			// Skip nodes that aren't version functions or variables
-			if (subNode.NodeType != "FunctionDefinition" &&
-				subNode.NodeType != "VariableDeclaration") ||
-				subNode.Name != "version" {
-				continue
-			}
-			if subNode.Documentation == nil {
-				continue
-			}
-			var docText string
-			switch doc := subNode.Documentation.(type) {
-			case string:
-				docText = doc
-			case map[string]interface{}:
-				if text, ok := doc["text"].(string); ok {
-					docText = text
-				}
-			}
-			if strings.Contains(docText, "@custom:semver") {
-				hasSemverTag = true
-				break
-			}
-		}
-		if hasSemverTag {
-			break
-		}
-	}
-	if !hasSemverTag {
+	if !hasSemverVersion(artifact, contractName) {
 		return nil, nil
 	}
 
@@ -137,4 +103,32 @@ func processFile(file string) (*SemverLockResult, []error) {
 			SourceCodeHash: sourceCodeHash,
 		},
 	}, nil
+}
+
+func hasSemverVersion(artifact *solc.ForgeArtifact, contractName string) bool {
+	for _, node := range artifact.Ast.Nodes {
+		if node.NodeType != "ContractDefinition" || node.Name != contractName {
+			continue
+		}
+		for _, subNode := range node.Nodes {
+			if (subNode.NodeType != "FunctionDefinition" &&
+				subNode.NodeType != "VariableDeclaration") ||
+				subNode.Name != "version" {
+				continue
+			}
+			var docText string
+			switch doc := subNode.Documentation.(type) {
+			case string:
+				docText = doc
+			case map[string]interface{}:
+				if text, ok := doc["text"].(string); ok {
+					docText = text
+				}
+			}
+			if strings.Contains(docText, "@custom:semver") {
+				return true
+			}
+		}
+	}
+	return false
 }
