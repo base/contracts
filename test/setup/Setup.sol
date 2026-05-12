@@ -21,7 +21,6 @@ import { Config } from "scripts/libraries/Config.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Preinstalls } from "src/libraries/Preinstalls.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
-import { Chains } from "scripts/libraries/Chains.sol";
 
 // Interfaces
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
@@ -65,6 +64,9 @@ abstract contract Setup is FeatureFlags {
 
     /// @notice The address of the foundry Vm contract.
     Vm private constant vm = Vm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
+
+    uint256 internal constant ETH_MAINNET_CHAIN_ID = 1;
+    uint256 internal constant ETH_SEPOLIA_CHAIN_ID = 11155111;
 
     /// @notice The address of the SystemDeploy contract. Set into state with `etch` to avoid
     ///         mutating any nonces. MUST not have constructor logic.
@@ -156,7 +158,7 @@ abstract contract Setup is FeatureFlags {
             vm.createSelectFork(Config.forkRpcUrl(), Config.forkBlockNumber());
             console.log("Setup: fork selected!");
             require(
-                block.chainid == Chains.Sepolia || block.chainid == Chains.Mainnet,
+                block.chainid == ETH_SEPOLIA_CHAIN_ID || block.chainid == ETH_MAINNET_CHAIN_ID,
                 "Setup: ETH_RPC_URL must be set to a production (Sepolia or Mainnet) RPC URL"
             );
         }

@@ -6,7 +6,6 @@ import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 
 import { Artifacts } from "scripts/Artifacts.s.sol";
-import { Chains } from "scripts/libraries/Chains.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
@@ -61,6 +60,8 @@ contract SystemDeploy is Script {
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
 
     uint256 internal constant STANDARD_MIPS_VERSION = 8;
+    uint256 internal constant ETH_MAINNET_CHAIN_ID = 1;
+    uint256 internal constant ETH_SEPOLIA_CHAIN_ID = 11155111;
 
     struct SuperchainInput {
         address guardian;
@@ -1185,7 +1186,8 @@ contract SystemDeploy is Script {
         internal
         returns (IMIPS64)
     {
-        if (_input.mipsVersion < 2 && (block.chainid == Chains.Mainnet || block.chainid == Chains.Sepolia)) {
+        if (_input.mipsVersion < 2 && (block.chainid == ETH_MAINNET_CHAIN_ID || block.chainid == ETH_SEPOLIA_CHAIN_ID))
+        {
             revert("SystemDeploy: only MIPS64 should be deployed on Mainnet or Sepolia");
         }
 
