@@ -6,260 +6,150 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-func TestErrorReporter(t *testing.T) {
-	os.Setenv("SUPPRESS_ERROR_REPORTER", "1")
-	defer os.Unsetenv("SUPPRESS_ERROR_REPORTER")
+func suppressErrorReporter(t *testing.T) {
+	t.Helper()
+	t.Setenv(EnvSuppressErrorReporter, "1")
+}
 
-	reporter := NewErrorReporter()
-
-	if reporter.HasError() {
-		t.Error("new reporter should not have errors")
-	}
-
-	reporter.Fail("test error")
-
-	if !reporter.HasError() {
-		t.Error("reporter should have error after Fail")
+func writeFiles(t *testing.T, files map[string]string) {
+	t.Helper()
+	for name, content := range files {
+		require.NoError(t, os.WriteFile(name, []byte(content), 0644))
 	}
 }
 
+func setupGlobFixture(t *testing.T) (includes, excludes []string) {
+	t.Helper()
+	t.Chdir(t.TempDir())
+	writeFiles(t, map[string]string{
+		"test1.txt": "content1",
+		"test2.txt": "content2",
+		"skip.txt":  "content3",
+	})
+	return []string{"*.txt"}, []string{"skip.txt"}
+}
+
+func TestErrorReporter(t *testing.T) {
+	suppressErrorReporter(t)
+
+	reporter := NewErrorReporter()
+	require.False(t, reporter.HasError(), "new reporter should not have errors")
+
+	reporter.Fail("test error")
+	require.True(t, reporter.HasError(), "reporter should have error after Fail")
+}
+
 func TestProcessFiles(t *testing.T) {
-	os.Setenv("SUPPRESS_ERROR_REPORTER", "1")
-	defer os.Unsetenv("SUPPRESS_ERROR_REPORTER")
+	suppressErrorReporter(t)
 
 	files := map[string]string{
 		"file1": "path1",
 		"file2": "path2",
 	}
 
-	// Test void processing (no results)
-	_, err := ProcessFiles(files, func(path string) (*Void, []error) {
-		return nil, nil
+	t.Run("void", func(t *testing.T) {
+		_, err := ProcessFiles(files, func(path string) (*Void, []error) {
+			return nil, nil
+		})
+		require.NoError(t, err)
 	})
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
 
-	// Test error handling
-	_, err = ProcessFiles(files, func(path string) (*Void, []error) {
-		var errors []error
-		errors = append(errors, os.ErrNotExist)
-		return nil, errors
+	t.Run("error", func(t *testing.T) {
+		_, err := ProcessFiles(files, func(path string) (*Void, []error) {
+			return nil, []error{os.ErrNotExist}
+		})
+		require.Error(t, err)
 	})
-	if err == nil {
-		t.Error("expected error, got nil")
-	}
 
-	// Test successful processing with string results
-	results, err := ProcessFiles(files, func(path string) (string, []error) {
-		return "processed_" + path, nil
+	t.Run("string results", func(t *testing.T) {
+		results, err := ProcessFiles(files, func(path string) (string, []error) {
+			return "processed_" + path, nil
+		})
+		require.NoError(t, err)
+		require.Equal(t, "processed_path1", results["path1"])
+		require.Equal(t, "processed_path2", results["path2"])
 	})
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
-	if len(results) != 2 {
-		t.Errorf("expected 2 results, got %d", len(results))
-	}
-	if results["path1"] != "processed_path1" {
-		t.Errorf("expected processed_path1, got %s", results["path1"])
-	}
 
-	// Test processing with struct results
-	type testResult struct {
-		Path    string
-		Counter int
-	}
-	structResults, err := ProcessFiles(files, func(path string) (testResult, []error) {
-		return testResult{Path: path, Counter: len(path)}, nil
+	t.Run("struct results", func(t *testing.T) {
+		type testResult struct {
+			Path    string
+			Counter int
+		}
+		results, err := ProcessFiles(files, func(path string) (testResult, []error) {
+			return testResult{Path: path, Counter: len(path)}, nil
+		})
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+		require.Equal(t, 5, results["path1"].Counter)
 	})
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
-	if len(structResults) != 2 {
-		t.Errorf("expected 2 results, got %d", len(structResults))
-	}
-	if structResults["path1"].Counter != 5 {
-		t.Errorf("expected counter 5, got %d", structResults["path1"].Counter)
-	}
 }
 
 func TestProcessFilesGlob(t *testing.T) {
-	os.Setenv("SUPPRESS_ERROR_REPORTER", "1")
-	defer os.Unsetenv("SUPPRESS_ERROR_REPORTER")
+	suppressErrorReporter(t)
+	includes, excludes := setupGlobFixture(t)
 
-	// Create test directory structure
-	tmpDir := t.TempDir()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create test files
-	files := map[string]string{
-		"test1.txt": "content1",
-		"test2.txt": "content2",
-		"skip.txt":  "content3",
-	}
-
-	for name, content := range files {
-		if err := os.WriteFile(name, []byte(content), 0644); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	includes := []string{"*.txt"}
-	excludes := []string{"skip.txt"}
-
-	// Test void processing (no results)
-	processedFiles := make(map[string]bool)
-	var mtx sync.Mutex
-	_, err := ProcessFilesGlob(includes, excludes, func(path string) (*Void, []error) {
-		mtx.Lock()
-		processedFiles[filepath.Base(path)] = true
-		mtx.Unlock()
-		return nil, nil
+	t.Run("void", func(t *testing.T) {
+		var mtx sync.Mutex
+		processed := make(map[string]bool)
+		_, err := ProcessFilesGlob(includes, excludes, func(path string) (*Void, []error) {
+			mtx.Lock()
+			defer mtx.Unlock()
+			processed[filepath.Base(path)] = true
+			return nil, nil
+		})
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{"test1.txt": true, "test2.txt": true}, processed)
 	})
 
-	if err != nil {
-		t.Errorf("ProcessFiles failed: %v", err)
-	}
-
-	// Verify void processing results
-	if len(processedFiles) != 2 {
-		t.Errorf("expected 2 processed files, got %d", len(processedFiles))
-	}
-	if !processedFiles["test1.txt"] {
-		t.Error("expected to process test1.txt")
-	}
-	if !processedFiles["test2.txt"] {
-		t.Error("expected to process test2.txt")
-	}
-	if processedFiles["skip.txt"] {
-		t.Error("skip.txt should have been excluded")
-	}
-
-	// Test processing with struct results
-	type fileInfo struct {
-		Size    int64
-		Content string
-	}
-
-	results, err := ProcessFilesGlob(includes, excludes, func(path string) (fileInfo, []error) {
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return fileInfo{}, []error{err}
-		}
-		info, err := os.Stat(path)
-		if err != nil {
-			return fileInfo{}, []error{err}
-		}
-		return fileInfo{
-			Size:    info.Size(),
-			Content: string(content),
-		}, nil
+	t.Run("struct results", func(t *testing.T) {
+		type fileInfo struct{ Content string }
+		results, err := ProcessFilesGlob(includes, excludes, func(path string) (fileInfo, []error) {
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return fileInfo{}, []error{err}
+			}
+			return fileInfo{Content: string(content)}, nil
+		})
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+		require.Equal(t, "content1", results["test1.txt"].Content)
+		require.Equal(t, "content2", results["test2.txt"].Content)
 	})
 
-	if err != nil {
-		t.Errorf("ProcessFilesGlob failed: %v", err)
-	}
-
-	// Verify struct results
-	if len(results) != 2 {
-		t.Errorf("expected 2 results, got %d", len(results))
-	}
-	if result, exists := results["test1.txt"]; !exists {
-		t.Error("expected result for test1.txt")
-	} else {
-		if result.Content != "content1" {
-			t.Errorf("expected content1, got %s", result.Content)
-		}
-		if result.Size != 8 {
-			t.Errorf("expected size 8, got %d", result.Size)
-		}
-	}
-
-	// Test error handling
-	_, err = ProcessFilesGlob(includes, excludes, func(path string) (fileInfo, []error) {
-		return fileInfo{}, []error{fmt.Errorf("test error")}
+	t.Run("error", func(t *testing.T) {
+		_, err := ProcessFilesGlob(includes, excludes, func(path string) (struct{}, []error) {
+			return struct{}{}, []error{fmt.Errorf("test error")}
+		})
+		require.Error(t, err)
 	})
-	if err == nil {
-		t.Error("expected error, got nil")
-	}
 }
 
 func TestFindFiles(t *testing.T) {
-	// Create test directory structure
-	tmpDir := t.TempDir()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create test files
-	files := map[string]string{
-		"test1.txt": "content1",
-		"test2.txt": "content2",
-		"skip.txt":  "content3",
-	}
-
-	for name, content := range files {
-		if err := os.WriteFile(name, []byte(content), 0644); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Test finding files
-	includes := []string{"*.txt"}
-	excludes := []string{"skip.txt"}
+	includes, excludes := setupGlobFixture(t)
 
 	found, err := FindFiles(includes, excludes)
-	if err != nil {
-		t.Fatalf("FindFiles failed: %v", err)
-	}
-
-	// Verify results
-	if len(found) != 2 {
-		t.Errorf("expected 2 files, got %d", len(found))
-	}
-	if _, exists := found["test1.txt"]; !exists {
-		t.Error("expected to find test1.txt")
-	}
-	if _, exists := found["test2.txt"]; !exists {
-		t.Error("expected to find test2.txt")
-	}
-	if _, exists := found["skip.txt"]; exists {
-		t.Error("skip.txt should have been excluded")
-	}
+	require.NoError(t, err)
+	require.Len(t, found, 2)
+	require.Contains(t, found, "test1.txt")
+	require.Contains(t, found, "test2.txt")
+	require.NotContains(t, found, "skip.txt")
 }
 
 func TestReadForgeArtifact(t *testing.T) {
-	// Create a temporary test artifact
-	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(t.TempDir(), "Test.json")
 	artifactContent := `{
 		"abi": [],
-		"bytecode": {
-			"object": "0x123"
-		},
-		"deployedBytecode": {
-			"object": "0x456"
-		}
+		"bytecode": {"object": "0x123"},
+		"deployedBytecode": {"object": "0x456"}
 	}`
-	tmpFile := filepath.Join(tmpDir, "Test.json")
-	if err := os.WriteFile(tmpFile, []byte(artifactContent), 0644); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(tmpFile, []byte(artifactContent), 0644))
 
-	// Test processing
 	artifact, err := ReadForgeArtifact(tmpFile)
-	if err != nil {
-		t.Fatalf("ReadForgeArtifact failed: %v", err)
-	}
-
-	// Verify results
-	if artifact.Bytecode.Object != "0x123" {
-		t.Errorf("expected bytecode '0x123', got %q", artifact.Bytecode.Object)
-	}
-	if artifact.DeployedBytecode.Object != "0x456" {
-		t.Errorf("expected deployed bytecode '0x456', got %q", artifact.DeployedBytecode.Object)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "0x123", artifact.Bytecode.Object)
+	require.Equal(t, "0x456", artifact.DeployedBytecode.Object)
 }

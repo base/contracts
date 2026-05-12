@@ -14,6 +14,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// EnvSuppressErrorReporter, when set, silences ErrorReporter stderr output. Used by tests.
+const EnvSuppressErrorReporter = "SUPPRESS_ERROR_REPORTER"
+
 type ErrorReporter struct {
 	hasErr atomic.Bool
 	outMtx sync.Mutex
@@ -25,8 +28,7 @@ func NewErrorReporter() *ErrorReporter {
 
 func (e *ErrorReporter) Fail(msg string, args ...any) {
 	e.outMtx.Lock()
-	// Useful for suppressing error reporting in tests
-	if os.Getenv("SUPPRESS_ERROR_REPORTER") == "" {
+	if os.Getenv(EnvSuppressErrorReporter) == "" {
 		_, _ = fmt.Fprintf(os.Stderr, "❌  "+msg+"\n", args...)
 	}
 	e.outMtx.Unlock()
@@ -49,7 +51,6 @@ func ProcessFiles[T any](files map[string]string, processor FileProcessor[T]) (m
 	results := sync.Map{}
 
 	for _, path := range files {
-		path := path // Capture loop variables
 		g.Go(func() error {
 			result, errs := processor(path)
 			if len(errs) > 0 {
@@ -73,7 +74,7 @@ func ProcessFiles[T any](files map[string]string, processor FileProcessor[T]) (m
 
 	// Convert sync.Map to regular map
 	finalResults := make(map[string]T)
-	results.Range(func(key, value interface{}) bool {
+	results.Range(func(key, value any) bool {
 		finalResults[key.(string)] = value.(T)
 		return true
 	})
@@ -137,7 +138,7 @@ func ReadForgeArtifact(path string) (*solc.ForgeArtifact, error) {
 	return &artifact, nil
 }
 
-func WriteJSON(data interface{}, path string) error {
+func WriteJSON(data any, path string) error {
 	var out bytes.Buffer
 	enc := json.NewEncoder(&out)
 	enc.SetEscapeHTML(false)
