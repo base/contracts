@@ -8,40 +8,19 @@ import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
 
-/// @notice Represents a deployment. Is serialized to JSON as a key/value
-///         pair. Can be accessed from within scripts.
-struct Deployment {
-    string name;
-    address payable addr;
-}
-
 /// @title Artifacts
 /// @notice Useful for accessing deployment artifacts from within scripts.
 ///         When a contract is deployed, call the `save` function to write its name and
 ///         contract address to disk. Inspired by `forge-deploy`.
 contract Artifacts {
-    /// @notice Foundry cheatcode VM.
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    /// @notice Error for when attempting to fetch a deployment and it does not exist
     error DeploymentDoesNotExist(string);
-    /// @notice Error for when trying to save an invalid deployment
     error InvalidDeployment(string);
-    /// @notice Error for when attempting to load the initialized slot of an unsupported contract.
-    error UnsupportedInitializableContract(string);
 
-    /// @notice The set of deployments that have been done during execution.
-    mapping(string => Deployment) internal _namedDeployments;
-    /// @notice The same as `_namedDeployments` but as an array.
-    Deployment[] internal _newDeployments;
-    /// @notice Path to the directory containing the hh deploy style artifacts
-    string internal deploymentsDir;
-    /// @notice The path to the deployment artifact that is being written to.
+    mapping(string => address payable) internal _namedDeployments;
     string internal deploymentOutfile;
-    /// @notice The namespace for the deployment. Can be set with the env var DEPLOYMENT_CONTEXT.
-    string internal deploymentContext;
 
-    /// @notice Setup function. The arguments here
     function setUp() public virtual {
         deploymentOutfile = Config.deploymentOutfile();
         console.log("Writing artifact to %s", deploymentOutfile);
@@ -51,30 +30,14 @@ contract Artifacts {
         console.log("Connected to network with chainid %s", chainId);
     }
 
-    /// @notice Returns all of the deployments done in the current context.
-    function newDeployments() external view returns (Deployment[] memory) {
-        return _newDeployments;
-    }
-
-    /// @notice Returns whether or not a particular deployment exists.
-    /// @param _name The name of the deployment.
-    /// @return Whether the deployment exists or not.
-    function has(string memory _name) public view returns (bool) {
-        Deployment memory existing = _namedDeployments[_name];
-        return bytes(existing.name).length > 0;
-    }
-
     /// @notice Returns the address of a deployment. Also handles the predeploys.
     /// @param _name The name of the deployment.
     /// @return The address of the deployment. May be `address(0)` if the deployment does not
     ///         exist.
     function getAddress(string memory _name) public view returns (address payable) {
-        Deployment memory existing = _namedDeployments[_name];
-        if (existing.addr != address(0)) {
-            if (bytes(existing.name).length == 0) {
-                return payable(address(0));
-            }
-            return existing.addr;
+        address payable existing = _namedDeployments[_name];
+        if (existing != address(0)) {
+            return existing;
         }
 
         bytes32 digest = keccak256(bytes(_name));
@@ -122,18 +85,11 @@ contract Artifacts {
     ///         does not exist.
     /// @return The address of the deployment.
     function mustGetAddress(string memory _name) public view returns (address payable) {
-        address addr = getAddress(_name);
+        address payable addr = getAddress(_name);
         if (addr == address(0)) {
             revert DeploymentDoesNotExist(_name);
         }
-        return payable(addr);
-    }
-
-    /// @notice Returns a deployment that is suitable to be used to interact with contracts.
-    /// @param _name The name of the deployment.
-    /// @return The deployment.
-    function get(string memory _name) public view returns (Deployment memory) {
-        return _namedDeployments[_name];
+        return addr;
     }
 
     /// @notice Appends a deployment to disk as a JSON deploy artifact.
@@ -144,22 +100,14 @@ contract Artifacts {
         if (bytes(_name).length == 0) {
             revert InvalidDeployment("EmptyName");
         }
-        Deployment memory existing = _namedDeployments[_name];
-        if (bytes(existing.name).length > 0) {
+        address payable existing = _namedDeployments[_name];
+        if (existing != address(0)) {
             console.log("Warning: Deployment already exists for %s.", _name);
-            console.log("Overwriting %s with %s", existing.addr, _deployed);
+            console.log("Overwriting %s with %s", existing, _deployed);
         }
 
-        Deployment memory deployment = Deployment({ name: _name, addr: payable(_deployed) });
-        _namedDeployments[_name] = deployment;
-        _newDeployments.push(deployment);
-        _appendDeployment(_name, _deployed);
-
-        vm.label(_deployed, _name);
-    }
-
-    /// @notice Adds a deployment to the temp deployments file
-    function _appendDeployment(string memory _name, address _deployed) internal {
+        _namedDeployments[_name] = payable(_deployed);
         vm.writeJson({ json: stdJson.serialize("", _name, _deployed), path: deploymentOutfile });
+        vm.label(_deployed, _name);
     }
 }
