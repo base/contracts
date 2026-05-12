@@ -14,7 +14,6 @@ contract DeployConfig is Script {
     string internal _json;
 
     address public baseFeeVaultRecipient;
-    address public batchInboxAddress;
     address public batchSenderAddress;
     address public finalSystemOwner;
     address public l1FeeVaultRecipient;
@@ -41,8 +40,6 @@ contract DeployConfig is Script {
     bytes32 public zkAggregationHash;
     bytes32 public zkRangeHash;
 
-    int256 internal _l2OutputOracleStartingTimestamp;
-
     uint32 public basefeeScalar;
     uint32 public blobbasefeeScalar;
 
@@ -50,11 +47,7 @@ contract DeployConfig is Script {
     uint256 public baseFeeVaultWithdrawalNetwork;
     uint256 public disputeGameFinalityDelaySeconds;
     uint256 public faultGameAbsolutePrestate;
-    uint256 public faultGameClockExtension;
     uint256 public faultGameGenesisBlock;
-    uint256 public faultGameMaxClockDuration;
-    uint256 public faultGameMaxDepth;
-    uint256 public faultGameSplitDepth;
     uint256 public faultGameV2ClockExtension;
     uint256 public faultGameV2MaxClockDuration;
     uint256 public faultGameV2MaxGameDepth;
@@ -66,6 +59,7 @@ contract DeployConfig is Script {
     uint256 public l2ChainId;
     uint256 public l2GenesisBlockGasLimit;
     uint256 public l2OutputOracleStartingBlockNumber;
+    uint256 public l2OutputOracleStartingTimestamp;
     uint256 public multiproofBlockInterval;
     uint256 public multiproofGameType;
     uint256 public multiproofGenesisBlockNumber;
@@ -78,7 +72,6 @@ contract DeployConfig is Script {
     uint256 public respectedGameType;
     uint256 public sequencerFeeVaultMinimumWithdrawalAmount;
     uint256 public sequencerFeeVaultWithdrawalNetwork;
-    uint256 public systemConfigStartBlock;
 
     function read(string memory _path) public {
         console.log("DeployConfig: reading file %s", _path);
@@ -89,7 +82,6 @@ contract DeployConfig is Script {
         }
 
         baseFeeVaultRecipient = _json.readAddress("$.baseFeeVaultRecipient");
-        batchInboxAddress = _json.readAddress("$.batchInboxAddress");
         batchSenderAddress = _json.readAddress("$.batchSenderAddress");
         finalSystemOwner = _json.readAddress("$.finalSystemOwner");
         l1FeeVaultRecipient = _json.readAddress("$.l1FeeVaultRecipient");
@@ -115,7 +107,6 @@ contract DeployConfig is Script {
         zkAggregationHash = _json.readBytes32("$.zkAggregationHash");
         zkRangeHash = _json.readBytes32("$.zkRangeHash");
 
-        _l2OutputOracleStartingTimestamp = _json.readInt("$.l2OutputOracleStartingTimestamp");
 
         basefeeScalar = uint32(_json.readUint("$.gasPriceOracleBaseFeeScalar"));
         blobbasefeeScalar = uint32(_json.readUint("$.gasPriceOracleBlobBaseFeeScalar"));
@@ -124,11 +115,7 @@ contract DeployConfig is Script {
         baseFeeVaultWithdrawalNetwork = _json.readUint("$.baseFeeVaultWithdrawalNetwork");
         disputeGameFinalityDelaySeconds = _json.readUint("$.disputeGameFinalityDelaySeconds");
         faultGameAbsolutePrestate = _json.readUint("$.faultGameAbsolutePrestate");
-        faultGameClockExtension = _json.readUint("$.faultGameClockExtension");
         faultGameGenesisBlock = _json.readUint("$.faultGameGenesisBlock");
-        faultGameMaxClockDuration = _json.readUint("$.faultGameMaxClockDuration");
-        faultGameMaxDepth = _json.readUint("$.faultGameMaxDepth");
-        faultGameSplitDepth = _json.readUint("$.faultGameSplitDepth");
         faultGameV2ClockExtension = _json.readUintOr("$.faultGameV2ClockExtension", 10800);
         faultGameV2MaxClockDuration = _json.readUintOr("$.faultGameV2MaxClockDuration", 302400);
         faultGameV2MaxGameDepth = _json.readUintOr("$.faultGameV2MaxGameDepth", 73);
@@ -140,6 +127,7 @@ contract DeployConfig is Script {
         l2ChainId = _json.readUint("$.l2ChainId");
         l2GenesisBlockGasLimit = _json.readUint("$.l2GenesisBlockGasLimit");
         l2OutputOracleStartingBlockNumber = _json.readUint("$.l2OutputOracleStartingBlockNumber");
+        l2OutputOracleStartingTimestamp = _json.readUint("$.l2OutputOracleStartingTimestamp");
         multiproofBlockInterval = _json.readUintOr("$.multiproofBlockInterval", 100);
         multiproofGameType = _json.readUintOr("$.multiproofGameType", 621);
         multiproofGenesisBlockNumber = _json.readUintOr("$.multiproofGenesisBlockNumber", 0);
@@ -152,7 +140,6 @@ contract DeployConfig is Script {
         respectedGameType = _json.readUintOr("$.respectedGameType", 0);
         sequencerFeeVaultMinimumWithdrawalAmount = _json.readUint("$.sequencerFeeVaultMinimumWithdrawalAmount");
         sequencerFeeVaultWithdrawalNetwork = _json.readUint("$.sequencerFeeVaultWithdrawalNetwork");
-        systemConfigStartBlock = _json.readUint("$.systemConfigStartBlock");
     }
 
     function l1StartingBlockTag() public returns (bytes32) {
@@ -166,16 +153,6 @@ contract DeployConfig is Script {
             return _getBlockByTag(vm.toString(tag_));
         } catch { }
         revert("DeployConfig: l1StartingBlockTag missing or not a bytes32/string/uint256");
-    }
-
-    function l2OutputOracleStartingTimestamp() public returns (uint256) {
-        if (_l2OutputOracleStartingTimestamp < 0) {
-            bytes32 tag = l1StartingBlockTag();
-            string memory cmd = string.concat("cast block ", vm.toString(tag), " --json | jq .timestamp");
-            string memory res = Process.bash(cmd);
-            return stdJson.readUint(res, "");
-        }
-        return uint256(_l2OutputOracleStartingTimestamp);
     }
 
     /// @notice Allow the `useUpgradedFork` config to be overridden in testing environments

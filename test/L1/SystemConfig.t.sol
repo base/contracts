@@ -25,7 +25,6 @@ abstract contract SystemConfig_TestInit is CommonTest {
 
     bytes32 public constant EXAMPLE_FEATURE = "EXAMPLE_FEATURE";
 
-    address batchInbox;
     address owner;
     bytes32 batcherHash;
     uint64 gasLimit;
@@ -37,7 +36,6 @@ abstract contract SystemConfig_TestInit is CommonTest {
 
     function setUp() public virtual override {
         super.setUp();
-        batchInbox = deploy.cfg().batchInboxAddress();
         owner = deploy.cfg().finalSystemOwner();
         basefeeScalar = deploy.cfg().basefeeScalar();
         blobbasefeeScalar = deploy.cfg().blobbasefeeScalar();
@@ -119,10 +117,6 @@ contract SystemConfig_Initialize_Test is SystemConfig_TestInit {
         assertEq(actual.minimumBaseFee, rcfg.minimumBaseFee);
         assertEq(actual.systemTxMaxGas, rcfg.systemTxMaxGas);
         assertEq(actual.maximumBaseFee, rcfg.maximumBaseFee);
-        // Depends on start block being set to 0 in `initialize`
-        uint256 cfgStartBlock = deploy.cfg().systemConfigStartBlock();
-        assertEq(systemConfig.startBlock(), (cfgStartBlock == 0 ? block.number : cfgStartBlock));
-        assertEq(address(systemConfig.batchInbox()), address(batchInbox));
 
         // Check address getters both for the single contract getter and the struct getter
         ISystemConfig.Addresses memory addrs = systemConfig.getAddresses();

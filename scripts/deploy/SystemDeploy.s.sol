@@ -371,10 +371,10 @@ contract SystemDeploy is Script {
             gasLimit: uint64(cfg.l2GenesisBlockGasLimit()),
             disputeGameType: GameTypes.PERMISSIONED_CANNON,
             disputeAbsolutePrestate: Claim.wrap(bytes32(cfg.faultGameAbsolutePrestate())),
-            disputeMaxGameDepth: cfg.faultGameMaxDepth(),
-            disputeSplitDepth: cfg.faultGameSplitDepth(),
-            disputeClockExtension: Duration.wrap(uint64(cfg.faultGameClockExtension())),
-            disputeMaxClockDuration: Duration.wrap(uint64(cfg.faultGameMaxClockDuration()))
+            disputeMaxGameDepth: cfg.faultGameV2MaxGameDepth(),
+            disputeSplitDepth: cfg.faultGameV2SplitDepth(),
+            disputeClockExtension: Duration.wrap(uint64(cfg.faultGameV2ClockExtension())),
+            disputeMaxClockDuration: Duration.wrap(uint64(cfg.faultGameV2MaxClockDuration()))
         });
     }
 
