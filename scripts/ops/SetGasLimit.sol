@@ -21,11 +21,6 @@ contract SetGasLimit is MultisigScript {
     address internal SYSTEM_CONFIG_OWNER = vm.envAddress("SYSTEM_CONFIG_OWNER");
     address internal L1_SYSTEM_CONFIG = vm.envAddress("L1_SYSTEM_CONFIG_ADDRESS");
 
-    /**
-     * -----------------------------------------------------------
-     * Implemented Functions
-     * -----------------------------------------------------------
-     */
     function _fromGasLimit() internal view returns (uint64) {
         return uint64(vm.envUint("FROM_GAS_LIMIT"));
     }
@@ -58,8 +53,8 @@ contract SetGasLimit is MultisigScript {
         return SYSTEM_CONFIG_OWNER;
     }
 
-    // We need to expect that the gas limit will have been updated previously in our simulation
-    // Use this override to specifically set the gas limit to the expected update value.
+    // Pin the simulation's starting gas limit to FROM_GAS_LIMIT so the simulated transition
+    // matches the intended FROM -> TO change even if production state has since drifted.
     function _simulationOverrides() internal view override returns (Simulation.StateOverride[] memory) {
         Simulation.StateOverride[] memory stateOverrides = new Simulation.StateOverride[](1);
         Simulation.StorageOverride[] memory storageOverrides = new Simulation.StorageOverride[](1);
