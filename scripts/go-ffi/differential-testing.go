@@ -26,22 +26,18 @@ import (
 
 // ABI types
 var (
-	// Plain dynamic dynBytes type
 	dynBytes, _ = abi.NewType("bytes", "", nil)
 	bytesArgs   = abi.Arguments{
 		{Type: dynBytes},
 	}
 
-	// Plain fixed bytes32 type
 	fixedBytes, _  = abi.NewType("bytes32", "", nil)
 	fixedBytesArgs = abi.Arguments{
 		{Type: fixedBytes},
 	}
 
-	// Plain uint32 type
 	uint32Type, _ = abi.NewType("uint32", "", nil)
 
-	// Plain uint256 type
 	uint256Type, _ = abi.NewType("uint256", "", nil)
 
 	// Decoded nonce tuple (nonce, version)
@@ -289,10 +285,11 @@ func DiffTestUtils() {
 		)
 		checkErr(err, "Error creating secure trie")
 
+		stateRoot := state.Hash()
 		account := types.StateAccount{
 			Nonce:   0,
 			Balance: common.U2560,
-			Root:    state.Hash(),
+			Root:    stateRoot,
 		}
 		writer := new(bytes.Buffer)
 		checkErr(account.EncodeRLP(writer), "Error encoding account")
@@ -302,7 +299,8 @@ func DiffTestUtils() {
 		var proof proofList
 		checkErr(state.Prove(predeploys.L2ToL1MessagePasserAddr.Bytes(), &proof), "Error getting proof")
 
-		outputRoot, err := hashOutputRootProof(common.Hash{}, world.Hash(), state.Hash(), common.Hash{})
+		worldRoot := world.Hash()
+		outputRoot, err := hashOutputRootProof(common.Hash{}, worldRoot, stateRoot, common.Hash{})
 		checkErr(err, "Error hashing output root proof")
 
 		output := struct {
@@ -312,8 +310,8 @@ func DiffTestUtils() {
 			WithdrawalHash common.Hash
 			Proof          proofList
 		}{
-			WorldRoot:      world.Hash(),
-			StateRoot:      state.Hash(),
+			WorldRoot:      worldRoot,
+			StateRoot:      stateRoot,
 			OutputRoot:     outputRoot,
 			WithdrawalHash: wdHash,
 			Proof:          proof,
@@ -338,21 +336,21 @@ func DiffTestUtils() {
 
 		var proof1 []byte
 		if len(args) >= 5 {
-			memAddr, err := strconv.ParseUint(args[3], 10, arch.WordSize)
+			memAddr1, err := strconv.ParseUint(args[3], 10, arch.WordSize)
 			checkErr(err, "Error decoding memAddr")
-			memValue, err := strconv.ParseUint(args[4], 10, arch.WordSize)
+			memValue1, err := strconv.ParseUint(args[4], 10, arch.WordSize)
 			checkErr(err, "Error decoding memValue")
-			mem.SetWord(arch.Word(memAddr), arch.Word(memValue))
-			proof := mem.MerkleProof(arch.Word(memAddr))
-			proof1 = proof[:]
-		}
-		if len(args) == 7 {
-			memAddr, err := strconv.ParseUint(args[5], 10, arch.WordSize)
-			checkErr(err, "Error decoding memAddr")
-			memValue, err := strconv.ParseUint(args[6], 10, arch.WordSize)
-			checkErr(err, "Error decoding memValue")
-			mem.SetWord(arch.Word(memAddr), arch.Word(memValue))
-			proof := mem.MerkleProof(arch.Word(memAddr))
+			mem.SetWord(arch.Word(memAddr1), arch.Word(memValue1))
+			proofAddr := memAddr1
+			if len(args) == 7 {
+				memAddr2, err := strconv.ParseUint(args[5], 10, arch.WordSize)
+				checkErr(err, "Error decoding memAddr")
+				memValue2, err := strconv.ParseUint(args[6], 10, arch.WordSize)
+				checkErr(err, "Error decoding memValue")
+				mem.SetWord(arch.Word(memAddr2), arch.Word(memValue2))
+				proofAddr = memAddr2
+			}
+			proof := mem.MerkleProof(arch.Word(proofAddr))
 			proof1 = proof[:]
 		}
 		proof0 := mem.MerkleProof(arch.Word(memAddr0))
@@ -413,7 +411,6 @@ func DiffTestUtils() {
 		checkErr(err, "Error decoding memValue0")
 		mem.SetWord(arch.Word(memAddr0), arch.Word(memValue0))
 
-		var insnProof, memProof [memory.MemProofSize]byte
 		memAddr1, err := strconv.ParseUint(args[3], 10, arch.WordSize)
 		checkErr(err, "Error decoding memAddr1")
 		memValue1, err := strconv.ParseUint(args[4], 10, arch.WordSize)
@@ -421,8 +418,8 @@ func DiffTestUtils() {
 		mem.SetWord(arch.Word(memAddr1), arch.Word(memValue1))
 
 		// Compute a valid proof for the root, but for the wrong leaves.
-		memProof = mem.MerkleProof(arch.Word(memAddr1 + arch.WordSize))
-		insnProof = mem.MerkleProof(arch.Word(memAddr0 + arch.WordSize))
+		memProof := mem.MerkleProof(arch.Word(memAddr1 + arch.WordSize))
+		insnProof := mem.MerkleProof(arch.Word(memAddr0 + arch.WordSize))
 
 		output := struct {
 			MemRoot common.Hash
@@ -499,6 +496,6 @@ func DiffTestUtils() {
 
 		fmt.Print(hexutil.Encode(packed))
 	default:
-		panic(fmt.Errorf("Unknown command: %s", variant))
+		panic(fmt.Sprintf("Unknown command: %s", variant))
 	}
 }
