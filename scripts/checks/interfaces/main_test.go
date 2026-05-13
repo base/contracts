@@ -92,6 +92,24 @@ func TestGetContractSemver(t *testing.T) {
 	}
 }
 
+func TestContractNameFromArtifactPath(t *testing.T) {
+	tests := []struct {
+		name         string
+		artifactPath string
+		want         string
+	}{
+		{"Plain artifact", "forge-artifacts/ICrossDomainMessenger.sol/ICrossDomainMessenger.json", "ICrossDomainMessenger"},
+		{"Versioned artifact", "forge-artifacts/ICrossDomainMessenger.sol/ICrossDomainMessenger.0.8.25.json", "ICrossDomainMessenger"},
+		{"Profiled artifact", "forge-artifacts/Initializable.sol/Initializable.default.json", "Initializable"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, contractNameFromArtifactPath(tt.artifactPath))
+		})
+	}
+}
+
 func TestNormalizeABI(t *testing.T) {
 	tests := []struct {
 		name string

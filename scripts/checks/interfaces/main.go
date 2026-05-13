@@ -88,7 +88,7 @@ func main() {
 }
 
 func processFile(artifactPath string) (*common.Void, []error) {
-	contractName := strings.TrimSuffix(filepath.Base(artifactPath), ".json")
+	contractName := contractNameFromArtifactPath(artifactPath)
 	if slices.Contains(excludeContracts, contractName) {
 		return nil, nil
 	}
@@ -174,6 +174,12 @@ func processFile(artifactPath string) (*common.Void, []error) {
 	}
 
 	return nil, nil
+}
+
+func contractNameFromArtifactPath(artifactPath string) string {
+	artifactName := strings.TrimSuffix(filepath.Base(artifactPath), ".json")
+	contractName, _, _ := strings.Cut(artifactName, ".")
+	return contractName
 }
 
 func readArtifact(path string) (*Artifact, error) {
