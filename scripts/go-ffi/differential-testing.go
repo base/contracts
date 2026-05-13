@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 	"os"
@@ -15,7 +14,6 @@ import (
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/arch"
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/memory"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/crossdomain"
-	"github.com/ethereum-optimism/optimism/op-core/predeploys"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 )
 
@@ -170,48 +168,7 @@ func DiffTestUtils() {
 		packAndPrint(fixedBytesArgs, &hash)
 	case "getProveWithdrawalTransactionInputs":
 		nonce, sender, target, value, gasLimit, data := parseCrossDomainArgs(args)
-
-		wdHash, err := hashWithdrawal(nonce, sender, target, value, gasLimit, data)
-		checkErr(err, "Error hashing withdrawal")
-
-		zero := common.Hash{}
-		slotKey := crypto.Keccak256Hash(wdHash.Bytes(), zero.Bytes())
-
-		state := newEmptyStateTrie()
-		checkErr(state.UpdateStorage(common.Address{}, slotKey.Bytes(), []byte{0x01}), "Error updating storage")
-
-		world := newEmptyStateTrie()
-		stateRoot := state.Hash()
-		account := types.StateAccount{
-			Nonce:   0,
-			Balance: common.U2560,
-			Root:    stateRoot,
-		}
-		writer := new(bytes.Buffer)
-		checkErr(account.EncodeRLP(writer), "Error encoding account")
-		err = world.UpdateStorage(common.Address{}, predeploys.L2ToL1MessagePasserAddr.Bytes(), writer.Bytes())
-		checkErr(err, "Error updating storage")
-
-		var proof proofList
-		checkErr(state.Prove(predeploys.L2ToL1MessagePasserAddr.Bytes(), &proof), "Error getting proof")
-
-		worldRoot := world.Hash()
-		outputRoot, err := hashOutputRootProof(common.Hash{}, worldRoot, stateRoot, common.Hash{})
-		checkErr(err, "Error hashing output root proof")
-
-		packTupleAndPrint(proveWithdrawalInputsArgs, &struct {
-			WorldRoot      common.Hash
-			StateRoot      common.Hash
-			OutputRoot     common.Hash
-			WithdrawalHash common.Hash
-			Proof          proofList
-		}{
-			WorldRoot:      worldRoot,
-			StateRoot:      stateRoot,
-			OutputRoot:     outputRoot,
-			WithdrawalHash: wdHash,
-			Proof:          proof,
-		})
+		packTupleAndPrint(proveWithdrawalInputsArgs, buildProveWithdrawalInputs(nonce, sender, target, value, gasLimit, data))
 	case "cannonMemoryProof":
 		// <memAddr0, memValue0, [memAddr1, memValue1], [memAddr2, memValue2]>
 		// Equivalent to the cannon STF prestate proofs of the program counter and memory access for instruction execution.
@@ -219,23 +176,23 @@ func DiffTestUtils() {
 			panic("Error: cannonMemoryProof requires 2, 4, or 6 arguments")
 		}
 		mem := memory.NewMemory()
-		memAddr0 := parseUintN(args[1], arch.WordSize)
-		mem.SetWord(arch.Word(memAddr0), arch.Word(parseUintN(args[2], arch.WordSize)))
+		memAddr0 := wordArg(args[1])
+		mem.SetWord(memAddr0, wordArg(args[2]))
 
 		var proof1 []byte
 		if len(args) >= 5 {
-			memAddr1 := parseUintN(args[3], arch.WordSize)
-			mem.SetWord(arch.Word(memAddr1), arch.Word(parseUintN(args[4], arch.WordSize)))
+			memAddr1 := wordArg(args[3])
+			mem.SetWord(memAddr1, wordArg(args[4]))
 			proofAddr := memAddr1
 			if len(args) == 7 {
-				memAddr2 := parseUintN(args[5], arch.WordSize)
-				mem.SetWord(arch.Word(memAddr2), arch.Word(parseUintN(args[6], arch.WordSize)))
+				memAddr2 := wordArg(args[5])
+				mem.SetWord(memAddr2, wordArg(args[6]))
 				proofAddr = memAddr2
 			}
-			proof := mem.MerkleProof(arch.Word(proofAddr))
+			proof := mem.MerkleProof(proofAddr)
 			proof1 = proof[:]
 		}
-		proof0 := mem.MerkleProof(arch.Word(memAddr0))
+		proof0 := mem.MerkleProof(memAddr0)
 
 		packTupleAndPrint(cannonMemoryProofArgs, &cannonMemoryProofOutput{
 			MemRoot: mem.MerkleRoot(),
@@ -248,9 +205,9 @@ func DiffTestUtils() {
 			panic("Error: cannonMemoryProof2 requires 5 arguments")
 		}
 		mem := memory.NewMemory()
-		mem.SetWord(arch.Word(parseUintN(args[1], arch.WordSize)), arch.Word(parseUintN(args[2], arch.WordSize)))
-		mem.SetWord(arch.Word(parseUintN(args[3], arch.WordSize)), arch.Word(parseUintN(args[4], arch.WordSize)))
-		memProof := mem.MerkleProof(arch.Word(parseUintN(args[5], arch.WordSize)))
+		mem.SetWord(wordArg(args[1]), wordArg(args[2]))
+		mem.SetWord(wordArg(args[3]), wordArg(args[4]))
+		memProof := mem.MerkleProof(wordArg(args[5]))
 
 		packTupleAndPrint(cannonMemoryProofArgs, &cannonMemoryProofOutput{
 			MemRoot: mem.MerkleRoot(),
@@ -262,13 +219,13 @@ func DiffTestUtils() {
 			panic("Error: cannonMemoryProofWrongLeaf requires 4 arguments")
 		}
 		mem := memory.NewMemory()
-		memAddr0 := parseUintN(args[1], arch.WordSize)
-		mem.SetWord(arch.Word(memAddr0), arch.Word(parseUintN(args[2], arch.WordSize)))
-		memAddr1 := parseUintN(args[3], arch.WordSize)
-		mem.SetWord(arch.Word(memAddr1), arch.Word(parseUintN(args[4], arch.WordSize)))
+		memAddr0 := wordArg(args[1])
+		mem.SetWord(memAddr0, wordArg(args[2]))
+		memAddr1 := wordArg(args[3])
+		mem.SetWord(memAddr1, wordArg(args[4]))
 
-		memProof := mem.MerkleProof(arch.Word(memAddr1 + arch.WordSize))
-		insnProof := mem.MerkleProof(arch.Word(memAddr0 + arch.WordSize))
+		memProof := mem.MerkleProof(memAddr1 + arch.Word(arch.WordSize))
+		insnProof := mem.MerkleProof(memAddr0 + arch.Word(arch.WordSize))
 
 		packTupleAndPrint(cannonMemoryProofArgs, &cannonMemoryProofOutput{
 			MemRoot: mem.MerkleRoot(),

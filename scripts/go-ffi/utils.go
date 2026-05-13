@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
 
+	"github.com/ethereum-optimism/optimism/cannon/mipsevm/arch"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/crossdomain"
+	"github.com/ethereum-optimism/optimism/op-core/predeploys"
 	"github.com/ethereum-optimism/optimism/op-node/bindings"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
@@ -16,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/triedb"
 	"github.com/ethereum/go-ethereum/triedb/hashdb"
@@ -63,6 +67,11 @@ func parseUintN(s string, bits int) uint64 {
 	v, err := strconv.ParseUint(s, 10, bits)
 	checkErr(err, "Error decoding uint")
 	return v
+}
+
+// wordArg parses a base-10 cannon memory word from a CLI argument.
+func wordArg(s string) arch.Word {
+	return arch.Word(parseUintN(s, arch.WordSize))
 }
 
 // parseCrossDomainArgs reads the (nonce, sender, target, value, gasLimit, data)
@@ -274,6 +283,54 @@ func makeDepositTx(
 	}
 
 	return depositTx
+}
+
+type proveWithdrawalResult struct {
+	WorldRoot      common.Hash
+	StateRoot      common.Hash
+	OutputRoot     common.Hash
+	WithdrawalHash common.Hash
+	Proof          proofList
+}
+
+// buildProveWithdrawalInputs constructs the world/state tries, output root, and
+// inclusion proof needed to call OptimismPortal.proveWithdrawalTransaction.
+func buildProveWithdrawalInputs(nonce *big.Int, sender, target common.Address, value, gasLimit *big.Int, data []byte) *proveWithdrawalResult {
+	wdHash, err := hashWithdrawal(nonce, sender, target, value, gasLimit, data)
+	checkErr(err, "Error hashing withdrawal")
+
+	zero := common.Hash{}
+	slotKey := crypto.Keccak256Hash(wdHash.Bytes(), zero.Bytes())
+
+	state := newEmptyStateTrie()
+	checkErr(state.UpdateStorage(common.Address{}, slotKey.Bytes(), []byte{0x01}), "Error updating storage")
+
+	stateRoot := state.Hash()
+	account := types.StateAccount{
+		Nonce:   0,
+		Balance: common.U2560,
+		Root:    stateRoot,
+	}
+	writer := new(bytes.Buffer)
+	checkErr(account.EncodeRLP(writer), "Error encoding account")
+
+	world := newEmptyStateTrie()
+	checkErr(world.UpdateStorage(common.Address{}, predeploys.L2ToL1MessagePasserAddr.Bytes(), writer.Bytes()), "Error updating storage")
+
+	var proof proofList
+	checkErr(state.Prove(predeploys.L2ToL1MessagePasserAddr.Bytes(), &proof), "Error getting proof")
+
+	worldRoot := world.Hash()
+	outputRoot, err := hashOutputRootProof(common.Hash{}, worldRoot, stateRoot, common.Hash{})
+	checkErr(err, "Error hashing output root proof")
+
+	return &proveWithdrawalResult{
+		WorldRoot:      worldRoot,
+		StateRoot:      stateRoot,
+		OutputRoot:     outputRoot,
+		WithdrawalHash: wdHash,
+		Proof:          proof,
+	}
 }
 
 // Custom type to write the generated proof to
