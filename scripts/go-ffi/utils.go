@@ -36,7 +36,7 @@ type SuperRootProof struct {
 	OutputRoots []OutputRootWithChainId
 }
 
-var UnknownNonceVersion = errors.New("Unknown nonce version")
+var errUnknownNonceVersion = errors.New("unknown nonce version")
 
 func checkErr(err error, failReason string) {
 	if err != nil {
@@ -107,7 +107,7 @@ func encodeCrossDomainMessage(nonce *big.Int, sender common.Address, target comm
 	case 1:
 		return crossdomain.EncodeCrossDomainMessageV1(nonce, sender, target, value, gasLimit, data)
 	default:
-		return nil, UnknownNonceVersion
+		return nil, errUnknownNonceVersion
 	}
 }
 
@@ -138,7 +138,7 @@ func parseSuperRootProof(abiEncodedProof []byte) (*SuperRootProof, error) {
 	for i, o := range tmp.OutputRoots {
 		proof.OutputRoots[i] = OutputRootWithChainId{
 			ChainId: o.ChainId,
-			Root:    common.BytesToHash(o.Root[:]),
+			Root:    o.Root,
 		}
 	}
 
