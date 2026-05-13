@@ -7,6 +7,7 @@
   "faultGameAbsolutePrestate": "0x03b7eaa4e3cbce90381921a4b48008f4769871d64f93d113fcadca08ecee503b",
   "faultGameGenesisBlock": 9496192,
   "faultGameGenesisOutputRoot": "0x63b1cda487c072b020a57c1203f7c2921754005cadbd54bed7f558111b8278d8",
+  "faultGameWithdrawalDelay": 604800,
   "finalSystemOwner": "0x6e427c3212C0b63BE0C382F97715D49b011bFF33",
   "gasPriceOracleBaseFeeScalar": 1368,
   "gasPriceOracleBlobBaseFeeScalar": 810949,
