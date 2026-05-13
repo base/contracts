@@ -147,7 +147,7 @@ func DiffTestUtils() {
 		depositTx := makeDepositTx(from, to, value, mint, gasLimit, isCreate, data, l1BlockHash, logIndex)
 
 		encoded, err := types.NewTx(&depositTx).MarshalBinary()
-		checkErr(err, "Failed to RLP encode deposit transaction")
+		checkErr(err, "Error encoding deposit transaction")
 		packAndPrint(bytesArgs, &encoded)
 	case "hashWithdrawal":
 		nonce, sender, target, value, gasLimit, data := parseCrossDomainArgs(args)
@@ -179,18 +179,16 @@ func DiffTestUtils() {
 		memAddr0 := wordArg(args[1])
 		mem.SetWord(memAddr0, wordArg(args[2]))
 
+		var lastExtraAddr arch.Word
+		for i := 3; i+1 < len(args); i += 2 {
+			lastExtraAddr = wordArg(args[i])
+			mem.SetWord(lastExtraAddr, wordArg(args[i+1]))
+		}
+
 		var proof1 []byte
 		if len(args) >= 5 {
-			memAddr1 := wordArg(args[3])
-			mem.SetWord(memAddr1, wordArg(args[4]))
-			proofAddr := memAddr1
-			if len(args) == 7 {
-				memAddr2 := wordArg(args[5])
-				mem.SetWord(memAddr2, wordArg(args[6]))
-				proofAddr = memAddr2
-			}
-			proof := mem.MerkleProof(proofAddr)
-			proof1 = proof[:]
+			p := mem.MerkleProof(lastExtraAddr)
+			proof1 = p[:]
 		}
 		proof0 := mem.MerkleProof(memAddr0)
 
@@ -249,14 +247,14 @@ func DiffTestUtils() {
 
 		packAndPrint(bytesArgs, &encoded)
 	case "encodeSuperRootProof":
-		if len(args) < 2 {
-			panic("Error: encodeSuperRootProof requires at least 1 argument")
+		if len(args) != 2 {
+			panic("Error: encodeSuperRootProof requires 1 argument")
 		}
 		encoded := parseAndEncodeSuperRoot(args[1])
 		packAndPrint(bytesArgs, &encoded)
 	case "hashSuperRootProof":
-		if len(args) < 2 {
-			panic("Error: hashSuperRootProof requires at least 1 argument")
+		if len(args) != 2 {
+			panic("Error: hashSuperRootProof requires 1 argument")
 		}
 		hash := crypto.Keccak256Hash(parseAndEncodeSuperRoot(args[1]))
 		packAndPrint(fixedBytesArgs, &hash)
