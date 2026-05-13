@@ -2,13 +2,12 @@
 pragma solidity 0.8.15;
 
 import { StdUtils } from "lib/forge-std/src/StdUtils.sol";
-import { StdInvariant } from "lib/forge-std/src/StdInvariant.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 
 import { Arithmetic } from "src/libraries/Arithmetic.sol";
 import { ResourceMetering } from "src/L1/ResourceMetering.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { Constants } from "src/libraries/Constants.sol";
-import { InvariantTest } from "test/invariants/InvariantTest.sol";
 
 contract ResourceMetering_User is StdUtils, ResourceMetering {
     bool public failedMaxGasPerBlock;
@@ -138,11 +137,10 @@ contract ResourceMetering_User is StdUtils, ResourceMetering {
     function _burnInternal(uint64 _gasToBurn) private metered(_gasToBurn) { }
 }
 
-contract ResourceMetering_Invariant is StdInvariant, InvariantTest {
+contract ResourceMetering_Invariant is Test {
     ResourceMetering_User internal actor;
 
-    function setUp() public override {
-        super.setUp();
+    function setUp() public {
         // Create a actor.
         actor = new ResourceMetering_User();
 
