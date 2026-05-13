@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 
 /// @title MockAnchorStateRegistry
@@ -18,11 +19,6 @@ contract MockAnchorStateRegistry {
     address public factory;
     GameType public respectedGameType;
 
-    /// @notice Initializes the mock registry.
-    /// @param newFactory The dispute game factory address.
-    /// @param newAnchorRoot The initial anchor root.
-    /// @param newAnchorL2BlockNumber The initial anchor L2 block number.
-    /// @param gameType The respected game type.
     function initialize(
         address newFactory,
         Hash newAnchorRoot,
@@ -37,84 +33,57 @@ contract MockAnchorStateRegistry {
         respectedGameType = gameType;
     }
 
-    /// @notice Returns the anchor root and block number.
-    /// @return The anchor root hash and L2 block number.
     function getAnchorRoot() external view returns (Hash, uint256) {
         return (anchorRoot, anchorL2BlockNumber);
     }
 
-    /// @notice Returns the starting anchor root as a Proposal.
-    /// @return The anchor root as a Proposal struct.
     function getStartingAnchorRoot() external view returns (Proposal memory) {
         return Proposal({ root: anchorRoot, l2SequenceNumber: anchorL2BlockNumber });
     }
 
-    /// @notice Returns the dispute game factory address.
-    /// @return The factory address.
-    function disputeGameFactory() external view returns (address) {
-        return factory;
+    function disputeGameFactory() external view returns (IDisputeGameFactory) {
+        return IDisputeGameFactory(factory);
     }
 
-    /// @notice Sets the respected game type.
-    /// @param gameType The new game type.
     function setRespectedGameType(GameType gameType) external {
         respectedGameType = gameType;
     }
 
-    /// @notice Updates the anchor state (for testing purposes).
-    /// @param newAnchorRoot The new anchor root.
-    /// @param newAnchorL2BlockNumber The new anchor L2 block number.
     function setAnchorState(Hash newAnchorRoot, uint256 newAnchorL2BlockNumber) external {
         anchorRoot = newAnchorRoot;
         anchorL2BlockNumber = newAnchorL2BlockNumber;
     }
 
-    /// @notice Checks if a game is registered.
-    /// @return Always returns true for testing.
     function isGameRegistered(IDisputeGame) external pure returns (bool) {
         return true;
     }
 
-    /// @notice Checks if a game is blacklisted.
-    /// @return Always returns false for testing.
     function isGameBlacklisted(IDisputeGame) external pure returns (bool) {
         return false;
     }
 
-    /// @notice Checks if a game is retired.
-    /// @return Always returns false for testing.
     function isGameRetired(IDisputeGame) external pure returns (bool) {
         return false;
     }
 
-    /// @notice Checks if a game is respected.
-    /// @return Always returns true for testing.
     function isGameRespected(IDisputeGame) external pure returns (bool) {
         return true;
     }
 
-    /// @notice Checks if a game is proper (registered, not blacklisted, not retired, not paused).
-    /// @return Always returns true for testing.
     function isGameProper(IDisputeGame) external pure returns (bool) {
         return true;
     }
 
-    /// @notice Checks if the system is paused.
-    /// @return Always returns false for testing.
     function paused() external pure returns (bool) {
         return false;
     }
 
-    /// @notice Checks if a game is finalized.
     /// @dev Mirrors the real AnchorStateRegistry: requires the game to be resolved.
     ///      Skips the airgap delay check since this is a dev mock without a finality delay.
-    /// @return Whether the game has been resolved.
     function isGameFinalized(IDisputeGame _game) external view returns (bool) {
         return _game.resolvedAt().raw() != 0;
     }
 
-    /// @notice Sets the anchor state from a dispute game.
-    /// @dev No-op for testing.
     function setAnchorState(IDisputeGame) external {
         // No-op in mock
     }
