@@ -9,12 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/trie"
-	"github.com/ethereum/go-ethereum/triedb"
-	"github.com/ethereum/go-ethereum/triedb/hashdb"
 
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/arch"
 	"github.com/ethereum-optimism/optimism/cannon/mipsevm/memory"
@@ -52,15 +48,6 @@ var (
 	decodedScalars = abi.Arguments{
 		{Name: "basefeeScalar", Type: uint32Type},
 		{Name: "blobbasefeeScalar", Type: uint32Type},
-	}
-
-	// WithdrawalHash slot tuple (bytes32, bytes32)
-	withdrawalSlot, _ = abi.NewType("tuple", "SlotHash", []abi.ArgumentMarshaling{
-		{Name: "withdrawalHash", Type: "bytes32"},
-		{Name: "zeroPadding", Type: "bytes32"},
-	})
-	withdrawalSlotArgs = abi.Arguments{
-		{Name: "slotHash", Type: withdrawalSlot},
 	}
 
 	// Prove withdrawal inputs tuple (bytes32, bytes32, bytes32, bytes32, bytes[])
@@ -187,33 +174,13 @@ func DiffTestUtils() {
 		wdHash, err := hashWithdrawal(nonce, sender, target, value, gasLimit, data)
 		checkErr(err, "Error hashing withdrawal")
 
-		slot := struct {
-			WithdrawalHash common.Hash
-			ZeroPadding    common.Hash
-		}{
-			WithdrawalHash: wdHash,
-			ZeroPadding:    common.Hash{},
-		}
-		packed, err := withdrawalSlotArgs.Pack(&slot)
-		checkErr(err, "Error packing withdrawal slot")
+		zero := common.Hash{}
+		slotKey := crypto.Keccak256Hash(wdHash.Bytes(), zero.Bytes())
 
-		hash := crypto.Keccak256Hash(packed)
+		state := newEmptyStateTrie()
+		checkErr(state.UpdateStorage(common.Address{}, slotKey.Bytes(), []byte{0x01}), "Error updating storage")
 
-		state, err := trie.NewStateTrie(
-			trie.TrieID(types.EmptyRootHash),
-			triedb.NewDatabase(rawdb.NewMemoryDatabase(), &triedb.Config{HashDB: hashdb.Defaults}),
-		)
-		checkErr(err, "Error creating secure trie")
-
-		err = state.UpdateStorage(common.Address{}, hash.Bytes(), []byte{0x01})
-		checkErr(err, "Error updating storage")
-
-		world, err := trie.NewStateTrie(
-			trie.TrieID(types.EmptyRootHash),
-			triedb.NewDatabase(rawdb.NewMemoryDatabase(), &triedb.Config{HashDB: hashdb.Defaults}),
-		)
-		checkErr(err, "Error creating secure trie")
-
+		world := newEmptyStateTrie()
 		stateRoot := state.Hash()
 		account := types.StateAccount{
 			Nonce:   0,
@@ -247,8 +214,7 @@ func DiffTestUtils() {
 		})
 	case "cannonMemoryProof":
 		// <memAddr0, memValue0, [memAddr1, memValue1], [memAddr2, memValue2]>
-		// Generates memory proofs of `memAddr0` for a trie containing memValue0 and `memAddr1` for a trie containing memValue1 and memValue2
-		// For the cannon stf, this is equivalent to the prestate proofs of the program counter and memory access for instruction execution
+		// Equivalent to the cannon STF prestate proofs of the program counter and memory access for instruction execution.
 		if len(args) != 3 && len(args) != 5 && len(args) != 7 {
 			panic("Error: cannonMemoryProof requires 2, 4, or 6 arguments")
 		}
@@ -301,7 +267,6 @@ func DiffTestUtils() {
 		memAddr1 := parseUintN(args[3], arch.WordSize)
 		mem.SetWord(arch.Word(memAddr1), arch.Word(parseUintN(args[4], arch.WordSize)))
 
-		// Compute a valid proof for the root, but for the wrong leaves.
 		memProof := mem.MerkleProof(arch.Word(memAddr1 + arch.WordSize))
 		insnProof := mem.MerkleProof(arch.Word(memAddr0 + arch.WordSize))
 
@@ -317,7 +282,7 @@ func DiffTestUtils() {
 		fmt.Print(hexutil.Encode(encoded[:]))
 	case "decodeScalarEcotone":
 		scalar := common.HexToHash(args[1])
-		scalars, err := eth.DecodeScalar([32]byte(scalar[:]))
+		scalars, err := eth.DecodeScalar(scalar)
 		checkErr(err, "Error decoding scalar")
 
 		packAndPrint(decodedScalars, scalars.BaseFeeScalar, scalars.BlobBaseFeeScalar)
@@ -330,26 +295,13 @@ func DiffTestUtils() {
 		if len(args) < 2 {
 			panic("Error: encodeSuperRootProof requires at least 1 argument")
 		}
-
-		proof, err := parseSuperRootProof(common.FromHex(args[1]))
-		checkErr(err, "Error parsing super root proof")
-
-		encoded, err := encodeSuperRootProof(proof)
-		checkErr(err, "Error encoding super root")
-
+		encoded := parseAndEncodeSuperRoot(args[1])
 		packAndPrint(bytesArgs, &encoded)
 	case "hashSuperRootProof":
 		if len(args) < 2 {
 			panic("Error: hashSuperRootProof requires at least 1 argument")
 		}
-
-		proof, err := parseSuperRootProof(common.FromHex(args[1]))
-		checkErr(err, "Error parsing super root proof")
-
-		encoded, err := encodeSuperRootProof(proof)
-		checkErr(err, "Error encoding super root proof")
-
-		hash := crypto.Keccak256Hash(encoded)
+		hash := crypto.Keccak256Hash(parseAndEncodeSuperRoot(args[1]))
 		packAndPrint(fixedBytesArgs, &hash)
 	default:
 		panic(fmt.Sprintf("Unknown command: %s", variant))

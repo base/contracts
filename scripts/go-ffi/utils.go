@@ -14,7 +14,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/triedb"
+	"github.com/ethereum/go-ethereum/triedb/hashdb"
 )
 
 type OutputRootWithChainId struct {
@@ -184,6 +188,26 @@ func encodeSuperRootProof(superRootProof *SuperRootProof) ([]byte, error) {
 	}
 
 	return encoded, nil
+}
+
+// newEmptyStateTrie returns a fresh in-memory secure state trie.
+func newEmptyStateTrie() *trie.StateTrie {
+	t, err := trie.NewStateTrie(
+		trie.TrieID(types.EmptyRootHash),
+		triedb.NewDatabase(rawdb.NewMemoryDatabase(), &triedb.Config{HashDB: hashdb.Defaults}),
+	)
+	checkErr(err, "Error creating secure trie")
+	return t
+}
+
+// parseAndEncodeSuperRoot parses an abi-encoded super root proof hex string
+// and returns its packed binary encoding.
+func parseAndEncodeSuperRoot(hexStr string) []byte {
+	proof, err := parseSuperRootProof(common.FromHex(hexStr))
+	checkErr(err, "Error parsing super root proof")
+	encoded, err := encodeSuperRootProof(proof)
+	checkErr(err, "Error encoding super root proof")
+	return encoded
 }
 
 // hashWithdrawal hashes a withdrawal transaction.
