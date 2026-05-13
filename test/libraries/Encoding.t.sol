@@ -298,4 +298,11 @@ contract Encoding_Uncategorized_Test is Encoding_TestInit {
 
         assertEq(_nonce, uint240(decodedNonce));
     }
+
+    /// @notice Tests decoding and re-encoding a versioned nonce.
+    function testFuzz_encodedNonceRoundTrip_succeeds(uint256 _versionedNonce) external pure {
+        (uint240 nonce, uint16 version) = Encoding.decodeVersionedNonce(_versionedNonce);
+
+        assertEq(Encoding.encodeVersionedNonce(nonce, version), _versionedNonce);
+    }
 }
