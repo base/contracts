@@ -1,17 +1,19 @@
-# `ctb-go-ffi`
+# `go-ffi`
 
-A lightweight binary for utilities accessed via `forge`'s `ffi` cheatcode in the `contracts-bedrock` test suite.
+A lightweight binary for utilities accessed via `forge`'s `ffi` cheatcode in the `contracts` test suite.
 
 <pre>
 ├── go-ffi
-│   ├── <a href="./bin.go">bin</a>: `go-ffi`'s binary
+│   ├── <a href="./bin.go">bin</a>: `go-ffi`'s entry point and subcommand dispatcher
+│   ├── <a href="./differential-testing.go">diff-testing</a>: Utility for differential testing Solidity implementations against their respective Go implementations
 │   ├── <a href="./trie.go">trie</a>: Utility for generating random merkle trie roots / inclusion proofs
-│   └── <a href="./differential-testing.go">diff-testing</a>: Utility for differential testing Solidity implementations against their respective Go implementations.
+│   ├── <a href="./merkle.go">merkle</a>: Utility for generating binary merkle tree roots / inclusion proofs
+│   └── <a href="./utils.go">utils</a>: Shared encoding and parsing helpers
 </pre>
 
 ## Usage
 
-To build, run `just build-go-ffi` from the `contract-bedrock` package.
+To build, run `just build-go-ffi` from the `contracts` package.
 
 ### In a Forge Test
 
@@ -31,7 +33,7 @@ function myFFITest() public {
 
 ### Available Modes
 
-There are two modes available in `go-ffi`: `diff` and `trie`. Each are present as a subcommand to the `go-ffi` binary, with their own set of variants.
+There are three modes available in `go-ffi`: `diff`, `trie`, and `merkle`. Each is a subcommand to the `go-ffi` binary, with its own set of variants.
 
 #### `diff`
 
@@ -49,6 +51,11 @@ There are two modes available in `go-ffi`: `diff` and `trie`. Each are present a
 | `hashOutputRootProof`                 | Hashes an output root proof and prints the digest                                                                  |
 | `getProveWithdrawalTransactionInputs` | Generates the inputs for a `getProveWithdrawalTransaction` call to the `OptimismPortal` given a withdrawal message |
 | `cannonMemoryProof`                   | Computes a merkle proof of Cannon's memory                                                                         |
+| `cannonMemoryProof2`                  | Generates a memory proof for a third address against a trie containing two preset values                           |
+| `encodeScalarEcotone`                 | Encodes Ecotone basefee and blob basefee scalars into a single packed scalar                                       |
+| `decodeScalarEcotone`                 | Decodes a packed Ecotone scalar into its basefee and blob basefee scalar components                                |
+| `encodeSuperRootProof`                | ABI-encodes a super root proof                                                                                     |
+| `hashSuperRootProof`                  | Encodes and hashes a super root proof and prints the digest                                                        |
 
 #### `trie`
 
@@ -66,3 +73,12 @@ There are two modes available in `go-ffi`: `diff` and `trie`. Each are present a
 | `prefixed_valid_key`          | Generate a valid test case with a key that has been given a random prefix                                                                 |
 | `empty_key`                   | Generate a valid test case with a proof of inclusion for an empty key.                                                                    |
 | `partial_proof`               | Generate an invalid test case with a partially correct proof                                                                              |
+
+#### `merkle`
+
+> **Note**
+> Variant required for `merkle` mode.
+
+| Variant     | Description                                                                                                 |
+| ----------- | ----------------------------------------------------------------------------------------------------------- |
+| `gen_proof` | Builds a binary merkle tree from the given hex-encoded leaves and emits the root and proof at a given index |
