@@ -15,6 +15,9 @@ import { MultisigScript, Simulation } from "../universal/MultisigScript.sol";
 ///      signer approvals & execution. The gas limit parameter controls the maximum amount of gas that can be consumed
 ///      in a single L2 block.
 contract SetGasLimit is MultisigScript {
+    /// @notice Storage slot of `gasLimit` on `SystemConfig`.
+    bytes32 internal constant GAS_LIMIT_SLOT = bytes32(uint256(0x68));
+
     address internal SYSTEM_CONFIG_OWNER = vm.envAddress("SYSTEM_CONFIG_OWNER");
     address internal L1_SYSTEM_CONFIG = vm.envAddress("L1_SYSTEM_CONFIG_ADDRESS");
 
@@ -57,10 +60,8 @@ contract SetGasLimit is MultisigScript {
     function _simulationOverrides() internal view override returns (Simulation.StateOverride[] memory) {
         Simulation.StateOverride[] memory stateOverrides = new Simulation.StateOverride[](1);
         Simulation.StorageOverride[] memory storageOverrides = new Simulation.StorageOverride[](1);
-        storageOverrides[0] = Simulation.StorageOverride({
-            key: 0x0000000000000000000000000000000000000000000000000000000000000068, // slot of gas limit
-            value: bytes32(uint256(_fromGasLimit()))
-        });
+        storageOverrides[0] =
+            Simulation.StorageOverride({ key: GAS_LIMIT_SLOT, value: bytes32(uint256(_fromGasLimit())) });
         // solhint-disable-next-line max-line-length
         stateOverrides[0] = Simulation.StateOverride({ contractAddress: L1_SYSTEM_CONFIG, overrides: storageOverrides });
         return stateOverrides;
