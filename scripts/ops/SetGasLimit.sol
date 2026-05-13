@@ -16,12 +16,12 @@ import { MultisigScript, Simulation } from "../universal/MultisigScript.sol";
 ///      in a single L2 block.
 contract SetGasLimit is MultisigScript {
     /// @notice Storage slot of `gasLimit` on `SystemConfig`.
-    bytes32 internal constant GAS_LIMIT_SLOT = bytes32(uint256(0x68));
+    bytes32 public constant GAS_LIMIT_SLOT = bytes32(uint256(0x68));
 
-    address internal SYSTEM_CONFIG_OWNER = vm.envAddress("SYSTEM_CONFIG_OWNER");
-    address internal L1_SYSTEM_CONFIG = vm.envAddress("L1_SYSTEM_CONFIG_ADDRESS");
-    uint64 internal FROM_GAS_LIMIT = uint64(vm.envUint("FROM_GAS_LIMIT"));
-    uint64 internal TO_GAS_LIMIT = uint64(vm.envUint("TO_GAS_LIMIT"));
+    address public immutable SYSTEM_CONFIG_OWNER = vm.envAddress("SYSTEM_CONFIG_OWNER");
+    address public immutable L1_SYSTEM_CONFIG = vm.envAddress("L1_SYSTEM_CONFIG_ADDRESS");
+    uint64 public immutable FROM_GAS_LIMIT = uint64(vm.envUint("FROM_GAS_LIMIT"));
+    uint64 public immutable TO_GAS_LIMIT = uint64(vm.envUint("TO_GAS_LIMIT"));
 
     function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal view override {
         require(
