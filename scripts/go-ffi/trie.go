@@ -16,7 +16,7 @@ import (
 
 const (
 	// Generate a test case with a valid proof of inclusion for the k/v pair in the trie.
-	valid string = "valid"
+	valid = "valid"
 	// Generate an invalid test case with an extra proof element attached to an otherwise
 	// valid proof of inclusion for the passed k/v.
 	extraProofElems = "extra_proof_elems"
