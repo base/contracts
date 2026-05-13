@@ -5,12 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/ethereum-optimism/optimism/op-chain-ops/crossdomain"
 	"github.com/ethereum-optimism/optimism/op-node/bindings"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -42,6 +45,54 @@ func checkErr(err error, failReason string) {
 	if err != nil {
 		panic(fmt.Errorf("%s: %w", failReason, err))
 	}
+}
+
+// parseBigInt parses a base-10 *big.Int and panics if invalid.
+func parseBigInt(s string) *big.Int {
+	v, ok := new(big.Int).SetString(s, 10)
+	checkOk(ok)
+	return v
+}
+
+// parseUintN parses a base-10 unsigned integer with the given bit size and panics if invalid.
+func parseUintN(s string, bits int) uint64 {
+	v, err := strconv.ParseUint(s, 10, bits)
+	checkErr(err, "Error decoding uint")
+	return v
+}
+
+// parseCrossDomainArgs reads the (nonce, sender, target, value, gasLimit, data)
+// tuple shared by the cross-domain-message and withdrawal CLI variants from positional
+// args starting at args[1].
+func parseCrossDomainArgs(args []string) (nonce *big.Int, sender common.Address, target common.Address, value *big.Int, gasLimit *big.Int, data []byte) {
+	return parseBigInt(args[1]),
+		common.HexToAddress(args[2]),
+		common.HexToAddress(args[3]),
+		parseBigInt(args[4]),
+		parseBigInt(args[5]),
+		common.FromHex(args[6])
+}
+
+// packAndPrint ABI-encodes vals using args and writes the hex result to stdout.
+func packAndPrint(args abi.Arguments, vals ...any) {
+	packed, err := args.Pack(vals...)
+	checkErr(err, "Error encoding output")
+	fmt.Print(hexutil.Encode(packed))
+}
+
+// packTupleAndPrint is like packAndPrint but strips the leading 32-byte head word
+// that go-ethereum prepends when the top-level Arguments wraps a single dynamic
+// tuple, so Solidity callers decode the inner tuple directly.
+func packTupleAndPrint(args abi.Arguments, v any) {
+	packed, err := args.Pack(v)
+	checkErr(err, "Error encoding output")
+	fmt.Print(hexutil.Encode(packed[32:]))
+}
+
+// cannonMemoryProofOutput is the ABI shape returned by all cannonMemoryProof variants.
+type cannonMemoryProofOutput struct {
+	MemRoot common.Hash
+	Proof   []byte
 }
 
 // encodeCrossDomainMessage encodes a versioned cross domain message into a byte array.

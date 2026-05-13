@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"strconv"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -111,72 +110,35 @@ func DiffTestUtils() {
 
 	switch variant {
 	case "decodeVersionedNonce":
-		input, ok := new(big.Int).SetString(args[1], 10)
-		checkOk(ok)
+		nonce, version := crossdomain.DecodeVersionedNonce(parseBigInt(args[1]))
 
-		nonce, version := crossdomain.DecodeVersionedNonce(input)
-
-		packArgs := struct {
+		packAndPrint(decodedNonceArgs, &struct {
 			Nonce   *big.Int
 			Version *big.Int
-		}{
-			nonce,
-			version,
-		}
-		packed, err := decodedNonceArgs.Pack(&packArgs)
-		checkErr(err, "Error encoding output")
-
-		fmt.Print(hexutil.Encode(packed))
+		}{nonce, version})
 	case "encodeCrossDomainMessage":
-		nonce, ok := new(big.Int).SetString(args[1], 10)
-		checkOk(ok)
-		sender := common.HexToAddress(args[2])
-		target := common.HexToAddress(args[3])
-		value, ok := new(big.Int).SetString(args[4], 10)
-		checkOk(ok)
-		gasLimit, ok := new(big.Int).SetString(args[5], 10)
-		checkOk(ok)
-		data := common.FromHex(args[6])
+		nonce, sender, target, value, gasLimit, data := parseCrossDomainArgs(args)
 
 		encoded, err := encodeCrossDomainMessage(nonce, sender, target, value, gasLimit, data)
 		checkErr(err, "Error encoding cross domain message")
 
-		packed, err := bytesArgs.Pack(&encoded)
-		checkErr(err, "Error encoding output")
-
-		fmt.Print(hexutil.Encode(packed))
+		packAndPrint(bytesArgs, &encoded)
 	case "hashCrossDomainMessage":
-		nonce, ok := new(big.Int).SetString(args[1], 10)
-		checkOk(ok)
-		sender := common.HexToAddress(args[2])
-		target := common.HexToAddress(args[3])
-		value, ok := new(big.Int).SetString(args[4], 10)
-		checkOk(ok)
-		gasLimit, ok := new(big.Int).SetString(args[5], 10)
-		checkOk(ok)
-		data := common.FromHex(args[6])
+		nonce, sender, target, value, gasLimit, data := parseCrossDomainArgs(args)
 
 		encoded, err := encodeCrossDomainMessage(nonce, sender, target, value, gasLimit, data)
 		checkErr(err, "Error encoding cross domain message")
 
 		hash := crypto.Keccak256Hash(encoded)
-
-		packed, err := fixedBytesArgs.Pack(&hash)
-		checkErr(err, "Error encoding output")
-
-		fmt.Print(hexutil.Encode(packed))
+		packAndPrint(fixedBytesArgs, &hash)
 	case "hashDepositTransaction":
 		l1BlockHash := common.HexToHash(args[1])
-		logIndex, ok := new(big.Int).SetString(args[2], 10)
-		checkOk(ok)
+		logIndex := parseBigInt(args[2])
 		from := common.HexToAddress(args[3])
 		to := common.HexToAddress(args[4])
-		mint, ok := new(big.Int).SetString(args[5], 10)
-		checkOk(ok)
-		value, ok := new(big.Int).SetString(args[6], 10)
-		checkOk(ok)
-		gasLimit, ok := new(big.Int).SetString(args[7], 10)
-		checkOk(ok)
+		mint := parseBigInt(args[5])
+		value := parseBigInt(args[6])
+		gasLimit := parseBigInt(args[7])
 		data := common.FromHex(args[8])
 
 		depositTx := makeDepositTx(from, to, value, mint, gasLimit, false, data, l1BlockHash, logIndex)
@@ -185,52 +147,30 @@ func DiffTestUtils() {
 		checkErr(err, "Error encoding deposit transaction")
 
 		hash := crypto.Keccak256Hash(encoded)
-
-		packed, err := fixedBytesArgs.Pack(&hash)
-		checkErr(err, "Error encoding output")
-
-		fmt.Print(hexutil.Encode(packed))
+		packAndPrint(fixedBytesArgs, &hash)
 	case "encodeDepositTransaction":
 		from := common.HexToAddress(args[1])
 		to := common.HexToAddress(args[2])
-		value, ok := new(big.Int).SetString(args[3], 10)
-		checkOk(ok)
-		mint, ok := new(big.Int).SetString(args[4], 10)
-		checkOk(ok)
-		gasLimit, ok := new(big.Int).SetString(args[5], 10)
-		checkOk(ok)
+		value := parseBigInt(args[3])
+		mint := parseBigInt(args[4])
+		gasLimit := parseBigInt(args[5])
 		isCreate := args[6] == "true"
 		data := common.FromHex(args[7])
 		l1BlockHash := common.HexToHash(args[8])
-		logIndex, ok := new(big.Int).SetString(args[9], 10)
-		checkOk(ok)
+		logIndex := parseBigInt(args[9])
 
 		depositTx := makeDepositTx(from, to, value, mint, gasLimit, isCreate, data, l1BlockHash, logIndex)
 
 		encoded, err := types.NewTx(&depositTx).MarshalBinary()
 		checkErr(err, "Failed to RLP encode deposit transaction")
-		packed, err := bytesArgs.Pack(&encoded)
-		checkErr(err, "Error encoding output")
-
-		fmt.Print(hexutil.Encode(packed))
+		packAndPrint(bytesArgs, &encoded)
 	case "hashWithdrawal":
-		nonce, ok := new(big.Int).SetString(args[1], 10)
-		checkOk(ok)
-		sender := common.HexToAddress(args[2])
-		target := common.HexToAddress(args[3])
-		value, ok := new(big.Int).SetString(args[4], 10)
-		checkOk(ok)
-		gasLimit, ok := new(big.Int).SetString(args[5], 10)
-		checkOk(ok)
-		data := common.FromHex(args[6])
+		nonce, sender, target, value, gasLimit, data := parseCrossDomainArgs(args)
 
 		hash, err := hashWithdrawal(nonce, sender, target, value, gasLimit, data)
 		checkErr(err, "Error hashing withdrawal")
 
-		packed, err := fixedBytesArgs.Pack(&hash)
-		checkErr(err, "Error encoding output")
-
-		fmt.Print(hexutil.Encode(packed))
+		packAndPrint(fixedBytesArgs, &hash)
 	case "hashOutputRootProof":
 		version := common.HexToHash(args[1])
 		stateRoot := common.HexToHash(args[2])
@@ -240,20 +180,9 @@ func DiffTestUtils() {
 		hash, err := hashOutputRootProof(version, stateRoot, messagePasserStorageRoot, latestBlockHash)
 		checkErr(err, "Error hashing output root proof")
 
-		packed, err := fixedBytesArgs.Pack(&hash)
-		checkErr(err, "Error encoding output")
-
-		fmt.Print(hexutil.Encode(packed))
+		packAndPrint(fixedBytesArgs, &hash)
 	case "getProveWithdrawalTransactionInputs":
-		nonce, ok := new(big.Int).SetString(args[1], 10)
-		checkOk(ok)
-		sender := common.HexToAddress(args[2])
-		target := common.HexToAddress(args[3])
-		value, ok := new(big.Int).SetString(args[4], 10)
-		checkOk(ok)
-		gasLimit, ok := new(big.Int).SetString(args[5], 10)
-		checkOk(ok)
-		data := common.FromHex(args[6])
+		nonce, sender, target, value, gasLimit, data := parseCrossDomainArgs(args)
 
 		wdHash, err := hashWithdrawal(nonce, sender, target, value, gasLimit, data)
 		checkErr(err, "Error hashing withdrawal")
@@ -303,7 +232,7 @@ func DiffTestUtils() {
 		outputRoot, err := hashOutputRootProof(common.Hash{}, worldRoot, stateRoot, common.Hash{})
 		checkErr(err, "Error hashing output root proof")
 
-		output := struct {
+		packTupleAndPrint(proveWithdrawalInputsArgs, &struct {
 			WorldRoot      common.Hash
 			StateRoot      common.Hash
 			OutputRoot     common.Hash
@@ -315,39 +244,26 @@ func DiffTestUtils() {
 			OutputRoot:     outputRoot,
 			WithdrawalHash: wdHash,
 			Proof:          proof,
-		}
-		packed, err = proveWithdrawalInputsArgs.Pack(&output)
-		checkErr(err, "Error encoding output")
-
-		fmt.Print(hexutil.Encode(packed[32:]))
+		})
 	case "cannonMemoryProof":
 		// <memAddr0, memValue0, [memAddr1, memValue1], [memAddr2, memValue2]>
 		// Generates memory proofs of `memAddr0` for a trie containing memValue0 and `memAddr1` for a trie containing memValue1 and memValue2
 		// For the cannon stf, this is equivalent to the prestate proofs of the program counter and memory access for instruction execution
-		mem := memory.NewMemory()
 		if len(args) != 3 && len(args) != 5 && len(args) != 7 {
 			panic("Error: cannonMemoryProof requires 2, 4, or 6 arguments")
 		}
-		memAddr0, err := strconv.ParseUint(args[1], 10, arch.WordSize)
-		checkErr(err, "Error decoding addr")
-		memValue0, err := strconv.ParseUint(args[2], 10, arch.WordSize)
-		checkErr(err, "Error decoding memValue0")
-		mem.SetWord(arch.Word(memAddr0), arch.Word(memValue0))
+		mem := memory.NewMemory()
+		memAddr0 := parseUintN(args[1], arch.WordSize)
+		mem.SetWord(arch.Word(memAddr0), arch.Word(parseUintN(args[2], arch.WordSize)))
 
 		var proof1 []byte
 		if len(args) >= 5 {
-			memAddr1, err := strconv.ParseUint(args[3], 10, arch.WordSize)
-			checkErr(err, "Error decoding memAddr")
-			memValue1, err := strconv.ParseUint(args[4], 10, arch.WordSize)
-			checkErr(err, "Error decoding memValue")
-			mem.SetWord(arch.Word(memAddr1), arch.Word(memValue1))
+			memAddr1 := parseUintN(args[3], arch.WordSize)
+			mem.SetWord(arch.Word(memAddr1), arch.Word(parseUintN(args[4], arch.WordSize)))
 			proofAddr := memAddr1
 			if len(args) == 7 {
-				memAddr2, err := strconv.ParseUint(args[5], 10, arch.WordSize)
-				checkErr(err, "Error decoding memAddr")
-				memValue2, err := strconv.ParseUint(args[6], 10, arch.WordSize)
-				checkErr(err, "Error decoding memValue")
-				mem.SetWord(arch.Word(memAddr2), arch.Word(memValue2))
+				memAddr2 := parseUintN(args[5], arch.WordSize)
+				mem.SetWord(arch.Word(memAddr2), arch.Word(parseUintN(args[6], arch.WordSize)))
 				proofAddr = memAddr2
 			}
 			proof := mem.MerkleProof(arch.Word(proofAddr))
@@ -355,91 +271,48 @@ func DiffTestUtils() {
 		}
 		proof0 := mem.MerkleProof(arch.Word(memAddr0))
 
-		output := struct {
-			MemRoot common.Hash
-			Proof   []byte
-		}{
+		packTupleAndPrint(cannonMemoryProofArgs, &cannonMemoryProofOutput{
 			MemRoot: mem.MerkleRoot(),
 			Proof:   append(proof0[:], proof1...),
-		}
-		packed, err := cannonMemoryProofArgs.Pack(&output)
-		checkErr(err, "Error encoding output")
-		fmt.Print(hexutil.Encode(packed[32:]))
+		})
 	case "cannonMemoryProof2":
 		// <memAddr0, memValue0, [memAddr1, memValue1], memAddr2>
 		// Generates memory proof of `memAddr2` for a trie containing `memValue0` and `memValue1`
-		mem := memory.NewMemory()
 		if len(args) != 6 {
 			panic("Error: cannonMemoryProof2 requires 5 arguments")
 		}
-		memAddr0, err := strconv.ParseUint(args[1], 10, arch.WordSize)
-		checkErr(err, "Error decoding addr")
-		memValue0, err := strconv.ParseUint(args[2], 10, arch.WordSize)
-		checkErr(err, "Error decoding memValue0")
-		mem.SetWord(arch.Word(memAddr0), arch.Word(memValue0))
+		mem := memory.NewMemory()
+		mem.SetWord(arch.Word(parseUintN(args[1], arch.WordSize)), arch.Word(parseUintN(args[2], arch.WordSize)))
+		mem.SetWord(arch.Word(parseUintN(args[3], arch.WordSize)), arch.Word(parseUintN(args[4], arch.WordSize)))
+		memProof := mem.MerkleProof(arch.Word(parseUintN(args[5], arch.WordSize)))
 
-		var memProof [memory.MemProofSize]byte
-		memAddr, err := strconv.ParseUint(args[3], 10, arch.WordSize)
-		checkErr(err, "Error decoding memAddr")
-		memValue1, err := strconv.ParseUint(args[4], 10, arch.WordSize)
-		checkErr(err, "Error decoding memValue1")
-		mem.SetWord(arch.Word(memAddr), arch.Word(memValue1))
-
-		memAddr2, err := strconv.ParseUint(args[5], 10, arch.WordSize)
-		checkErr(err, "Error decoding memAddr")
-		memProof = mem.MerkleProof(arch.Word(memAddr2))
-
-		output := struct {
-			MemRoot common.Hash
-			Proof   []byte
-		}{
+		packTupleAndPrint(cannonMemoryProofArgs, &cannonMemoryProofOutput{
 			MemRoot: mem.MerkleRoot(),
 			Proof:   memProof[:],
-		}
-		packed, err := cannonMemoryProofArgs.Pack(&output)
-		checkErr(err, "Error encoding output")
-		fmt.Print(hexutil.Encode(packed[32:]))
+		})
 	case "cannonMemoryProofWrongLeaf":
 		// <memAddr0, memValue0, memAddr1, memValue1>
-		mem := memory.NewMemory()
 		if len(args) != 5 {
 			panic("Error: cannonMemoryProofWrongLeaf requires 4 arguments")
 		}
-		memAddr0, err := strconv.ParseUint(args[1], 10, arch.WordSize)
-		checkErr(err, "Error decoding memAddr0")
-		memValue0, err := strconv.ParseUint(args[2], 10, arch.WordSize)
-		checkErr(err, "Error decoding memValue0")
-		mem.SetWord(arch.Word(memAddr0), arch.Word(memValue0))
-
-		memAddr1, err := strconv.ParseUint(args[3], 10, arch.WordSize)
-		checkErr(err, "Error decoding memAddr1")
-		memValue1, err := strconv.ParseUint(args[4], 10, arch.WordSize)
-		checkErr(err, "Error decoding memValue1")
-		mem.SetWord(arch.Word(memAddr1), arch.Word(memValue1))
+		mem := memory.NewMemory()
+		memAddr0 := parseUintN(args[1], arch.WordSize)
+		mem.SetWord(arch.Word(memAddr0), arch.Word(parseUintN(args[2], arch.WordSize)))
+		memAddr1 := parseUintN(args[3], arch.WordSize)
+		mem.SetWord(arch.Word(memAddr1), arch.Word(parseUintN(args[4], arch.WordSize)))
 
 		// Compute a valid proof for the root, but for the wrong leaves.
 		memProof := mem.MerkleProof(arch.Word(memAddr1 + arch.WordSize))
 		insnProof := mem.MerkleProof(arch.Word(memAddr0 + arch.WordSize))
 
-		output := struct {
-			MemRoot common.Hash
-			Proof   []byte
-		}{
+		packTupleAndPrint(cannonMemoryProofArgs, &cannonMemoryProofOutput{
 			MemRoot: mem.MerkleRoot(),
 			Proof:   append(insnProof[:], memProof[:]...),
-		}
-		packed, err := cannonMemoryProofArgs.Pack(&output)
-		checkErr(err, "Error encoding output")
-		fmt.Print(hexutil.Encode(packed[32:]))
+		})
 	case "encodeScalarEcotone":
-		basefeeScalar, err := strconv.ParseUint(args[1], 10, 32)
-		checkErr(err, "Error decoding basefeeScalar")
-		blobbasefeeScalar, err := strconv.ParseUint(args[2], 10, 32)
-		checkErr(err, "Error decoding blobbasefeeScalar")
-
 		encoded := eth.EncodeScalar(eth.EcotoneScalars{
-			BaseFeeScalar:     uint32(basefeeScalar),
-			BlobBaseFeeScalar: uint32(blobbasefeeScalar),
+			BaseFeeScalar:     uint32(parseUintN(args[1], 32)),
+			BlobBaseFeeScalar: uint32(parseUintN(args[2], 32)),
 		})
 		fmt.Print(hexutil.Encode(encoded[:]))
 	case "decodeScalarEcotone":
@@ -447,54 +320,37 @@ func DiffTestUtils() {
 		scalars, err := eth.DecodeScalar([32]byte(scalar[:]))
 		checkErr(err, "Error decoding scalar")
 
-		packed, err := decodedScalars.Pack(scalars.BaseFeeScalar, scalars.BlobBaseFeeScalar)
-		checkErr(err, "Error encoding output")
-		fmt.Print(hexutil.Encode(packed))
+		packAndPrint(decodedScalars, scalars.BaseFeeScalar, scalars.BlobBaseFeeScalar)
 	case "encodeDependency":
-		chainId, ok := new(big.Int).SetString(args[1], 10)
-		checkOk(ok)
-
-		encoded, err := dependencyArgs.Pack(chainId)
+		encoded, err := dependencyArgs.Pack(parseBigInt(args[1]))
 		checkErr(err, "Error encoding dependency")
 
-		packed, err := bytesArgs.Pack(&encoded)
-		checkErr(err, "Error encoding output")
-
-		fmt.Print(hexutil.Encode(packed))
+		packAndPrint(bytesArgs, &encoded)
 	case "encodeSuperRootProof":
 		if len(args) < 2 {
 			panic("Error: encodeSuperRootProof requires at least 1 argument")
 		}
 
-		superRootProofData := common.FromHex(args[1])
-		proof, err := parseSuperRootProof(superRootProofData)
+		proof, err := parseSuperRootProof(common.FromHex(args[1]))
 		checkErr(err, "Error parsing super root proof")
 
 		encoded, err := encodeSuperRootProof(proof)
 		checkErr(err, "Error encoding super root")
 
-		packed, err := bytesArgs.Pack(&encoded)
-		checkErr(err, "Error encoding output")
-
-		fmt.Print(hexutil.Encode(packed))
+		packAndPrint(bytesArgs, &encoded)
 	case "hashSuperRootProof":
 		if len(args) < 2 {
 			panic("Error: hashSuperRootProof requires at least 1 argument")
 		}
 
-		superRootProofData := common.FromHex(args[1])
-		proof, err := parseSuperRootProof(superRootProofData)
+		proof, err := parseSuperRootProof(common.FromHex(args[1]))
 		checkErr(err, "Error parsing super root proof")
 
 		encoded, err := encodeSuperRootProof(proof)
 		checkErr(err, "Error encoding super root proof")
 
 		hash := crypto.Keccak256Hash(encoded)
-
-		packed, err := fixedBytesArgs.Pack(&hash)
-		checkErr(err, "Error encoding output")
-
-		fmt.Print(hexutil.Encode(packed))
+		packAndPrint(fixedBytesArgs, &hash)
 	default:
 		panic(fmt.Sprintf("Unknown command: %s", variant))
 	}
