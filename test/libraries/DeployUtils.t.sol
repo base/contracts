@@ -6,7 +6,6 @@ import { Test } from "lib/forge-std/src/Test.sol";
 
 // Libraries
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
-import { Solarray } from "scripts/libraries/Solarray.sol";
 
 /// @title DeployUtils_TestInit
 /// @notice Reusable test initialization for `DeployUtils` tests.
@@ -36,7 +35,9 @@ contract DeployUtils_AssertUniqueAddresses_Test is DeployUtils_TestInit {
 
     /// @param value The address to be tested.
     function testFuzz_assertUniqueAddresses_withOneAddress_succeeds(address value) public pure {
-        DeployUtils.assertUniqueAddresses(Solarray.addresses(value));
+        address[] memory addresses = new address[](1);
+        addresses[0] = value;
+        DeployUtils.assertUniqueAddresses(addresses);
     }
 
     /// @param _length The length of the array of addresses.

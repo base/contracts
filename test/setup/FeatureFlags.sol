@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-// Testing
-import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { Vm } from "lib/forge-std/src/Vm.sol";
-
-// Libraries
-import { Config } from "scripts/libraries/Config.sol";
 
 // Interfaces
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";

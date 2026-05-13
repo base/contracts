@@ -8,23 +8,25 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/base/contracts/scripts/checks/common"
 )
 
+var internalTypeRegex = regexp.MustCompile(`(contract|struct|enum)\s+([^I]\w+|I[a-z]\w*)`)
+
+func normalizeInternalType(internalType string) string {
+	return internalTypeRegex.ReplaceAllString(internalType, "$1 I$2")
+}
+
 // excludeContracts is a list of contracts whose interfaces do not need to match perfectly.
 var excludeContracts = []string{
-	// External dependencies
 	"IERC20", "IERC721", "IERC5267", "IERC721Enumerable", "IERC721Upgradeable", "IERC721Metadata",
 	"IERC165", "IERC165Upgradeable", "ERC721TokenReceiver", "ERC1155TokenReceiver",
 	"ERC777TokensRecipient", "Guard", "IProxy", "Vm", "VmSafe", "IMulticall3",
 	"IERC721TokenReceiver", "IProxyCreationCallback", "IBeacon", "IEIP712",
-
-	// Generic interfaces
 	"IHasSuperchainConfig",
-
-	// EAS
 	"IEAS", "ISchemaResolver", "ISchemaRegistry",
 
 	// TODO: Interfaces that need to be fixed
@@ -34,7 +36,6 @@ var excludeContracts = []string{
 
 // excludeSourceContracts is a list of contracts that are allowed to not have interfaces
 var excludeSourceContracts = []string{
-	// Base contracts with no external functions
 	"CrossDomainMessengerLegacySpacer0", "CrossDomainMessengerLegacySpacer1",
 
 	// FIXME
@@ -53,7 +54,8 @@ type ASTNode struct {
 }
 
 type ArtifactAST struct {
-	Nodes []ASTNode `json:"nodes"`
+	AbsolutePath string    `json:"absolutePath"`
+	Nodes        []ASTNode `json:"nodes"`
 }
 
 type Artifact struct {
@@ -61,7 +63,20 @@ type Artifact struct {
 	ABI json.RawMessage `json:"abi"`
 }
 
+var (
+	cwd          string
+	artifactsDir string
+)
+
 func main() {
+	var err error
+	cwd, err = os.Getwd()
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+		os.Exit(1)
+	}
+	artifactsDir = filepath.Join(cwd, "forge-artifacts")
+
 	if _, err := common.ProcessFilesGlob(
 		[]string{"forge-artifacts/**/*.json"},
 		[]string{},
@@ -73,15 +88,8 @@ func main() {
 }
 
 func processFile(artifactPath string) (*common.Void, []error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, []error{fmt.Errorf("failed to get current working directory: %w", err)}
-	}
-	artifactsDir := filepath.Join(cwd, "forge-artifacts")
-
-	// Check if this is an excluded contract, skip if so
-	contractName := strings.Split(filepath.Base(artifactPath), ".")[0]
-	if checkExclusion(contractName, excludeContracts) {
+	contractName := contractNameFromArtifactPath(artifactPath)
+	if slices.Contains(excludeContracts, contractName) {
 		return nil, nil
 	}
 
@@ -92,57 +100,40 @@ func processFile(artifactPath string) (*common.Void, []error) {
 
 	contractDef := getContractDefinition(artifact, contractName)
 	if contractDef == nil {
-		return nil, nil // Skip processing if contract definition is not found
+		return nil, nil
 	}
 
-	// If this is not an interface, make sure that it has a corresponding interface
 	if contractDef.ContractKind != "interface" {
-		// Grab the forge artifact, better api but doesn't work well for other
-		// interface check work because it's a struct and not a json object.
-		forgeArtifact, err := common.ReadForgeArtifact(artifactPath)
-		if err != nil {
-			return nil, []error{fmt.Errorf("failed to read forge artifact: %w", err)}
-		}
-
-		// If this isn't a contract, skip
 		if contractDef.ContractKind != "contract" {
 			return nil, nil
 		}
 
-		// Skip if it's not in the src directory
-		if !strings.HasPrefix(forgeArtifact.Ast.AbsolutePath, "src/") {
+		absPath := artifact.AST.AbsolutePath
+		if !strings.HasPrefix(absPath, "src/") {
 			return nil, nil
 		}
 
-		// Create an array of the folders to exclude
-		excludeFolders := []string{"src/libraries", "src/vendor"}
-		for _, folder := range excludeFolders {
-			if strings.HasPrefix(forgeArtifact.Ast.AbsolutePath, folder) {
+		for _, folder := range []string{"src/libraries", "src/vendor"} {
+			if strings.HasPrefix(absPath, folder) {
 				return nil, nil
 			}
 		}
 
-		// If this is another excluded contract, skip
-		if checkExclusion(contractName, excludeSourceContracts) {
+		if slices.Contains(excludeSourceContracts, contractName) {
 			return nil, nil
 		}
 
-		// Otherwise, expect that this file has a corresponding interface
-		dirPath := filepath.Dir(strings.TrimPrefix(forgeArtifact.Ast.AbsolutePath, "src/"))
-		newFileName := "I" + contractName + ".sol"
-		interfacePath := filepath.Join(cwd, "interfaces", dirPath, newFileName)
-		_, err = os.Stat(interfacePath)
-		if os.IsNotExist(err) {
-			return nil, []error{fmt.Errorf("Contract %s in %s does not have a corresponding interface at %s",
-				contractName, forgeArtifact.Ast.AbsolutePath, interfacePath)}
+		dirPath := filepath.Dir(strings.TrimPrefix(absPath, "src/"))
+		interfacePath := filepath.Join(cwd, "interfaces", dirPath, "I"+contractName+".sol")
+		if _, err := os.Stat(interfacePath); errors.Is(err, os.ErrNotExist) {
+			return nil, []error{fmt.Errorf("%s: contract in %s has no corresponding interface at %s",
+				contractName, absPath, interfacePath)}
 		}
-
-		// Ok we can return now
 		return nil, nil
 	}
 
 	if !strings.HasPrefix(contractName, "I") {
-		return nil, []error{fmt.Errorf("%s: Interface does not start with 'I'", contractName)}
+		return nil, []error{fmt.Errorf("%s: interface does not start with 'I'", contractName)}
 	}
 
 	semver, err := getContractSemver(artifact)
@@ -151,17 +142,16 @@ func processFile(artifactPath string) (*common.Void, []error) {
 	}
 
 	if semver != "solidity^0.8.0" {
-		return nil, []error{fmt.Errorf("%s: Interface does not have correct compiler version (MUST be exactly solidity ^0.8.0)", contractName)}
+		return nil, []error{fmt.Errorf("%s: interface does not have correct compiler version (MUST be exactly solidity ^0.8.0)", contractName)}
 	}
 
 	contractBasename := contractName[1:]
 	correspondingContractFile := filepath.Join(artifactsDir, contractBasename+".sol", contractBasename+".json")
 
-	if _, err := os.Stat(correspondingContractFile); errors.Is(err, os.ErrNotExist) {
+	contractArtifact, err := readArtifact(correspondingContractFile)
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
-
-	contractArtifact, err := readArtifact(correspondingContractFile)
 	if err != nil {
 		return nil, []error{fmt.Errorf("failed to read corresponding contract artifact: %w", err)}
 	}
@@ -179,15 +169,17 @@ func processFile(artifactPath string) (*common.Void, []error) {
 		return nil, []error{fmt.Errorf("failed to normalize contract ABI: %w", err)}
 	}
 
-	match, err := compareABIs(normalizedInterfaceABI, normalizedContractABI)
-	if err != nil {
-		return nil, []error{fmt.Errorf("failed to compare ABIs: %w", err)}
-	}
-	if !match {
-		return nil, []error{fmt.Errorf("differences found")}
+	if !compareABIs(normalizedInterfaceABI, normalizedContractABI) {
+		return nil, []error{fmt.Errorf("%s: ABI differs from contract", contractName)}
 	}
 
 	return nil, nil
+}
+
+func contractNameFromArtifactPath(artifactPath string) string {
+	artifactName := strings.TrimSuffix(filepath.Base(artifactPath), ".json")
+	contractName, _, _ := strings.Cut(artifactName, ".")
+	return contractName
 }
 
 func readArtifact(path string) (*Artifact, error) {
@@ -223,34 +215,37 @@ func getContractSemver(artifact *Artifact) (string, error) {
 	return "", errors.New("semver not found")
 }
 
-func normalizeABI(abi json.RawMessage) (json.RawMessage, error) {
+func normalizeABI(abi json.RawMessage) ([]map[string]interface{}, error) {
 	var abiData []map[string]interface{}
 	if err := json.Unmarshal(abi, &abiData); err != nil {
 		return nil, err
 	}
 
 	hasConstructor := false
-	for i := range abiData {
-		normalizeABIItem(abiData[i])
-		if abiData[i]["type"] == "constructor" {
+	for _, item := range abiData {
+		normalizeInternalTypes(item)
+		if item["type"] == "function" && item["name"] == "__constructor__" {
+			item["type"] = "constructor"
+			delete(item, "name")
+			delete(item, "outputs")
+		}
+		if item["type"] == "constructor" {
 			hasConstructor = true
 		}
 	}
 
-	// Add an empty constructor if it doesn't exist
 	if !hasConstructor {
-		emptyConstructor := map[string]interface{}{
+		abiData = append(abiData, map[string]interface{}{
 			"type":            "constructor",
 			"stateMutability": "nonpayable",
 			"inputs":          []interface{}{},
-		}
-		abiData = append(abiData, emptyConstructor)
+		})
 	}
 
-	return json.Marshal(abiData)
+	return abiData, nil
 }
 
-func normalizeABIItem(item map[string]interface{}) {
+func normalizeInternalTypes(item map[string]interface{}) {
 	for key, value := range item {
 		switch v := value.(type) {
 		case string:
@@ -258,147 +253,58 @@ func normalizeABIItem(item map[string]interface{}) {
 				item[key] = normalizeInternalType(v)
 			}
 		case map[string]interface{}:
-			normalizeABIItem(v)
+			normalizeInternalTypes(v)
 		case []interface{}:
 			for _, elem := range v {
 				if elemMap, ok := elem.(map[string]interface{}); ok {
-					normalizeABIItem(elemMap)
+					normalizeInternalTypes(elemMap)
 				}
 			}
 		}
 	}
-
-	if item["type"] == "function" && item["name"] == "__constructor__" {
-		item["type"] = "constructor"
-		delete(item, "name")
-		delete(item, "outputs")
-	}
 }
 
-func normalizeInternalType(internalType string) string {
-	// Helper function to add 'I' prefix for non-interface types
-	addIPrefix := func(match string) string {
-		// Skip if it's already an interface pattern (I followed by uppercase)
-		if len(match) > 1 && match[0] == 'I' && match[1] >= 'A' && match[1] <= 'Z' {
-			return match
-		}
-		return "I" + match
-	}
-
-	// Replace patterns like "contract Something" with "contract ISomething"
-	internalType = regexp.MustCompile(`(contract|struct|enum)\s+([^I]\w+|I[a-z]\w*)`).
-		ReplaceAllStringFunc(internalType, func(s string) string {
-			parts := strings.SplitN(s, " ", 2)
-			return parts[0] + " " + addIPrefix(parts[1])
-		})
-
-	return internalType
-}
-
-func compareABIs(abi1, abi2 json.RawMessage) (bool, error) {
-	var interfaceABI, contractABI []map[string]interface{}
-
-	if err := json.Unmarshal(abi1, &interfaceABI); err != nil {
-		return false, fmt.Errorf("error unmarshalling interface ABI: %w", err)
-	}
-
-	if err := json.Unmarshal(abi2, &contractABI); err != nil {
-		return false, fmt.Errorf("error unmarshalling contract ABI: %w", err)
-	}
-
-	// Create maps for easier lookup
-	interfaceItems := make(map[string]map[string]interface{})
-	contractItems := make(map[string]map[string]interface{})
-
-	// Helper to create a unique key for each ABI item
+func compareABIs(interfaceABI, contractABI []map[string]interface{}) bool {
 	makeKey := func(item map[string]interface{}) string {
-		itemType := getString(item, "type")
-		itemName := getString(item, "name")
 		inputs, _ := json.Marshal(item["inputs"])
 		outputs, _ := json.Marshal(item["outputs"])
-		return fmt.Sprintf("%s_%s_%s_%s", itemType, itemName, inputs, outputs)
+		return fmt.Sprintf("%s_%s_%s_%s", getString(item, "type"), getString(item, "name"), inputs, outputs)
 	}
 
-	// Build lookup maps
-	for _, item := range interfaceABI {
-		key := makeKey(item)
-		interfaceItems[key] = item
-	}
-	for _, item := range contractABI {
-		key := makeKey(item)
-		contractItems[key] = item
+	indexBy := func(items []map[string]interface{}) map[string]map[string]interface{} {
+		out := make(map[string]map[string]interface{}, len(items))
+		for _, item := range items {
+			out[makeKey(item)] = item
+		}
+		return out
 	}
 
-	// Check for missing items in both directions
+	interfaceItems := indexBy(interfaceABI)
+	contractItems := indexBy(contractABI)
+
 	isMatch := true
-
-	// Check interface items exist in contract
 	for key, item := range interfaceItems {
 		if _, exists := contractItems[key]; !exists {
-			itemType := getString(item, "type")
-			signature := formatABIItem(item)
-			log.Printf("REMOVE %s from interface: %s", itemType, signature)
+			log.Printf("REMOVE %s from interface: %s", getString(item, "type"), formatABIItem(item))
 			isMatch = false
 		}
 	}
-
-	// Check contract items exist in interface
 	for key, item := range contractItems {
 		if _, exists := interfaceItems[key]; !exists {
-			itemType := getString(item, "type")
-			signature := formatABIItem(item)
-			log.Printf("ADD %s to interface: %s", itemType, signature)
+			log.Printf("ADD %s to interface: %s", getString(item, "type"), formatABIItem(item))
 			isMatch = false
 		}
 	}
 
-	return isMatch, nil
+	return isMatch
 }
 
-// Helper function to format ABI item into a readable signature
 func formatABIItem(item map[string]interface{}) string {
 	itemType := getString(item, "type")
 	itemName := getString(item, "name")
+	inputStr := formatABIParams(item["inputs"])
+	outputStr := formatABIParams(item["outputs"])
 
-	// Format inputs
-	inputs, _ := item["inputs"].([]interface{})
-	inputStr := make([]string, 0, len(inputs))
-	for _, input := range inputs {
-		if inputMap, ok := input.(map[string]interface{}); ok {
-			internalType := getString(inputMap, "internalType")
-			paramType := internalType
-			if parts := strings.Fields(internalType); len(parts) == 2 {
-				paramType = parts[1]
-			}
-			paramName := getString(inputMap, "name")
-			if paramName != "" {
-				inputStr = append(inputStr, fmt.Sprintf("%s %s", paramType, paramName))
-			} else {
-				inputStr = append(inputStr, paramType)
-			}
-		}
-	}
-
-	// Format outputs
-	outputs, _ := item["outputs"].([]interface{})
-	outputStr := make([]string, 0, len(outputs))
-	for _, output := range outputs {
-		if outputMap, ok := output.(map[string]interface{}); ok {
-			internalType := getString(outputMap, "internalType")
-			paramType := internalType
-			if parts := strings.Fields(internalType); len(parts) == 2 {
-				paramType = parts[1]
-			}
-			paramName := getString(outputMap, "name")
-			if paramName != "" {
-				outputStr = append(outputStr, fmt.Sprintf("%s %s", paramType, paramName))
-			} else {
-				outputStr = append(outputStr, paramType)
-			}
-		}
-	}
-
-	// Build the signature based on the item type
 	switch itemType {
 	case "function":
 		returnStr := ""
@@ -415,17 +321,27 @@ func formatABIItem(item map[string]interface{}) string {
 	}
 }
 
-// checkExclusion returns true if the contract is in the exclude list
-func checkExclusion(contractName string, excludeList []string) bool {
-	for _, exclude := range excludeList {
-		if exclude == contractName {
-			return true
+func formatABIParams(raw interface{}) []string {
+	params, _ := raw.([]interface{})
+	out := make([]string, 0, len(params))
+	for _, p := range params {
+		paramMap, ok := p.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		paramType := getString(paramMap, "internalType")
+		if parts := strings.Fields(paramType); len(parts) == 2 {
+			paramType = parts[1]
+		}
+		if paramName := getString(paramMap, "name"); paramName != "" {
+			out = append(out, fmt.Sprintf("%s %s", paramType, paramName))
+		} else {
+			out = append(out, paramType)
 		}
 	}
-	return false
+	return out
 }
 
-// getString safely retrieves a string value from a map[string]interface{}
 func getString(m map[string]interface{}, key string) string {
 	if val, ok := m[key]; ok {
 		if str, ok := val.(string); ok {

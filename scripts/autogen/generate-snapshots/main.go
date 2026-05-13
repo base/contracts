@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
-	"github.com/ethereum-optimism/optimism/op-chain-ops/solc"
 	"github.com/base/contracts/scripts/checks/common"
+	"github.com/ethereum-optimism/optimism/op-chain-ops/solc"
 )
 
 const (
@@ -16,66 +15,38 @@ const (
 	abiDir           = "snapshots/abi"
 )
 
-type SnapshotResult struct {
-	ContractName  string
-	Abi           interface{}
-	StorageLayout []solc.AbiSpecStorageLayoutEntry
-}
-
 func main() {
 	if err := resetDirectory(storageLayoutDir); err != nil {
-		fmt.Printf("failed to reset storage layout directory: %v\n", err)
+		fmt.Printf("Failed to reset storage layout directory: %v\n", err)
 		os.Exit(1)
 	}
 	if err := resetDirectory(abiDir); err != nil {
-		fmt.Printf("failed to reset abi directory: %v\n", err)
+		fmt.Printf("Failed to reset abi directory: %v\n", err)
 		os.Exit(1)
 	}
 
-	results, err := common.ProcessFilesGlob(
+	if _, err := common.ProcessFilesGlob(
 		[]string{"forge-artifacts/**/*.json"},
 		[]string{},
 		processFile,
-	)
-	if err != nil {
+	); err != nil {
 		fmt.Printf("Failed to generate snapshots: %v\n", err)
 		os.Exit(1)
 	}
-
-	for _, result := range results {
-		if result == nil {
-			continue
-		}
-
-		err := common.WriteJSON(result.Abi, filepath.Join(abiDir, fmt.Sprintf("%s.json", result.ContractName)))
-		if err != nil {
-			fmt.Printf("failed to write abi: %v\n", err)
-			os.Exit(1)
-		}
-
-		err = common.WriteJSON(result.StorageLayout, filepath.Join(storageLayoutDir, fmt.Sprintf("%s.json", result.ContractName)))
-		if err != nil {
-			fmt.Printf("failed to write storage layout: %v\n", err)
-			os.Exit(1)
-		}
-	}
 }
 
-func processFile(file string) (*SnapshotResult, []error) {
+func processFile(file string) (common.Void, []error) {
 	artifact, err := common.ReadForgeArtifact(file)
 	if err != nil {
-		return nil, []error{err}
+		return common.Void{}, []error{err}
 	}
 
-	contractName, err := parseArtifactName(file)
-	if err != nil {
-		return nil, []error{fmt.Errorf("failed to parse artifact name %q: %w", file, err)}
-	}
+	contractName := parseArtifactName(file)
 
 	// Skip anything that isn't in the src directory, with the exception of
 	// GnosisSafe because it's used for decoding storage changes in superchain-ops.
 	if !strings.HasPrefix(artifact.Ast.AbsolutePath, "src/") && contractName != "GnosisSafe" {
-		return nil, nil
+		return common.Void{}, nil
 	}
 
 	// Skip anything that isn't a proper contract.
@@ -90,18 +61,16 @@ func processFile(file string) (*SnapshotResult, []error) {
 		}
 	}
 	if !isContract {
-		return nil, nil
+		return common.Void{}, nil
 	}
 
 	storageLayout := make([]solc.AbiSpecStorageLayoutEntry, 0, len(artifact.StorageLayout.Storage))
 	for _, storageEntry := range artifact.StorageLayout.Storage {
-		// Convert ast-based type to Solidity type.
 		typ, ok := artifact.StorageLayout.Types[storageEntry.Type]
 		if !ok {
-			return nil, []error{fmt.Errorf("undefined type for %s:%s", contractName, storageEntry.Label)}
+			return common.Void{}, []error{fmt.Errorf("undefined type for %s:%s", contractName, storageEntry.Label)}
 		}
 
-		// Convert to Solidity storage layout entry.
 		storageLayout = append(storageLayout, solc.AbiSpecStorageLayoutEntry{
 			Label:  storageEntry.Label,
 			Bytes:  typ.NumberOfBytes,
@@ -111,23 +80,21 @@ func processFile(file string) (*SnapshotResult, []error) {
 		})
 	}
 
-	return &SnapshotResult{
-		ContractName:  contractName,
-		Abi:           artifact.Abi.Raw,
-		StorageLayout: storageLayout,
-	}, nil
+	if err := common.WriteJSON(artifact.Abi.Raw, filepath.Join(abiDir, contractName+".json")); err != nil {
+		return common.Void{}, []error{fmt.Errorf("failed to write abi: %w", err)}
+	}
+	if err := common.WriteJSON(storageLayout, filepath.Join(storageLayoutDir, contractName+".json")); err != nil {
+		return common.Void{}, []error{fmt.Errorf("failed to write storage layout: %w", err)}
+	}
+
+	return common.Void{}, nil
 }
 
-// ContractName.0.9.8.json -> ContractName.sol
-// ContractName.json -> ContractName.sol
-func parseArtifactName(artifactVersionFile string) (string, error) {
-	re := regexp.MustCompile(`(.*?)\.([0-9]+\.[0-9]+\.[0-9]+)?`)
-	baseName := filepath.Base(artifactVersionFile)
-	match := re.FindStringSubmatch(baseName)
-	if len(match) < 2 {
-		return "", fmt.Errorf("invalid artifact file name: %q", artifactVersionFile)
-	}
-	return match[1], nil
+// parseArtifactName extracts the contract name from a forge artifact filename.
+// e.g. "ContractName.0.9.8.json" or "ContractName.json" -> "ContractName".
+func parseArtifactName(artifactVersionFile string) string {
+	name, _, _ := strings.Cut(filepath.Base(artifactVersionFile), ".")
+	return name
 }
 
 func resetDirectory(dir string) error {

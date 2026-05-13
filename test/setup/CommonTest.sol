@@ -9,14 +9,9 @@ import { Setup } from "test/setup/Setup.sol";
 import { Events } from "test/setup/Events.sol";
 import { FFIInterface } from "test/setup/FFIInterface.sol";
 
-// Scripts
-import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
-
 // Contracts
 import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-// Libraries
-import { Config } from "scripts/libraries/Config.sol";
 import { console } from "lib/forge-std/src/console.sol";
 
 // Interfaces
@@ -32,18 +27,11 @@ abstract contract CommonTest is Test, Setup, Events {
 
     FFIInterface constant ffi = FFIInterface(address(uint160(uint256(keccak256(abi.encode("optimism.ffi"))))));
 
-    bool useInteropOverride;
-    bool useRevenueShareOverride;
-
     /// @dev This value is only used in forked tests. During forked tests, the default is to perform the upgrade before
     ///      running the tests.
     ///      This value should only be set to false in forked tests which are specifically testing the upgrade path
     ///      itself, rather than simply ensuring that the tests pass after the upgrade.
     bool useUpgradedFork = true;
-
-    // Needed for testing purposes to check the contracts were properly deployed and setup.
-    address chainFeesRecipient = makeAddr("chainFeesRecipient");
-    address l1FeesDepositor = makeAddr("l1FeesDepositor");
 
     ERC20 L1Token;
     ERC20 BadL1Token;
@@ -68,25 +56,11 @@ abstract contract CommonTest is Test, Setup, Events {
         vm.deal(bob, 10000 ether);
 
         // Override the config after the deploy script initialized the config
-        if (useInteropOverride) {
-            deploy.cfg().setUseInterop(true);
-        }
-        if (useRevenueShareOverride) {
-            console.log("CommonTest: enabling revenue share");
-            deploy.cfg().setUseRevenueShare(true);
-            deploy.cfg().setChainFeesRecipient(chainFeesRecipient);
-            deploy.cfg().setL1FeesDepositor(l1FeesDepositor);
-        }
         if (useUpgradedFork) {
             deploy.cfg().setUseUpgradedFork(true);
         }
 
-        if (isForkTest()) {
-            // Skip any test suite which uses a nonstandard configuration.
-            if (useInteropOverride) {
-                vm.skip(true);
-            }
-        } else {
+        if (!isForkTest()) {
             // Modifying these values on a fork test causes issues.
             vm.warp(deploy.cfg().l2OutputOracleStartingTimestamp() + 1);
             vm.roll(deploy.cfg().l2OutputOracleStartingBlockNumber() + 1);
@@ -174,18 +148,6 @@ abstract contract CommonTest is Test, Setup, Events {
             );
         }
         console.log("CommonTest: enabling", _feature);
-    }
-
-    /// @dev Enables interoperability mode for testing
-    function enableInterop() public {
-        _checkNotDeployed("interop");
-        useInteropOverride = true;
-    }
-
-    /// @dev Enables revenue sharing mode for testing
-    function enableRevenueShare() public {
-        _checkNotDeployed("revenue share");
-        useRevenueShareOverride = true;
     }
 
     /// @dev Disables upgrade mode for testing. By default the fork testing env will be upgraded to the latest

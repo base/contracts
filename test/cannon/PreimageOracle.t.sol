@@ -11,7 +11,6 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { LibKeccak } from "lib/lib-keccak/contracts/lib/LibKeccak.sol";
 import { PreimageKeyLib } from "src/cannon/PreimageKeyLib.sol";
 import { Bytes } from "src/libraries/Bytes.sol";
-import { Process } from "scripts/libraries/Process.sol";
 import "src/cannon/libraries/CannonErrors.sol";
 import "src/cannon/libraries/CannonTypes.sol";
 
@@ -160,7 +159,7 @@ abstract contract PreimageOracle_TestInit is Test {
         commands[2] = "gen_proof";
         commands[3] = vm.toString(abi.encodePacked(leaves));
         commands[4] = vm.toString(_leafIdx);
-        (root_, proof_) = abi.decode(Process.run(commands), (bytes32, bytes32[]));
+        (root_, proof_) = abi.decode(vm.ffi(commands), (bytes32, bytes32[]));
     }
 
     fallback() external payable { }

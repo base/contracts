@@ -8,7 +8,7 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 
 // Scripts
-import { Deploy } from "scripts/deploy/Deploy.s.sol";
+import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { ForkLive } from "test/setup/ForkLive.s.sol";
 import { LATEST_FORK } from "scripts/libraries/Config.sol";
 import { L2Genesis } from "scripts/L2Genesis.s.sol";
@@ -21,7 +21,6 @@ import { Config } from "scripts/libraries/Config.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Preinstalls } from "src/libraries/Preinstalls.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
-import { Chains } from "scripts/libraries/Chains.sol";
 
 // Interfaces
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
@@ -66,16 +65,20 @@ abstract contract Setup is FeatureFlags {
     /// @notice The address of the foundry Vm contract.
     Vm private constant vm = Vm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
 
-    /// @notice The address of the Deploy contract. Set into state with `etch` to avoid
+    uint256 internal constant ETH_MAINNET_CHAIN_ID = 1;
+    uint256 internal constant ETH_SEPOLIA_CHAIN_ID = 11155111;
+
+    /// @notice The address of the SystemDeploy contract. Set into state with `etch` to avoid
     ///         mutating any nonces. MUST not have constructor logic.
-    Deploy internal constant deploy = Deploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
+    SystemDeploy internal constant deploy =
+        SystemDeploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
 
     /// @notice The address of the ForkLive contract. Set into state with `etch` to avoid
     ///         mutating any nonces. MUST not have constructor logic.
     ForkLive internal constant forkLive =
         ForkLive(address(uint160(uint256(keccak256(abi.encode("optimism.forklive"))))));
 
-    /// @notice The address of the Artifacts contract. Set into state by Deployer.setUp() with `etch` to avoid
+    /// @notice The address of the Artifacts contract. Set into state by SystemDeploy.setUp() with `etch` to avoid
     ///         mutating any nonces. MUST not have constructor logic.
     Artifacts public constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
@@ -141,12 +144,12 @@ abstract contract Setup is FeatureFlags {
         return keccak256(bytes(opChain)) == keccak256(bytes("op"));
     }
 
-    /// @dev Deploys either the Deploy.s.sol or Fork.s.sol contract, by fetching the bytecode dynamically using
+    /// @dev Deploys either the SystemDeploy.s.sol or Fork.s.sol contract, by fetching the bytecode dynamically using
     ///      `vm.getDeployedCode()` and etching it into the state.
     ///      This enables us to avoid including the bytecode of those contracts in the bytecode of this contract.
     ///      If the bytecode of those contracts was included in this contract, then it will double
     ///      the compile time and bloat all of the test contract artifacts since they
-    ///      will also need to include the bytecode for the Deploy contract.
+    ///      will also need to include the bytecode for the SystemDeploy contract.
     ///      This is a hack as we are pushing solidity to the edge.
     function setUp() public virtual {
         console.log("Setup: L1 setup start!");
@@ -155,19 +158,16 @@ abstract contract Setup is FeatureFlags {
             vm.createSelectFork(Config.forkRpcUrl(), Config.forkBlockNumber());
             console.log("Setup: fork selected!");
             require(
-                block.chainid == Chains.Sepolia || block.chainid == Chains.Mainnet,
+                block.chainid == ETH_SEPOLIA_CHAIN_ID || block.chainid == ETH_MAINNET_CHAIN_ID,
                 "Setup: ETH_RPC_URL must be set to a production (Sepolia or Mainnet) RPC URL"
             );
         }
 
         // Etch the contracts used to setup the test environment
-        DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(deploy), _cname: "Deploy" });
+        DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(deploy), _cname: "SystemDeploy" });
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(forkLive), _cname: "ForkLive" });
 
         deploy.setUp();
-        forkLive.setUp();
-
-        deploy.cfg().setDevFeatureBitmap(devFeatureBitmap);
 
         console.log("Setup: L1 setup done!");
 
@@ -284,8 +284,8 @@ abstract contract Setup is FeatureFlags {
         console.log("Setup: creating L2 genesis with fork %s", l2Fork.toString());
         l2Genesis.run(
             L2Genesis.Input({
-                l1ChainID: deploy.cfg().l1ChainID(),
-                l2ChainID: deploy.cfg().l2ChainID(),
+                l1ChainID: deploy.cfg().l1ChainId(),
+                l2ChainID: deploy.cfg().l2ChainId(),
                 l1CrossDomainMessengerProxy: payable(address(l1CrossDomainMessenger)),
                 l1StandardBridgeProxy: payable(address(l1StandardBridge)),
                 l1ERC721BridgeProxy: payable(address(l1ERC721Bridge)),
@@ -302,12 +302,8 @@ abstract contract Setup is FeatureFlags {
                 operatorFeeVaultRecipient: deploy.cfg().operatorFeeVaultRecipient(),
                 operatorFeeVaultMinimumWithdrawalAmount: deploy.cfg().operatorFeeVaultMinimumWithdrawalAmount(),
                 operatorFeeVaultWithdrawalNetwork: deploy.cfg().operatorFeeVaultWithdrawalNetwork(),
-                governanceTokenOwner: deploy.cfg().governanceTokenOwner(),
                 fork: uint256(l2Fork),
-                enableGovernance: deploy.cfg().enableGovernance(),
-                fundDevAccounts: deploy.cfg().fundDevAccounts(),
-                chainFeesRecipient: deploy.cfg().chainFeesRecipient(),
-                l1FeesDepositor: deploy.cfg().l1FeesDepositor()
+                fundDevAccounts: deploy.cfg().fundDevAccounts()
             })
         );
 

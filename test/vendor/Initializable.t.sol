@@ -6,7 +6,6 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 
 // Scripts
 import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
-import { Process } from "scripts/libraries/Process.sol";
 
 // Libraries
 import { LibString } from "lib/solady/src/utils/LibString.sol";
@@ -369,9 +368,14 @@ contract Initializer_Test is CommonTest {
                 ForgeArtifacts.getAbi(contractName),
                 "' | jq '.[] | select(.name == \"initialize\" and .type == \"function\")'"
             );
+            string[] memory command = new string[](3);
+            command[0] = "bash";
+            command[1] = "-c";
+            command[2] = cmd;
+            bytes memory output = vm.ffi(command);
 
             // If the contract does not have an `initialize()` function, skip it.
-            if (bytes(Process.bash(cmd)).length == 0) {
+            if (output.length == 0 || keccak256(output) == keccak256(bytes("[]"))) {
                 continue;
             }
 
