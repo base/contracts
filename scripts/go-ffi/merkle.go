@@ -1,10 +1,7 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"os"
-	"strconv"
 
 	"github.com/ethereum-optimism/optimism/op-challenger/game/keccak/merkle"
 
@@ -14,8 +11,6 @@ import (
 )
 
 const (
-	// GenProof generates a merkle proof for a given leaf index by reconstructing the merkle tree from the passed
-	// leaves.
 	genProof = "gen_proof"
 )
 
@@ -32,49 +27,36 @@ var (
 
 // DiffMerkle generates an abi-encoded `merkleTestCase` of a specified variant.
 func DiffMerkle() {
-	variant := os.Args[2]
+	args := os.Args[2:]
+	if len(args) == 0 {
+		panic("Must pass a variant to the merkle diff tester!")
+	}
+	variant := args[0]
 
 	switch variant {
 	case genProof:
-		if len(os.Args) < 5 {
-			log.Fatal("Invalid arguments to `gen_proof` variant.")
+		if len(args) < 3 {
+			panic("Invalid arguments to `gen_proof` variant.")
 		}
 
-		rawLeaves, err := hexutil.Decode(os.Args[3])
-		if err != nil {
-			log.Fatal("Failed to decode leaves: ", err)
-		}
-		index, err := strconv.ParseUint(os.Args[4], 10, 64)
-		if err != nil {
-			log.Fatal("Failed to parse leaf index: ", err)
-		}
+		rawLeaves, err := hexutil.Decode(args[1])
+		checkErr(err, "Failed to decode leaves")
+		index := parseUintN(args[2], 64)
+
 		merkleTree := merkle.NewBinaryMerkleTree()
-
-		// Append all leaves to the merkle tree.
 		for i := 0; i < len(rawLeaves)/32; i++ {
 			leaf := common.BytesToHash(rawLeaves[i<<5 : (i+1)<<5])
 			merkleTree.AddLeaf(leaf)
 		}
 
-		// Generate the proof for the given index.
-		proof := merkleTree.ProofAtIndex(index)
-
-		// Generate the merkle root.
-		root := merkleTree.RootHash()
-
-		// Return "abi.encode(root, proof)"
-		packed, err := merkleEncoder.Pack(struct {
+		packTupleAndPrint(merkleEncoder, struct {
 			Root  common.Hash
 			Proof [merkle.BinaryMerkleTreeDepth]common.Hash
 		}{
-			Root:  root,
-			Proof: proof,
+			Root:  merkleTree.RootHash(),
+			Proof: merkleTree.ProofAtIndex(index),
 		})
-		if err != nil {
-			log.Fatal("Failed to ABI encode root and proof: ", err)
-		}
-		fmt.Print(hexutil.Encode(packed[32:]))
 	default:
-		log.Fatal("Invalid variant passed to merkle diff tester!")
+		panic("Invalid variant passed to merkle diff tester!")
 	}
 }
