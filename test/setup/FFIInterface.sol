@@ -336,5 +336,4 @@ contract FFIInterface {
         bytes memory result = vm.ffi(cmds);
         return abi.decode(result, (uint32, uint32));
     }
-
 }

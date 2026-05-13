@@ -113,13 +113,7 @@ contract SeedGames is Script {
         );
     }
 
-    function _createGames(
-        SeedCtx memory ctx,
-        address asrAddr
-    )
-        internal
-        returns (address firstGame, address lastGame)
-    {
+    function _createGames(SeedCtx memory ctx, address asrAddr) internal returns (address firstGame, address lastGame) {
         uint256 count = ctx.roots.length / INTERMEDIATE_ROOTS_COUNT;
         address parentAddr = asrAddr;
 

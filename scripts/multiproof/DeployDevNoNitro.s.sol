@@ -34,9 +34,10 @@ contract DeployDevNoNitro is DeployDevBase {
     }
 
     function _deployTEERegistryImpl() internal override returns (address) {
-        return address(
-            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(disputeGameFactory))
-        );
+        return
+            address(
+                new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(disputeGameFactory))
+            );
     }
 
     function _logHeader() internal view override {
