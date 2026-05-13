@@ -1,41 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-/**
- * @title DeployDevWithNitro
- * @notice Development deployment WITH AWS Nitro attestation validation.
- *
- * ══════════════════════════════════════════════════════════════════════════════════
- *                            DEPLOYMENT TYPE: DEV (WITH NITRO)
- * ══════════════════════════════════════════════════════════════════════════════════
- *
- * This script deploys infrastructure using the REAL TEEProverRegistry, which
- * REQUIRES a ZK proof of a valid AWS Nitro attestation for signer registration.
- * You cannot use addDevSigner() - you must go through the full registerSigner() flow.
- *
- * PREREQUISITES:
- *   1. Deploy the RISC Zero verifier stack AND NitroEnclaveVerifier using
- *      DeployRiscZeroStack.s.sol (required because NitroEnclaveVerifier and its
- *      dependencies need Solidity ^0.8.20, while this script is pinned to =0.8.15).
- *   2. Set `nitroEnclaveVerifier` in the deploy config to the deployed address.
- *
- * ─────────────────────────────────────────────────────────────────────────────────
- * SIGNER REGISTRATION FLOW
- * ─────────────────────────────────────────────────────────────────────────────────
- *
- * After deployment, register a signer by generating a RISC Zero ZK proof of a
- * valid AWS Nitro attestation document and calling:
- *
- *   cast send $TEE_PROVER_REGISTRY \
- *     "registerSigner(bytes,bytes)" $ZK_OUTPUT $ZK_PROOF_BYTES \
- *     --private-key $OWNER_OR_MANAGER_KEY --rpc-url $RPC_URL
- *
- * IMPORTANT: The attestation is only valid for 60 minutes! Generate the proof
- * and submit the transaction within that window.
- *
- * ══════════════════════════════════════════════════════════════════════════════════
- */
-
 import { console2 as console } from "lib/forge-std/src/console2.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
@@ -44,6 +9,15 @@ import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
 import { DeployDevBase } from "./DeployDevBase.s.sol";
 
+/// @title DeployDevWithNitro
+/// @notice Development deployment WITH AWS Nitro attestation validation. Uses the real
+///         TEEProverRegistry, so signer registration requires a ZK proof of a valid AWS
+///         Nitro attestation (no addDevSigner bypass).
+/// @dev Prerequisite: deploy the RISC Zero verifier stack and NitroEnclaveVerifier via
+///      DeployRiscZeroStack.s.sol first (those contracts need Solidity ^0.8.20, while this
+///      script is pinned to =0.8.15), then set `nitroEnclaveVerifier` in the deploy config.
+///      Note: AWS Nitro attestations are only valid for 60 minutes — generate the ZK proof
+///      and submit registerSigner() within that window.
 contract DeployDevWithNitro is DeployDevBase {
     uint256 public constant BLOCK_INTERVAL = 600;
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
