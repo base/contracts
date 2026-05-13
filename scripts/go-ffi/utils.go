@@ -99,26 +99,18 @@ type cannonMemoryProofOutput struct {
 	Proof   []byte
 }
 
-// encodeCrossDomainMessage encodes a versioned cross domain message into a byte array.
 func encodeCrossDomainMessage(nonce *big.Int, sender common.Address, target common.Address, value *big.Int, gasLimit *big.Int, data []byte) ([]byte, error) {
 	_, version := crossdomain.DecodeVersionedNonce(nonce)
-
-	var encoded []byte
-	var err error
-	if version.Cmp(big.NewInt(0)) == 0 {
-		// Encode cross domain message V0
-		encoded, err = crossdomain.EncodeCrossDomainMessageV0(target, sender, data, nonce)
-	} else if version.Cmp(big.NewInt(1)) == 0 {
-		// Encode cross domain message V1
-		encoded, err = crossdomain.EncodeCrossDomainMessageV1(nonce, sender, target, value, gasLimit, data)
-	} else {
+	switch version.Uint64() {
+	case 0:
+		return crossdomain.EncodeCrossDomainMessageV0(target, sender, data, nonce)
+	case 1:
+		return crossdomain.EncodeCrossDomainMessageV1(nonce, sender, target, value, gasLimit, data)
+	default:
 		return nil, UnknownNonceVersion
 	}
-
-	return encoded, err
 }
 
-// parseSuperRootProof parses an abi encoded super root proof into a SuperRootProof struct.
 func parseSuperRootProof(abiEncodedProof []byte) (*SuperRootProof, error) {
 	unpacked, err := superRootProofArgs.Unpack(abiEncodedProof)
 	if err != nil {
@@ -128,6 +120,7 @@ func parseSuperRootProof(abiEncodedProof []byte) (*SuperRootProof, error) {
 		return nil, errors.New("unexpected number of values after unpacking super root proof")
 	}
 
+	// abi.Unpack maps Solidity bytes1 to a [1]uint8 array, not a plain uint8.
 	tmp := unpacked[0].(struct {
 		Version     [1]uint8 `json:"version"`
 		Timestamp   uint64   `json:"timestamp"`
@@ -138,20 +131,20 @@ func parseSuperRootProof(abiEncodedProof []byte) (*SuperRootProof, error) {
 	})
 
 	proof := SuperRootProof{
-		Version:   tmp.Version[0],
-		Timestamp: tmp.Timestamp,
+		Version:     tmp.Version[0],
+		Timestamp:   tmp.Timestamp,
+		OutputRoots: make([]OutputRootWithChainId, len(tmp.OutputRoots)),
 	}
-	for _, o := range tmp.OutputRoots {
-		proof.OutputRoots = append(proof.OutputRoots, OutputRootWithChainId{
+	for i, o := range tmp.OutputRoots {
+		proof.OutputRoots[i] = OutputRootWithChainId{
 			ChainId: o.ChainId,
 			Root:    common.BytesToHash(o.Root[:]),
-		})
+		}
 	}
 
 	return &proof, nil
 }
 
-// encodeSuperRootProof encodes a super root proof into a byte array.
 func encodeSuperRootProof(superRootProof *SuperRootProof) ([]byte, error) {
 	if superRootProof.Version != 0x01 {
 		return nil, errors.New("invalid super root version")
@@ -160,23 +153,20 @@ func encodeSuperRootProof(superRootProof *SuperRootProof) ([]byte, error) {
 		return nil, errors.New("empty super root")
 	}
 
-	encoded := []byte{superRootProof.Version}
-
-	timestampBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(timestampBytes, superRootProof.Timestamp)
-	encoded = append(encoded, timestampBytes...)
+	encoded := make([]byte, 9, 9+64*len(superRootProof.OutputRoots))
+	encoded[0] = superRootProof.Version
+	binary.BigEndian.PutUint64(encoded[1:9], superRootProof.Timestamp)
 
 	for _, outputRoot := range superRootProof.OutputRoots {
-		chainIdBytes := make([]byte, 32)
-		outputRoot.ChainId.FillBytes(chainIdBytes)
-		encoded = append(encoded, chainIdBytes...)
+		var chainIdBytes [32]byte
+		outputRoot.ChainId.FillBytes(chainIdBytes[:])
+		encoded = append(encoded, chainIdBytes[:]...)
 		encoded = append(encoded, outputRoot.Root.Bytes()...)
 	}
 
 	return encoded, nil
 }
 
-// newEmptyStateTrie returns a fresh in-memory secure state trie.
 func newEmptyStateTrie() *trie.StateTrie {
 	t, err := trie.NewStateTrie(
 		trie.TrieID(types.EmptyRootHash),
@@ -196,7 +186,6 @@ func parseAndEncodeSuperRoot(hexStr string) []byte {
 	return encoded
 }
 
-// hashWithdrawal hashes a withdrawal transaction.
 func hashWithdrawal(nonce *big.Int, sender common.Address, target common.Address, value *big.Int, gasLimit *big.Int, data []byte) (common.Hash, error) {
 	wd := crossdomain.Withdrawal{
 		Nonce:    nonce,
@@ -209,7 +198,6 @@ func hashWithdrawal(nonce *big.Int, sender common.Address, target common.Address
 	return wd.Hash()
 }
 
-// hashOutputRootProof hashes an output root proof.
 func hashOutputRootProof(version common.Hash, stateRoot common.Hash, messagePasserStorageRoot common.Hash, latestBlockHash common.Hash) (common.Hash, error) {
 	hash, err := rollup.ComputeL2OutputRoot(&bindings.TypesOutputRootProof{
 		Version:                  version,
@@ -223,7 +211,6 @@ func hashOutputRootProof(version common.Hash, stateRoot common.Hash, messagePass
 	return common.Hash(hash), nil
 }
 
-// makeDepositTx creates a deposit transaction type.
 func makeDepositTx(
 	from common.Address,
 	to common.Address,
@@ -249,7 +236,7 @@ func makeDepositTx(
 		Data:                data,
 	}
 
-	if mint.Cmp(big.NewInt(0)) == 1 {
+	if mint.Sign() > 0 {
 		depositTx.Mint = mint
 	}
 	if !isCreate {
