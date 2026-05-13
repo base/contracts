@@ -12,7 +12,6 @@ import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 ///         (SystemConfig, SuperchainConfig, ProxyAdmin, Guardian roles, etc.)
 ///      2. The real contract has "stack too deep" compilation issues that require
 ///         special compiler settings (via-ir) which significantly slow builds
-///      3. For TEE prover testing, we only need getAnchorRoot() and setAnchorState()
 contract MockAnchorStateRegistry {
     Hash public anchorRoot;
     uint256 public anchorL2BlockNumber;
