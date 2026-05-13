@@ -31,8 +31,6 @@ var (
 
 	uint32Type, _ = abi.NewType("uint32", "", nil)
 
-	uint256Type, _ = abi.NewType("uint256", "", nil)
-
 	// Decoded nonce tuple (nonce, version)
 	decodedNonce, _ = abi.NewType("tuple", "DecodedNonce", []abi.ArgumentMarshaling{
 		{Name: "nonce", Type: "uint256"},
@@ -81,9 +79,6 @@ var (
 	superRootProofArgs = abi.Arguments{
 		{Type: superRootProof},
 	}
-
-	// Dependency tuple (uint256)
-	dependencyArgs = abi.Arguments{{Name: "chainId", Type: uint256Type}}
 )
 
 func DiffTestUtils() {
@@ -211,24 +206,6 @@ func DiffTestUtils() {
 			MemRoot: mem.MerkleRoot(),
 			Proof:   memProof[:],
 		})
-	case "cannonMemoryProofWrongLeaf":
-		// <memAddr0, memValue0, memAddr1, memValue1>
-		if len(args) != 5 {
-			panic("Error: cannonMemoryProofWrongLeaf requires 4 arguments")
-		}
-		mem := memory.NewMemory()
-		memAddr0 := wordArg(args[1])
-		mem.SetWord(memAddr0, wordArg(args[2]))
-		memAddr1 := wordArg(args[3])
-		mem.SetWord(memAddr1, wordArg(args[4]))
-
-		memProof := mem.MerkleProof(memAddr1 + arch.Word(arch.WordSize))
-		insnProof := mem.MerkleProof(memAddr0 + arch.Word(arch.WordSize))
-
-		packTupleAndPrint(cannonMemoryProofArgs, &cannonMemoryProofOutput{
-			MemRoot: mem.MerkleRoot(),
-			Proof:   append(insnProof[:], memProof[:]...),
-		})
 	case "encodeScalarEcotone":
 		encoded := eth.EncodeScalar(eth.EcotoneScalars{
 			BaseFeeScalar:     uint32(parseUintN(args[1], 32)),
@@ -241,11 +218,6 @@ func DiffTestUtils() {
 		checkErr(err, "Error decoding scalar")
 
 		packAndPrint(decodedScalars, scalars.BaseFeeScalar, scalars.BlobBaseFeeScalar)
-	case "encodeDependency":
-		encoded, err := dependencyArgs.Pack(parseBigInt(args[1]))
-		checkErr(err, "Error encoding dependency")
-
-		packAndPrint(bytesArgs, &encoded)
 	case "encodeSuperRootProof":
 		if len(args) != 2 {
 			panic("Error: encodeSuperRootProof requires 1 argument")

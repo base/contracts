@@ -30,7 +30,6 @@ type OutputRootWithChainId struct {
 	Root    common.Hash
 }
 
-// Define a proper type for SuperRootProof
 type SuperRootProof struct {
 	Version     uint8
 	Timestamp   uint64
@@ -39,16 +38,6 @@ type SuperRootProof struct {
 
 var UnknownNonceVersion = errors.New("Unknown nonce version")
 
-// checkOk checks if ok is false, and panics if so.
-// Shorthand to ease go's god awful error handling
-func checkOk(ok bool) {
-	if !ok {
-		panic(fmt.Errorf("checkOk failed"))
-	}
-}
-
-// checkErr checks if err is not nil, and throws if so.
-// Shorthand to ease go's god awful error handling
 func checkErr(err error, failReason string) {
 	if err != nil {
 		panic(fmt.Errorf("%s: %w", failReason, err))
@@ -58,7 +47,9 @@ func checkErr(err error, failReason string) {
 // parseBigInt parses a base-10 *big.Int and panics if invalid.
 func parseBigInt(s string) *big.Int {
 	v, ok := new(big.Int).SetString(s, 10)
-	checkOk(ok)
+	if !ok {
+		panic(fmt.Errorf("parseBigInt: invalid base-10 integer %q", s))
+	}
 	return v
 }
 
@@ -129,18 +120,14 @@ func encodeCrossDomainMessage(nonce *big.Int, sender common.Address, target comm
 
 // parseSuperRootProof parses an abi encoded super root proof into a SuperRootProof struct.
 func parseSuperRootProof(abiEncodedProof []byte) (*SuperRootProof, error) {
-	// Parse the input as hex data
 	unpacked, err := superRootProofArgs.Unpack(abiEncodedProof)
 	if err != nil {
 		return nil, err
 	}
-
-	// The Unpack method returns a slice of interface{}, so we need to get the first element
 	if len(unpacked) != 1 {
 		return nil, errors.New("unexpected number of values after unpacking super root proof")
 	}
 
-	// Use an anonymous struct matching the tuple’s layout.
 	tmp := unpacked[0].(struct {
 		Version     [1]uint8 `json:"version"`
 		Timestamp   uint64   `json:"timestamp"`
@@ -150,7 +137,6 @@ func parseSuperRootProof(abiEncodedProof []byte) (*SuperRootProof, error) {
 		} `json:"outputRoots"`
 	})
 
-	// Convert into our desired SuperRootProof type.
 	proof := SuperRootProof{
 		Version:   tmp.Version[0],
 		Timestamp: tmp.Timestamp,
@@ -167,32 +153,23 @@ func parseSuperRootProof(abiEncodedProof []byte) (*SuperRootProof, error) {
 
 // encodeSuperRootProof encodes a super root proof into a byte array.
 func encodeSuperRootProof(superRootProof *SuperRootProof) ([]byte, error) {
-	// Version must match the expected version (0x01)
 	if superRootProof.Version != 0x01 {
 		return nil, errors.New("invalid super root version")
 	}
-
-	// Output roots must not be empty
 	if len(superRootProof.OutputRoots) == 0 {
 		return nil, errors.New("empty super root")
 	}
 
-	// Start with version byte and timestamp
 	encoded := []byte{superRootProof.Version}
 
-	// Add timestamp as bytes8 (uint64)
 	timestampBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(timestampBytes, superRootProof.Timestamp)
 	encoded = append(encoded, timestampBytes...)
 
-	// Add each output root (chainId + root)
 	for _, outputRoot := range superRootProof.OutputRoots {
-		// Append chainId bytes (padded to 32 bytes)
 		chainIdBytes := make([]byte, 32)
 		outputRoot.ChainId.FillBytes(chainIdBytes)
 		encoded = append(encoded, chainIdBytes...)
-
-		// Append root hash (already 32 bytes)
 		encoded = append(encoded, outputRoot.Root.Bytes()...)
 	}
 
@@ -258,23 +235,20 @@ func makeDepositTx(
 	l1BlockHash common.Hash,
 	logIndex *big.Int,
 ) types.DepositTx {
-	// Create deposit transaction source
 	udp := derive.UserDepositSource{
 		L1BlockHash: l1BlockHash,
 		LogIndex:    logIndex.Uint64(),
 	}
 
-	// Create deposit transaction
 	depositTx := types.DepositTx{
 		SourceHash:          udp.SourceHash(),
 		From:                from,
 		Value:               value,
 		Gas:                 gasLimit.Uint64(),
-		IsSystemTransaction: false, // This will never be a system transaction in the tests.
+		IsSystemTransaction: false,
 		Data:                data,
 	}
 
-	// Fill optional fields
 	if mint.Cmp(big.NewInt(0)) == 1 {
 		depositTx.Mint = mint
 	}
@@ -333,7 +307,6 @@ func buildProveWithdrawalInputs(nonce *big.Int, sender, target common.Address, v
 	}
 }
 
-// Custom type to write the generated proof to
 type proofList [][]byte
 
 func (n *proofList) Put(key []byte, value []byte) error {
