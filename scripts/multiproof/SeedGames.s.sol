@@ -149,15 +149,12 @@ contract SeedGames is Script {
         return address(created);
     }
 
-    function _sliceRoots(bytes32[] memory all, uint256 offset) internal pure returns (bytes memory roots) {
-        uint256 n = INTERMEDIATE_ROOTS_COUNT;
-        roots = new bytes(n * 32);
-        for (uint256 j = 0; j < n; j++) {
-            bytes32 r = all[offset + j];
-            assembly {
-                mstore(add(add(roots, 32), mul(j, 32)), r)
-            }
+    function _sliceRoots(bytes32[] memory all, uint256 offset) internal pure returns (bytes memory) {
+        bytes32[] memory slice = new bytes32[](INTERMEDIATE_ROOTS_COUNT);
+        for (uint256 j = 0; j < INTERMEDIATE_ROOTS_COUNT; j++) {
+            slice[j] = all[offset + j];
         }
+        return abi.encodePacked(slice);
     }
 
     function _writeOutput(
