@@ -8,8 +8,6 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 // Libraries
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
-import { Fork } from "scripts/libraries/Config.sol";
-import { Features } from "src/libraries/Features.sol";
 
 /// @title Predeploys_TestInit
 /// @notice Reusable test initialization for `Predeploys` tests.
@@ -49,7 +47,7 @@ abstract contract Predeploys_TestInit is CommonTest {
     }
 
     /// @notice Internal test function for predeploys validation across different forks.
-    function _test_predeploys() internal {
+    function _test_predeploys() internal view {
         uint256 count = 2048;
         uint160 prefix = uint160(0x420) << 148;
 
@@ -145,7 +143,7 @@ contract Predeploys_PredeployToCodeNamespace_Test is Predeploys_TestInit {
 contract Predeploys_Uncategorized_Test is Predeploys_TestInit {
     /// @notice Tests that the predeploy addresses are set correctly. They have code
     ///         and the proxied accounts have the correct admin.
-    function test_predeploys_succeeds() external {
+    function test_predeploys_succeeds() external view {
         _test_predeploys();
     }
 }

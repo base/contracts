@@ -151,12 +151,8 @@ contract L2Genesis_Run_Test is L2Genesis_TestInit {
             operatorFeeVaultRecipient: address(0x0000000000000000000000000000000000000008),
             operatorFeeVaultMinimumWithdrawalAmount: 1,
             operatorFeeVaultWithdrawalNetwork: 1,
-            governanceTokenOwner: address(0x0000000000000000000000000000000000000009),
             fork: uint256(LATEST_FORK),
-            enableGovernance: true,
-            fundDevAccounts: true,
-            chainFeesRecipient: address(0x000000000000000000000000000000000000000b),
-            l1FeesDepositor: address(0x000000000000000000000000000000000000000C)
+            fundDevAccounts: true
         });
     }
 

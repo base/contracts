@@ -2,13 +2,14 @@
 pragma solidity ^0.8.0;
 
 import { console2 as console } from "lib/forge-std/src/console2.sol";
+import { Script } from "lib/forge-std/src/Script.sol";
 import { StdAssertions } from "lib/forge-std/src/StdAssertions.sol";
 
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 
 // Scripts
-import { Deployer } from "scripts/deploy/Deployer.sol";
-import { Deploy } from "scripts/deploy/Deploy.s.sol";
+import { Artifacts } from "scripts/Artifacts.s.sol";
+import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
 import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
 
@@ -33,15 +34,21 @@ import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 
 /// @title ForkLive
 /// @notice This script is called by Setup.sol as a preparation step for the foundry test suite, and is run as an
-///         alternative to Deploy.s.sol, when `FORK_TEST=true` is set in the env.
-///         Like Deploy.s.sol this script saves the system addresses to the Artifacts contract so that they can be
+///         alternative to SystemDeploy.s.sol, when `FORK_TEST=true` is set in the env.
+///         Like SystemDeploy.s.sol this script saves the system addresses to the Artifacts contract so that they can be
 ///         read by other contracts. However, rather than deploying new contracts from the local source code, it seeds
 ///         the fork with a small set of production entrypoint addresses and derives the rest onchain.
 ///         Therefore this script can only be run against a fork of a production network which is listed in
 ///         `forkSystemAddresses`.
 ///         This contract must not have constructor logic because it is set into state using `etch`.
 
-contract ForkLive is Deployer, StdAssertions, FeatureFlags {
+contract ForkLive is Script, StdAssertions, FeatureFlags {
+    DeployConfig internal constant cfg =
+        DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
+
+    Artifacts internal constant artifacts =
+        Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
+
     bool public useOpsRepo;
 
     struct SystemAddresses {
@@ -188,11 +195,11 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
         artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(gameAddresses.weth));
     }
 
-    /// @notice Calls to the Deploy.s.sol contract etched by Setup.sol to a deterministic address, sets up the
+    /// @notice Calls to the SystemDeploy.s.sol contract etched by Setup.sol to a deterministic address, sets up the
     /// environment, and deploys new implementations.
     function _deployNewImplementations() internal {
-        Deploy deploy = Deploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
-        deploy.deployImplementations({ _isInterop: false });
+        SystemDeploy deploy = SystemDeploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
+        deploy.deployImplementations();
     }
 
     /// @notice Performs a script-level upgrade without a manager delegatecall.
@@ -284,7 +291,7 @@ contract ForkLive is Deployer, StdAssertions, FeatureFlags {
 
     /// @notice Returns the latest implementation set saved by deployImplementations.
     function _latestImplementations() internal view returns (Types.Implementations memory) {
-        Deploy deploy = Deploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
+        SystemDeploy deploy = SystemDeploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
         return deploy.getImplementations();
     }
 

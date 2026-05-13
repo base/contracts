@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IBigStepper } from "interfaces/L1/proofs/IBigStepper.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
@@ -10,7 +9,6 @@ import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
 import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
@@ -22,7 +20,7 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 
-import { Claim, Duration, GameType } from "src/libraries/bridge/Types.sol";
+import { Claim, Duration, GameType, Proposal } from "src/libraries/bridge/Types.sol";
 
 library Types {
     /// @notice Represents the roles that can be set when deploying a standard OP Stack chain.
@@ -41,12 +39,9 @@ library Types {
         uint32 basefeeScalar;
         uint32 blobBasefeeScalar;
         uint256 l2ChainId;
-        // The correct type is Proposal memory but OP Deployer does not yet support structs.
-        bytes startingAnchorRoot;
-        // The salt mixer is used as part of making the resulting salt unique.
+        Proposal startingAnchorRoot;
         string saltMixer;
         uint64 gasLimit;
-        // Configurable dispute game parameters.
         GameType disputeGameType;
         Claim disputeAbsolutePrestate;
         uint256 disputeMaxGameDepth;
@@ -109,80 +104,6 @@ library Types {
         ISystemConfig systemConfigProxy;
         Claim cannonPrestate;
         Claim cannonKonaPrestate;
-    }
-
-    /// @notice The input required to identify a chain for updating prestates.
-    struct UpdatePrestateInput {
-        ISystemConfig systemConfigProxy;
-        Claim cannonPrestate;
-        Claim cannonKonaPrestate;
-    }
-
-    struct AddGameInput {
-        string saltMixer;
-        ISystemConfig systemConfig;
-        IDelayedWETH delayedWETH;
-        GameType disputeGameType;
-        Claim disputeAbsolutePrestate;
-        uint256 disputeMaxGameDepth;
-        uint256 disputeSplitDepth;
-        Duration disputeClockExtension;
-        Duration disputeMaxClockDuration;
-        uint256 initialBond;
-        IBigStepper vm;
-        bool permissioned;
-    }
-
-    struct AddGameOutput {
-        IDelayedWETH delayedWETH;
-        IFaultDisputeGameV2 faultDisputeGame;
-    }
-
-    /// @notice Represents a set of L1 contracts. Used to represent a set of proxies.
-    /// This is not an exhaustive list of all contracts on L1, but rather a subset.
-    struct ContractSet {
-        address L1CrossDomainMessenger;
-        address L1StandardBridge;
-        address L2OutputOracle;
-        address DisputeGameFactory;
-        address DelayedWETH;
-        address PermissionedDelayedWETH;
-        address AnchorStateRegistry;
-        address OptimismMintableERC20Factory;
-        address OptimismPortal;
-        address ETHLockbox;
-        address SystemConfig;
-        address L1ERC721Bridge;
-        address SuperchainConfig;
-    }
-
-    struct DeployOPChainInput {
-        // Roles
-        address opChainProxyAdminOwner;
-        address systemConfigOwner;
-        address batcher;
-        address unsafeBlockSigner;
-        address proposer;
-        address challenger;
-        // TODO Add fault proofs inputs in a future PR.
-        uint32 basefeeScalar;
-        uint32 blobBaseFeeScalar;
-        uint256 l2ChainId;
-        ISuperchainConfig superchainConfigProxy;
-        Implementations implementations;
-        string saltMixer;
-        uint64 gasLimit;
-        // Configurable dispute game inputs
-        GameType disputeGameType;
-        Claim disputeAbsolutePrestate;
-        uint256 disputeMaxGameDepth;
-        uint256 disputeSplitDepth;
-        Duration disputeClockExtension;
-        Duration disputeMaxClockDuration;
-        bool allowCustomDisputeParameters;
-        // Fee params
-        uint32 operatorFeeScalar;
-        uint64 operatorFeeConstant;
     }
 
     /// @notice Maps an L2 chain ID to the standard L1 batch inbox address.
