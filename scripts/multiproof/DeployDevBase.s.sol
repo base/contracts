@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { Proxy } from "src/universal/Proxy.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
-import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { DisputeGameFactory } from "src/L1/proofs/DisputeGameFactory.sol";
 import { GameType, Hash } from "src/libraries/bridge/Types.sol";
 
