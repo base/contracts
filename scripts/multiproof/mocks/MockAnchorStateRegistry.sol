@@ -44,10 +44,6 @@ contract MockAnchorStateRegistry {
         return IDisputeGameFactory(factory);
     }
 
-    function setRespectedGameType(GameType gameType) external {
-        respectedGameType = gameType;
-    }
-
     function setAnchorState(Hash newAnchorRoot, uint256 newAnchorL2BlockNumber) external {
         anchorRoot = newAnchorRoot;
         anchorL2BlockNumber = newAnchorL2BlockNumber;
