@@ -79,7 +79,5 @@ contract MockAnchorStateRegistry {
         return _game.resolvedAt().raw() != 0;
     }
 
-    function setAnchorState(IDisputeGame) external {
-        // No-op in mock
-    }
+    function setAnchorState(IDisputeGame) external { }
 }
