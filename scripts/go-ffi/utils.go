@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -20,10 +19,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/triedb"
 	"github.com/ethereum/go-ethereum/triedb/hashdb"
 )
+
+const superRootVersionV1 byte = 0x01
 
 type OutputRootWithChainId struct {
 	ChainId *big.Int
@@ -35,8 +37,6 @@ type SuperRootProof struct {
 	Timestamp   uint64
 	OutputRoots []OutputRootWithChainId
 }
-
-var errUnknownNonceVersion = errors.New("unknown nonce version")
 
 func checkErr(err error, failReason string) {
 	if err != nil {
@@ -107,7 +107,7 @@ func encodeCrossDomainMessage(nonce *big.Int, sender common.Address, target comm
 	case 1:
 		return crossdomain.EncodeCrossDomainMessageV1(nonce, sender, target, value, gasLimit, data)
 	default:
-		return nil, errUnknownNonceVersion
+		return nil, fmt.Errorf("unknown cross-domain message nonce version %d", version.Uint64())
 	}
 }
 
@@ -146,16 +146,18 @@ func parseSuperRootProof(abiEncodedProof []byte) (*SuperRootProof, error) {
 }
 
 func encodeSuperRootProof(superRootProof *SuperRootProof) ([]byte, error) {
-	if superRootProof.Version != 0x01 {
+	if superRootProof.Version != superRootVersionV1 {
 		return nil, errors.New("invalid super root version")
 	}
 	if len(superRootProof.OutputRoots) == 0 {
 		return nil, errors.New("empty super root")
 	}
 
-	encoded := make([]byte, 9, 9+64*len(superRootProof.OutputRoots))
+	const headerLen = 1 + 8 // version byte + uint64 timestamp
+	const chainOutputLen = 32 + 32
+	encoded := make([]byte, headerLen, headerLen+chainOutputLen*len(superRootProof.OutputRoots))
 	encoded[0] = superRootProof.Version
-	binary.BigEndian.PutUint64(encoded[1:9], superRootProof.Timestamp)
+	binary.BigEndian.PutUint64(encoded[1:headerLen], superRootProof.Timestamp)
 
 	for _, outputRoot := range superRootProof.OutputRoots {
 		var chainIdBytes [32]byte
@@ -267,16 +269,15 @@ func buildProveWithdrawalInputs(nonce *big.Int, sender, target common.Address, v
 	checkErr(state.UpdateStorage(common.Address{}, slotKey.Bytes(), []byte{0x01}), "Error updating storage")
 
 	stateRoot := state.Hash()
-	account := types.StateAccount{
+	encodedAccount, err := rlp.EncodeToBytes(&types.StateAccount{
 		Nonce:   0,
 		Balance: common.U2560,
 		Root:    stateRoot,
-	}
-	writer := new(bytes.Buffer)
-	checkErr(account.EncodeRLP(writer), "Error encoding account")
+	})
+	checkErr(err, "Error encoding account")
 
 	world := newEmptyStateTrie()
-	checkErr(world.UpdateStorage(common.Address{}, predeploys.L2ToL1MessagePasserAddr.Bytes(), writer.Bytes()), "Error updating storage")
+	checkErr(world.UpdateStorage(common.Address{}, predeploys.L2ToL1MessagePasserAddr.Bytes(), encodedAccount), "Error updating storage")
 
 	var proof proofList
 	checkErr(state.Prove(predeploys.L2ToL1MessagePasserAddr.Bytes(), &proof), "Error getting proof")
