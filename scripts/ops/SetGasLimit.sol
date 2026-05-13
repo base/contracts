@@ -20,18 +20,12 @@ contract SetGasLimit is MultisigScript {
 
     address internal SYSTEM_CONFIG_OWNER = vm.envAddress("SYSTEM_CONFIG_OWNER");
     address internal L1_SYSTEM_CONFIG = vm.envAddress("L1_SYSTEM_CONFIG_ADDRESS");
-
-    function _fromGasLimit() internal view returns (uint64) {
-        return uint64(vm.envUint("FROM_GAS_LIMIT"));
-    }
-
-    function _toGasLimit() internal view returns (uint64) {
-        return uint64(vm.envUint("TO_GAS_LIMIT"));
-    }
+    uint64 internal FROM_GAS_LIMIT = uint64(vm.envUint("FROM_GAS_LIMIT"));
+    uint64 internal TO_GAS_LIMIT = uint64(vm.envUint("TO_GAS_LIMIT"));
 
     function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal view override {
         require(
-            SystemConfig(L1_SYSTEM_CONFIG).gasLimit() == _toGasLimit(),
+            SystemConfig(L1_SYSTEM_CONFIG).gasLimit() == TO_GAS_LIMIT,
             "SetGasLimit::_postCheck: gas limit was not updated"
         );
     }
@@ -42,7 +36,7 @@ contract SetGasLimit is MultisigScript {
         calls[0] = Call({
             operation: Enum.Operation.Call,
             target: L1_SYSTEM_CONFIG,
-            data: abi.encodeCall(SystemConfig.setGasLimit, (_toGasLimit())),
+            data: abi.encodeCall(SystemConfig.setGasLimit, (TO_GAS_LIMIT)),
             value: 0
         });
 
@@ -59,7 +53,7 @@ contract SetGasLimit is MultisigScript {
         Simulation.StateOverride[] memory stateOverrides = new Simulation.StateOverride[](1);
         Simulation.StorageOverride[] memory storageOverrides = new Simulation.StorageOverride[](1);
         storageOverrides[0] =
-            Simulation.StorageOverride({ key: GAS_LIMIT_SLOT, value: bytes32(uint256(_fromGasLimit())) });
+            Simulation.StorageOverride({ key: GAS_LIMIT_SLOT, value: bytes32(uint256(FROM_GAS_LIMIT)) });
         // solhint-disable-next-line max-line-length
         stateOverrides[0] = Simulation.StateOverride({ contractAddress: L1_SYSTEM_CONFIG, overrides: storageOverrides });
         return stateOverrides;
