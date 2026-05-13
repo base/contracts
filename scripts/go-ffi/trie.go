@@ -3,20 +3,17 @@ package main
 import (
 	"crypto/rand"
 	"fmt"
-	"log"
 	"math/big"
 	"os"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/triedb"
 )
 
-// Variant enum
 const (
 	// Generate a test case with a valid proof of inclusion for the k/v pair in the trie.
 	valid string = "valid"
@@ -40,161 +37,78 @@ const (
 	partialProof = "partial_proof"
 )
 
-// Generate an abi-encoded `trieTestCase` of a specified variant
+// FuzzTrie generates an abi-encoded `trieTestCase` of a specified variant.
 func FuzzTrie() {
 	variant := os.Args[2]
-	if len(variant) < 1 {
-		log.Fatal("Must pass a variant to the trie fuzzer!")
-	}
+	testCase := genTrieTestCase(variant == emptyKey)
 
-	var testCase trieTestCase
 	switch variant {
-	case valid:
-		testCase = genTrieTestCase(false)
+	case valid, emptyKey:
+		// Valid as generated; no mutation.
 	case extraProofElems:
-		testCase = genTrieTestCase(false)
-		// Duplicate the last element of the proof
-		testCase.Proof = append(testCase.Proof, [][]byte{testCase.Proof[len(testCase.Proof)-1]}...)
+		testCase.Proof = append(testCase.Proof, testCase.Proof[len(testCase.Proof)-1])
 	case corruptedProof:
-		testCase = genTrieTestCase(false)
-
-		// Re-encode a random element within the proof
 		idx := randRange(0, int64(len(testCase.Proof)))
 		encoded, _ := rlp.EncodeToBytes(testCase.Proof[idx])
 		testCase.Proof[idx] = encoded
 	case invalidDataRemainder:
-		testCase = genTrieTestCase(false)
-
-		// Alter true length of random proof element by appending random bytes
-		// Do not update the encoded length
+		// Extend a proof element without updating its RLP-encoded length so the
+		// decoder sees trailing bytes past the declared end.
 		idx := randRange(0, int64(len(testCase.Proof)))
-		b := make([]byte, randRange(1, 512))
-		if _, err := rand.Read(b); err != nil {
-			log.Fatal("Error generating random bytes")
-		}
-		testCase.Proof[idx] = append(testCase.Proof[idx], b...)
+		testCase.Proof[idx] = append(testCase.Proof[idx], randBytes(randRange(1, 512))...)
 	case invalidLargeInternalHash:
-		testCase = genTrieTestCase(false)
-
-		// Clobber 4 bytes within a list element of a random proof element
-		// TODO: Improve this by decoding the proof elem and choosing random
-		// bytes to overwrite.
+		// Clobber 4 bytes within a random non-root proof element.
+		// TODO: Improve by decoding the proof elem and choosing random bytes to overwrite.
 		idx := randRange(1, int64(len(testCase.Proof)))
-		b := make([]byte, 4)
-		if _, err := rand.Read(b); err != nil {
-			log.Fatal("Error generating random bytes")
-		}
-		testCase.Proof[idx] = append(
-			testCase.Proof[idx][:20],
-			append(
-				b,
-				testCase.Proof[idx][24:]...,
-			)...,
-		)
+		copy(testCase.Proof[idx][20:24], randBytes(4))
 	case invalidInternalNodeHash:
-		testCase = genTrieTestCase(false)
-		// Assign the last proof element to an encoded list containing a
-		// random 29 byte value
-		b := make([]byte, 29)
-		if _, err := rand.Read(b); err != nil {
-			log.Fatal("Error generating random bytes")
-		}
-		e, _ := rlp.EncodeToBytes(b)
+		// Replace the last proof element with an RLP list containing a 29-byte value.
+		e, _ := rlp.EncodeToBytes(randBytes(29))
 		testCase.Proof[len(testCase.Proof)-1] = append([]byte{0xc0 + 30}, e...)
 	case prefixedValidKey:
-		testCase = genTrieTestCase(false)
-
-		b := make([]byte, randRange(1, 16))
-		if _, err := rand.Read(b); err != nil {
-			log.Fatal("Error generating random bytes")
-		}
-		testCase.Key = append(b, testCase.Key...)
-	case emptyKey:
-		testCase = genTrieTestCase(true)
+		testCase.Key = append(randBytes(randRange(1, 16)), testCase.Key...)
 	case partialProof:
-		testCase = genTrieTestCase(false)
-
-		// Cut the proof in half
-		proofLen := len(testCase.Proof)
-		newProof := make([][]byte, proofLen/2)
-		for i := 0; i < proofLen/2; i++ {
-			newProof[i] = testCase.Proof[i]
-		}
-
-		testCase.Proof = newProof
+		testCase.Proof = testCase.Proof[:len(testCase.Proof)/2]
 	default:
-		log.Fatal("Invalid variant passed to trie fuzzer!")
+		panic(fmt.Errorf("Invalid variant passed to trie fuzzer: %q", variant))
 	}
 
-	// Print encoded test case with no newline so that foundry's FFI can read the output
-	fmt.Print(testCase.AbiEncode())
+	packTupleAndPrint(abi.Arguments{{Type: trieTestCaseTuple}}, &testCase)
 }
 
-// Generate a random test case for Bedrock's MerkleTrie verifier.
+// genTrieTestCase builds a random Merkle trie and produces a proof of inclusion
+// for one of its k/v pairs.
 func genTrieTestCase(selectEmptyKey bool) trieTestCase {
-	// Create an empty merkle trie
-	memdb := rawdb.NewMemoryDatabase()
-	randTrie := trie.NewEmpty(triedb.NewDatabase(memdb, nil))
+	randTrie := trie.NewEmpty(triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil))
 
-	// Get a random number of elements to put into the trie
 	randN := randRange(2, 1024)
-	// Get a random key/value pair to generate a proof of inclusion for
 	randSelect := randRange(0, randN)
 
-	// Create a fixed-length key as well as a randomly-sized value
-	// We create these out of the loop to reduce mem allocations.
-	randKey := make([]byte, 32)
-	randValue := make([]byte, randRange(2, 1024))
-
-	// Randomly selected key/value for proof generation
-	var key []byte
-	var value []byte
-
-	// Add `randN` elements to the trie
-	for i := int64(0); i < randN; i++ {
-		// Randomize the contents of `randKey` and `randValue`
-		if _, err := rand.Read(randKey); err != nil {
-			log.Fatal("Error generating random bytes")
-		}
-		if _, err := rand.Read(randValue); err != nil {
-			log.Fatal("Error generating random bytes")
-		}
-
-		// Clear the selected key if `selectEmptyKey` is true
+	var key, value []byte
+	for i := range randN {
+		k := randBytes(32)
+		v := randBytes(randRange(2, 1024))
 		if i == randSelect && selectEmptyKey {
-			randKey = make([]byte, 0)
+			k = nil
 		}
-
-		// Insert the random k/v pair into the trie
-		if err := randTrie.Update(randKey, randValue); err != nil {
-			log.Fatal("Error adding key-value pair to trie")
-		}
-
-		// If this is our randomly selected k/v pair, store it in `key` & `value`
+		checkErr(randTrie.Update(k, v), "Error adding key-value pair to trie")
 		if i == randSelect {
-			key = randKey
-			value = randValue
+			key, value = k, v
 		}
 	}
 
-	// Generate proof for `key`'s inclusion in our trie
 	var proof proofList
-	if err := randTrie.Prove(key, &proof); err != nil {
-		log.Fatal("Error creating proof for randomly selected key's inclusion in generated trie")
-	}
+	checkErr(randTrie.Prove(key, &proof), "Error creating proof for key inclusion")
 
-	// Create our test case with the data collected
-	testCase := trieTestCase{
+	return trieTestCase{
 		Root:  randTrie.Hash(),
 		Key:   key,
 		Value: value,
 		Proof: proof,
 	}
-
-	return testCase
 }
 
-// Represents a test case for bedrock's `MerkleTrie.sol`
+// trieTestCase represents a test case for bedrock's `MerkleTrie.sol`.
 type trieTestCase struct {
 	Root  common.Hash
 	Key   []byte
@@ -202,39 +116,24 @@ type trieTestCase struct {
 	Proof [][]byte
 }
 
-// Tuple type to encode `TrieTestCase`
-var (
-	trieTestCaseTuple, _ = abi.NewType("tuple", "TrieTestCase", []abi.ArgumentMarshaling{
-		{Name: "root", Type: "bytes32"},
-		{Name: "key", Type: "bytes"},
-		{Name: "value", Type: "bytes"},
-		{Name: "proof", Type: "bytes[]"},
-	})
+var trieTestCaseTuple, _ = abi.NewType("tuple", "TrieTestCase", []abi.ArgumentMarshaling{
+	{Name: "root", Type: "bytes32"},
+	{Name: "key", Type: "bytes"},
+	{Name: "value", Type: "bytes"},
+	{Name: "proof", Type: "bytes[]"},
+})
 
-	encoder = abi.Arguments{
-		{Type: trieTestCaseTuple},
-	}
-)
-
-// Encodes the trieTestCase as the `trieTestCaseTuple`.
-func (t *trieTestCase) AbiEncode() string {
-	// Encode the contents of the struct as a tuple
-	packed, err := encoder.Pack(&t)
-	if err != nil {
-		log.Fatalf("Error packing TrieTestCase: %v", err)
-	}
-
-	// Remove the pointer and encode the packed bytes as a hex string
-	return hexutil.Encode(packed[32:])
+// randBytes returns n cryptographically-random bytes.
+func randBytes(n int64) []byte {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+	checkErr(err, "Error generating random bytes")
+	return b
 }
 
-// Helper that generates a cryptographically secure random 64-bit integer
-// between the range [min, max)
+// randRange returns a cryptographically secure random 64-bit integer in [min, max).
 func randRange(min int64, max int64) int64 {
-	r, err := rand.Int(rand.Reader, new(big.Int).Sub(new(big.Int).SetInt64(max), new(big.Int).SetInt64(min)))
-	if err != nil {
-		log.Fatal("Failed to generate random number within bounds")
-	}
-
-	return (new(big.Int).Add(r, new(big.Int).SetInt64(min))).Int64()
+	r, err := rand.Int(rand.Reader, big.NewInt(max-min))
+	checkErr(err, "Failed to generate random number within bounds")
+	return r.Int64() + min
 }
