@@ -44,7 +44,6 @@ func checkErr(err error, failReason string) {
 	}
 }
 
-// parseBigInt parses a base-10 *big.Int and panics if invalid.
 func parseBigInt(s string) *big.Int {
 	v, ok := new(big.Int).SetString(s, 10)
 	if !ok {
@@ -53,7 +52,6 @@ func parseBigInt(s string) *big.Int {
 	return v
 }
 
-// parseUintN parses a base-10 unsigned integer with the given bit size and panics if invalid.
 func parseUintN(s string, bits int) uint64 {
 	v, err := strconv.ParseUint(s, 10, bits)
 	checkErr(err, "Error decoding uint")
@@ -77,7 +75,6 @@ func parseCrossDomainArgs(args []string) (nonce *big.Int, sender common.Address,
 		common.FromHex(args[6])
 }
 
-// packAndPrint ABI-encodes vals using args and writes the hex result to stdout.
 func packAndPrint(args abi.Arguments, vals ...any) {
 	packed, err := args.Pack(vals...)
 	checkErr(err, "Error encoding output")
@@ -178,8 +175,6 @@ func newEmptyStateTrie() *trie.StateTrie {
 	return t
 }
 
-// parseAndEncodeSuperRoot parses an abi-encoded super root proof hex string
-// and returns its packed binary encoding.
 func parseAndEncodeSuperRoot(hexStr string) []byte {
 	proof, err := parseSuperRootProof(common.FromHex(hexStr))
 	checkErr(err, "Error parsing super root proof")
