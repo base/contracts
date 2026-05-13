@@ -11,22 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 )
-
-// VerifyMerkleProof verifies a merkle proof against the root hash and the leaf hash.
-// Reference: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#is_valid_merkle_branch
-func VerifyMerkleProof(root, leaf common.Hash, index uint64, proof [merkle.BinaryMerkleTreeDepth]common.Hash) bool {
-	value := leaf
-	for i := 0; i < merkle.BinaryMerkleTreeDepth; i++ {
-		if ((index >> i) & 1) == 1 {
-			value = crypto.Keccak256Hash(proof[i][:], value[:])
-		} else {
-			value = crypto.Keccak256Hash(value[:], proof[i][:])
-		}
-	}
-	return value == root
-}
 
 const (
 	// GenProof generates a merkle proof for a given leaf index by reconstructing the merkle tree from the passed
@@ -48,9 +33,6 @@ var (
 // DiffMerkle generates an abi-encoded `merkleTestCase` of a specified variant.
 func DiffMerkle() {
 	variant := os.Args[2]
-	if len(variant) == 0 {
-		log.Fatal("Must pass a variant to the merkle diff tester!")
-	}
 
 	switch variant {
 	case genProof:
@@ -62,7 +44,7 @@ func DiffMerkle() {
 		if err != nil {
 			log.Fatal("Failed to decode leaves: ", err)
 		}
-		index, err := strconv.ParseInt(os.Args[4], 10, 64)
+		index, err := strconv.ParseUint(os.Args[4], 10, 64)
 		if err != nil {
 			log.Fatal("Failed to parse leaf index: ", err)
 		}
@@ -75,7 +57,7 @@ func DiffMerkle() {
 		}
 
 		// Generate the proof for the given index.
-		proof := merkleTree.ProofAtIndex(uint64(index))
+		proof := merkleTree.ProofAtIndex(index)
 
 		// Generate the merkle root.
 		root := merkleTree.RootHash()
