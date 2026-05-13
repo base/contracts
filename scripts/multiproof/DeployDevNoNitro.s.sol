@@ -1,57 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-/**
- * @title DeployDevNoNitro
- * @notice Development deployment WITHOUT AWS Nitro attestation validation.
- *
- * ══════════════════════════════════════════════════════════════════════════════════
- *                              DEPLOYMENT TYPE: DEV (NO NITRO)
- * ══════════════════════════════════════════════════════════════════════════════════
- *
- * This script deploys infrastructure using DevTEEProverRegistry, which BYPASSES
- * AWS Nitro attestation validation. Signers can be registered with a simple call
- * to addDevSigner() without needing a real Nitro enclave or attestation document.
- *
- * USE THIS SCRIPT WHEN:
- * - Running local development or testing
- * - You don't have access to an AWS Nitro enclave
- * - You want to quickly test the prover without attestation overhead
- *
- * DO NOT USE THIS SCRIPT FOR:
- * - Production deployments
- * - Security testing of the attestation flow
- *
- * ─────────────────────────────────────────────────────────────────────────────────
- * SIGNER REGISTRATION (SIMPLIFIED)
- * ─────────────────────────────────────────────────────────────────────────────────
- *
- * After deployment, register a signer with a single call:
- *
- *   cast send $TEE_PROVER_REGISTRY \
- *     "addDevSigner(address,bytes32)" $SIGNER_ADDRESS $TEE_IMAGE_HASH \
- *     --private-key $OWNER_KEY --rpc-url $RPC_URL
- *
- * No attestation, PCR0 registration, or certificate validation required.
- *
- * ─────────────────────────────────────────────────────────────────────────────────
- * COMPARISON WITH DeployDevWithNitro
- * ─────────────────────────────────────────────────────────────────────────────────
- *
- * | Feature                    | DeployDevNoNitro       | DeployDevWithNitro     |
- * |----------------------------|------------------------|------------------------|
- * | TEEProverRegistry          | DevTEEProverRegistry   | TEEProverRegistry      |
- * | Signer registration        | addDevSigner()         | registerSigner()       |
- * | Requires Nitro enclave     | No                     | Yes                    |
- * | Validates attestation (ZK) | No                     | Yes                    |
- * | PCR0 pre-registration      | No                     | Yes                    |
- * | Attestation freshness      | N/A                    | < 60 minutes           |
- *
- * Both scripts use mocks for AnchorStateRegistry, DelayedWETH, and ZK Verifier.
- *
- * ══════════════════════════════════════════════════════════════════════════════════
- */
-
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { Proxy } from "src/universal/Proxy.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
@@ -79,8 +28,8 @@ import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";
 import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 
 /// @title DeployDevNoNitro
-/// @notice Development deployment WITHOUT AWS Nitro attestation validation.
-/// @dev Uses DevTEEProverRegistry which allows addDevSigner() to bypass attestation.
+/// @notice Development deployment using DevTEEProverRegistry, which bypasses AWS Nitro attestation
+///         validation. See scripts/multiproof/README.md for usage. Not for production.
 contract DeployDevNoNitro is Script {
     uint256 public constant BLOCK_INTERVAL = 100;
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 10;
@@ -110,8 +59,6 @@ contract DeployDevNoNitro is Script {
         console.log("TEE Proposer:", cfg.teeProposer());
         console.log("TEE Challenger:", cfg.teeChallenger());
         console.log("Game Type:", cfg.multiproofGameType());
-        console.log("");
-        console.log("NOTE: Using DevTEEProverRegistry - NO attestation required.");
 
         vm.startBroadcast();
 
@@ -144,13 +91,14 @@ contract DeployDevNoNitro is Script {
     }
 
     function _deployInfrastructure(GameType gameType) internal {
+        address owner = cfg.finalSystemOwner();
         address factoryImpl = address(new DisputeGameFactory());
-        MinimalProxyAdmin proxyAdmin = new MinimalProxyAdmin(cfg.finalSystemOwner());
+        MinimalProxyAdmin proxyAdmin = new MinimalProxyAdmin(owner);
 
         Proxy proxy = new Proxy(msg.sender);
         proxy.upgradeTo(factoryImpl);
         proxy.changeAdmin(address(proxyAdmin));
-        DisputeGameFactory(address(proxy)).initialize(cfg.finalSystemOwner());
+        DisputeGameFactory(address(proxy)).initialize(owner);
         disputeGameFactory = address(proxy);
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
@@ -192,28 +140,16 @@ contract DeployDevNoNitro is Script {
     }
 
     function _printSummary() internal view {
-        console.log("\n========================================");
-        console.log("    DEV DEPLOYMENT COMPLETE (NO NITRO)");
-        console.log("========================================");
-        console.log("\nTEE Contracts:");
-        console.log("  DevTEEProverRegistry:", teeProverRegistryProxy);
-        console.log("  TEEVerifier:", teeVerifier);
-        console.log("\nInfrastructure:");
-        console.log("  DisputeGameFactory:", disputeGameFactory);
-        console.log("  AnchorStateRegistry (mock):", address(mockAnchorRegistry));
-        console.log("  DelayedWETH (mock):", mockDelayedWETH);
-        console.log("\nGame:");
-        console.log("  AggregateVerifier:", aggregateVerifier);
-        console.log("  Game Type:", cfg.multiproofGameType());
-        console.log("  TEE Image Hash:", vm.toString(cfg.teeImageHash()));
-        console.log("  Config Hash:", vm.toString(cfg.multiproofConfigHash()));
-        console.log("========================================");
-        console.log("\n>>> NEXT STEP - Register dev signer (NO ATTESTATION NEEDED) <<<");
-        console.log("\ncast send", teeProverRegistryProxy);
-        console.log('  "addDevSigner(address,bytes32)" <SIGNER_ADDRESS>');
-        console.log(" ", vm.toString(cfg.teeImageHash()));
-        console.log("  --private-key <OWNER_KEY> --rpc-url <RPC>");
-        console.log("\n========================================\n");
+        console.log("\n=== DEV DEPLOYMENT COMPLETE (NO NITRO) ===");
+        console.log("DevTEEProverRegistry:", teeProverRegistryProxy);
+        console.log("TEEVerifier:", teeVerifier);
+        console.log("DisputeGameFactory:", disputeGameFactory);
+        console.log("AnchorStateRegistry (mock):", address(mockAnchorRegistry));
+        console.log("DelayedWETH (mock):", mockDelayedWETH);
+        console.log("AggregateVerifier:", aggregateVerifier);
+        console.log("Game Type:", cfg.multiproofGameType());
+        console.log("TEE Image Hash:", vm.toString(cfg.teeImageHash()));
+        console.log("Config Hash:", vm.toString(cfg.multiproofConfigHash()));
     }
 
     function _writeOutput() internal {
