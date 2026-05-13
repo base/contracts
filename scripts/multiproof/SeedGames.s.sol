@@ -30,6 +30,7 @@ contract SeedGames is Script {
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
     uint256 public constant INTERMEDIATE_ROOTS_COUNT = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;
     uint32 public constant GAME_TYPE_ID = 621;
+    uint256 public constant PROGRESS_LOG_INTERVAL = 100;
 
     struct SeedCtx {
         IDisputeGameFactory factory;
@@ -59,7 +60,7 @@ contract SeedGames is Script {
         console.log("Total ETH required:", ctx.initBond * gameCount);
 
         vm.startBroadcast();
-        (address firstGame, address lastGame) = _createGames(ctx, asrAddr, gameCount);
+        (address firstGame, address lastGame) = _createGames(ctx, asrAddr);
         vm.stopBroadcast();
 
         uint256 l2Start = ctx.anchorBlock + BLOCK_INTERVAL;
@@ -114,12 +115,12 @@ contract SeedGames is Script {
 
     function _createGames(
         SeedCtx memory ctx,
-        address asrAddr,
-        uint256 count
+        address asrAddr
     )
         internal
         returns (address firstGame, address lastGame)
     {
+        uint256 count = ctx.roots.length / INTERMEDIATE_ROOTS_COUNT;
         address parentAddr = asrAddr;
 
         for (uint256 i = 0; i < count; i++) {
@@ -128,7 +129,7 @@ contract SeedGames is Script {
             if (i == 0) firstGame = game;
             parentAddr = game;
 
-            if ((i + 1) % 100 == 0) {
+            if ((i + 1) % PROGRESS_LOG_INTERVAL == 0) {
                 console.log("  Created games:", i + 1);
             }
         }
