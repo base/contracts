@@ -2,22 +2,18 @@
 pragma solidity 0.8.15;
 
 /// @title MockDelayedWETH
-/// @notice Minimal mock for testing - implements the IDelayedWETH interface.
-/// @dev For testing purposes only. The real DelayedWETH handles bond deposits and withdrawals.
+/// @notice Minimal mock exposing only the deposit/unlock/withdraw entry points the dev
+///         scripts exercise. The real DelayedWETH enforces a withdrawal delay and the
+///         full ERC20/proxy surface, none of which is needed for local deploys.
 contract MockDelayedWETH {
-    /// @notice Accepts ETH deposits (no-op for testing).
     function deposit() external payable { }
 
-    /// @notice Mock unlock - no-op for testing.
     function unlock(address, uint256) external { }
 
-    /// @notice Mock withdraw - transfers ETH back.
-    /// @param recipient The address to send ETH to.
-    /// @param amount The amount of ETH to withdraw.
     function withdraw(address recipient, uint256 amount) external {
-        payable(recipient).transfer(amount);
+        (bool ok,) = payable(recipient).call{ value: amount }("");
+        require(ok, "MockDelayedWETH: withdraw failed");
     }
 
-    /// @notice Allows contract to receive ETH.
     receive() external payable { }
 }
