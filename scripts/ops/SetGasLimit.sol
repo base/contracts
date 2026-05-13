@@ -35,7 +35,10 @@ contract SetGasLimit is MultisigScript {
     }
 
     function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal view override {
-        assert(SystemConfig(L1_SYSTEM_CONFIG).gasLimit() == _toGasLimit());
+        require(
+            SystemConfig(L1_SYSTEM_CONFIG).gasLimit() == _toGasLimit(),
+            "SetGasLimit::_postCheck: gas limit was not updated"
+        );
     }
 
     function _buildCalls() internal view override returns (Call[] memory) {
