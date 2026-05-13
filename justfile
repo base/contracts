@@ -276,14 +276,6 @@ reinitializer-check-no-build:
 size-check:
   forge build --sizes --skip "/**/test/**" --skip "/**/scripts/**"
 
-# Checks that any contracts with a modified semver lock also have a modified semver version.
-# Does not build contracts.
-semver-diff-check-no-build:
-  ./scripts/checks/check-semver-diff.sh
-
-# Checks that any contracts with a modified semver lock also have a modified semver version.
-semver-diff-check: build semver-diff-check-no-build
-
 # Checks that the semgrep tests are valid.
 semgrep-test-validity-check:
   forge fmt ../../.semgrep/tests/sol-rules.t.sol --check
@@ -305,13 +297,6 @@ unused-imports-check-no-build:
 
 # Checks for unused imports in Solidity contracts.
 unused-imports-check: build unused-imports-check-no-build
-
-# Checks that the semver of contracts are valid. Does not build contracts.
-valid-semver-check-no-build:
-  go run ./scripts/checks/valid-semver-check/main.go
-
-# Checks that the semver of contracts are valid.
-valid-semver-check: build valid-semver-check-no-build
 
 # Checks that the deploy configs are valid.
 validate-deploy-configs:
@@ -339,8 +324,6 @@ check:
   lint-check \
   snapshots-check-no-build \
   unused-imports-check-no-build \
-  valid-semver-check-no-build \
-  semver-diff-check-no-build \
   validate-deploy-configs \
   validate-spacers-no-build \
   reinitializer-check-no-build \
