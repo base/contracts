@@ -152,13 +152,3 @@ compilation_restrictions = [
   { paths = "src/L2/OptimismMintableERC721.sol", optimizer_runs = 0 },
   { paths = "src/L2/OptimismMintableERC721Factory.sol", optimizer_runs = 0 },
 ]
-
-################################################################
-#                         PROFILE: KONTROL                     #
-################################################################
-
-[profile.kprove]
-src = 'test/kontrol/proofs'
-out = 'kout-proofs'
-test = 'test/kontrol/proofs'
-script = 'test/kontrol/proofs'

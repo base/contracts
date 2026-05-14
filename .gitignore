@@ -3,8 +3,6 @@ artifacts
 forge-artifacts
 cache
 broadcast
-kout-proofs
-test/kontrol/logs
 out
 lib
 
@@ -14,7 +12,6 @@ coverage.out
 
 # Testing State
 .testdata
-kontrol_prove_report.xml
 
 # Scripts
 scripts/go-ffi/go-ffi
@@ -32,10 +29,6 @@ deployments/getting-started
 deployments/*/.deploy
 deployments/1337
 deployments/31337-deploy.json
-deployments/kontrol.json
-deployments/kontrol.jsonReversed
-deployments/kontrol-fp.json
-deployments/kontrol-fp.jsonReversed
 deployments/1-deploy.json
 
 # Getting Started guide deploy config

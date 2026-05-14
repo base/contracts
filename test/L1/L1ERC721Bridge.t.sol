@@ -54,9 +54,7 @@ abstract contract L1ERC721Bridge_TestInit is CommonTest {
     );
 
     /// @notice Sets up the testing environment.
-    /// @dev Marked virtual to be overridden in
-    ///         test/kontrol/deployment/DeploymentSummary.t.sol
-    function setUp() public virtual override {
+    function setUp() public override {
         super.setUp();
 
         localToken = new L1ERC721Bridge_TestERC721_Harness();
@@ -75,9 +73,7 @@ abstract contract L1ERC721Bridge_TestInit is CommonTest {
 /// @notice Test contract for L1ERC721Bridge `constructor` function.
 contract L1ERC721Bridge_Constructor_Test is L1ERC721Bridge_TestInit {
     /// @notice Tests that the impl is created with the correct values.
-    /// @dev Marked virtual to be overridden in
-    ///      test/kontrol/deployment/DeploymentSummary.t.sol
-    function test_constructor_succeeds() public virtual {
+    function test_constructor_succeeds() public view {
         IL1ERC721Bridge impl = IL1ERC721Bridge(EIP1967Helper.getImplementation(address(l1ERC721Bridge)));
         assertEq(address(impl.MESSENGER()), address(0));
         assertEq(address(impl.messenger()), address(0));
