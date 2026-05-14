@@ -23,7 +23,6 @@ import {
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 
-import { MockSystemConfig } from "test/mocks/MockSystemConfig.sol";
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 
 import { LibClone } from "lib/solady/src/utils/LibClone.sol";
@@ -55,7 +54,7 @@ contract BaseTest is Test {
     bytes32 public immutable CONFIG_HASH = keccak256("config");
 
     ProxyAdmin public proxyAdmin;
-    MockSystemConfig public systemConfig;
+    ISystemConfig public systemConfig;
 
     DisputeGameFactory public factory;
     AnchorStateRegistry public anchorStateRegistry;
@@ -78,8 +77,9 @@ contract BaseTest is Test {
     }
 
     function _deployContractsAndProxies() internal {
-        // Deploy the system config
-        systemConfig = new MockSystemConfig();
+        systemConfig = ISystemConfig(makeAddr("system-config"));
+        vm.mockCall(address(systemConfig), abi.encodeCall(ISystemConfig.guardian, ()), abi.encode(address(this)));
+        vm.mockCall(address(systemConfig), abi.encodeCall(ISystemConfig.paused, ()), abi.encode(false));
         // Deploy the relay anchor state registry
         AnchorStateRegistry _anchorStateRegistry = new AnchorStateRegistry(FINALITY_DELAY);
         // Deploy the delayed WETH
@@ -113,7 +113,7 @@ contract BaseTest is Test {
     function _initializeProxies() internal {
         // Initialize the proxies
         anchorStateRegistry.initialize(
-            ISystemConfig(address(systemConfig)),
+            systemConfig,
             IDisputeGameFactory(address(factory)),
             Proposal({
                 root: Hash.wrap(keccak256(abi.encode(currentL2BlockNumber))), l2SequenceNumber: currentL2BlockNumber
@@ -121,7 +121,7 @@ contract BaseTest is Test {
             GameType.wrap(0)
         );
         factory.initialize(address(this));
-        delayedWETH.initialize(ISystemConfig(address(systemConfig)));
+        delayedWETH.initialize(systemConfig);
     }
 
     function _deployAndSetAggregateVerifier() internal {
