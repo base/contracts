@@ -47,7 +47,6 @@ contract_name_validation = [
     "test/L1/ResourceMetering.t.sol",        # Contains contracts not matching ResourceMetering base name
     "test/L2/GasPriceOracle.t.sol",          # Contains contracts not matching GasPriceOracle base name
     "test/universal/StandardBridge.t.sol",   # Contains contracts not matching StandardBridge base name
-    "test/libraries/Blueprint.t.sol",        # Contains helper contracts (BlueprintHarness, ConstructorArgMock)
     "test/libraries/SafeCall.t.sol",         # Contains helper contracts (SimpleSafeCaller)
 ]
 
