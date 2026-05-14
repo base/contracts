@@ -21,7 +21,6 @@ src_validation = [
     "test/cannon/MIPS64Memory.t.sol",           # Tests external MIPS implementation
     "test/libraries/bridge/LibClock.t.sol",     # Tests library utilities
     "test/libraries/bridge/LibGameId.t.sol",    # Tests library utilities
-    "test/libraries/DeployUtils.t.sol",         # Tests library utilities - no direct src counterpart
     "test/universal/BenchmarkTest.t.sol",       # Performance benchmarking tests
     "test/universal/ExtendedPause.t.sol",       # Tests extended functionality
     "test/vendor/Initializable.t.sol",          # Tests external vendor code
