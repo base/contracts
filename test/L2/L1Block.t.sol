@@ -298,6 +298,23 @@ contract L1Block_SetL1BlockValuesJovian_Test is L1Block_TestInit {
         uint16 daFootprintGasScalar;
     }
 
+    function encodeMaxSetL1BlockValuesJovian() internal pure returns (bytes memory) {
+        return Encoding.encodeSetL1BlockValuesJovian(
+            type(uint32).max,
+            type(uint32).max,
+            type(uint64).max,
+            type(uint64).max,
+            type(uint64).max,
+            type(uint256).max,
+            type(uint256).max,
+            bytes32(type(uint256).max),
+            bytes32(type(uint256).max),
+            type(uint32).max,
+            type(uint64).max,
+            type(uint16).max
+        );
+    }
+
     /// @notice Tests that setL1BlockValuesJovian updates the values appropriately.
     function testFuzz_setL1BlockValuesJovian_succeeds(L1BlockValuesJovianParams memory params) external {
         bytes memory functionCallDataPacked = Encoding.encodeSetL1BlockValuesJovian(
@@ -337,42 +354,28 @@ contract L1Block_SetL1BlockValuesJovian_Test is L1Block_TestInit {
 
     /// @notice Tests that `setL1BlockValuesJovian` succeeds with max values
     function test_setL1BlockValuesJovian_isDepositorMax_succeeds() external {
-        bytes memory functionCallDataPacked = Encoding.encodeSetL1BlockValuesJovian(
-            type(uint32).max,
-            type(uint32).max,
-            type(uint64).max,
-            type(uint64).max,
-            type(uint64).max,
-            type(uint256).max,
-            type(uint256).max,
-            bytes32(type(uint256).max),
-            bytes32(type(uint256).max),
-            type(uint32).max,
-            type(uint64).max,
-            type(uint16).max
-        );
+        bytes memory functionCallDataPacked = encodeMaxSetL1BlockValuesJovian();
 
         vm.prank(depositor);
         (bool success,) = address(l1Block).call(functionCallDataPacked);
         assertTrue(success, "function call failed");
     }
 
+    /// @notice Prevents the L1 attributes system transaction from approaching its gas limit.
+    function test_setL1BlockValuesJovian_benchmark() external {
+        skipIfCoverage();
+
+        bytes memory functionCallDataPacked = encodeMaxSetL1BlockValuesJovian();
+
+        vm.prank(depositor);
+        (bool success,) = address(l1Block).call(functionCallDataPacked);
+        assertTrue(success, "function call failed");
+        assertLt(vm.lastCallGas().gasTotalUsed, 200_000);
+    }
+
     /// @notice Tests that `setL1BlockValuesJovian` reverts if sender address is not the depositor
     function test_setL1BlockValuesJovian_notDepositor_reverts() external {
-        bytes memory functionCallDataPacked = Encoding.encodeSetL1BlockValuesJovian(
-            type(uint32).max,
-            type(uint32).max,
-            type(uint64).max,
-            type(uint64).max,
-            type(uint64).max,
-            type(uint256).max,
-            type(uint256).max,
-            bytes32(type(uint256).max),
-            bytes32(type(uint256).max),
-            type(uint32).max,
-            type(uint64).max,
-            type(uint16).max
-        );
+        bytes memory functionCallDataPacked = encodeMaxSetL1BlockValuesJovian();
 
         (bool success, bytes memory data) = address(l1Block).call(functionCallDataPacked);
         assertTrue(!success, "function call should have failed");
