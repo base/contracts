@@ -11,7 +11,6 @@ import { GameType, Proposal, Claim, GameStatus, Hash } from "src/libraries/bridg
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
-import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
@@ -38,7 +37,7 @@ contract AnchorStateRegistry is ProxyAdminOwnedBase, Initializable, Reinitializa
     IDisputeGameFactory public disputeGameFactory;
 
     /// @notice The game whose claim is currently being used as the anchor state.
-    IFaultDisputeGameV2 public anchorGame;
+    IDisputeGame public anchorGame;
 
     /// @notice The starting anchor root.
     Proposal internal startingAnchorRoot;
@@ -56,7 +55,7 @@ contract AnchorStateRegistry is ProxyAdminOwnedBase, Initializable, Reinitializa
 
     /// @notice Emitted when an anchor state is updated.
     /// @param game Game that was used as the new anchor game.
-    event AnchorUpdated(IFaultDisputeGameV2 indexed game);
+    event AnchorUpdated(IDisputeGame indexed game);
 
     /// @notice Emitted when the respected game type is set.
     /// @param gameType The new respected game type.
@@ -209,7 +208,7 @@ contract AnchorStateRegistry is ProxyAdminOwnedBase, Initializable, Reinitializa
 
         // Grab the AnchorStateRegistry from the game. Awkward type conversion here but
         // IDisputeGame probably needs to have this function eventually anyway.
-        address asr = address(IFaultDisputeGameV2(address(_game)).anchorStateRegistry());
+        address asr = address(IDisputeGame(address(_game)).anchorStateRegistry());
 
         // Return whether the game is factory registered and uses this AnchorStateRegistry. We
         // check for both of these conditions because the game could be using a different
@@ -340,10 +339,10 @@ contract AnchorStateRegistry is ProxyAdminOwnedBase, Initializable, Reinitializa
     function setAnchorState(IDisputeGame _game) public {
         // Convert game to FaultDisputeGame.
         // We can't use FaultDisputeGame in the interface because this function is called from the
-        // FaultDisputeGame contract which can't import IFaultDisputeGameV2 by convention. We should
+        // FaultDisputeGame contract which can't import IDisputeGame by convention. We should
         // likely introduce a new interface (e.g., StateDisputeGame) that can act as a more useful
         // version of IDisputeGame in the future.
-        IFaultDisputeGameV2 game = IFaultDisputeGameV2(address(_game));
+        IDisputeGame game = IDisputeGame(address(_game));
 
         // Check if the candidate game claim is valid.
         if (!isGameClaimValid(game)) {

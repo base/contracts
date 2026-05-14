@@ -9,6 +9,7 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 import { NextImpl } from "test/mocks/NextImpl.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { DisputeGameFactory_TestInit } from "test/L1/proofs/DisputeGameFactory.t.sol";
+import { MockVerifier } from "test/mocks/MockVerifier.sol";
 
 // Scripts
 import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
@@ -20,23 +21,25 @@ import { Constants } from "src/libraries/Constants.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { Features } from "src/libraries/Features.sol";
+import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import "src/libraries/bridge/Types.sol";
 
 // Interfaces
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
+import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
-import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
+import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 
 abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
     address depositor;
 
     Types.WithdrawalTransaction _defaultTx;
-    IFaultDisputeGameV2 game;
+    IAggregateVerifier game;
     uint256 _proposedGameIndex;
     uint256 _proposedBlockNumber;
     bytes32 _stateRoot;
@@ -75,49 +78,68 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
 
     /// @dev Setup the system for a ready-to-use state.
     function setUp() public virtual override {
-        if (isForkTest()) {
-            // Set the proposed block number to be the next block number on the forked network
-            (, _proposedBlockNumber) = anchorStateRegistry.getAnchorRoot();
-            _proposedBlockNumber += 1;
+        respectedGameType = optimismPortal2.respectedGameType();
+        MockVerifier teeVerifier = new MockVerifier(anchorStateRegistry);
+        MockVerifier zkVerifier = new MockVerifier(anchorStateRegistry);
+        AggregateVerifier gameImpl = new AggregateVerifier(
+            respectedGameType,
+            anchorStateRegistry,
+            delayedWeth,
+            IVerifier(address(teeVerifier)),
+            IVerifier(address(zkVerifier)),
+            bytes32(uint256(1)),
+            AggregateVerifier.ZkHashes(bytes32(uint256(2)), bytes32(uint256(3))),
+            bytes32(uint256(4)),
+            deploy.cfg().l2ChainId(),
+            100,
+            10
+        );
+        disputeGameFactory.setImplementation(respectedGameType, IDisputeGame(address(gameImpl)));
+        disputeGameFactory.setInitBond(respectedGameType, 0);
 
-            // Set the init bond of anchor game type 0 to be 0.
-            // It is a mapping so the storage slot is calculated as keccak256(abi.encode(key, slot)).
-            // The storage slot for the initBond mapping is 102, see `snapshots/storageLayout/DisputeGameFactory.json`.
-            vm.store(
-                address(disputeGameFactory), keccak256(abi.encode(GameType.wrap(0), uint256(102))), bytes32(uint256(0))
-            );
-        } else {
-            // Set up the dummy game.
-            _proposedBlockNumber = 0xFF;
-        }
+        Proposal memory startingRoot = anchorStateRegistry.getStartingAnchorRoot();
+        _proposedBlockNumber = startingRoot.l2SequenceNumber + gameImpl.BLOCK_INTERVAL();
 
         depositor = makeAddr("depositor");
-
-        setupFaultDisputeGame(Claim.wrap(_outputRoot));
 
         // Warp forward in time to ensure that the game is created after the retirement timestamp.
         vm.warp(anchorStateRegistry.retirementTimestamp() + 1);
 
-        respectedGameType = optimismPortal2.respectedGameType();
-        game = IFaultDisputeGameV2(
-            payable(address(
-                    disputeGameFactory.create{ value: disputeGameFactory.initBonds(respectedGameType) }(
-                        respectedGameType, Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber)
-                    )
-                ))
-        );
+        game = _createDisputeGame(Claim.wrap(_outputRoot), 0);
 
         // Grab the index of the game we just created.
         _proposedGameIndex = disputeGameFactory.gameCount() - 1;
 
-        // Warp beyond the chess clocks and finalize the game.
-        vm.warp(block.timestamp + game.maxClockDuration().raw() + 1 seconds);
+        // Warp beyond the resolution delay.
+        vm.warp(game.expectedResolution().raw() + 1 seconds);
 
         // Fund the portal so that we can withdraw ETH.
         vm.deal(address(optimismPortal2), 0xFFFFFFFF);
         if (isUsingLockbox()) {
             vm.deal(address(ethLockbox), 0xFFFFFFFF);
         }
+    }
+
+    function _createDisputeGame(Claim _rootClaim, uint256 _salt) internal returns (IAggregateVerifier game_) {
+        bytes memory intermediateRoots;
+        AggregateVerifier gameImpl = AggregateVerifier(address(disputeGameFactory.gameImpls(respectedGameType)));
+        for (uint256 i = 1; i < gameImpl.intermediateOutputRootsCount(); i++) {
+            intermediateRoots =
+                abi.encodePacked(intermediateRoots, keccak256(abi.encode(_proposedBlockNumber, i, _salt)));
+        }
+        bytes memory extraData =
+            abi.encodePacked(_proposedBlockNumber, address(anchorStateRegistry), intermediateRoots, _rootClaim.raw());
+        bytes memory proof = abi.encodePacked(
+            uint8(AggregateVerifier.ProofType.TEE), blockhash(block.number - 1), block.number - 1, bytes32(0)
+        );
+
+        game_ = IAggregateVerifier(
+            payable(address(
+                    disputeGameFactory.createWithInitData{ value: disputeGameFactory.initBonds(respectedGameType) }(
+                        respectedGameType, _rootClaim, extraData, proof
+                    )
+                ))
+        );
     }
 
     /// @notice Asserts that the reentrant call will revert.
@@ -687,11 +709,7 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
         });
 
         // Create a new dispute game, and mock both games to be CHALLENGER_WINS.
-        IDisputeGame game2 = disputeGameFactory.create{
-            value: disputeGameFactory.initBonds(optimismPortal2.respectedGameType())
-        }(
-            optimismPortal2.respectedGameType(), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1)
-        );
+        IDisputeGame game2 = _createDisputeGame(Claim.wrap(_outputRoot), 1);
         _proposedGameIndex = disputeGameFactory.gameCount() - 1;
         vm.mockCall(address(game), abi.encodeCall(game.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
         vm.mockCall(address(game2), abi.encodeCall(game.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
@@ -779,9 +797,7 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
         vm.mockCall(address(game), abi.encodeCall(game.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
 
         // Create a new game to re-prove against
-        disputeGameFactory.create{ value: disputeGameFactory.initBonds(respectedGameType) }(
-            respectedGameType, Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1)
-        );
+        _createDisputeGame(Claim.wrap(_outputRoot), 1);
         _proposedGameIndex = disputeGameFactory.gameCount() - 1;
 
         // Warp 1 second into the future so we're not in the same block as the dispute game.
@@ -815,11 +831,7 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
         });
 
         // Create a new game.
-        IDisputeGame newGame = disputeGameFactory.create{
-            value: disputeGameFactory.initBonds(optimismPortal2.respectedGameType())
-        }(
-            GameType.wrap(0), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1)
-        );
+        IDisputeGame newGame = _createDisputeGame(Claim.wrap(_outputRoot), 1);
 
         // Update the respected game type to 0xbeef.
         vm.prank(optimismPortal2.guardian());
@@ -891,7 +903,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         optimismPortal2.proveWithdrawalTransaction(_defaultTx, _proposedGameIndex, _outputRootProof, _withdrawalProof);
 
         // Warp and resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1 seconds);
 
@@ -921,18 +932,12 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
             latestBlockhash: bytes32(uint256(0))
         });
 
-        IFaultDisputeGameV2 game_noData = IFaultDisputeGameV2(
-            payable(address(
-                    disputeGameFactory.create{ value: disputeGameFactory.initBonds(respectedGameType) }(
-                        respectedGameType, Claim.wrap(_outputRoot_noData), abi.encode(_proposedBlockNumber)
-                    )
-                ))
-        );
+        IAggregateVerifier game_noData = _createDisputeGame(Claim.wrap(_outputRoot_noData), 0);
 
         uint256 _proposedGameIndex_noData = disputeGameFactory.gameCount() - 1;
 
-        // Warp beyond the chess clocks and finalize the game.
-        vm.warp(block.timestamp + game_noData.maxClockDuration().raw() + 1 seconds);
+        // Warp beyond the resolution delay.
+        vm.warp(game_noData.expectedResolution().raw() + 1 seconds);
 
         // Fund the portal so that we can withdraw ETH.
         vm.store(address(optimismPortal2), bytes32(uint256(61)), bytes32(uint256(0xFFFFFFFF)));
@@ -955,7 +960,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         });
 
         // Warp and resolve the dispute game.
-        game_noData.resolveClaim(0, 0);
         game_noData.resolve();
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1 seconds);
 
@@ -982,7 +986,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         });
 
         // Warp and resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1 seconds);
 
@@ -999,11 +1002,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         uint256 bobBalanceBefore = address(bob).balance;
 
         // Create a secondary dispute game.
-        IDisputeGame secondGame = disputeGameFactory.create{
-            value: disputeGameFactory.initBonds(optimismPortal2.respectedGameType())
-        }(
-            optimismPortal2.respectedGameType(), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1)
-        );
+        IDisputeGame secondGame = _createDisputeGame(Claim.wrap(_outputRoot), 1);
 
         // Warp 1 second into the future so that the proof is submitted after the timestamp of game creation.
         vm.warp(block.timestamp + 1);
@@ -1038,7 +1037,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         });
 
         // Warp and resolve the original dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1 seconds);
 
@@ -1178,7 +1176,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         });
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
@@ -1219,7 +1216,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         });
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
@@ -1249,7 +1245,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         });
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
@@ -1290,7 +1285,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         });
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
@@ -1334,7 +1328,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         optimismPortal2.proveWithdrawalTransaction(_testTx, _proposedGameIndex, outputRootProof, withdrawalProof);
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
@@ -1409,7 +1402,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         assertTrue(_game.rootClaim().raw() != bytes32(0));
 
         // Resolve the dispute game
-        game.resolveClaim(0, 0);
         game.resolve();
 
         // Warp past the finalization period
@@ -1488,7 +1480,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         assertTrue(_game.rootClaim().raw() != bytes32(0));
 
         // Resolve the dispute game
-        game.resolveClaim(0, 0);
         game.resolve();
 
         // Warp past the finalization period
@@ -1519,7 +1510,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         });
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         vm.prank(optimismPortal2.guardian());
@@ -1549,7 +1539,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         // Attempt to finalize the withdrawal directly after the game resolves. This should fail.
@@ -1580,7 +1569,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         // Warp past the dispute game finality delay.
@@ -1614,7 +1602,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         // Warp past the dispute game finality delay.
@@ -1646,7 +1633,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         // Warp past the dispute game finality delay.
@@ -1689,7 +1675,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
 
         // Finalize the dispute game and attempt to finalize the withdrawal again. This should
         // also fail, since the air gap dispute game delay has not elapsed.
-        game.resolveClaim(0, 0);
         game.resolve();
         vm.warp(block.timestamp + optimismPortal2.disputeGameFinalityDelaySeconds());
         vm.expectRevert(IOptimismPortal.OptimismPortal_InvalidRootClaim.selector);
@@ -1737,7 +1722,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransactionExternalProof_Test is Opti
         });
 
         // Warp and resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1 seconds);
 
@@ -1800,7 +1784,6 @@ contract OptimismPortal2_CheckWithdrawal_Test is OptimismPortal2_TestInit {
         });
 
         // Warp and resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
 

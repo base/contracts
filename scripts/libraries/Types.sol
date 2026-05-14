@@ -10,8 +10,6 @@ import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
-import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
@@ -64,8 +62,6 @@ library Types {
         IOptimismPortal2 optimismPortalProxy;
         IDisputeGameFactory disputeGameFactoryProxy;
         IAnchorStateRegistry anchorStateRegistryProxy;
-        IFaultDisputeGameV2 faultDisputeGame;
-        IPermissionedDisputeGameV2 permissionedDisputeGame;
         IDelayedWETH delayedWETHPermissionedGameProxy;
         IDelayedWETH delayedWETHPermissionlessGameProxy;
         // Multiproof contracts.
@@ -90,9 +86,6 @@ library Types {
         address disputeGameFactoryImpl;
         address anchorStateRegistryImpl;
         address delayedWETHImpl;
-        address mipsImpl;
-        address faultDisputeGameV2Impl;
-        address permissionedDisputeGameV2Impl;
         address aggregateVerifierImpl;
         address teeProverRegistryImpl;
         address teeVerifierImpl;

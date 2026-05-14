@@ -39,7 +39,7 @@ var excludeSourceContracts = []string{
 	"CrossDomainMessengerLegacySpacer0", "CrossDomainMessengerLegacySpacer1",
 
 	// FIXME
-	"WETH", "MIPS64",
+	"WETH",
 }
 
 type ContractDefinition struct {

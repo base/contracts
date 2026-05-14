@@ -6,21 +6,20 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 
 // Scripts
 import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
-import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 // Libraries
 import "src/libraries/bridge/Types.sol";
 import "src/libraries/bridge/Errors.sol";
+import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 
 // Interfaces
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
-import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
-import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
-import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
+import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+
 // Mocks
-import { AlphabetVM } from "test/mocks/AlphabetVM.sol";
+import { MockVerifier } from "test/mocks/MockVerifier.sol";
 
 /// @notice A fake clone used for testing the `DisputeGameFactory` contract's `create` function.
 contract DisputeGameFactory_FakeClone_Harness {
@@ -62,32 +61,6 @@ abstract contract DisputeGameFactory_TestInit is CommonTest {
         disputeGameFactory.transferOwnership(address(this));
     }
 
-    /// @notice Creates a new VM instance with the given absolute prestate
-    function _createVM(Claim _absolutePrestate) internal returns (AlphabetVM vm_, IPreimageOracle preimageOracle_) {
-        // Set preimage oracle challenge period to something arbitrary (4 seconds) just so we can
-        // actually test the clock extensions later on. This is not a realistic value.
-        preimageOracle_ = IPreimageOracle(
-            DeployUtils.create1({
-                _name: "PreimageOracle",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IPreimageOracle.__constructor__, (0, 4)))
-            })
-        );
-        vm_ = new AlphabetVM(_absolutePrestate, preimageOracle_);
-    }
-
-    function _getGameConstructorParamsV2()
-        internal
-        pure
-        returns (IFaultDisputeGameV2.GameConstructorParams memory params_)
-    {
-        return IFaultDisputeGameV2.GameConstructorParams({
-            maxGameDepth: 2 ** 3,
-            splitDepth: 2 ** 2,
-            clockExtension: Duration.wrap(3 hours),
-            maxClockDuration: Duration.wrap(3.5 days)
-        });
-    }
-
     function _setGame(address _gameImpl, GameType _gameType) internal {
         _setGame(_gameImpl, _gameType, false, "");
     }
@@ -107,117 +80,10 @@ abstract contract DisputeGameFactory_TestInit is CommonTest {
         vm.stopPrank();
     }
 
-    /// @notice Sets up a fault game implementation
-    function setupFaultDisputeGame(Claim _absolutePrestate)
-        internal
-        returns (address gameImpl_, AlphabetVM vm_, IPreimageOracle preimageOracle_)
-    {
-        return setupFaultDisputeGameV2(_absolutePrestate);
-    }
-
-    /// @notice Sets up immutable data for fault game v2 implementation
-    function getFaultDisputeGameV2ImmutableArgs(Claim _absolutePrestate)
-        internal
-        returns (bytes memory immutableArgs_, AlphabetVM vm_, IPreimageOracle preimageOracle_)
-    {
-        (vm_, preimageOracle_) = _createVM(_absolutePrestate);
-        // Encode the implementation args for CWIA (tightly packed)
-        immutableArgs_ = abi.encodePacked(
-            _absolutePrestate, // 32 bytes
-            vm_, // 20 bytes
-            anchorStateRegistry, // 20 bytes
-            delayedWeth, // 20 bytes
-            l2ChainId // 32 bytes (l2ChainId)
-        );
-    }
-
-    /// @notice Sets up a fault game v2 implementation
-    function setupFaultDisputeGameV2(Claim _absolutePrestate)
-        internal
-        returns (address gameImpl_, AlphabetVM vm_, IPreimageOracle preimageOracle_)
-    {
-        bytes memory immutableArgs;
-        (immutableArgs, vm_, preimageOracle_) = getFaultDisputeGameV2ImmutableArgs(_absolutePrestate);
-        gameImpl_ = setupFaultDisputeGameV2(immutableArgs);
-    }
-
-    function setupFaultDisputeGameV2(bytes memory immutableArgs) internal returns (address gameImpl_) {
-        gameImpl_ = DeployUtils.create1({
-            _name: "FaultDisputeGameV2",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(IFaultDisputeGameV2.__constructor__, (_getGameConstructorParamsV2()))
-            )
-        });
-
-        _setGame(gameImpl_, GameTypes.CANNON, immutableArgs);
-    }
-
-    function setupPermissionedDisputeGame(
-        Claim _absolutePrestate,
-        address _proposer,
-        address _challenger
-    )
-        internal
-        returns (address gameImpl_, AlphabetVM vm_, IPreimageOracle preimageOracle_)
-    {
-        return setupPermissionedDisputeGameV2(_absolutePrestate, _proposer, _challenger);
-    }
-
     function changeClaimStatus(Claim _claim, VMStatus _status) public pure returns (Claim out_) {
         assembly {
             out_ := or(and(not(shl(248, 0xFF)), _claim), shl(248, _status))
         }
-    }
-
-    /// @notice Sets up immutable args for PDG v2 implementation
-    function getPermissionedDisputeGameV2ImmutableArgs(
-        Claim _absolutePrestate,
-        address _proposer,
-        address _challenger
-    )
-        internal
-        returns (bytes memory implArgs_, AlphabetVM vm_, IPreimageOracle preimageOracle_)
-    {
-        (vm_, preimageOracle_) = _createVM(_absolutePrestate);
-
-        // Encode the implementation args for CWIA (tightly packed)
-        implArgs_ = abi.encodePacked(
-            _absolutePrestate, // 32 bytes
-            vm_, // 20 bytes
-            anchorStateRegistry, // 20 bytes
-            delayedWeth, // 20 bytes
-            l2ChainId, // 32 bytes (l2ChainId),
-            _proposer, // 20 bytes
-            _challenger // 20 bytes
-        );
-    }
-
-    /// @notice Deploys PDG v2 implementation and sets it on the DGF
-    function setupPermissionedDisputeGameV2(
-        Claim _absolutePrestate,
-        address _proposer,
-        address _challenger
-    )
-        internal
-        returns (address gameImpl_, AlphabetVM vm_, IPreimageOracle preimageOracle_)
-    {
-        bytes memory implArgs;
-        (implArgs, vm_, preimageOracle_) =
-            getPermissionedDisputeGameV2ImmutableArgs(_absolutePrestate, _proposer, _challenger);
-
-        gameImpl_ = setupPermissionedDisputeGameV2(implArgs);
-    }
-
-    /// @notice Deploys PDG v2 implementation and sets it on the DGF
-    function setupPermissionedDisputeGameV2(bytes memory _implArgs) internal returns (address gameImpl_) {
-        gameImpl_ = DeployUtils.create1({
-            _name: "PermissionedDisputeGameV2",
-            _args: DeployUtils.encodeConstructor(
-                abi.encodeCall(IPermissionedDisputeGameV2.__constructor__, (_getGameConstructorParamsV2()))
-            )
-        });
-
-        _setGame(gameImpl_, GameTypes.PERMISSIONED_CANNON, _implArgs);
     }
 }
 
@@ -390,44 +256,68 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
     }
 
     function test_create_implArgs_succeeds() public {
-        Claim absolutePrestate = Claim.wrap(bytes32(hex"dead"));
-        (, AlphabetVM vm_,) = setupFaultDisputeGameV2(absolutePrestate);
+        MockVerifier teeVerifier = new MockVerifier(anchorStateRegistry);
+        MockVerifier zkVerifier = new MockVerifier(anchorStateRegistry);
+        AggregateVerifier gameImpl = new AggregateVerifier(
+            GameTypes.AGGREGATE_VERIFIER,
+            anchorStateRegistry,
+            delayedWeth,
+            IVerifier(address(teeVerifier)),
+            IVerifier(address(zkVerifier)),
+            bytes32(uint256(1)),
+            AggregateVerifier.ZkHashes(bytes32(uint256(2)), bytes32(uint256(3))),
+            bytes32(uint256(4)),
+            l2ChainId,
+            100,
+            10
+        );
+        _setGame(address(gameImpl), GameTypes.AGGREGATE_VERIFIER);
 
-        Claim rootClaim = changeClaimStatus(Claim.wrap(bytes32(hex"beef")), VMStatuses.INVALID);
-        // extraData should contain the l2BlockNumber as first 32 bytes
-        bytes memory extraData = bytes.concat(bytes32(uint256(type(uint32).max)));
+        Claim rootClaim = Claim.wrap(bytes32(hex"beef"));
+        Proposal memory startingRoot = anchorStateRegistry.getStartingAnchorRoot();
+        bytes memory intermediateRoots;
+        for (uint256 i = 1; i < gameImpl.intermediateOutputRootsCount(); i++) {
+            intermediateRoots =
+                abi.encodePacked(intermediateRoots, keccak256(abi.encode(startingRoot.l2SequenceNumber + 10 * i)));
+        }
+        intermediateRoots = abi.encodePacked(intermediateRoots, rootClaim.raw());
+        bytes memory extraData =
+            abi.encodePacked(startingRoot.l2SequenceNumber + 100, address(anchorStateRegistry), intermediateRoots);
+        bytes memory proof = abi.encodePacked(
+            uint8(AggregateVerifier.ProofType.TEE), blockhash(block.number - 1), block.number - 1, bytes32(0)
+        );
 
-        uint256 bondAmount = disputeGameFactory.initBonds(GameTypes.CANNON);
+        uint256 bondAmount = disputeGameFactory.initBonds(GameTypes.AGGREGATE_VERIFIER);
         vm.deal(address(this), bondAmount);
 
         // Create the game
-        IDisputeGame proxy = disputeGameFactory.create{ value: bondAmount }(GameTypes.CANNON, rootClaim, extraData);
+        IDisputeGame proxy = disputeGameFactory.createWithInitData{ value: bondAmount }(
+            GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, proof
+        );
 
         // Verify the game was created and stored
-        (IDisputeGame game, Timestamp timestamp) = disputeGameFactory.games(GameTypes.CANNON, rootClaim, extraData);
+        (IDisputeGame game, Timestamp timestamp) =
+            disputeGameFactory.games(GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData);
 
         assertEq(address(game), address(proxy));
         assertEq(Timestamp.unwrap(timestamp), block.timestamp);
 
         // Verify the game has the correct parameters via CWIA
-        IFaultDisputeGameV2 gameV2 = IFaultDisputeGameV2(address(proxy));
+        AggregateVerifier gameV2 = AggregateVerifier(address(proxy));
 
         // Test CWIA getters
-        assertEq(Claim.unwrap(gameV2.absolutePrestate()), Claim.unwrap(absolutePrestate));
         assertEq(Claim.unwrap(gameV2.rootClaim()), Claim.unwrap(rootClaim));
         assertEq(gameV2.extraData(), extraData);
-        assertEq(gameV2.l2ChainId(), l2ChainId);
+        assertEq(gameV2.L2_CHAIN_ID(), l2ChainId);
         assertEq(address(gameV2.gameCreator()), address(this));
-        assertEq(gameV2.l2BlockNumber(), uint256(type(uint32).max));
-        assertEq(address(gameV2.vm()), address(vm_));
-        assertEq(address(gameV2.weth()), address(delayedWeth));
+        assertEq(gameV2.l2SequenceNumber(), startingRoot.l2SequenceNumber + 100);
+        assertEq(gameV2.parentAddress(), address(anchorStateRegistry));
+        assertEq(address(gameV2.DELAYED_WETH()), address(delayedWeth));
         assertEq(address(gameV2.anchorStateRegistry()), address(anchorStateRegistry));
         // Test Constructor args
-        assertEq(GameType.unwrap(gameV2.gameType()), GameType.unwrap(GameTypes.CANNON));
-        assertEq(gameV2.maxGameDepth(), 2 ** 3);
-        assertEq(gameV2.splitDepth(), 2 ** 2);
-        assertEq(Duration.unwrap(gameV2.clockExtension()), Duration.unwrap(Duration.wrap(3 hours)));
-        assertEq(Duration.unwrap(gameV2.maxClockDuration()), Duration.unwrap(Duration.wrap(3.5 days)));
+        assertEq(GameType.unwrap(gameV2.gameType()), GameType.unwrap(GameTypes.AGGREGATE_VERIFIER));
+        assertEq(gameV2.BLOCK_INTERVAL(), 100);
+        assertEq(gameV2.INTERMEDIATE_BLOCK_INTERVAL(), 10);
     }
 }
 
@@ -459,14 +349,10 @@ contract DisputeGameFactory_SetImplementation_Test is DisputeGameFactory_TestIni
     ///         and args for a given `GameType`.
     function test_setImplementation_withArgs_succeeds() public {
         address fakeGame = address(1);
-        Claim absolutePrestate = Claim.wrap(bytes32(hex"dead"));
-        AlphabetVM vm_;
-        IPreimageOracle preimageOracle_;
-        (vm_, preimageOracle_) = _createVM(absolutePrestate);
 
         bytes memory args = abi.encodePacked(
-            absolutePrestate, // 32 bytes
-            vm_, // 20 bytes
+            bytes32(hex"dead"), // 32 bytes
+            address(0xbeef), // 20 bytes
             anchorStateRegistry, // 20 bytes
             delayedWeth, // 20 bytes
             l2ChainId // 32 bytes (l2ChainId)

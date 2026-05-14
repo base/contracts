@@ -87,6 +87,9 @@ library GameTypes {
     ///         Not intended for production use.
     GameType internal constant ALPHABET = GameType.wrap(255);
 
+    /// @notice A dispute game type for aggregating results from TEE + ZK verifiers (multiproofs).
+    GameType internal constant AGGREGATE_VERIFIER = GameType.wrap(621);
+
     /// @notice A dispute game type that uses RISC Zero's Kailua
     GameType internal constant KAILUA = GameType.wrap(1337);
 }
