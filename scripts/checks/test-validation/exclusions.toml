@@ -40,7 +40,6 @@ src_validation = [
 # These naming inconsistencies may indicate the presence of specialized test
 # infrastructure beyond standard harnesses or different setup contracts patterns.
 contract_name_validation = [
-    "test/L1/proofs/FaultDisputeGame.t.sol", # Contains contracts not matching FaultDisputeGame base name
     "test/L1/ResourceMetering.t.sol",        # Contains contracts not matching ResourceMetering base name
     "test/L2/GasPriceOracle.t.sol",          # Contains contracts not matching GasPriceOracle base name
     "test/universal/StandardBridge.t.sol",   # Contains contracts not matching StandardBridge base name
