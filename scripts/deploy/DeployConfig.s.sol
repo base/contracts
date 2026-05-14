@@ -14,8 +14,6 @@ contract DeployConfig is Script {
     address public batchSenderAddress;
     address public finalSystemOwner;
     address public l1FeeVaultRecipient;
-    address public l2OutputOracleChallenger;
-    address public l2OutputOracleProposer;
     address public nitroEnclaveVerifier;
     address public operatorFeeVaultRecipient;
     address public p2pSequencerAddress;
@@ -30,7 +28,6 @@ contract DeployConfig is Script {
     bool public fundDevAccounts;
     bool public useUpgradedFork;
 
-    bytes32 public faultGameGenesisOutputRoot;
     bytes32 public multiproofConfigHash;
     bytes32 public multiproofGenesisOutputRoot;
     bytes32 public teeImageHash;
@@ -43,12 +40,6 @@ contract DeployConfig is Script {
     uint256 public baseFeeVaultMinimumWithdrawalAmount;
     uint256 public baseFeeVaultWithdrawalNetwork;
     uint256 public disputeGameFinalityDelaySeconds;
-    uint256 public faultGameAbsolutePrestate;
-    uint256 public faultGameGenesisBlock;
-    uint256 public faultGameV2ClockExtension;
-    uint256 public faultGameV2MaxClockDuration;
-    uint256 public faultGameV2MaxGameDepth;
-    uint256 public faultGameV2SplitDepth;
     uint256 public faultGameWithdrawalDelay;
     uint256 public l1ChainId;
     uint256 public l1FeeVaultMinimumWithdrawalAmount;
@@ -63,8 +54,6 @@ contract DeployConfig is Script {
     uint256 public multiproofIntermediateBlockInterval;
     uint256 public operatorFeeVaultMinimumWithdrawalAmount;
     uint256 public operatorFeeVaultWithdrawalNetwork;
-    uint256 public preimageOracleChallengePeriod;
-    uint256 public preimageOracleMinProposalSize;
     uint256 public proofMaturityDelaySeconds;
     uint256 public respectedGameType;
     uint256 public sequencerFeeVaultMinimumWithdrawalAmount;
@@ -78,8 +67,6 @@ contract DeployConfig is Script {
         batchSenderAddress = _json.readAddress("$.batchSenderAddress");
         finalSystemOwner = _json.readAddress("$.finalSystemOwner");
         l1FeeVaultRecipient = _json.readAddress("$.l1FeeVaultRecipient");
-        l2OutputOracleChallenger = _json.readAddress("$.l2OutputOracleChallenger");
-        l2OutputOracleProposer = _json.readAddress("$.l2OutputOracleProposer");
         nitroEnclaveVerifier = _json.readAddress("$.nitroEnclaveVerifier");
         operatorFeeVaultRecipient = _json.readAddress("$.operatorFeeVaultRecipient");
         p2pSequencerAddress = _json.readAddress("$.p2pSequencerAddress");
@@ -93,7 +80,6 @@ contract DeployConfig is Script {
 
         fundDevAccounts = _json.readBoolOr("$.fundDevAccounts", false);
 
-        faultGameGenesisOutputRoot = _json.readBytes32("$.faultGameGenesisOutputRoot");
         multiproofConfigHash = _json.readBytes32("$.multiproofConfigHash");
         multiproofGenesisOutputRoot = _json.readBytes32("$.multiproofGenesisOutputRoot");
         teeImageHash = _json.readBytes32("$.teeImageHash");
@@ -106,12 +92,6 @@ contract DeployConfig is Script {
         baseFeeVaultMinimumWithdrawalAmount = _json.readUint("$.baseFeeVaultMinimumWithdrawalAmount");
         baseFeeVaultWithdrawalNetwork = _json.readUint("$.baseFeeVaultWithdrawalNetwork");
         disputeGameFinalityDelaySeconds = _json.readUint("$.disputeGameFinalityDelaySeconds");
-        faultGameAbsolutePrestate = _json.readUint("$.faultGameAbsolutePrestate");
-        faultGameGenesisBlock = _json.readUint("$.faultGameGenesisBlock");
-        faultGameV2ClockExtension = _json.readUintOr("$.faultGameV2ClockExtension", 10800);
-        faultGameV2MaxClockDuration = _json.readUintOr("$.faultGameV2MaxClockDuration", 302400);
-        faultGameV2MaxGameDepth = _json.readUintOr("$.faultGameV2MaxGameDepth", 73);
-        faultGameV2SplitDepth = _json.readUintOr("$.faultGameV2SplitDepth", 30);
         faultGameWithdrawalDelay = _json.readUint("$.faultGameWithdrawalDelay");
         l1ChainId = _json.readUint("$.l1ChainId");
         l1FeeVaultMinimumWithdrawalAmount = _json.readUint("$.l1FeeVaultMinimumWithdrawalAmount");
@@ -126,8 +106,6 @@ contract DeployConfig is Script {
         multiproofIntermediateBlockInterval = _json.readUintOr("$.multiproofIntermediateBlockInterval", 10);
         operatorFeeVaultMinimumWithdrawalAmount = _json.readUint("$.operatorFeeVaultMinimumWithdrawalAmount");
         operatorFeeVaultWithdrawalNetwork = _json.readUint("$.operatorFeeVaultWithdrawalNetwork");
-        preimageOracleChallengePeriod = _json.readUint("$.preimageOracleChallengePeriod");
-        preimageOracleMinProposalSize = _json.readUint("$.preimageOracleMinProposalSize");
         proofMaturityDelaySeconds = _json.readUintOr("$.proofMaturityDelaySeconds", 0);
         respectedGameType = _json.readUintOr("$.respectedGameType", 0);
         sequencerFeeVaultMinimumWithdrawalAmount = _json.readUint("$.sequencerFeeVaultMinimumWithdrawalAmount");

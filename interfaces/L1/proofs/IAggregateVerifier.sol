@@ -5,7 +5,8 @@ import { IDisputeGame } from "./IDisputeGame.sol";
 import { IDisputeGameFactory } from "./IDisputeGameFactory.sol";
 import { IDelayedWETH } from "./IDelayedWETH.sol";
 import { IVerifier } from "./IVerifier.sol";
-import { Proposal, Timestamp, Hash } from "src/libraries/bridge/Types.sol";
+import { Proposal, Hash } from "src/libraries/bridge/Types.sol";
+import { Timestamp } from "src/libraries/bridge/LibUDT.sol";
 
 interface IAggregateVerifier is IDisputeGame {
     function SLOW_FINALIZATION_DELAY() external view returns (uint64);

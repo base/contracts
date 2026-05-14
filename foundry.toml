@@ -17,6 +17,9 @@ optimizer_runs = 999999
 # also update the restrictions in the "LITE" profile to match. This guarantees
 # that builds will fully overwrite one another without needing to clean the
 # entire build directory.
+additional_compiler_profiles = [
+  { name = "dispute", optimizer_runs = 5000 },
+]
 compilation_restrictions = [
   { paths = "src/L1/proofs/DisputeGameFactory.sol", optimizer_runs = 5000 },
   { paths = "src/L1/OptimismPortal2.sol", optimizer_runs = 5000 },
@@ -130,6 +133,9 @@ depth = 8
 
 # IMPORTANT:
 # See the info in the "DEFAULT" profile to understand this section.
+additional_compiler_profiles = [
+  { name = "dispute", optimizer_runs = 0 },
+]
 compilation_restrictions = [
   { paths = "src/L1/proofs/DisputeGameFactory.sol", optimizer_runs = 0 },
   { paths = "src/L1/OptimismPortal2.sol", optimizer_runs = 0 },

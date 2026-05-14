@@ -8,6 +8,7 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
 
 // Libraries
+import { VMStatus, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 import "src/libraries/bridge/Types.sol";
 import "src/libraries/bridge/Errors.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
@@ -79,12 +80,6 @@ abstract contract DisputeGameFactory_TestInit is CommonTest {
         disputeGameFactory.setInitBond(_gameType, 0.08 ether);
         vm.stopPrank();
     }
-
-    function changeClaimStatus(Claim _claim, VMStatus _status) public pure returns (Claim out_) {
-        assembly {
-            out_ := or(and(not(shl(248, 0xFF)), _claim), shl(248, _status))
-        }
-    }
 }
 
 /// @title DisputeGameFactory_Initialize_Test
@@ -146,8 +141,6 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         // values.
         uint32 maxGameType = 8;
         GameType gt = GameType.wrap(uint8(bound(gameType, 0, maxGameType)));
-        // Ensure the rootClaim has a VMStatus that disagrees with the validity.
-        rootClaim = changeClaimStatus(rootClaim, VMStatuses.INVALID);
 
         // Set all three implementations to the same `FakeClone` contract.
         for (uint8 i; i < maxGameType + 1; i++) {
@@ -191,8 +184,6 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         // Ensure that the `gameType` is within the bounds of the `GameType` enum's possible
         // values.
         GameType gt = GameType.wrap(uint8(bound(gameType, 0, 2)));
-        // Ensure the rootClaim has a VMStatus that disagrees with the validity.
-        rootClaim = changeClaimStatus(rootClaim, VMStatuses.INVALID);
 
         // Set all three implementations to the same `FakeClone` contract.
         for (uint8 i; i < 3; i++) {
@@ -213,8 +204,6 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         // that game type.
         uint32 maxGameType = 8;
         GameType gt = GameType.wrap(uint32(bound(gameType, maxGameType + 1, type(uint32).max)));
-        // Ensure the rootClaim has a VMStatus that disagrees with the validity.
-        rootClaim = changeClaimStatus(rootClaim, VMStatuses.INVALID);
 
         vm.expectRevert(abi.encodeWithSelector(NoImplementation.selector, gt));
         disputeGameFactory.create(gt, rootClaim, extraData);
@@ -227,8 +216,6 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         // values.
         uint32 maxGameType = 8;
         GameType gt = GameType.wrap(uint8(bound(gameType, 0, maxGameType)));
-        // Ensure the rootClaim has a VMStatus that disagrees with the validity.
-        rootClaim = changeClaimStatus(rootClaim, VMStatuses.INVALID);
 
         // Set all three implementations to the same `FakeClone` contract.
         for (uint8 i; i < maxGameType + 1; i++) {
@@ -328,13 +315,13 @@ contract DisputeGameFactory_SetImplementation_Test is DisputeGameFactory_TestIni
     ///         given `GameType`.
     function test_setImplementation_succeeds() public {
         vm.expectEmit(true, true, true, true, address(disputeGameFactory));
-        emit ImplementationSet(address(1), GameTypes.CANNON);
+        emit ImplementationSet(address(1), GameTypes.AGGREGATE_VERIFIER);
 
-        // Set the implementation for the `GameTypes.CANNON` enum value.
-        disputeGameFactory.setImplementation(GameTypes.CANNON, IDisputeGame(address(1)));
+        // Set the implementation for the `GameTypes.AGGREGATE_VERIFIER` enum value.
+        disputeGameFactory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(1)));
 
-        // Ensure that the implementation for the `GameTypes.CANNON` enum value is set.
-        assertEq(address(disputeGameFactory.gameImpls(GameTypes.CANNON)), address(1));
+        // Ensure that the implementation for the `GameTypes.AGGREGATE_VERIFIER` enum value is set.
+        assertEq(address(disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER)), address(1));
     }
 
     /// @notice Tests that the `setImplementation` function reverts when called by a non-owner.
@@ -342,7 +329,7 @@ contract DisputeGameFactory_SetImplementation_Test is DisputeGameFactory_TestIni
         // Ensure that the `setImplementation` function reverts when called by a non-owner.
         vm.prank(address(0));
         vm.expectRevert("Ownable: caller is not the owner");
-        disputeGameFactory.setImplementation(GameTypes.CANNON, IDisputeGame(address(1)));
+        disputeGameFactory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(1)));
     }
 
     /// @notice Tests that the `setImplementation` function with args properly sets the implementation
@@ -359,17 +346,17 @@ contract DisputeGameFactory_SetImplementation_Test is DisputeGameFactory_TestIni
         );
 
         vm.expectEmit(true, true, true, true, address(disputeGameFactory));
-        emit ImplementationSet(address(1), GameTypes.CANNON);
+        emit ImplementationSet(address(1), GameTypes.AGGREGATE_VERIFIER);
         vm.expectEmit(true, true, true, true, address(disputeGameFactory));
-        emit ImplementationArgsSet(GameTypes.CANNON, args);
+        emit ImplementationArgsSet(GameTypes.AGGREGATE_VERIFIER, args);
 
-        // Set the implementation and args for the `GameTypes.CANNON` enum value.
-        disputeGameFactory.setImplementation(GameTypes.CANNON, IDisputeGame(fakeGame), args);
+        // Set the implementation and args for the `GameTypes.AGGREGATE_VERIFIER` enum value.
+        disputeGameFactory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(fakeGame), args);
 
-        // Ensure that the implementation for the `GameTypes.CANNON` enum value is set.
-        assertEq(address(disputeGameFactory.gameImpls(GameTypes.CANNON)), address(1));
-        // Ensure that the args for the `GameTypes.CANNON` enum value are set.
-        assertEq(disputeGameFactory.gameArgs(GameTypes.CANNON), args);
+        // Ensure that the implementation for the `GameTypes.AGGREGATE_VERIFIER` enum value is set.
+        assertEq(address(disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER)), address(1));
+        // Ensure that the args for the `GameTypes.AGGREGATE_VERIFIER` enum value are set.
+        assertEq(disputeGameFactory.gameArgs(GameTypes.AGGREGATE_VERIFIER), args);
     }
 
     /// @notice Tests that the `setImplementation` function with args reverts when called by a non-owner.
@@ -379,7 +366,7 @@ contract DisputeGameFactory_SetImplementation_Test is DisputeGameFactory_TestIni
         // Ensure that the `setImplementation` function reverts when called by a non-owner.
         vm.prank(address(0));
         vm.expectRevert("Ownable: caller is not the owner");
-        disputeGameFactory.setImplementation(GameTypes.CANNON, IDisputeGame(address(1)), args);
+        disputeGameFactory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(1)), args);
     }
 }
 
@@ -390,22 +377,22 @@ contract DisputeGameFactory_SetInitBond_Test is DisputeGameFactory_TestInit {
     ///         `GameType`.
     function test_setInitBond_succeeds() public {
         vm.expectEmit(true, true, true, true, address(disputeGameFactory));
-        emit InitBondUpdated(GameTypes.CANNON, 1 ether);
+        emit InitBondUpdated(GameTypes.AGGREGATE_VERIFIER, 1 ether);
 
-        // Set the init bond for the `GameTypes.CANNON` enum value.
-        disputeGameFactory.setInitBond(GameTypes.CANNON, 1 ether);
+        // Set the init bond for the `GameTypes.AGGREGATE_VERIFIER` enum value.
+        disputeGameFactory.setInitBond(GameTypes.AGGREGATE_VERIFIER, 1 ether);
 
-        // Ensure that the init bond for the `GameTypes.CANNON` enum value is set.
-        assertEq(disputeGameFactory.initBonds(GameTypes.CANNON), 1 ether);
+        // Ensure that the init bond for the `GameTypes.AGGREGATE_VERIFIER` enum value is set.
+        assertEq(disputeGameFactory.initBonds(GameTypes.AGGREGATE_VERIFIER), 1 ether);
 
         vm.expectEmit(true, true, true, true, address(disputeGameFactory));
-        emit InitBondUpdated(GameTypes.CANNON, 2 ether);
+        emit InitBondUpdated(GameTypes.AGGREGATE_VERIFIER, 2 ether);
 
-        // Set the init bond for the `GameTypes.CANNON` enum value.
-        disputeGameFactory.setInitBond(GameTypes.CANNON, 2 ether);
+        // Set the init bond for the `GameTypes.AGGREGATE_VERIFIER` enum value.
+        disputeGameFactory.setInitBond(GameTypes.AGGREGATE_VERIFIER, 2 ether);
 
-        // Ensure that the init bond for the `GameTypes.CANNON` enum value is set.
-        assertEq(disputeGameFactory.initBonds(GameTypes.CANNON), 2 ether);
+        // Ensure that the init bond for the `GameTypes.AGGREGATE_VERIFIER` enum value is set.
+        assertEq(disputeGameFactory.initBonds(GameTypes.AGGREGATE_VERIFIER), 2 ether);
     }
 
     /// @notice Tests that the `setInitBond` function reverts when called by a non-owner.
@@ -413,7 +400,7 @@ contract DisputeGameFactory_SetInitBond_Test is DisputeGameFactory_TestInit {
         // Ensure that the `setInitBond` function reverts when called by a non-owner.
         vm.prank(address(0));
         vm.expectRevert("Ownable: caller is not the owner");
-        disputeGameFactory.setInitBond(GameTypes.CANNON, 1 ether);
+        disputeGameFactory.setInitBond(GameTypes.AGGREGATE_VERIFIER, 1 ether);
     }
 }
 
@@ -465,7 +452,7 @@ contract DisputeGameFactory_FindLatestGames_Test is DisputeGameFactory_TestInit 
 
         // The array's length should always be 0.
         IDisputeGameFactory.GameSearchResult[] memory games =
-            disputeGameFactory.findLatestGames(GameTypes.CANNON, _start, 1);
+            disputeGameFactory.findLatestGames(GameTypes.AGGREGATE_VERIFIER, _start, 1);
         assertEq(games.length, 0);
     }
 

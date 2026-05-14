@@ -41,7 +41,8 @@ import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { SemverComp } from "src/libraries/SemverComp.sol";
-import { Claim, Duration, GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { Duration, Claim } from "src/libraries/bridge/LibUDT.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 
 /// @title SystemDeploy
@@ -53,7 +54,6 @@ contract SystemDeploy is Script {
     Artifacts internal constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
 
-    uint256 internal constant STANDARD_MIPS_VERSION = 8;
     uint256 internal constant ETH_MAINNET_CHAIN_ID = 1;
     uint256 internal constant ETH_SEPOLIA_CHAIN_ID = 11155111;
 
@@ -71,15 +71,8 @@ contract SystemDeploy is Script {
 
     struct ImplementationInput {
         uint256 withdrawalDelaySeconds;
-        uint256 minProposalSizeBytes;
-        uint256 challengePeriodSeconds;
         uint256 proofMaturityDelaySeconds;
         uint256 disputeGameFinalityDelaySeconds;
-        uint256 mipsVersion;
-        uint256 faultGameV2MaxGameDepth;
-        uint256 faultGameV2SplitDepth;
-        uint256 faultGameV2ClockExtension;
-        uint256 faultGameV2MaxClockDuration;
         bytes32 teeImageHash;
         bytes32 zkRangeHash;
         bytes32 zkAggregationHash;
@@ -119,7 +112,7 @@ contract SystemDeploy is Script {
         bool saveArtifacts;
         ISuperchainConfig superchainConfigProxy;
         Types.Implementations implementations;
-        Types.OpChainConfig[] opChainConfigs;
+        ISystemConfig[] systemConfigProxies;
     }
 
     struct UpgradeOutput {
@@ -283,15 +276,8 @@ contract SystemDeploy is Script {
     {
         input_ = ImplementationInput({
             withdrawalDelaySeconds: cfg.faultGameWithdrawalDelay(),
-            minProposalSizeBytes: cfg.preimageOracleMinProposalSize(),
-            challengePeriodSeconds: cfg.preimageOracleChallengePeriod(),
             proofMaturityDelaySeconds: cfg.proofMaturityDelaySeconds(),
             disputeGameFinalityDelaySeconds: cfg.disputeGameFinalityDelaySeconds(),
-            mipsVersion: STANDARD_MIPS_VERSION,
-            faultGameV2MaxGameDepth: cfg.faultGameV2MaxGameDepth(),
-            faultGameV2SplitDepth: cfg.faultGameV2SplitDepth(),
-            faultGameV2ClockExtension: cfg.faultGameV2ClockExtension(),
-            faultGameV2MaxClockDuration: cfg.faultGameV2MaxClockDuration(),
             teeImageHash: cfg.teeImageHash(),
             zkRangeHash: cfg.zkRangeHash(),
             zkAggregationHash: cfg.zkAggregationHash(),
@@ -317,24 +303,17 @@ contract SystemDeploy is Script {
                 opChainProxyAdminOwner: cfg.finalSystemOwner(),
                 systemConfigOwner: cfg.finalSystemOwner(),
                 batcher: cfg.batchSenderAddress(),
-                unsafeBlockSigner: cfg.p2pSequencerAddress(),
-                proposer: cfg.l2OutputOracleProposer(),
-                challenger: cfg.l2OutputOracleChallenger()
+                unsafeBlockSigner: cfg.p2pSequencerAddress()
             }),
             basefeeScalar: cfg.basefeeScalar(),
             blobBasefeeScalar: cfg.blobbasefeeScalar(),
             l2ChainId: cfg.l2ChainId(),
             startingAnchorRoot: Proposal({
-                root: Hash.wrap(cfg.faultGameGenesisOutputRoot()), l2SequenceNumber: cfg.faultGameGenesisBlock()
+                root: Hash.wrap(cfg.multiproofGenesisOutputRoot()), l2SequenceNumber: cfg.multiproofGenesisBlockNumber()
             }),
             saltMixer: "salt mixer",
             gasLimit: uint64(cfg.l2GenesisBlockGasLimit()),
-            disputeGameType: GameTypes.PERMISSIONED_CANNON,
-            disputeAbsolutePrestate: Claim.wrap(bytes32(cfg.faultGameAbsolutePrestate())),
-            disputeMaxGameDepth: cfg.faultGameV2MaxGameDepth(),
-            disputeSplitDepth: cfg.faultGameV2SplitDepth(),
-            disputeClockExtension: Duration.wrap(uint64(cfg.faultGameV2ClockExtension())),
-            disputeMaxClockDuration: Duration.wrap(uint64(cfg.faultGameV2MaxClockDuration()))
+            disputeGameType: GameTypes.AGGREGATE_VERIFIER
         });
     }
 
@@ -374,18 +353,18 @@ contract SystemDeploy is Script {
                 _upgradeSuperchainConfigIfNeeded(_input.superchainConfigProxy, _input.implementations);
         }
 
-        for (uint256 i = 0; i < _input.opChainConfigs.length; i++) {
-            Types.OpChainConfig memory config = _input.opChainConfigs[i];
-            DeployUtils.assertValidContractAddress(address(config.systemConfigProxy));
+        for (uint256 i = 0; i < _input.systemConfigProxies.length; i++) {
+            ISystemConfig systemConfigProxy = _input.systemConfigProxies[i];
+            DeployUtils.assertValidContractAddress(address(systemConfigProxy));
 
-            ISuperchainConfig superchainConfig = config.systemConfigProxy.superchainConfig();
+            ISuperchainConfig superchainConfig = systemConfigProxy.superchainConfig();
             if (SemverComp.lt(
                     superchainConfig.version(), ISuperchainConfig(_input.implementations.superchainConfigImpl).version()
                 )) {
                 revert SuperchainConfigNeedsUpgrade(i);
             }
 
-            _upgradeOPChain(config, _input.implementations);
+            _upgradeOPChain(systemConfigProxy, _input.implementations);
             output_.chainsUpgraded++;
         }
 
@@ -580,9 +559,6 @@ contract SystemDeploy is Script {
         vm.broadcast(msg.sender);
         output_.opChainProxyAdmin.setImplementationName(address(output_.l1CrossDomainMessengerProxy), messengerName);
 
-        output_.delayedWETHPermissionedGameProxy =
-            IDelayedWETH(payable(_deployProxy(_input, output_.opChainProxyAdmin, "DelayedWETHPermissionedGame")));
-
         _initializeOPChain(_input, _superchainConfig, impls_, output_);
 
         output_.delayedWETHPermissionlessGameProxy =
@@ -675,13 +651,6 @@ contract SystemDeploy is Script {
 
         _upgradeToAndCall(
             _output.opChainProxyAdmin,
-            address(_output.delayedWETHPermissionedGameProxy),
-            _impls.delayedWETHImpl,
-            abi.encodeCall(IDelayedWETH.initialize, (_output.systemConfigProxy))
-        );
-
-        _upgradeToAndCall(
-            _output.opChainProxyAdmin,
             address(_output.disputeGameFactoryProxy),
             _impls.disputeGameFactoryImpl,
             abi.encodeCall(IDisputeGameFactory.initialize, (msg.sender))
@@ -712,30 +681,30 @@ contract SystemDeploy is Script {
     }
 
     // TODO: upgrade multiproofs here too
-    function _upgradeOPChain(Types.OpChainConfig memory _config, Types.Implementations memory _impls) internal {
-        IProxyAdmin proxyAdmin = _config.systemConfigProxy.proxyAdmin();
-        uint256 l2ChainId = _config.systemConfigProxy.l2ChainId();
+    function _upgradeOPChain(ISystemConfig _systemConfigProxy, Types.Implementations memory _impls) internal {
+        IProxyAdmin proxyAdmin = _systemConfigProxy.proxyAdmin();
+        uint256 l2ChainId = _systemConfigProxy.l2ChainId();
 
-        _upgradeTo(proxyAdmin, address(_config.systemConfigProxy), _impls.systemConfigImpl);
+        _upgradeTo(proxyAdmin, address(_systemConfigProxy), _impls.systemConfigImpl);
 
-        IOptimismPortal optimismPortal = IOptimismPortal(payable(_config.systemConfigProxy.optimismPortal()));
+        IOptimismPortal optimismPortal = IOptimismPortal(payable(_systemConfigProxy.optimismPortal()));
         _upgradeTo(proxyAdmin, address(optimismPortal), _impls.optimismPortalImpl);
         _upgradeTo(proxyAdmin, address(optimismPortal.anchorStateRegistry()), _impls.anchorStateRegistryImpl);
         _upgradeTo(
             proxyAdmin,
-            _config.systemConfigProxy.optimismMintableERC20Factory(),
+            _systemConfigProxy.optimismMintableERC20Factory(),
             _impls.optimismMintableERC20FactoryImpl
         );
 
-        IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(_config.systemConfigProxy.disputeGameFactory());
+        IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(_systemConfigProxy.disputeGameFactory());
         _upgradeTo(proxyAdmin, address(disputeGameFactory), _impls.disputeGameFactoryImpl);
 
-        ISystemConfig.Addresses memory opChainAddrs = _config.systemConfigProxy.getAddresses();
+        ISystemConfig.Addresses memory opChainAddrs = _systemConfigProxy.getAddresses();
         _upgradeTo(proxyAdmin, opChainAddrs.l1CrossDomainMessenger, _impls.l1CrossDomainMessengerImpl);
         _upgradeTo(proxyAdmin, opChainAddrs.l1StandardBridge, _impls.l1StandardBridgeImpl);
         _upgradeTo(proxyAdmin, opChainAddrs.l1ERC721Bridge, _impls.l1ERC721BridgeImpl);
 
-        emit Upgraded(l2ChainId, _config.systemConfigProxy, msg.sender);
+        emit Upgraded(l2ChainId, _systemConfigProxy, msg.sender);
     }
 
 
@@ -789,7 +758,7 @@ contract SystemDeploy is Script {
                 _output.systemConfigProxy,
                 _output.disputeGameFactoryProxy,
                 _input.startingAnchorRoot,
-                GameTypes.PERMISSIONED_CANNON
+                GameTypes.AGGREGATE_VERIFIER
             )
         );
     }
@@ -1108,36 +1077,16 @@ contract SystemDeploy is Script {
         if (_input.roles.systemConfigOwner == address(0)) revert InvalidRoleAddress("systemConfigOwner");
         if (_input.roles.batcher == address(0)) revert InvalidRoleAddress("batcher");
         if (_input.roles.unsafeBlockSigner == address(0)) revert InvalidRoleAddress("unsafeBlockSigner");
-        if (_input.roles.proposer == address(0)) revert InvalidRoleAddress("proposer");
-        if (_input.roles.challenger == address(0)) revert InvalidRoleAddress("challenger");
         if (Hash.unwrap(_input.startingAnchorRoot.root) == bytes32(0)) {
             revert InvalidStartingAnchorRoot();
         }
     }
 
+    // TODO: add multiproof checks
     function _assertValidImplementationInput(ImplementationInput memory _input) internal pure {
-        require(
-            _input.faultGameV2MaxGameDepth > 0 && _input.faultGameV2MaxGameDepth <= 125,
-            "SystemDeploy: faultGameV2MaxGameDepth out of range"
-        );
-        require(
-            _input.faultGameV2SplitDepth >= 2 && _input.faultGameV2SplitDepth + 1 < _input.faultGameV2MaxGameDepth,
-            "SystemDeploy: invalid faultGameV2SplitDepth"
-        );
-        require(_input.faultGameV2ClockExtension <= type(uint64).max, "SystemDeploy: clockExtension too large");
-        require(_input.faultGameV2MaxClockDuration <= type(uint64).max, "SystemDeploy: maxClockDuration too large");
-        require(
-            _input.faultGameV2MaxClockDuration >= _input.faultGameV2ClockExtension,
-            "SystemDeploy: invalid clock durations"
-        );
-        require(_input.faultGameV2ClockExtension > 0, "SystemDeploy: faultGameV2ClockExtension not set");
         require(_input.withdrawalDelaySeconds != 0, "SystemDeploy: withdrawalDelaySeconds not set");
-        require(_input.minProposalSizeBytes != 0, "SystemDeploy: minProposalSizeBytes not set");
-        require(_input.challengePeriodSeconds != 0, "SystemDeploy: challengePeriodSeconds not set");
-        require(_input.challengePeriodSeconds <= type(uint64).max, "SystemDeploy: challengePeriodSeconds too large");
         require(_input.proofMaturityDelaySeconds != 0, "SystemDeploy: proofMaturityDelaySeconds not set");
         require(_input.disputeGameFinalityDelaySeconds != 0, "SystemDeploy: finality delay not set");
-        require(_input.mipsVersion != 0, "SystemDeploy: mipsVersion not set");
         require(address(_input.superchainConfigProxy) != address(0), "SystemDeploy: superchainConfigProxy not set");
         require(address(_input.superchainProxyAdmin) != address(0), "SystemDeploy: superchainProxyAdmin not set");
     }
@@ -1211,7 +1160,6 @@ contract SystemDeploy is Script {
         artifacts.save("L1CrossDomainMessengerProxy", address(chain.l1CrossDomainMessengerProxy));
         artifacts.save("ETHLockboxProxy", address(chain.ethLockboxProxy));
         artifacts.save("DisputeGameFactoryProxy", address(chain.disputeGameFactoryProxy));
-        artifacts.save("PermissionedDelayedWETHProxy", address(chain.delayedWETHPermissionedGameProxy));
         artifacts.save("DelayedWETHProxy", address(chain.delayedWETHPermissionlessGameProxy));
         artifacts.save("AnchorStateRegistryProxy", address(chain.anchorStateRegistryProxy));
         artifacts.save("OptimismPortalProxy", address(chain.optimismPortalProxy));

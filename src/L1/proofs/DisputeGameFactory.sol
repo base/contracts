@@ -8,7 +8,8 @@ import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 
 // Libraries
 import { LibClone } from "lib/solady/src/utils/LibClone.sol";
-import { GameType, Claim, GameId, Timestamp, Hash, LibGameId } from "src/libraries/bridge/Types.sol";
+import { GameType, Hash } from "src/libraries/bridge/Types.sol";
+import { LibGameId, Timestamp, GameId, Claim } from "src/libraries/bridge/LibUDT.sol";
 import { NoImplementation, IncorrectBondAmount, GameAlreadyExists } from "src/libraries/bridge/Errors.sol";
 
 // Interfaces

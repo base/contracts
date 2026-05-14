@@ -18,7 +18,8 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 
-import { Claim, Duration, GameType, Proposal } from "src/libraries/bridge/Types.sol";
+import { GameType, Proposal } from "src/libraries/bridge/Types.sol";
+import { Duration, Claim } from "src/libraries/bridge/LibUDT.sol";
 
 library Types {
     /// @notice Represents the roles that can be set when deploying a standard OP Stack chain.
@@ -27,8 +28,6 @@ library Types {
         address systemConfigOwner;
         address batcher;
         address unsafeBlockSigner;
-        address proposer;
-        address challenger;
     }
 
     /// @notice The full set of inputs to deploy a new OP Stack chain.
@@ -41,11 +40,6 @@ library Types {
         string saltMixer;
         uint64 gasLimit;
         GameType disputeGameType;
-        Claim disputeAbsolutePrestate;
-        uint256 disputeMaxGameDepth;
-        uint256 disputeSplitDepth;
-        Duration disputeClockExtension;
-        Duration disputeMaxClockDuration;
     }
 
     /// @notice The full set of outputs from deploying a new OP Stack chain.
@@ -58,13 +52,10 @@ library Types {
         IL1StandardBridge l1StandardBridgeProxy;
         IL1CrossDomainMessenger l1CrossDomainMessengerProxy;
         IETHLockbox ethLockboxProxy;
-        // Fault proof contracts below.
         IOptimismPortal2 optimismPortalProxy;
         IDisputeGameFactory disputeGameFactoryProxy;
         IAnchorStateRegistry anchorStateRegistryProxy;
-        IDelayedWETH delayedWETHPermissionedGameProxy;
         IDelayedWETH delayedWETHPermissionlessGameProxy;
-        // Multiproof contracts.
         IVerifier aggregateVerifier;
         ITEEProverRegistry teeProverRegistryProxy;
         IVerifier teeVerifier;
@@ -90,13 +81,6 @@ library Types {
         address teeProverRegistryImpl;
         address teeVerifierImpl;
         address zkVerifierImpl;
-    }
-
-    /// @notice The input required to identify a chain for upgrading, along with new prestate hashes.
-    struct OpChainConfig {
-        ISystemConfig systemConfigProxy;
-        Claim cannonPrestate;
-        Claim cannonKonaPrestate;
     }
 
     /// @notice Maps an L2 chain ID to the standard L1 batch inbox address.

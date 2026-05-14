@@ -23,6 +23,7 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { Features } from "src/libraries/Features.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import "src/libraries/bridge/Types.sol";
+import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 
 // Interfaces
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";

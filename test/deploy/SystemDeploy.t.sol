@@ -9,6 +9,7 @@ import { Types } from "scripts/libraries/Types.sol";
 import { SystemDeployAssertions } from "test/deploy/SystemDeployAssertions.sol";
 
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
+import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
@@ -18,7 +19,8 @@ import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
-import { Claim, Duration, GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { Claim, Duration } from "src/libraries/bridge/LibUDT.sol";
 
 contract MockNitroEnclaveVerifier {
     address public proofSubmitter;
@@ -146,19 +148,15 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     function test_upgrade_withoutManagerDelegatecall_succeeds() public {
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_defaultDeployInput());
 
-        Types.OpChainConfig[] memory opChainConfigs = new Types.OpChainConfig[](1);
-        opChainConfigs[0] = Types.OpChainConfig({
-            systemConfigProxy: output.opChain.systemConfigProxy,
-            cannonPrestate: absolutePrestate,
-            cannonKonaPrestate: Claim.wrap(bytes32(0))
-        });
+        ISystemConfig[] memory systemConfigProxies = new ISystemConfig[](1);
+        systemConfigProxies[0] = output.opChain.systemConfigProxy;
 
         SystemDeploy.UpgradeOutput memory upgradeOutput = systemDeploy.upgrade(
             SystemDeploy.UpgradeInput({
                 saveArtifacts: false,
                 superchainConfigProxy: output.superchain.superchainConfigProxy,
                 implementations: output.impls,
-                opChainConfigs: opChainConfigs
+                systemConfigProxies: systemConfigProxies
             })
         );
 
@@ -200,15 +198,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         });
         input_.implementationsInput = SystemDeploy.ImplementationInput({
             withdrawalDelaySeconds: 100,
-            minProposalSizeBytes: 200,
-            challengePeriodSeconds: 300,
             proofMaturityDelaySeconds: 400,
             disputeGameFinalityDelaySeconds: 500,
-            mipsVersion: STANDARD_MIPS_VERSION,
-            faultGameV2MaxGameDepth: 73,
-            faultGameV2SplitDepth: 30,
-            faultGameV2ClockExtension: 10_800,
-            faultGameV2MaxClockDuration: 302_400,
             teeImageHash: bytes32(uint256(1)),
             zkRangeHash: bytes32(uint256(2)),
             zkAggregationHash: bytes32(uint256(3)),
@@ -231,9 +222,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
                 opChainProxyAdminOwner: owner,
                 systemConfigOwner: owner,
                 batcher: batcher,
-                unsafeBlockSigner: unsafeBlockSigner,
-                proposer: proposer,
-                challenger: challenger
+                unsafeBlockSigner: unsafeBlockSigner
             }),
             basefeeScalar: 100,
             blobBasefeeScalar: 200,
@@ -241,12 +230,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             startingAnchorRoot: Proposal({ root: Hash.wrap(bytes32(uint256(1))), l2SequenceNumber: 0 }),
             saltMixer: "system-deploy-test",
             gasLimit: 60_000_000,
-            disputeGameType: GameTypes.PERMISSIONED_CANNON,
-            disputeAbsolutePrestate: absolutePrestate,
-            disputeMaxGameDepth: 73,
-            disputeSplitDepth: 30,
-            disputeClockExtension: Duration.wrap(10_800),
-            disputeMaxClockDuration: Duration.wrap(302_400)
+            disputeGameType: GameTypes.AGGREGATE_VERIFIER
         });
     }
 

@@ -7,7 +7,8 @@ import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
-import { Claim, GameType } from "src/libraries/bridge/Types.sol";
+import { GameType } from "src/libraries/bridge/Types.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";
 

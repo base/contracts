@@ -7,7 +7,8 @@ import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 import { ReinitializableBase } from "src/universal/ReinitializableBase.sol";
 
 // Libraries
-import { GameType, Proposal, Claim, GameStatus, Hash } from "src/libraries/bridge/Types.sol";
+import { GameType, Proposal, GameStatus, Hash } from "src/libraries/bridge/Types.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";

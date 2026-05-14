@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
 
 import { IInitializable } from "interfaces/L1/proofs/IInitializable.sol";
 import { IAnchorStateRegistry } from "./IAnchorStateRegistry.sol";
-import { Timestamp, GameStatus, GameType, Claim, Hash } from "src/libraries/bridge/Types.sol";
+import { GameStatus, GameType, Hash } from "src/libraries/bridge/Types.sol";
+import { Timestamp, Claim } from "src/libraries/bridge/LibUDT.sol";
 
 interface IDisputeGame is IInitializable {
     event Resolved(GameStatus indexed status);

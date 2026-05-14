@@ -5,7 +5,8 @@ pragma solidity ^0.8.15;
 import { BaseTest } from "test/L1/proofs/BaseTest.t.sol";
 
 // Libraries
-import { GameType, GameStatus, Hash, Claim, Proposal } from "src/libraries/bridge/Types.sol";
+import { GameType, GameStatus, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
 
 // Interfaces

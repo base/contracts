@@ -14,7 +14,8 @@ import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
 
 // Libraries
-import { GameTypes, Claim } from "src/libraries/bridge/Types.sol";
+import { GameTypes } from "src/libraries/bridge/Types.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 import { Types } from "scripts/libraries/Types.sol";
@@ -22,6 +23,8 @@ import { Types } from "scripts/libraries/Types.sol";
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
+import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
 import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
@@ -197,13 +200,8 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         SystemDeploy systemDeploy = new SystemDeploy();
         Types.Implementations memory implementations = _latestImplementations();
 
-        ISystemConfig systemConfig = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
-        Types.OpChainConfig[] memory opChains = new Types.OpChainConfig[](1);
-        opChains[0] = Types.OpChainConfig({
-            systemConfigProxy: systemConfig,
-            cannonPrestate: Claim.wrap(bytes32(keccak256("cannonPrestate"))),
-            cannonKonaPrestate: Claim.wrap(bytes32(keccak256("cannonKonaPrestate")))
-        });
+        ISystemConfig[] memory systemConfigProxies = new ISystemConfig[](1);
+        systemConfigProxies[0] = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
 
         ISuperchainConfig superchainConfig = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
         IProxyAdmin superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
@@ -217,7 +215,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
                 saveArtifacts: false,
                 superchainConfigProxy: superchainConfig,
                 implementations: implementations,
-                opChainConfigs: new Types.OpChainConfig[](0)
+                systemConfigProxies: new ISystemConfig[](0)
             })
         );
 
@@ -228,7 +226,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
                 saveArtifacts: false,
                 superchainConfigProxy: ISuperchainConfig(address(0)),
                 implementations: implementations,
-                opChainConfigs: opChains
+                systemConfigProxies: systemConfigProxies
             })
         );
     }
@@ -258,12 +256,10 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         // A new ASR and new dispute games were deployed, so we need to update them
         IDisputeGameFactory disputeGameFactory =
             IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
-        address permissionedDisputeGame = address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON));
-        artifacts.save("PermissionedDisputeGame", permissionedDisputeGame);
+        IDisputeGame av = disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER);
+        artifacts.save("AggregateVerifier", address(av));
 
-        IAnchorStateRegistry newAnchorStateRegistry = IAnchorStateRegistry(
-            LibGameArgs.decode(disputeGameFactory.gameArgs(GameTypes.PERMISSIONED_CANNON)).anchorStateRegistry
-        );
+        IAnchorStateRegistry newAnchorStateRegistry = av.anchorStateRegistry();
         artifacts.save("AnchorStateRegistryProxy", address(newAnchorStateRegistry));
 
         // Get the lockbox address from the portal, and save it
@@ -272,8 +268,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         artifacts.save("ETHLockboxProxy", lockboxAddress);
 
         // Get the new DelayedWETH address and save it (might be a new proxy).
-        IDelayedWETH newDelayedWeth =
-            IDelayedWETH(payable(LibGameArgs.decode(disputeGameFactory.gameArgs(GameTypes.PERMISSIONED_CANNON)).weth));
+        IDelayedWETH newDelayedWeth = IAggregateVerifier(address(av)).DELAYED_WETH();
         artifacts.save("DelayedWETHProxy", address(newDelayedWeth));
         artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(address(newDelayedWeth)));
     }

@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 // Libraries
 import { Types } from "src/libraries/Types.sol";
+import { Timestamp } from "src/libraries/bridge/LibUDT.sol";
 import "src/libraries/bridge/Types.sol";
 
 // Interfaces

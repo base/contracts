@@ -2,7 +2,7 @@
 pragma solidity ^0.8.15;
 
 import { Test } from "lib/forge-std/src/Test.sol";
-import { LibPosition } from "src/libraries/bridge/LibPosition.sol";
+import { LibPosition, Position } from "src/libraries/bridge/LibPosition.sol";
 import "src/libraries/bridge/Types.sol";
 
 /// @title LibPosition_TestInit
