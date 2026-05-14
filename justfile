@@ -11,7 +11,6 @@ install-foundry:
 deps: clean-lib
   forge install --no-git \
     github.com/foundry-rs/forge-std@6853b9ec7df5dc0c213b05ae67785ad4f4baa0ea \
-    github.com/runtimeverification/kontrol-cheatcodes@2c48ae1ab44228c199dca29414c0b4b18a3434e6 \
     github.com/ethereum-optimism/lib-keccak@3b1e7bbb4cc23e9228097cfebe42aedaf3b8f2b9 \
     github.com/OpenZeppelin/openzeppelin-contracts@ecd2ca2cd7cac116f7a37d0e474bbb3d7d5e1c4d \
     github.com/OpenZeppelin/openzeppelin-contracts-upgradeable@0a2cb9a445c365870ed7a8ab461b12acf3e27d63 \
@@ -162,13 +161,6 @@ test-rerun: build-go-ffi
 test-dev-rerun: build-go-ffi
   FOUNDRY_PROFILE=lite forge test --rerun -vvv
 
-# Run Kontrol tests and build all dependencies.
-test-kontrol: build-go-ffi build kontrol-summary-full test-kontrol-no-build
-
-# Run Kontrol tests without dependencies.
-test-kontrol-no-build:
-  ./test/kontrol/scripts/run-kontrol.sh script
-
 # Runs contract coverage.
 coverage: build-go-ffi
   forge coverage
@@ -207,17 +199,6 @@ deploy:
 ########################################################
 #                       SNAPSHOTS                      #
 ########################################################
-
-# Generates default Kontrol summary.
-kontrol-summary:
-  ./test/kontrol/scripts/make-summary-deployment.sh
-
-# Generates fault proofs Kontrol summary.
-kontrol-summary-fp:
-  KONTROL_FP_DEPLOYMENT=true ./test/kontrol/scripts/make-summary-deployment.sh
-
-# Generates all Kontrol summaries (default and FP).
-kontrol-summary-full: kontrol-summary kontrol-summary-fp
 
 # Generates ABI snapshots for contracts.
 snapshots-abi-storage-no-build:

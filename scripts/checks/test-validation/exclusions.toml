@@ -21,8 +21,6 @@ src_validation = [
     "test/cannon/MIPS64Memory.t.sol",           # Tests external MIPS implementation
     "test/libraries/bridge/LibClock.t.sol",     # Tests library utilities
     "test/libraries/bridge/LibGameId.t.sol",    # Tests library utilities
-    "test/libraries/DeployUtils.t.sol",         # Tests library utilities - no direct src counterpart
-    "test/universal/BenchmarkTest.t.sol",       # Performance benchmarking tests
     "test/universal/ExtendedPause.t.sol",       # Tests extended functionality
     "test/vendor/Initializable.t.sol",          # Tests external vendor code
     "test/vendor/InitializableOZv5.t.sol",      # Tests external vendor code
@@ -47,7 +45,6 @@ contract_name_validation = [
     "test/L1/ResourceMetering.t.sol",        # Contains contracts not matching ResourceMetering base name
     "test/L2/GasPriceOracle.t.sol",          # Contains contracts not matching GasPriceOracle base name
     "test/universal/StandardBridge.t.sol",   # Contains contracts not matching StandardBridge base name
-    "test/libraries/Blueprint.t.sol",        # Contains helper contracts (BlueprintHarness, ConstructorArgMock)
     "test/libraries/SafeCall.t.sol",         # Contains helper contracts (SimpleSafeCaller)
 ]
 

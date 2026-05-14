@@ -5,10 +5,10 @@ import { Proxy } from "src/universal/Proxy.sol";
 
 import { BalanceTracker } from "src/L1/BalanceTracker.sol";
 
-import { CommonTest } from "test/CommonTest.t.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 import { ReenterProcessFees } from "test/mocks/ReenterProcessFees.sol";
 
-contract BalanceTrackerTest is CommonTest {
+contract BalanceTrackerTest is Test {
     event ProcessedFunds(
         address indexed systemAddress, bool indexed success, uint256 balanceNeeded, uint256 balanceSent
     );
@@ -32,9 +32,7 @@ contract BalanceTrackerTest is CommonTest {
     uint256[] targetBalances = [batchSenderTargetBalance, l2OutputProposerTargetBalance];
     address proxyAdminOwner = address(2048);
 
-    function setUp() public override {
-        super.setUp();
-
+    function setUp() public {
         balanceTrackerImplementation = new BalanceTracker(profitWallet);
         balanceTrackerProxy = new Proxy(proxyAdminOwner);
         vm.prank(proxyAdminOwner);
@@ -44,7 +42,7 @@ contract BalanceTrackerTest is CommonTest {
 
     function test_constructor_fail_profitWallet_zeroAddress() external {
         vm.expectRevert("BalanceTracker: PROFIT_WALLET cannot be address(0)");
-        new BalanceTracker(payable(ZERO_ADDRESS));
+        new BalanceTracker(payable(address(0)));
     }
 
     function test_constructor_success() external {
@@ -84,7 +82,7 @@ contract BalanceTrackerTest is CommonTest {
     }
 
     function test_initializer_fail_targetBalances_containsZero() external {
-        targetBalances[1] = ZERO_VALUE;
+        targetBalances[1] = 0;
 
         vm.expectRevert("BalanceTracker: targetBalances cannot contain 0 target");
         balanceTracker.initialize(systemAddresses, targetBalances);
@@ -115,9 +113,9 @@ contract BalanceTrackerTest is CommonTest {
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, ZERO_VALUE);
+        assertEq(address(balanceTracker).balance, 0);
         assertEq(profitWallet.balance, expectedProfitWalletBalance);
-        assertEq(batchSender.balance, ZERO_VALUE);
+        assertEq(batchSender.balance, 0);
         assertEq(l2OutputProposer.balance, l2OutputProposerTargetBalance);
     }
 
@@ -141,9 +139,9 @@ contract BalanceTrackerTest is CommonTest {
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, ZERO_VALUE);
+        assertEq(address(balanceTracker).balance, 0);
         assertEq(profitWallet.balance, expectedProfitWalletBalance);
-        assertEq(batchSender.balance, ZERO_VALUE);
+        assertEq(batchSender.balance, 0);
         assertEq(l2OutputProposer.balance, l2OutputProposerTargetBalance);
     }
 
@@ -161,7 +159,7 @@ contract BalanceTrackerTest is CommonTest {
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, ZERO_VALUE);
+        assertEq(address(balanceTracker).balance, 0);
         assertEq(profitWallet.balance, expectedProfitWalletBalance);
         assertEq(batchSender.balance, batchSenderTargetBalance);
         assertEq(l2OutputProposer.balance, l2OutputProposerTargetBalance);
@@ -170,18 +168,18 @@ contract BalanceTrackerTest is CommonTest {
     function test_processFees_success_noFunds() external {
         balanceTracker.initialize(systemAddresses, targetBalances);
         vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(batchSender, true, batchSenderTargetBalance, ZERO_VALUE);
+        emit ProcessedFunds(batchSender, true, batchSenderTargetBalance, 0);
         vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(l2OutputProposer, true, l2OutputProposerTargetBalance, ZERO_VALUE);
+        emit ProcessedFunds(l2OutputProposer, true, l2OutputProposerTargetBalance, 0);
         vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit SentProfit(profitWallet, true, ZERO_VALUE);
+        emit SentProfit(profitWallet, true, 0);
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, ZERO_VALUE);
-        assertEq(profitWallet.balance, ZERO_VALUE);
-        assertEq(batchSender.balance, ZERO_VALUE);
-        assertEq(l2OutputProposer.balance, ZERO_VALUE);
+        assertEq(address(balanceTracker).balance, 0);
+        assertEq(profitWallet.balance, 0);
+        assertEq(batchSender.balance, 0);
+        assertEq(l2OutputProposer.balance, 0);
     }
 
     function test_processFees_success_partialFunds() external {
@@ -191,16 +189,16 @@ contract BalanceTrackerTest is CommonTest {
         vm.expectEmit(true, true, true, true, address(balanceTracker));
         emit ProcessedFunds(batchSender, true, batchSenderTargetBalance, partialBalanceTrackerBalance);
         vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(l2OutputProposer, true, l2OutputProposerTargetBalance, ZERO_VALUE);
+        emit ProcessedFunds(l2OutputProposer, true, l2OutputProposerTargetBalance, 0);
         vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit SentProfit(profitWallet, true, ZERO_VALUE);
+        emit SentProfit(profitWallet, true, 0);
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, ZERO_VALUE);
-        assertEq(profitWallet.balance, ZERO_VALUE);
+        assertEq(address(balanceTracker).balance, 0);
+        assertEq(profitWallet.balance, 0);
         assertEq(batchSender.balance, partialBalanceTrackerBalance);
-        assertEq(l2OutputProposer.balance, ZERO_VALUE);
+        assertEq(l2OutputProposer.balance, 0);
     }
 
     function test_processFees_success_skipsAddressesAtTargetBalance() external {
@@ -209,15 +207,15 @@ contract BalanceTrackerTest is CommonTest {
         vm.deal(l2OutputProposer, l2OutputProposerTargetBalance);
         balanceTracker.initialize(systemAddresses, targetBalances);
         vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(batchSender, false, ZERO_VALUE, ZERO_VALUE);
+        emit ProcessedFunds(batchSender, false, 0, 0);
         vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(l2OutputProposer, false, ZERO_VALUE, ZERO_VALUE);
+        emit ProcessedFunds(l2OutputProposer, false, 0, 0);
         vm.expectEmit(true, true, true, true, address(balanceTracker));
         emit SentProfit(profitWallet, true, INITIAL_BALANCE_TRACKER_BALANCE);
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, ZERO_VALUE);
+        assertEq(address(balanceTracker).balance, 0);
         assertEq(profitWallet.balance, INITIAL_BALANCE_TRACKER_BALANCE);
         assertEq(batchSender.balance, batchSenderTargetBalance);
         assertEq(l2OutputProposer.balance, l2OutputProposerTargetBalance);
@@ -236,23 +234,24 @@ contract BalanceTrackerTest is CommonTest {
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, ZERO_VALUE);
+        assertEq(address(balanceTracker).balance, 0);
         for (uint256 i = 0; i < balanceTracker.MAX_SYSTEM_ADDRESS_COUNT(); i++) {
             assertEq(systemAddresses[i].balance, l2OutputProposerTargetBalance);
         }
-        assertEq(profitWallet.balance, ZERO_VALUE);
+        assertEq(profitWallet.balance, 0);
     }
 
     function test_receive_success() external {
-        vm.deal(l1StandardBridge, NON_ZERO_VALUE);
+        uint256 value = 100;
+        vm.deal(l1StandardBridge, value);
 
         vm.prank(l1StandardBridge);
         vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ReceivedFunds(l1StandardBridge, NON_ZERO_VALUE);
+        emit ReceivedFunds(l1StandardBridge, value);
 
-        (bool success,) = payable(address(balanceTracker)).call{ value: NON_ZERO_VALUE }("");
+        (bool success,) = payable(address(balanceTracker)).call{ value: value }("");
         assertTrue(success);
 
-        assertEq(address(balanceTracker).balance, NON_ZERO_VALUE);
+        assertEq(address(balanceTracker).balance, value);
     }
 }

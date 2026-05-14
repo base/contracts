@@ -105,6 +105,8 @@ contract SystemConfig_Initialize_Test is SystemConfig_TestInit {
         assertEq(systemConfig.scalar() >> 248, 1);
         assertEq(systemConfig.batcherHash(), batcherHash);
         assertEq(systemConfig.gasLimit(), gasLimit);
+        assertTrue(gasLimit >= systemConfig.minimumGasLimit());
+        assertTrue(gasLimit <= systemConfig.maximumGasLimit());
         assertEq(systemConfig.unsafeBlockSigner(), unsafeBlockSigner);
         assertEq(systemConfig.basefeeScalar(), basefeeScalar);
         assertEq(systemConfig.blobbasefeeScalar(), blobbasefeeScalar);

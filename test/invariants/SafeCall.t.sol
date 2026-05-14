@@ -2,15 +2,14 @@
 pragma solidity 0.8.15;
 
 import { StdUtils } from "lib/forge-std/src/StdUtils.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 import { Vm } from "lib/forge-std/src/Vm.sol";
 import { SafeCall } from "src/libraries/SafeCall.sol";
-import { InvariantTest } from "test/invariants/InvariantTest.sol";
 
-contract SafeCall_Succeeds_Invariants is InvariantTest {
+contract SafeCall_Succeeds_Invariants is Test {
     SafeCaller_Actor actor;
 
-    function setUp() public override {
-        super.setUp();
+    function setUp() public {
         // Create a new safe caller actor.
         actor = new SafeCaller_Actor(vm, false);
 
@@ -38,11 +37,10 @@ contract SafeCall_Succeeds_Invariants is InvariantTest {
     }
 }
 
-contract SafeCall_Fails_Invariants is InvariantTest {
+contract SafeCall_Fails_Invariants is Test {
     SafeCaller_Actor actor;
 
-    function setUp() public override {
-        super.setUp();
+    function setUp() public {
         // Create a new safe caller actor.
         actor = new SafeCaller_Actor(vm, true);
 

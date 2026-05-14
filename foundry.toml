@@ -56,7 +56,7 @@ fs_permissions = [
 # 5159 error code is selfdestruct error code
 # 2424 is deprecated natspec memory-safe-assembly comment (forge-std, solmate)
 # 8429 is deprecated virtual modifiers (solmate)
-ignored_error_codes = ["transient-storage", "code-size", "init-code-size", "too-many-warnings", 5159, 2424, 8429]
+ignored_error_codes = ["transient-storage", "code-size", "init-code-size", "too-many-warnings", 5159, 2424, 8429, 6335]
 deny = "warnings"
 ffi = true
 
@@ -152,13 +152,3 @@ compilation_restrictions = [
   { paths = "src/L2/OptimismMintableERC721.sol", optimizer_runs = 0 },
   { paths = "src/L2/OptimismMintableERC721Factory.sol", optimizer_runs = 0 },
 ]
-
-################################################################
-#                         PROFILE: KONTROL                     #
-################################################################
-
-[profile.kprove]
-src = 'test/kontrol/proofs'
-out = 'kout-proofs'
-test = 'test/kontrol/proofs'
-script = 'test/kontrol/proofs'

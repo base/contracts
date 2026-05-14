@@ -2,8 +2,7 @@
 pragma solidity 0.8.25;
 
 import { CBMulticall, Call, Call3, Call3Value, Result } from "src/universal/CBMulticall.sol";
-import { CommonTest } from "test/CommonTest.t.sol";
-import { MockReceiver } from "test/mocks/MockReceiver.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 
 /// @dev Helper contract used to invoke `aggregateDelegateCalls` via `delegatecall`.
 ///      This simulates the intended multisig usage pattern where the multicall
@@ -22,13 +21,26 @@ contract CBMulticallDelegateCaller {
     }
 }
 
-contract CBMulticallTest is CommonTest {
+contract MockReceiver {
+    function bump(uint256 x) external pure returns (uint256) {
+        return x + 1;
+    }
+
+    function payAndEcho(uint256 x) external payable returns (uint256, uint256) {
+        return (x, msg.value);
+    }
+
+    function willRevert() external pure {
+        revert("revert");
+    }
+}
+
+contract CBMulticallTest is Test {
     CBMulticall mc;
     MockReceiver target;
     CBMulticallDelegateCaller delegateCaller;
 
-    function setUp() public override {
-        super.setUp();
+    function setUp() public {
         mc = new CBMulticall();
         target = new MockReceiver();
         delegateCaller = new CBMulticallDelegateCaller(mc);
