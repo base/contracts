@@ -29,21 +29,19 @@ For contract deployment artifacts, see [base-org/contract-deployments](https://g
 
 ### Fixing semver-lock CI failures
 
-If the `semver-lock` CI check fails, regenerate locally and commit:
+If the `semver-lock` CI check fails, install the pinned Foundry version used by CI, then regenerate locally and commit:
 
-```bash
+foundryup --version <pinned-version>
 just semver-lock
-```
 
-If CI still rejects it (Foundry version mismatch), update your local Foundry first:
+Do not run unpinned `foundryup` for `semver-lock` regeneration. Installing the latest Foundry can change compiler metadata, artifact formatting, or lock output and cause CI drift.
 
-```bash
-foundryup
-just semver-lock
-```
+The pinned Foundry version must match CI and repository tooling. If CI is updated to a new Foundry version, update the local install command accordingly before regenerating `semver-lock`.
 
 ### setup and testing
 
 - If you don't have foundry installed, run `just install-foundry`.
-- `just deps`
+- Install the pinned Foundry version used by CI:
+    foundryup --version <pinned-version>
+  - `just deps`
 - Test contracts: `just test`
