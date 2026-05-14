@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.15;
 
-// Libraries
-import { Position } from "src/libraries/bridge/LibPosition.sol";
-
 using LibClaim for Claim global;
 using LibHash for Hash global;
 using LibDuration for Duration global;
@@ -122,27 +119,6 @@ library LibClaim {
     function raw(Claim _claim) internal pure returns (bytes32 claim_) {
         assembly {
             claim_ := _claim
-        }
-    }
-
-    /// @notice Hashes a claim and a position together.
-    /// @param _claim A Claim type.
-    /// @param _position The position of `claim`.
-    /// @param _challengeIndex The index of the claim being moved against.
-    /// @return claimHash_ A hash of abi.encodePacked(claim, position|challengeIndex);
-    function hashClaimPos(
-        Claim _claim,
-        Position _position,
-        uint256 _challengeIndex
-    )
-        internal
-        pure
-        returns (Hash claimHash_)
-    {
-        assembly {
-            mstore(0x00, _claim)
-            mstore(0x20, or(shl(128, _position), and(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, _challengeIndex)))
-            claimHash_ := keccak256(0x00, 0x40)
         }
     }
 }
