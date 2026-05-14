@@ -8,7 +8,6 @@ import { Types } from "scripts/libraries/Types.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { Features } from "src/libraries/Features.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
-import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 import { GameType, GameTypes, Hash } from "src/libraries/bridge/Types.sol";
 import { Claim, Duration } from "src/libraries/bridge/LibUDT.sol";
 

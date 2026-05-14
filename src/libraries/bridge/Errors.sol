@@ -69,10 +69,3 @@ error GameOver();
 
 /// @notice Thrown when the game is not over.
 error GameNotOver();
-
-////////////////////////////////////////////////////////////////
-//              `LibGameArgs` Errors                          //
-////////////////////////////////////////////////////////////////
-
-/// @notice Thrown when the length of the game arguments is invalid.
-error InvalidGameArgsLength();

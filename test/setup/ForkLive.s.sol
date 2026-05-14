@@ -17,7 +17,6 @@ import { Config } from "scripts/libraries/Config.sol";
 import { GameTypes } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
-import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
 // Interfaces

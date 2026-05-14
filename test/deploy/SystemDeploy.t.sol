@@ -14,7 +14,6 @@ import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
