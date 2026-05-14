@@ -6,7 +6,7 @@ import { Test } from "lib/forge-std/src/Test.sol";
 import { Artifacts } from "scripts/Artifacts.s.sol";
 import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Types } from "scripts/libraries/Types.sol";
-import { StandardSystemAssertions } from "test/setup/StandardSystemAssertions.sol";
+import { SystemDeployAssertions } from "test/deploy/SystemDeployAssertions.sol";
 
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
@@ -32,7 +32,7 @@ contract MockSP1Verifier {
     function verifyProof(bytes32, bytes calldata, bytes calldata) external pure { }
 }
 
-contract SystemDeploy_Test is Test, StandardSystemAssertions {
+contract SystemDeploy_Test is Test, SystemDeployAssertions {
     Artifacts internal constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
     uint256 internal constant STANDARD_MIPS_VERSION = 8;
@@ -488,9 +488,9 @@ contract SystemDeploy_Test is Test, StandardSystemAssertions {
     )
         internal
         pure
-        returns (StandardSystemAssertions.Expected memory expected_)
+        returns (SystemDeployAssertions.ExpectedSystemDeployState memory expected_)
     {
-        expected_ = StandardSystemAssertions.Expected({
+        expected_ = SystemDeployAssertions.ExpectedSystemDeployState({
             systemConfig: _output.opChain.systemConfigProxy,
             superchainConfig: _output.superchain.superchainConfigProxy,
             implementations: _output.implementationOutput.implementations,

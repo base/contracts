@@ -11,7 +11,6 @@ import { Predeploys } from "src/libraries/Predeploys.sol";
 import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 import { Claim, Duration, GameType, GameTypes, Hash } from "src/libraries/bridge/Types.sol";
 
-import { IBigStepper } from "interfaces/L1/proofs/IBigStepper.sol";
 import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
 import { IMIPS64 } from "interfaces/cannon/IMIPS64.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
@@ -32,13 +31,8 @@ import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMin
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 
-abstract contract StandardSystemAssertions is Test {
-    struct ValidationOverrides {
-        address l1PAOMultisig;
-        address challenger;
-    }
-
-    struct Expected {
+abstract contract SystemDeployAssertions is Test {
+    struct ExpectedSystemDeployState {
         ISystemConfig systemConfig;
         ISuperchainConfig superchainConfig;
         Types.Implementations implementations;
@@ -62,46 +56,27 @@ abstract contract StandardSystemAssertions is Test {
         Duration disputeMaxClockDuration;
     }
 
-    function assertValidStandardSystem(Expected memory _expected) internal view {
-        assertValidStandardSystemWithOverrides(
-            _expected, ValidationOverrides({ l1PAOMultisig: address(0), challenger: address(0) })
-        );
-    }
-
-    function assertValidStandardSystemWithOverrides(
-        Expected memory _expected,
-        ValidationOverrides memory _overrides
-    )
-        internal
-        view
-    {
+    function assertValidStandardSystem(ExpectedSystemDeployState memory _expected) internal view {
         IProxyAdmin proxyAdmin = _expected.systemConfig.proxyAdmin();
 
         _assertSuperchainConfig(_expected);
-        _assertProxyAdmin(_expected, _overrides, proxyAdmin);
+        _assertProxyAdmin(_expected, proxyAdmin);
         _assertSystemConfig(_expected, proxyAdmin);
         _assertBridgeAndPortalWiring(_expected, proxyAdmin);
-        _assertDisputeGameFactory(_expected, _overrides, proxyAdmin);
-        _assertGames(_expected, _overrides, proxyAdmin);
+        _assertDisputeGameFactory(_expected, proxyAdmin);
+        _assertGames(_expected, proxyAdmin);
         _assertETHLockbox(_expected, proxyAdmin);
     }
 
-    function _assertSuperchainConfig(Expected memory _expected) private view {
+    function _assertSuperchainConfig(ExpectedSystemDeployState memory _expected) private view {
         assertFalse(_expected.superchainConfig.paused(address(0)), "SPRCFG-10");
     }
 
-    function _assertProxyAdmin(
-        Expected memory _expected,
-        ValidationOverrides memory _overrides,
-        IProxyAdmin _proxyAdmin
-    )
-        private
-        view
-    {
-        assertEq(_proxyAdmin.owner(), _expectedL1PAOMultisig(_expected, _overrides), "PROXYA-10");
+    function _assertProxyAdmin(ExpectedSystemDeployState memory _expected, IProxyAdmin _proxyAdmin) private view {
+        assertEq(_proxyAdmin.owner(), _expected.proxyAdminOwner, "PROXYA-10");
     }
 
-    function _assertSystemConfig(Expected memory _expected, IProxyAdmin _proxyAdmin) private view {
+    function _assertSystemConfig(ExpectedSystemDeployState memory _expected, IProxyAdmin _proxyAdmin) private view {
         ISystemConfig sysCfg = _expected.systemConfig;
         assertEq(_version(address(sysCfg)), _version(_expected.implementations.systemConfigImpl), "SYSCON-10");
         assertLe(sysCfg.gasLimit(), uint64(500_000_000), "SYSCON-20");
@@ -125,7 +100,13 @@ abstract contract StandardSystemAssertions is Test {
         assertEq(sysCfg.l2ChainId(), _expected.l2ChainId, "SYSCON-150");
     }
 
-    function _assertBridgeAndPortalWiring(Expected memory _expected, IProxyAdmin _proxyAdmin) private view {
+    function _assertBridgeAndPortalWiring(
+        ExpectedSystemDeployState memory _expected,
+        IProxyAdmin _proxyAdmin
+    )
+        private
+        view
+    {
         ISystemConfig sysCfg = _expected.systemConfig;
         IOptimismPortal2 portal = IOptimismPortal2(payable(sysCfg.optimismPortal()));
         IDisputeGameFactory dgf = IDisputeGameFactory(sysCfg.disputeGameFactory());
@@ -204,8 +185,7 @@ abstract contract StandardSystemAssertions is Test {
     }
 
     function _assertDisputeGameFactory(
-        Expected memory _expected,
-        ValidationOverrides memory _overrides,
+        ExpectedSystemDeployState memory _expected,
         IProxyAdmin _proxyAdmin
     )
         private
@@ -218,26 +198,18 @@ abstract contract StandardSystemAssertions is Test {
             _expected.implementations.disputeGameFactoryImpl,
             "DF-20"
         );
-        assertEq(factory.owner(), _expectedL1PAOMultisig(_expected, _overrides), "DF-30");
+        assertEq(factory.owner(), _expected.proxyAdminOwner, "DF-30");
         assertEq(address(_proxyAdminFor(address(factory))), address(_proxyAdmin), "DF-40");
     }
 
-    function _assertGames(
-        Expected memory _expected,
-        ValidationOverrides memory _overrides,
-        IProxyAdmin _proxyAdmin
-    )
-        private
-        view
-    {
-        _assertGame(_expected, _overrides, _proxyAdmin, GameTypes.PERMISSIONED_CANNON, true, "PDDG");
-        _assertGame(_expected, _overrides, _proxyAdmin, GameTypes.CANNON, _expected.expectCannon, "PLDG");
-        _assertGame(_expected, _overrides, _proxyAdmin, GameTypes.CANNON_KONA, _expected.expectCannonKona, "CKDG");
+    function _assertGames(ExpectedSystemDeployState memory _expected, IProxyAdmin _proxyAdmin) private view {
+        _assertGame(_expected, _proxyAdmin, GameTypes.PERMISSIONED_CANNON, true, "PDDG");
+        _assertGame(_expected, _proxyAdmin, GameTypes.CANNON, _expected.expectCannon, "PLDG");
+        _assertGame(_expected, _proxyAdmin, GameTypes.CANNON_KONA, _expected.expectCannonKona, "CKDG");
     }
 
     function _assertGame(
-        Expected memory _expected,
-        ValidationOverrides memory _overrides,
+        ExpectedSystemDeployState memory _expected,
         IProxyAdmin _proxyAdmin,
         GameType _gameType,
         bool _expectSet,
@@ -270,7 +242,6 @@ abstract contract StandardSystemAssertions is Test {
         }
         _assertGameArgsAndContracts({
             _expected: _expected,
-            _overrides: _overrides,
             _proxyAdmin: _proxyAdmin,
             _factory: factory,
             _faultGame: IFaultDisputeGameV2(address(game)),
@@ -282,8 +253,7 @@ abstract contract StandardSystemAssertions is Test {
     }
 
     function _assertGameArgsAndContracts(
-        Expected memory _expected,
-        ValidationOverrides memory _overrides,
+        ExpectedSystemDeployState memory _expected,
         IProxyAdmin _proxyAdmin,
         IDisputeGameFactory _factory,
         IFaultDisputeGameV2 _faultGame,
@@ -305,14 +275,14 @@ abstract contract StandardSystemAssertions is Test {
         assertNotEq(anchorRoot.raw(), bytes32(0), string.concat(_prefix, "-120"));
 
         if (_permissioned) {
-            assertEq(_args.challenger, _expectedChallenger(_expected, _overrides), "PDDG-130");
+            assertEq(_args.challenger, _expected.challenger, "PDDG-130");
             assertEq(_args.proposer, _expected.proposer, "PDDG-140");
         } else {
             assertEq(_args.challenger, address(0), string.concat(_prefix, "-130"));
             assertEq(_args.proposer, address(0), string.concat(_prefix, "-140"));
         }
 
-        _assertDelayedWETH(_expected, _overrides, _proxyAdmin, IDelayedWETH(payable(_args.weth)), _prefix);
+        _assertDelayedWETH(_expected, _proxyAdmin, IDelayedWETH(payable(_args.weth)), _prefix);
         _assertAnchorStateRegistry(
             _expected, _proxyAdmin, _factory, IAnchorStateRegistry(_args.anchorStateRegistry), _prefix
         );
@@ -320,7 +290,7 @@ abstract contract StandardSystemAssertions is Test {
     }
 
     function _assertGameImmutableArgs(
-        Expected memory _expected,
+        ExpectedSystemDeployState memory _expected,
         IFaultDisputeGameV2 _faultGame,
         string memory _prefix
     )
@@ -339,8 +309,7 @@ abstract contract StandardSystemAssertions is Test {
     }
 
     function _assertDelayedWETH(
-        Expected memory _expected,
-        ValidationOverrides memory _overrides,
+        ExpectedSystemDeployState memory _expected,
         IProxyAdmin _proxyAdmin,
         IDelayedWETH _weth,
         string memory _prefix
@@ -357,14 +326,14 @@ abstract contract StandardSystemAssertions is Test {
             _expected.implementations.delayedWETHImpl,
             string.concat(prefix, "-20")
         );
-        assertEq(_weth.proxyAdminOwner(), _expectedL1PAOMultisig(_expected, _overrides), string.concat(prefix, "-30"));
+        assertEq(_weth.proxyAdminOwner(), _expected.proxyAdminOwner, string.concat(prefix, "-30"));
         assertEq(_weth.delay(), _expected.withdrawalDelaySeconds, string.concat(prefix, "-40"));
         assertEq(address(_weth.systemConfig()), address(_expected.systemConfig), string.concat(prefix, "-50"));
         assertEq(address(_proxyAdminFor(address(_weth))), address(_proxyAdmin), string.concat(prefix, "-60"));
     }
 
     function _assertAnchorStateRegistry(
-        Expected memory _expected,
+        ExpectedSystemDeployState memory _expected,
         IProxyAdmin _proxyAdmin,
         IDisputeGameFactory _factory,
         IAnchorStateRegistry _asr,
@@ -391,7 +360,7 @@ abstract contract StandardSystemAssertions is Test {
     }
 
     function _assertMipsAndPreimageOracle(
-        Expected memory _expected,
+        ExpectedSystemDeployState memory _expected,
         IMIPS64 _mips,
         string memory _prefix
     )
@@ -410,7 +379,7 @@ abstract contract StandardSystemAssertions is Test {
         assertEq(oracle.minProposalSize(), _expected.minProposalSizeBytes, string.concat(oraclePrefix, "-30"));
     }
 
-    function _assertETHLockbox(Expected memory _expected, IProxyAdmin _proxyAdmin) private view {
+    function _assertETHLockbox(ExpectedSystemDeployState memory _expected, IProxyAdmin _proxyAdmin) private view {
         IOptimismPortal2 portal = IOptimismPortal2(payable(_expected.systemConfig.optimismPortal()));
         IETHLockbox lockbox = _expected.ethLockbox;
 
@@ -428,7 +397,14 @@ abstract contract StandardSystemAssertions is Test {
         }
     }
 
-    function _expectedPrestate(Expected memory _expected, GameType _gameType) private pure returns (Claim) {
+    function _expectedPrestate(
+        ExpectedSystemDeployState memory _expected,
+        GameType _gameType
+    )
+        private
+        pure
+        returns (Claim)
+    {
         if (_gameType.raw() == GameTypes.CANNON_KONA.raw()) {
             return _expected.cannonKonaPrestate;
         }
@@ -436,28 +412,6 @@ abstract contract StandardSystemAssertions is Test {
             return _expected.permissionedCannonPrestate;
         }
         return _expected.cannonPrestate;
-    }
-
-    function _expectedL1PAOMultisig(
-        Expected memory _expected,
-        ValidationOverrides memory _overrides
-    )
-        private
-        pure
-        returns (address)
-    {
-        return _overrides.l1PAOMultisig == address(0) ? _expected.proxyAdminOwner : _overrides.l1PAOMultisig;
-    }
-
-    function _expectedChallenger(
-        Expected memory _expected,
-        ValidationOverrides memory _overrides
-    )
-        private
-        pure
-        returns (address)
-    {
-        return _overrides.challenger == address(0) ? _expected.challenger : _overrides.challenger;
     }
 
     function _proxyAdminFor(address _contract) private view returns (IProxyAdmin) {
