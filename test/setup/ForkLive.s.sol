@@ -177,7 +177,8 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
 
         // Fault proof proxied contracts
         IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(systemConfig.disputeGameFactory());
-        IAggregateVerifier aggregateVerifier = IAggregateVerifier(address(disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER)));
+        IAggregateVerifier aggregateVerifier =
+            IAggregateVerifier(address(disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER)));
         GameAddresses memory gameAddresses = _permissionedGameAddresses(aggregateVerifier);
         _saveProxyAndImpl("AnchorStateRegistry", gameAddresses.anchorStateRegistry);
         _saveProxyAndImpl("DisputeGameFactory", address(disputeGameFactory));
@@ -294,9 +295,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
     }
 
     /// @notice Returns the addresses encoded for the permissioned dispute game.
-    function _permissionedGameAddresses(
-        IAggregateVerifier _aggregateVerifier
-    )
+    function _permissionedGameAddresses(IAggregateVerifier _aggregateVerifier)
         internal
         view
         returns (GameAddresses memory game_)

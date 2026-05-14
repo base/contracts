@@ -322,8 +322,7 @@ contract SystemDeploy is Script {
 
         output_.superchain = _deployOrLoadSuperchain(_input);
         if (_input.deployImplementations) {
-            output_.impls =
-                _deployImplementations(_withSuperchainImplementationsInput(_input, output_.superchain));
+            output_.impls = _deployImplementations(_withSuperchainImplementationsInput(_input, output_.superchain));
         } else {
             _assertValidImplementations(_input.implementations);
             output_.impls = _input.implementations;
@@ -477,8 +476,7 @@ contract SystemDeploy is Script {
     {
         _assertValidImplementationInput(_input);
 
-        output_.superchainConfigImpl =
-            address(_deploySuperchainConfigImpl(_input.guardian, _input.incidentResponder));
+        output_.superchainConfigImpl = address(_deploySuperchainConfigImpl(_input.guardian, _input.incidentResponder));
         output_.systemConfigImpl = address(_deploySystemConfigImpl());
         output_.l1CrossDomainMessengerImpl = address(_deployL1CrossDomainMessengerImpl());
         output_.l1ERC721BridgeImpl = address(_deployL1ERC721BridgeImpl());
@@ -691,9 +689,7 @@ contract SystemDeploy is Script {
         _upgradeTo(proxyAdmin, address(optimismPortal), _impls.optimismPortalImpl);
         _upgradeTo(proxyAdmin, address(optimismPortal.anchorStateRegistry()), _impls.anchorStateRegistryImpl);
         _upgradeTo(
-            proxyAdmin,
-            _systemConfigProxy.optimismMintableERC20Factory(),
-            _impls.optimismMintableERC20FactoryImpl
+            proxyAdmin, _systemConfigProxy.optimismMintableERC20Factory(), _impls.optimismMintableERC20FactoryImpl
         );
 
         IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(_systemConfigProxy.disputeGameFactory());
@@ -706,7 +702,6 @@ contract SystemDeploy is Script {
 
         emit Upgraded(l2ChainId, _systemConfigProxy, msg.sender);
     }
-
 
     function _encodeSystemConfigInitializer(
         Types.DeployInput memory _input,

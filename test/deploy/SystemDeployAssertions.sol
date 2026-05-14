@@ -228,9 +228,7 @@ abstract contract SystemDeployAssertions is Test {
         (Hash anchorRoot,) = asr.getAnchorRoot();
         assertNotEq(anchorRoot.raw(), bytes32(0), "AV-120");
         _assertDelayedWETH(_expected, _proxyAdmin, weth);
-        _assertAnchorStateRegistry(
-            _expected, _proxyAdmin, _factory, asr
-        );
+        _assertAnchorStateRegistry(_expected, _proxyAdmin, _factory, asr);
     }
 
     // TODO: adapt this to assert AggregateVerifier args

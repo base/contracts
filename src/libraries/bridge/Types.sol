@@ -2,10 +2,7 @@
 pragma solidity ^0.8.15;
 
 // Libraries
-import {
-    Hash,
-    GameType
-} from "src/libraries/bridge/LibUDT.sol";
+import { Hash, GameType } from "src/libraries/bridge/LibUDT.sol";
 
 /// @notice The current status of the dispute game.
 enum GameStatus {

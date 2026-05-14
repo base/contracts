@@ -163,9 +163,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertFalse(upgradeOutput.superchainConfigUpgraded, "superchain already current");
         assertEq(upgradeOutput.chainsUpgraded, 1, "chains upgraded");
         _assertUpgradedProxyImplementations(output);
-        assertValidStandardSystem(
-            _expected(output, _defaultDeployInput())
-        );
+        assertValidStandardSystem(_expected(output, _defaultDeployInput()));
     }
 
     function test_deploy_reusingImplementations_doesNotSaveZeroImplementationOnlyArtifacts() public {
