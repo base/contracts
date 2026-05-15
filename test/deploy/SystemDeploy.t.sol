@@ -76,6 +76,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertEq(output.superchainProxyAdmin.owner(), _superchainProxyAdminOwner, "proxy admin owner");
         assertEq(output.superchainConfigProxy.guardian(), _guardian, "proxy guardian");
         assertEq(output.superchainConfigImpl.guardian(), _guardian, "impl guardian");
+        assertEq(output.superchainConfigProxy.incidentResponder(), _incidentResponder, "proxy incident responder");
+        assertEq(output.superchainConfigImpl.incidentResponder(), _incidentResponder, "impl incident responder");
 
         vm.startPrank(address(0));
         assertEq(
@@ -93,15 +95,13 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
 
     function test_deploySuperchain_nullInput_reverts() public {
         SystemDeploy.SuperchainInput memory input = SystemDeploy.SuperchainInput({
-            guardian: guardian, incidentResponder: address(0), superchainProxyAdminOwner: owner
+            guardian: guardian, incidentResponder: incidentResponder, superchainProxyAdminOwner: address(0)
         });
-
-        input.superchainProxyAdminOwner = address(0);
         vm.expectRevert(abi.encodeWithSelector(SystemDeploy.InvalidRoleAddress.selector, "superchainProxyAdminOwner"));
         systemDeploy.deploySuperchain(input);
 
         input = SystemDeploy.SuperchainInput({
-            guardian: address(0), incidentResponder: address(0), superchainProxyAdminOwner: owner
+            guardian: address(0), incidentResponder: incidentResponder, superchainProxyAdminOwner: owner
         });
         vm.expectRevert(abi.encodeWithSelector(SystemDeploy.InvalidRoleAddress.selector, "guardian"));
         systemDeploy.deploySuperchain(input);
@@ -109,7 +109,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
 
     function test_deploySuperchain_reuseAddresses_succeeds() public {
         SystemDeploy.SuperchainInput memory input = SystemDeploy.SuperchainInput({
-            guardian: guardian, incidentResponder: address(0), superchainProxyAdminOwner: owner
+            guardian: guardian, incidentResponder: incidentResponder, superchainProxyAdminOwner: owner
         });
 
         SystemDeploy.SuperchainOutput memory output0 = systemDeploy.deploySuperchain(input);
