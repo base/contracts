@@ -44,8 +44,8 @@ contract RelayActor is StdUtils {
     /// @notice Relays a message to the `L1CrossDomainMessenger` with a random `version`,
     ///         and `_message`.
     function relay(uint8 _version, uint8 _value, bytes memory _message) external {
-        // Restrict version to [0, 1] and value to [0, 1] (variance with/without value;
-        // the ID precompile accepts value).
+        // Vary value between 0 and 1 to exercise the with/without-value paths; the ID
+        // precompile accepts value.
         _version = _version % 2;
         _value = _value % 2;
 
@@ -69,7 +69,6 @@ contract RelayActor is StdUtils {
             Hashing.hashCrossDomainMessageV1(nonce, sender, IDENTITY_PRECOMPILE, _value, relayMinGasLimit, _message);
         hashes.push(_hash);
 
-        // Make sure we've got a fresh message.
         vm.assume(xdm.successfulMessages(_hash) == false && xdm.failedMessages(_hash) == false);
 
         vm.startPrank(address(op));
