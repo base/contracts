@@ -18,8 +18,6 @@
 src_validation = [
     "test/invariants/",                         # Invariant testing framework - no direct src counterpart
     "test/scripts/",                            # Script tests - test deployment/utility scripts, not contracts
-    "test/cannon/MIPS64Memory.t.sol",           # Tests external MIPS implementation
-    "test/libraries/bridge/LibClock.t.sol",     # Tests library utilities
     "test/libraries/bridge/LibGameId.t.sol",    # Tests library utilities
     "test/universal/ExtendedPause.t.sol",       # Tests extended functionality
     "test/vendor/Initializable.t.sol",          # Tests external vendor code
@@ -41,7 +39,6 @@ src_validation = [
 # These naming inconsistencies may indicate the presence of specialized test
 # infrastructure beyond standard harnesses or different setup contracts patterns.
 contract_name_validation = [
-    "test/L1/proofs/FaultDisputeGame.t.sol", # Contains contracts not matching FaultDisputeGame base name
     "test/L1/ResourceMetering.t.sol",        # Contains contracts not matching ResourceMetering base name
     "test/L2/GasPriceOracle.t.sol",          # Contains contracts not matching GasPriceOracle base name
     "test/universal/StandardBridge.t.sol",   # Contains contracts not matching StandardBridge base name

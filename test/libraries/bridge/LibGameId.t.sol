@@ -3,6 +3,7 @@ pragma solidity ^0.8.15;
 
 import { Test } from "lib/forge-std/src/Test.sol";
 
+import { Timestamp, GameId, LibGameId } from "src/libraries/bridge/LibUDT.sol";
 import "src/libraries/bridge/Types.sol";
 
 /// @title LibGameId_Pack_Test

@@ -22,8 +22,6 @@ additional_compiler_profiles = [
 ]
 compilation_restrictions = [
   { paths = "src/L1/proofs/DisputeGameFactory.sol", optimizer_runs = 5000 },
-  { paths = "src/L1/proofs/v2/FaultDisputeGameV2.sol", optimizer_runs = 5000 },
-  { paths = "src/L1/proofs/v2/PermissionedDisputeGameV2.sol", optimizer_runs = 5000 },
   { paths = "src/L1/OptimismPortal2.sol", optimizer_runs = 5000 },
   { paths = "src/L1/SystemConfig.sol", optimizer_runs = 5000 },
   { paths = "src/universal/OptimismMintableERC20Factory.sol", optimizer_runs = 5000 },
@@ -140,8 +138,6 @@ additional_compiler_profiles = [
 ]
 compilation_restrictions = [
   { paths = "src/L1/proofs/DisputeGameFactory.sol", optimizer_runs = 0 },
-  { paths = "src/L1/proofs/v2/FaultDisputeGameV2.sol", optimizer_runs = 0 },
-  { paths = "src/L1/proofs/v2/PermissionedDisputeGameV2.sol", optimizer_runs = 0 },
   { paths = "src/L1/OptimismPortal2.sol", optimizer_runs = 0 },
   { paths = "src/L1/SystemConfig.sol", optimizer_runs = 0 },
   { paths = "src/universal/OptimismMintableERC20Factory.sol", optimizer_runs = 0 },

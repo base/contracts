@@ -14,16 +14,17 @@ import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
 
 // Libraries
-import { GameTypes, Claim } from "src/libraries/bridge/Types.sol";
+import { GameTypes } from "src/libraries/bridge/Types.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
-import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { IBigStepper } from "interfaces/L1/proofs/IBigStepper.sol";
+import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
+import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
+import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
@@ -59,7 +60,6 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
     struct GameAddresses {
         address anchorStateRegistry;
         address weth;
-        address mips;
     }
 
     /// @notice Thrown when testing with an unsupported chain ID.
@@ -174,23 +174,14 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         _saveProxyAndImpl("L1StandardBridge", systemConfigAddresses.l1StandardBridge);
         _saveProxyAndImpl("L1ERC721Bridge", systemConfigAddresses.l1ERC721Bridge);
 
-        // Fault proof proxied contracts
         IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(systemConfig.disputeGameFactory());
-        IFaultDisputeGameV2 permissionedDisputeGame =
-            IFaultDisputeGameV2(address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON)));
-        GameAddresses memory gameAddresses = _permissionedGameAddresses(disputeGameFactory, permissionedDisputeGame);
+        IAggregateVerifier aggregateVerifier =
+            IAggregateVerifier(address(disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER)));
+        GameAddresses memory gameAddresses = _aggregateVerifierAddresses(aggregateVerifier);
         _saveProxyAndImpl("AnchorStateRegistry", gameAddresses.anchorStateRegistry);
         _saveProxyAndImpl("DisputeGameFactory", address(disputeGameFactory));
 
-        // Fault proof non-proxied contracts
-        IBigStepper mips = IBigStepper(gameAddresses.mips);
-        artifacts.save("PreimageOracle", address(mips.oracle()));
-        artifacts.save("MipsSingleton", address(mips));
-
-        artifacts.save("PermissionedDisputeGame", address(permissionedDisputeGame));
-        artifacts.save("PermissionedDelayedWETHProxy", gameAddresses.weth);
-
-        // Pull the DelayedWETH addresses from the PermissionedDisputeGame so stale local data cannot break this.
+        // Pull DelayedWETH from the AggregateVerifier so stale local data cannot break this.
         artifacts.save("DelayedWETHProxy", gameAddresses.weth);
         artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(gameAddresses.weth));
     }
@@ -208,13 +199,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         SystemDeploy systemDeploy = new SystemDeploy();
         Types.Implementations memory implementations = _latestImplementations();
 
-        ISystemConfig systemConfig = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
-        Types.OpChainConfig[] memory opChains = new Types.OpChainConfig[](1);
-        opChains[0] = Types.OpChainConfig({
-            systemConfigProxy: systemConfig,
-            cannonPrestate: Claim.wrap(bytes32(keccak256("cannonPrestate"))),
-            cannonKonaPrestate: Claim.wrap(bytes32(keccak256("cannonKonaPrestate")))
-        });
+        ISystemConfig systemConfigProxy = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
 
         ISuperchainConfig superchainConfig = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
         IProxyAdmin superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
@@ -228,7 +213,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
                 saveArtifacts: false,
                 superchainConfigProxy: superchainConfig,
                 implementations: implementations,
-                opChainConfigs: new Types.OpChainConfig[](0)
+                systemConfigProxy: ISystemConfig(address(0))
             })
         );
 
@@ -239,7 +224,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
                 saveArtifacts: false,
                 superchainConfigProxy: ISuperchainConfig(address(0)),
                 implementations: implementations,
-                opChainConfigs: opChains
+                systemConfigProxy: systemConfigProxy
             })
         );
     }
@@ -269,12 +254,10 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         // A new ASR and new dispute games were deployed, so we need to update them
         IDisputeGameFactory disputeGameFactory =
             IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
-        address permissionedDisputeGame = address(disputeGameFactory.gameImpls(GameTypes.PERMISSIONED_CANNON));
-        artifacts.save("PermissionedDisputeGame", permissionedDisputeGame);
+        IDisputeGame av = disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER);
+        artifacts.save("AggregateVerifier", address(av));
 
-        IAnchorStateRegistry newAnchorStateRegistry = IAnchorStateRegistry(
-            LibGameArgs.decode(disputeGameFactory.gameArgs(GameTypes.PERMISSIONED_CANNON)).anchorStateRegistry
-        );
+        IAnchorStateRegistry newAnchorStateRegistry = av.anchorStateRegistry();
         artifacts.save("AnchorStateRegistryProxy", address(newAnchorStateRegistry));
 
         // Get the lockbox address from the portal, and save it
@@ -283,8 +266,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         artifacts.save("ETHLockboxProxy", lockboxAddress);
 
         // Get the new DelayedWETH address and save it (might be a new proxy).
-        IDelayedWETH newDelayedWeth =
-            IDelayedWETH(payable(LibGameArgs.decode(disputeGameFactory.gameArgs(GameTypes.PERMISSIONED_CANNON)).weth));
+        IDelayedWETH newDelayedWeth = IAggregateVerifier(address(av)).DELAYED_WETH();
         artifacts.save("DelayedWETHProxy", address(newDelayedWeth));
         artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(address(newDelayedWeth)));
     }
@@ -309,31 +291,15 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         return address(uint160(uint256(vm.load(_proxy, keccak256(abi.encode(_proxy, uint256(1)))))));
     }
 
-    /// @notice Returns the addresses encoded for the permissioned dispute game.
-    function _permissionedGameAddresses(
-        IDisputeGameFactory _disputeGameFactory,
-        IFaultDisputeGameV2 _permissionedDisputeGame
-    )
+    /// @notice Returns the addresses used by the AggregateVerifier.
+    function _aggregateVerifierAddresses(IAggregateVerifier _aggregateVerifier)
         internal
         view
         returns (GameAddresses memory game_)
     {
-        bytes memory gameArgs = _disputeGameFactory.gameArgs(GameTypes.PERMISSIONED_CANNON);
-        if (
-            gameArgs.length == LibGameArgs.PERMISSIONED_ARGS_LENGTH
-                || gameArgs.length == LibGameArgs.PERMISSIONLESS_ARGS_LENGTH
-        ) {
-            LibGameArgs.GameArgs memory decoded = LibGameArgs.decode(gameArgs);
-            return
-                GameAddresses({
-                    anchorStateRegistry: decoded.anchorStateRegistry, weth: decoded.weth, mips: decoded.vm
-                });
-        }
-
         return GameAddresses({
-            anchorStateRegistry: address(_permissionedDisputeGame.anchorStateRegistry()),
-            weth: address(_permissionedDisputeGame.weth()),
-            mips: address(_permissionedDisputeGame.vm())
+            anchorStateRegistry: address(_aggregateVerifier.anchorStateRegistry()),
+            weth: address(_aggregateVerifier.DELAYED_WETH())
         });
     }
 }

@@ -1,23 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Test } from "lib/forge-std/src/Test.sol";
+import { Test, console } from "lib/forge-std/src/Test.sol";
 
 import { Types } from "scripts/libraries/Types.sol";
 
 import { Constants } from "src/libraries/Constants.sol";
 import { Features } from "src/libraries/Features.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
-import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
-import { Claim, Duration, GameType, GameTypes, Hash } from "src/libraries/bridge/Types.sol";
+import { GameType, Hash } from "src/libraries/bridge/Types.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
-import { IPreimageOracle } from "interfaces/cannon/IPreimageOracle.sol";
-import { IMIPS64 } from "interfaces/cannon/IMIPS64.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
+import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
@@ -34,26 +32,21 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 abstract contract SystemDeployAssertions is Test {
     struct ExpectedSystemDeployState {
         ISystemConfig systemConfig;
+        IAnchorStateRegistry anchorStateRegistry;
         ISuperchainConfig superchainConfig;
         Types.Implementations implementations;
+        IDelayedWETH delayedWETH;
         IETHLockbox ethLockbox;
         address proxyAdminOwner;
-        address challenger;
-        address proposer;
+        GameType multiproofGameType;
+        bytes32 teeImageHash;
+        bytes32 zkRangeHash;
+        bytes32 zkAggregationHash;
+        bytes32 multiproofConfigHash;
         uint256 l2ChainId;
-        Claim permissionedCannonPrestate;
-        Claim cannonPrestate;
-        Claim cannonKonaPrestate;
-        bool expectCannon;
-        bool expectCannonKona;
+        uint256 multiproofBlockInterval;
+        uint256 multiproofIntermediateBlockInterval;
         uint256 withdrawalDelaySeconds;
-        uint256 minProposalSizeBytes;
-        uint256 challengePeriodSeconds;
-        uint256 mipsVersion;
-        uint256 disputeMaxGameDepth;
-        uint256 disputeSplitDepth;
-        Duration disputeClockExtension;
-        Duration disputeMaxClockDuration;
     }
 
     function assertValidStandardSystem(ExpectedSystemDeployState memory _expected) internal view {
@@ -64,7 +57,7 @@ abstract contract SystemDeployAssertions is Test {
         _assertSystemConfig(_expected, proxyAdmin);
         _assertBridgeAndPortalWiring(_expected, proxyAdmin);
         _assertDisputeGameFactory(_expected, proxyAdmin);
-        _assertGames(_expected, proxyAdmin);
+        _assertGame(_expected, proxyAdmin, _expected.multiproofGameType);
         _assertETHLockbox(_expected, proxyAdmin);
     }
 
@@ -98,6 +91,7 @@ abstract contract SystemDeployAssertions is Test {
         assertEq(address(sysCfg.superchainConfig()), address(_expected.superchainConfig), "SYSCON-130");
         assertEq(sysCfg.batchInbox(), Types.chainIdToBatchInboxAddress(_expected.l2ChainId), "SYSCON-140");
         assertEq(sysCfg.l2ChainId(), _expected.l2ChainId, "SYSCON-150");
+        assertEq(sysCfg.delayedWETH(), address(_expected.delayedWETH), "SYSCON-160");
     }
 
     function _assertBridgeAndPortalWiring(
@@ -178,8 +172,8 @@ abstract contract SystemDeployAssertions is Test {
         );
         assertEq(address(portal.disputeGameFactory()), address(dgf), "PORTAL-30");
         assertEq(address(portal.systemConfig()), address(sysCfg), "PORTAL-40");
-        LibGameArgs.GameArgs memory permissionedArgs = LibGameArgs.decode(dgf.gameArgs(GameTypes.PERMISSIONED_CANNON));
-        assertEq(address(portal.anchorStateRegistry()), permissionedArgs.anchorStateRegistry, "PORTAL-50");
+        IDisputeGame av = dgf.gameImpls(_expected.multiproofGameType);
+        assertEq(address(portal.anchorStateRegistry()), address(av.anchorStateRegistry()), "PORTAL-50");
         assertEq(portal.l2Sender(), Constants.DEFAULT_L2_SENDER, "PORTAL-80");
         assertEq(address(_proxyAdminFor(address(portal))), address(_proxyAdmin), "PORTAL-90");
     }
@@ -202,53 +196,27 @@ abstract contract SystemDeployAssertions is Test {
         assertEq(address(_proxyAdminFor(address(factory))), address(_proxyAdmin), "DF-40");
     }
 
-    function _assertGames(ExpectedSystemDeployState memory _expected, IProxyAdmin _proxyAdmin) private view {
-        _assertGame(_expected, _proxyAdmin, GameTypes.PERMISSIONED_CANNON, true, "PDDG");
-        _assertGame(_expected, _proxyAdmin, GameTypes.CANNON, _expected.expectCannon, "PLDG");
-        _assertGame(_expected, _proxyAdmin, GameTypes.CANNON_KONA, _expected.expectCannonKona, "CKDG");
-    }
-
     function _assertGame(
         ExpectedSystemDeployState memory _expected,
         IProxyAdmin _proxyAdmin,
-        GameType _gameType,
-        bool _expectSet,
-        string memory _prefix
+        GameType _gameType
     )
         private
         view
     {
         IDisputeGameFactory factory = IDisputeGameFactory(_expected.systemConfig.disputeGameFactory());
         IDisputeGame game = factory.gameImpls(_gameType);
-        if (!_expectSet) {
-            assertEq(address(game), address(0), string.concat(_prefix, "-10"));
-            assertEq(factory.gameArgs(_gameType).length, 0, string.concat(_prefix, "-GARGS-10"));
-            return;
-        }
 
-        assertNotEq(address(game), address(0), string.concat(_prefix, "-10"));
-        bool permissioned = _gameType.raw() == GameTypes.PERMISSIONED_CANNON.raw();
-        address expectedImpl = permissioned
-            ? _expected.implementations.permissionedDisputeGameV2Impl
-            : _expected.implementations.faultDisputeGameV2Impl;
-        assertEq(address(game), expectedImpl, string.concat(_prefix, "-15"));
-        assertEq(_version(address(game)), _version(expectedImpl), string.concat(_prefix, "-20"));
+        assertNotEq(address(game), address(0), "AV-10");
+        address expectedImpl = _expected.implementations.aggregateVerifierImpl;
+        assertEq(address(game), expectedImpl, "AV-15");
+        assertEq(_version(address(game)), _version(expectedImpl), "AV-20");
 
-        bytes memory rawArgs = factory.gameArgs(_gameType);
-        if (permissioned) {
-            assertTrue(LibGameArgs.isValidPermissionedArgs(rawArgs), string.concat(_prefix, "-GARGS-10"));
-        } else {
-            assertTrue(LibGameArgs.isValidPermissionlessArgs(rawArgs), string.concat(_prefix, "-GARGS-10"));
-        }
         _assertGameArgsAndContracts({
             _expected: _expected,
             _proxyAdmin: _proxyAdmin,
             _factory: factory,
-            _faultGame: IFaultDisputeGameV2(address(game)),
-            _gameType: _gameType,
-            _args: LibGameArgs.decode(rawArgs),
-            _permissioned: permissioned,
-            _prefix: _prefix
+            _aggregateVerifier: IAggregateVerifier(address(game))
         });
     }
 
@@ -256,68 +224,55 @@ abstract contract SystemDeployAssertions is Test {
         ExpectedSystemDeployState memory _expected,
         IProxyAdmin _proxyAdmin,
         IDisputeGameFactory _factory,
-        IFaultDisputeGameV2 _faultGame,
-        GameType _gameType,
-        LibGameArgs.GameArgs memory _args,
-        bool _permissioned,
-        string memory _prefix
+        IAggregateVerifier _aggregateVerifier
     )
         private
         view
     {
-        Claim expectedPrestate = _expectedPrestate(_expected, _gameType);
-        assertEq(_args.absolutePrestate, expectedPrestate.raw(), string.concat(_prefix, "-40"));
-        assertEq(_args.vm, _expected.implementations.mipsImpl, string.concat(_prefix, "-VM-10"));
-        assertEq(_args.l2ChainId, _expected.l2ChainId, string.concat(_prefix, "-60"));
-        _assertGameImmutableArgs(_expected, _faultGame, _prefix);
+        IAnchorStateRegistry asr = _aggregateVerifier.anchorStateRegistry();
+        IDelayedWETH weth = _aggregateVerifier.DELAYED_WETH();
+        _assertGameImmutableArgs(_expected, _factory, _aggregateVerifier);
 
-        (Hash anchorRoot,) = IAnchorStateRegistry(_args.anchorStateRegistry).getAnchorRoot();
-        assertNotEq(anchorRoot.raw(), bytes32(0), string.concat(_prefix, "-120"));
-
-        if (_permissioned) {
-            assertEq(_args.challenger, _expected.challenger, "PDDG-130");
-            assertEq(_args.proposer, _expected.proposer, "PDDG-140");
-        } else {
-            assertEq(_args.challenger, address(0), string.concat(_prefix, "-130"));
-            assertEq(_args.proposer, address(0), string.concat(_prefix, "-140"));
-        }
-
-        _assertDelayedWETH(_expected, _proxyAdmin, IDelayedWETH(payable(_args.weth)), _prefix);
-        _assertAnchorStateRegistry(
-            _expected, _proxyAdmin, _factory, IAnchorStateRegistry(_args.anchorStateRegistry), _prefix
-        );
-        _assertMipsAndPreimageOracle(_expected, IMIPS64(_args.vm), _prefix);
+        (Hash anchorRoot,) = asr.getAnchorRoot();
+        assertNotEq(anchorRoot.raw(), bytes32(0), "AV-200");
+        _assertDelayedWETH(_expected, _proxyAdmin, weth);
+        _assertAnchorStateRegistry(_expected, _proxyAdmin, _factory, asr);
     }
 
     function _assertGameImmutableArgs(
         ExpectedSystemDeployState memory _expected,
-        IFaultDisputeGameV2 _faultGame,
-        string memory _prefix
+        IDisputeGameFactory _factory,
+        IAggregateVerifier _aggregateVerifier
     )
         private
         view
     {
-        assertEq(_faultGame.l2SequenceNumber(), 0, string.concat(_prefix, "-70"));
+        assertEq(_aggregateVerifier.gameType().raw(), _expected.multiproofGameType.raw(), "AV-30");
+        assertEq(address(_aggregateVerifier.anchorStateRegistry()), address(_expected.anchorStateRegistry), "AV-40");
+        assertEq(address(_aggregateVerifier.DISPUTE_GAME_FACTORY()), address(_factory), "AV-50");
+        assertEq(address(_aggregateVerifier.DELAYED_WETH()), address(_expected.delayedWETH), "AV-60");
+        assertEq(address(_aggregateVerifier.TEE_VERIFIER()), _expected.implementations.teeVerifierImpl, "AV-70");
+        assertEq(address(_aggregateVerifier.ZK_VERIFIER()), _expected.implementations.zkVerifierImpl, "AV-80");
+        assertEq(_aggregateVerifier.TEE_IMAGE_HASH(), _expected.teeImageHash, "AV-90");
+        assertEq(_aggregateVerifier.ZK_RANGE_HASH(), _expected.zkRangeHash, "AV-100");
+        assertEq(_aggregateVerifier.ZK_AGGREGATE_HASH(), _expected.zkAggregationHash, "AV-110");
+        assertEq(_aggregateVerifier.CONFIG_HASH(), _expected.multiproofConfigHash, "AV-120");
+        assertEq(_aggregateVerifier.L2_CHAIN_ID(), _expected.l2ChainId, "AV-130");
+        assertEq(_aggregateVerifier.BLOCK_INTERVAL(), _expected.multiproofBlockInterval, "AV-140");
         assertEq(
-            _faultGame.clockExtension().raw(), _expected.disputeClockExtension.raw(), string.concat(_prefix, "-80")
-        );
-        assertEq(_faultGame.splitDepth(), _expected.disputeSplitDepth, string.concat(_prefix, "-90"));
-        assertEq(_faultGame.maxGameDepth(), _expected.disputeMaxGameDepth, string.concat(_prefix, "-100"));
-        assertEq(
-            _faultGame.maxClockDuration().raw(), _expected.disputeMaxClockDuration.raw(), string.concat(_prefix, "-110")
+            _aggregateVerifier.INTERMEDIATE_BLOCK_INTERVAL(), _expected.multiproofIntermediateBlockInterval, "AV-150"
         );
     }
 
     function _assertDelayedWETH(
         ExpectedSystemDeployState memory _expected,
         IProxyAdmin _proxyAdmin,
-        IDelayedWETH _weth,
-        string memory _prefix
+        IDelayedWETH _weth
     )
         private
         view
     {
-        string memory prefix = string.concat(_prefix, "-DWETH");
+        string memory prefix = "AV-DWETH";
         assertEq(
             _version(address(_weth)), _version(_expected.implementations.delayedWETHImpl), string.concat(prefix, "-10")
         );
@@ -336,13 +291,12 @@ abstract contract SystemDeployAssertions is Test {
         ExpectedSystemDeployState memory _expected,
         IProxyAdmin _proxyAdmin,
         IDisputeGameFactory _factory,
-        IAnchorStateRegistry _asr,
-        string memory _prefix
+        IAnchorStateRegistry _asr
     )
         private
         view
     {
-        string memory prefix = string.concat(_prefix, "-ANCHORP");
+        string memory prefix = "AV-ANCHORP";
         assertEq(
             _version(address(_asr)),
             _version(_expected.implementations.anchorStateRegistryImpl),
@@ -357,26 +311,6 @@ abstract contract SystemDeployAssertions is Test {
         assertEq(address(_asr.systemConfig()), address(_expected.systemConfig), string.concat(prefix, "-40"));
         assertEq(address(_proxyAdminFor(address(_asr))), address(_proxyAdmin), string.concat(prefix, "-50"));
         assertGt(_asr.retirementTimestamp(), 0, string.concat(prefix, "-60"));
-    }
-
-    function _assertMipsAndPreimageOracle(
-        ExpectedSystemDeployState memory _expected,
-        IMIPS64 _mips,
-        string memory _prefix
-    )
-        private
-        view
-    {
-        string memory vmPrefix = string.concat(_prefix, "-VM");
-        assertEq(address(_mips), _expected.implementations.mipsImpl, string.concat(vmPrefix, "-10"));
-        assertEq(_version(address(_mips)), _version(_expected.implementations.mipsImpl), string.concat(vmPrefix, "-20"));
-        assertEq(_mips.stateVersion(), _expected.mipsVersion, string.concat(vmPrefix, "-30"));
-
-        IPreimageOracle oracle = _mips.oracle();
-        string memory oraclePrefix = string.concat(_prefix, "-PIMGO");
-        assertGt(bytes(_version(address(oracle))).length, 0, string.concat(oraclePrefix, "-10"));
-        assertEq(oracle.challengePeriod(), _expected.challengePeriodSeconds, string.concat(oraclePrefix, "-20"));
-        assertEq(oracle.minProposalSize(), _expected.minProposalSizeBytes, string.concat(oraclePrefix, "-30"));
     }
 
     function _assertETHLockbox(ExpectedSystemDeployState memory _expected, IProxyAdmin _proxyAdmin) private view {
@@ -395,23 +329,6 @@ abstract contract SystemDeployAssertions is Test {
         if (_expected.systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX)) {
             assertEq(address(portal.ethLockbox()), address(lockbox), "LOCKBOX-60");
         }
-    }
-
-    function _expectedPrestate(
-        ExpectedSystemDeployState memory _expected,
-        GameType _gameType
-    )
-        private
-        pure
-        returns (Claim)
-    {
-        if (_gameType.raw() == GameTypes.CANNON_KONA.raw()) {
-            return _expected.cannonKonaPrestate;
-        }
-        if (_gameType.raw() == GameTypes.PERMISSIONED_CANNON.raw()) {
-            return _expected.permissionedCannonPrestate;
-        }
-        return _expected.cannonPrestate;
     }
 
     function _proxyAdminFor(address _contract) private view returns (IProxyAdmin) {

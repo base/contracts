@@ -34,7 +34,6 @@ import { IOptimismMintableERC721Factory } from "interfaces/L2/IOptimismMintableE
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { IBigStepper } from "interfaces/L1/proofs/IBigStepper.sol";
 import { IL2CrossDomainMessenger } from "interfaces/L2/IL2CrossDomainMessenger.sol";
 import { IL2StandardBridge } from "interfaces/L2/IL2StandardBridge.sol";
 import { IL2ToL1MessagePasser } from "interfaces/L2/IL2ToL1MessagePasser.sol";
@@ -49,8 +48,6 @@ import { IGasPriceOracle } from "interfaces/L2/IGasPriceOracle.sol";
 import { IL1Block } from "interfaces/L2/IL1Block.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IWETH98 } from "interfaces/universal/IWETH98.sol";
-import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
-import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
@@ -92,10 +89,7 @@ abstract contract Setup is FeatureFlags {
     // L1 contracts - dispute
     IDisputeGameFactory disputeGameFactory;
     IAnchorStateRegistry anchorStateRegistry;
-    IFaultDisputeGameV2 faultDisputeGame;
     IDelayedWETH delayedWeth;
-    IPermissionedDisputeGameV2 permissionedDisputeGame;
-    IDelayedWETH delayedWETHPermissionedGameProxy;
 
     // L1 contracts - core
     address proxyAdminOwner;
@@ -111,7 +105,6 @@ abstract contract Setup is FeatureFlags {
     IL1ERC721Bridge l1ERC721Bridge;
     IOptimismMintableERC20Factory l1OptimismMintableERC20Factory;
     ISuperchainConfig superchainConfig;
-    IBigStepper mips;
 
     // L2 contracts
     IL2CrossDomainMessenger l2CrossDomainMessenger =
@@ -263,7 +256,6 @@ abstract contract Setup is FeatureFlags {
         proxyAdminOwner = proxyAdmin.owner();
         superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
         superchainProxyAdminOwner = superchainProxyAdmin.owner();
-        mips = IBigStepper(artifacts.mustGetAddress("MipsSingleton"));
         aggregateVerifier = IVerifier(artifacts.getAddress("AggregateVerifier"));
         teeProverRegistry = TEEProverRegistry(artifacts.getAddress("TEEProverRegistry"));
 

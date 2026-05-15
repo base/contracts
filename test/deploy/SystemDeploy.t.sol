@@ -8,17 +8,16 @@ import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Types } from "scripts/libraries/Types.sol";
 import { SystemDeployAssertions } from "test/deploy/SystemDeployAssertions.sol";
 
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { LibGameArgs } from "src/libraries/bridge/LibGameArgs.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
-import { Claim, Duration, GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 contract MockNitroEnclaveVerifier {
     address public proofSubmitter;
@@ -35,8 +34,6 @@ contract MockSP1Verifier {
 contract SystemDeploy_Test is Test, SystemDeployAssertions {
     Artifacts internal constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
-    uint256 internal constant STANDARD_MIPS_VERSION = 8;
-
     SystemDeploy internal systemDeploy;
 
     address internal owner = address(this);
@@ -130,178 +127,77 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertNotEq(address(output.opChain.systemConfigProxy), address(0), "system config");
         assertNotEq(address(output.opChain.optimismPortalProxy), address(0), "portal");
         assertNotEq(address(output.opChain.ethLockboxProxy), address(0), "lockbox");
-        assertNotEq(address(output.opChain.delayedWETHPermissionlessGameProxy), address(0), "permissionless weth");
+        assertNotEq(address(output.opChain.delayedWETHProxy), address(0), "delayed weth");
 
         assertEq(output.opChain.opChainProxyAdmin.owner(), owner, "op chain proxy admin owner");
         assertEq(output.opChain.systemConfigProxy.batchInbox(), Types.chainIdToBatchInboxAddress(l2ChainId), "inbox");
-        assertEq(
-            address(output.opChain.disputeGameFactoryProxy.gameImpls(GameTypes.PERMISSIONED_CANNON)),
-            output.implementationOutput.implementations.permissionedDisputeGameV2Impl,
-            "permissioned game impl"
-        );
         _assertMultiproofDeployed(output, input);
         assertEq(
             address(output.opChain.systemConfigProxy.superchainConfig()),
             address(output.superchain.superchainConfigProxy),
             "superchain config"
         );
-        assertValidStandardSystem(_expected(output, input, false, false, absolutePrestate, Claim.wrap(bytes32(0))));
+        assertValidStandardSystem(_expected(output, input));
     }
 
     function test_upgrade_withoutManagerDelegatecall_succeeds() public {
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_defaultDeployInput());
 
-        Types.OpChainConfig[] memory opChainConfigs = new Types.OpChainConfig[](1);
-        opChainConfigs[0] = Types.OpChainConfig({
-            systemConfigProxy: output.opChain.systemConfigProxy,
-            cannonPrestate: absolutePrestate,
-            cannonKonaPrestate: Claim.wrap(bytes32(0))
-        });
-
         SystemDeploy.UpgradeOutput memory upgradeOutput = systemDeploy.upgrade(
             SystemDeploy.UpgradeInput({
                 saveArtifacts: false,
                 superchainConfigProxy: output.superchain.superchainConfigProxy,
-                implementations: output.implementationOutput.implementations,
-                opChainConfigs: opChainConfigs
+                implementations: output.impls,
+                systemConfigProxy: output.opChain.systemConfigProxy
             })
         );
 
         assertFalse(upgradeOutput.superchainConfigUpgraded, "superchain already current");
-        assertEq(upgradeOutput.chainsUpgraded, 1, "chains upgraded");
-        assertEq(
-            address(output.opChain.disputeGameFactoryProxy.gameImpls(GameTypes.PERMISSIONED_CANNON)),
-            output.implementationOutput.implementations.permissionedDisputeGameV2Impl,
-            "permissioned game impl after upgrade"
-        );
+        assertTrue(upgradeOutput.chainUpgraded, "chain upgraded");
         _assertUpgradedProxyImplementations(output);
-        assertValidStandardSystem(
-            _expected(output, _defaultDeployInput(), false, false, absolutePrestate, Claim.wrap(bytes32(0)))
-        );
-    }
-
-    function test_upgrade_existingCannonKonaFallsBackToCurrentPrestate_succeeds() public {
-        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_defaultDeployInput());
-
-        Claim currentCannonPrestate = Claim.wrap(bytes32(uint256(3)));
-        Claim currentCannonKonaPrestate = Claim.wrap(bytes32(uint256(4)));
-        output.opChain.disputeGameFactoryProxy
-            .setImplementation(
-                GameTypes.CANNON,
-                IDisputeGame(output.implementationOutput.implementations.permissionedDisputeGameV2Impl),
-                _permissionlessGameArgs(output, currentCannonPrestate)
-            );
-        output.opChain.disputeGameFactoryProxy
-            .setImplementation(
-                GameTypes.CANNON_KONA,
-                IDisputeGame(output.implementationOutput.implementations.permissionedDisputeGameV2Impl),
-                _permissionlessGameArgs(output, currentCannonKonaPrestate)
-            );
-        output.opChain.disputeGameFactoryProxy.setInitBond(GameTypes.CANNON, 1 ether);
-
-        Types.OpChainConfig[] memory opChainConfigs = new Types.OpChainConfig[](1);
-        opChainConfigs[0] = Types.OpChainConfig({
-            systemConfigProxy: output.opChain.systemConfigProxy,
-            cannonPrestate: Claim.wrap(bytes32(0)),
-            cannonKonaPrestate: Claim.wrap(bytes32(0))
-        });
-
-        systemDeploy.upgrade(
-            SystemDeploy.UpgradeInput({
-                saveArtifacts: false,
-                superchainConfigProxy: output.superchain.superchainConfigProxy,
-                implementations: output.implementationOutput.implementations,
-                opChainConfigs: opChainConfigs
-            })
-        );
-
-        assertEq(
-            address(output.opChain.disputeGameFactoryProxy.gameImpls(GameTypes.CANNON)),
-            output.implementationOutput.implementations.faultDisputeGameV2Impl,
-            "cannon impl"
-        );
-        assertEq(
-            address(output.opChain.disputeGameFactoryProxy.gameImpls(GameTypes.CANNON_KONA)),
-            output.implementationOutput.implementations.faultDisputeGameV2Impl,
-            "cannon kona impl"
-        );
-
-        LibGameArgs.GameArgs memory cannonArgs =
-            LibGameArgs.decode(output.opChain.disputeGameFactoryProxy.gameArgs(GameTypes.CANNON));
-        LibGameArgs.GameArgs memory cannonKonaArgs =
-            LibGameArgs.decode(output.opChain.disputeGameFactoryProxy.gameArgs(GameTypes.CANNON_KONA));
-        assertEq(cannonArgs.absolutePrestate, currentCannonPrestate.raw(), "cannon prestate");
-        assertEq(cannonKonaArgs.absolutePrestate, currentCannonKonaPrestate.raw(), "cannon kona prestate");
-        assertEq(cannonKonaArgs.weth, cannonArgs.weth, "shared weth");
-        assertEq(cannonKonaArgs.anchorStateRegistry, cannonArgs.anchorStateRegistry, "shared asr");
-        assertEq(
-            output.opChain.disputeGameFactoryProxy.initBonds(GameTypes.CANNON_KONA),
-            output.opChain.disputeGameFactoryProxy.initBonds(GameTypes.CANNON),
-            "cannon kona bond"
-        );
-        assertValidStandardSystem(
-            _expected(output, _defaultDeployInput(), true, true, currentCannonPrestate, currentCannonKonaPrestate)
-        );
+        assertValidStandardSystem(_expected(output, _defaultDeployInput()));
     }
 
     function test_deploy_reusingImplementations_doesNotSaveZeroImplementationOnlyArtifacts() public {
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_defaultDeployInput());
 
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
-        input.deploySuperchain = false;
-        input.deployImplementations = false;
         input.saveArtifacts = true;
         input.superchainConfigProxy = output.superchain.superchainConfigProxy;
-        input.implementations = output.implementationOutput.implementations;
+        input.implementations = output.impls;
         input.opChainInput.l2ChainId = l2ChainId + 1;
-        input.implementationsInput.l2ChainID = input.opChainInput.l2ChainId;
         input.opChainInput.saltMixer = "system-deploy-reuse-test";
 
         vm.mockCallRevert(
-            address(artifacts), abi.encodeCall(Artifacts.save, ("PreimageOracle", address(0))), "zero preimage oracle"
+            address(artifacts),
+            abi.encodeCall(Artifacts.save, ("AggregateVerifier", address(0))),
+            "zero aggregate verifier"
         );
         SystemDeploy.DeployOutput memory reuseOutput = systemDeploy.deploy(input);
 
-        assertEq(
-            address(reuseOutput.implementationOutput.preimageOracleSingleton),
-            address(output.implementationOutput.preimageOracleSingleton),
-            "preimage oracle"
-        );
         _assertMultiproofDeployed(reuseOutput, input);
     }
 
     function _defaultDeployInput() internal view returns (SystemDeploy.DeployInput memory input_) {
-        input_.deploySuperchain = true;
-        input_.deployImplementations = true;
         input_.saveArtifacts = false;
         input_.superchainInput = SystemDeploy.SuperchainInput({
             guardian: guardian, incidentResponder: incidentResponder, superchainProxyAdminOwner: owner
         });
         input_.implementationsInput = SystemDeploy.ImplementationInput({
             withdrawalDelaySeconds: 100,
-            minProposalSizeBytes: 200,
-            challengePeriodSeconds: 300,
             proofMaturityDelaySeconds: 400,
             disputeGameFinalityDelaySeconds: 500,
-            mipsVersion: STANDARD_MIPS_VERSION,
-            faultGameV2MaxGameDepth: 73,
-            faultGameV2SplitDepth: 30,
-            faultGameV2ClockExtension: 10_800,
-            faultGameV2MaxClockDuration: 302_400,
             teeImageHash: bytes32(uint256(1)),
             zkRangeHash: bytes32(uint256(2)),
             zkAggregationHash: bytes32(uint256(3)),
             multiproofConfigHash: bytes32(uint256(4)),
             multiproofGameType: 621,
             nitroEnclaveVerifier: address(nitroEnclaveVerifier),
-            l2ChainID: l2ChainId,
             multiproofBlockInterval: 100,
             multiproofIntermediateBlockInterval: 10,
             sp1Verifier: ISP1Verifier(address(sp1Verifier)),
             teeProposer: proposer,
             teeChallenger: challenger,
-            superchainConfigProxy: ISuperchainConfig(address(0)),
-            superchainProxyAdmin: IProxyAdmin(address(0)),
             guardian: guardian,
             incidentResponder: incidentResponder
         });
@@ -310,44 +206,15 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
                 opChainProxyAdminOwner: owner,
                 systemConfigOwner: owner,
                 batcher: batcher,
-                unsafeBlockSigner: unsafeBlockSigner,
-                proposer: proposer,
-                challenger: challenger
+                unsafeBlockSigner: unsafeBlockSigner
             }),
             basefeeScalar: 100,
             blobBasefeeScalar: 200,
             l2ChainId: l2ChainId,
             startingAnchorRoot: Proposal({ root: Hash.wrap(bytes32(uint256(1))), l2SequenceNumber: 0 }),
             saltMixer: "system-deploy-test",
-            gasLimit: 60_000_000,
-            disputeGameType: GameTypes.PERMISSIONED_CANNON,
-            disputeAbsolutePrestate: absolutePrestate,
-            disputeMaxGameDepth: 73,
-            disputeSplitDepth: 30,
-            disputeClockExtension: Duration.wrap(10_800),
-            disputeMaxClockDuration: Duration.wrap(302_400)
+            gasLimit: 60_000_000
         });
-    }
-
-    function _permissionlessGameArgs(
-        SystemDeploy.DeployOutput memory _output,
-        Claim _absolutePrestate
-    )
-        internal
-        view
-        returns (bytes memory)
-    {
-        return LibGameArgs.encode(
-            LibGameArgs.GameArgs({
-                absolutePrestate: _absolutePrestate.raw(),
-                vm: _output.implementationOutput.implementations.mipsImpl,
-                anchorStateRegistry: address(_output.opChain.anchorStateRegistryProxy),
-                weth: address(_output.opChain.delayedWETHPermissionlessGameProxy),
-                l2ChainId: l2ChainId,
-                proposer: address(0),
-                challenger: address(0)
-            })
-        );
     }
 
     function _assertMultiproofDeployed(
@@ -362,7 +229,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         address teeProverRegistryProxyAddr = address(_output.opChain.teeProverRegistryProxy);
         address teeVerifierAddr = address(_output.opChain.teeVerifier);
         address zkVerifierAddr = address(_output.opChain.zkVerifier);
-        Types.Implementations memory impls = _output.implementationOutput.implementations;
+        Types.Implementations memory impls = _output.impls;
 
         assertNotEq(aggregateVerifierAddr, address(0), "aggregate verifier");
         assertNotEq(teeProverRegistryProxyAddr, address(0), "tee prover registry proxy");
@@ -393,7 +260,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             "aggregate verifier asr"
         );
         assertEq(address(aggregateVerifier.DISPUTE_GAME_FACTORY()), address(_output.opChain.disputeGameFactoryProxy));
-        assertEq(address(aggregateVerifier.DELAYED_WETH()), address(_output.opChain.delayedWETHPermissionlessGameProxy));
+        assertEq(address(aggregateVerifier.DELAYED_WETH()), address(_output.opChain.delayedWETHProxy));
         assertEq(address(aggregateVerifier.TEE_VERIFIER()), teeVerifierAddr);
         assertEq(address(aggregateVerifier.ZK_VERIFIER()), zkVerifierAddr);
         assertEq(aggregateVerifier.TEE_IMAGE_HASH(), _input.implementationsInput.teeImageHash);
@@ -429,7 +296,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     function _assertUpgradedProxyImplementations(SystemDeploy.DeployOutput memory _output) internal view {
         IProxyAdmin superchainProxyAdmin = _output.superchain.superchainProxyAdmin;
         IProxyAdmin opChainProxyAdmin = _output.opChain.opChainProxyAdmin;
-        Types.Implementations memory impls = _output.implementationOutput.implementations;
+        Types.Implementations memory impls = _output.impls;
 
         assertEq(
             superchainProxyAdmin.getProxyImplementation(address(_output.superchain.superchainConfigProxy)),
@@ -480,11 +347,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
 
     function _expected(
         SystemDeploy.DeployOutput memory _output,
-        SystemDeploy.DeployInput memory _input,
-        bool _expectCannon,
-        bool _expectCannonKona,
-        Claim _cannonPrestate,
-        Claim _cannonKonaPrestate
+        SystemDeploy.DeployInput memory _input
     )
         internal
         pure
@@ -492,26 +355,21 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     {
         expected_ = SystemDeployAssertions.ExpectedSystemDeployState({
             systemConfig: _output.opChain.systemConfigProxy,
+            anchorStateRegistry: _output.opChain.anchorStateRegistryProxy,
             superchainConfig: _output.superchain.superchainConfigProxy,
-            implementations: _output.implementationOutput.implementations,
+            implementations: _output.impls,
+            delayedWETH: _output.opChain.delayedWETHProxy,
             ethLockbox: _output.opChain.ethLockboxProxy,
             proxyAdminOwner: _input.opChainInput.roles.opChainProxyAdminOwner,
-            challenger: _input.opChainInput.roles.challenger,
-            proposer: _input.opChainInput.roles.proposer,
+            multiproofGameType: GameType.wrap(uint32(_input.implementationsInput.multiproofGameType)),
+            teeImageHash: _input.implementationsInput.teeImageHash,
+            zkRangeHash: _input.implementationsInput.zkRangeHash,
+            zkAggregationHash: _input.implementationsInput.zkAggregationHash,
+            multiproofConfigHash: _input.implementationsInput.multiproofConfigHash,
             l2ChainId: _input.opChainInput.l2ChainId,
-            permissionedCannonPrestate: _input.opChainInput.disputeAbsolutePrestate,
-            cannonPrestate: _cannonPrestate,
-            cannonKonaPrestate: _cannonKonaPrestate,
-            expectCannon: _expectCannon,
-            expectCannonKona: _expectCannonKona,
-            withdrawalDelaySeconds: _input.implementationsInput.withdrawalDelaySeconds,
-            minProposalSizeBytes: _input.implementationsInput.minProposalSizeBytes,
-            challengePeriodSeconds: _input.implementationsInput.challengePeriodSeconds,
-            mipsVersion: _input.implementationsInput.mipsVersion,
-            disputeMaxGameDepth: _input.opChainInput.disputeMaxGameDepth,
-            disputeSplitDepth: _input.opChainInput.disputeSplitDepth,
-            disputeClockExtension: _input.opChainInput.disputeClockExtension,
-            disputeMaxClockDuration: _input.opChainInput.disputeMaxClockDuration
+            multiproofBlockInterval: _input.implementationsInput.multiproofBlockInterval,
+            multiproofIntermediateBlockInterval: _input.implementationsInput.multiproofIntermediateBlockInterval,
+            withdrawalDelaySeconds: _input.implementationsInput.withdrawalDelaySeconds
         });
     }
 }

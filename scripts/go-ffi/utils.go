@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/ethereum-optimism/optimism/cannon/mipsevm/arch"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/crossdomain"
 	"github.com/ethereum-optimism/optimism/op-core/predeploys"
 	"github.com/ethereum-optimism/optimism/op-node/bindings"
@@ -58,11 +57,6 @@ func parseUintN(s string, bits int) uint64 {
 	return v
 }
 
-// wordArg parses a base-10 cannon memory word from a CLI argument.
-func wordArg(s string) arch.Word {
-	return arch.Word(parseUintN(s, arch.WordSize))
-}
-
 // parseCrossDomainArgs reads the (nonce, sender, target, value, gasLimit, data)
 // tuple shared by the cross-domain-message and withdrawal CLI variants from positional
 // args starting at args[1].
@@ -88,12 +82,6 @@ func packTupleAndPrint(args abi.Arguments, v any) {
 	packed, err := args.Pack(v)
 	checkErr(err, "Error encoding output")
 	fmt.Print(hexutil.Encode(packed[32:]))
-}
-
-// cannonMemoryProofOutput is the ABI shape returned by all cannonMemoryProof variants.
-type cannonMemoryProofOutput struct {
-	MemRoot common.Hash
-	Proof   []byte
 }
 
 func encodeCrossDomainMessage(nonce *big.Int, sender common.Address, target common.Address, value *big.Int, gasLimit *big.Int, data []byte) ([]byte, error) {

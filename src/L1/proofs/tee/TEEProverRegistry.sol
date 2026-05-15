@@ -40,7 +40,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
 
     /// @notice The game type used to look up the AggregateVerifier in the factory.
-    /// @dev Owner-settable to support game type migrations (e.g., moving to a permissioned type).
+    /// @dev Owner-settable to support game type migrations.
     GameType public gameType;
 
     /// @notice Mapping of whether a signer address is registered.

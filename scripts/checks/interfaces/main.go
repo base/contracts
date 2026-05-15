@@ -22,16 +22,10 @@ func normalizeInternalType(internalType string) string {
 
 // excludeContracts is a list of contracts whose interfaces do not need to match perfectly.
 var excludeContracts = []string{
-	"IERC20", "IERC721", "IERC5267", "IERC721Enumerable", "IERC721Upgradeable", "IERC721Metadata",
-	"IERC165", "IERC165Upgradeable", "ERC721TokenReceiver", "ERC1155TokenReceiver",
-	"ERC777TokensRecipient", "Guard", "IProxy", "Vm", "VmSafe", "IMulticall3",
-	"IERC721TokenReceiver", "IProxyCreationCallback", "IBeacon", "IEIP712",
-	"IHasSuperchainConfig",
-	"IEAS", "ISchemaResolver", "ISchemaRegistry",
+	"IProxy", "IEIP712", "IEAS", "ISchemaResolver", "ISchemaRegistry",
 
 	// TODO: Interfaces that need to be fixed
-	"IInitializable", "IOptimismMintableERC20",
-	"KontrolCheatsBase", "IResolvedDelegateProxy",
+	"IInitializable", "IOptimismMintableERC20", "IResolvedDelegateProxy",
 }
 
 // excludeSourceContracts is a list of contracts that are allowed to not have interfaces
@@ -39,7 +33,7 @@ var excludeSourceContracts = []string{
 	"CrossDomainMessengerLegacySpacer0", "CrossDomainMessengerLegacySpacer1",
 
 	// FIXME
-	"WETH", "MIPS64",
+	"WETH",
 }
 
 type ContractDefinition struct {

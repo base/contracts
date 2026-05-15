@@ -17,7 +17,7 @@
   },
   "src/L1/OptimismPortal2.sol:OptimismPortal2": {
     "initCodeHash": "0x2c01bc6c0a55a1a27263224e05c1b28703ff85c61075bae7ab384b3043820ed2",
-    "sourceCodeHash": "0x5dfc09c290c24b144f5af3b2d06478214da5406e8bf7397c69215b45934267ea"
+    "sourceCodeHash": "0xa1281f5da03fa0431eabad33da23f51a8d835b0dd04554603fd59e11efe9fa51"
   },
   "src/L1/SuperchainConfig.sol:SuperchainConfig": {
     "initCodeHash": "0x9b1f3555b499709485d51d5d9665002c0eb1e5eb893be1fb978a30749e894858",
@@ -29,11 +29,11 @@
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0x10bb6a60f21de103d1da9ff310a38f571c53a8113d04a029087648debf3f0341",
-    "sourceCodeHash": "0xc8239431f25b0fa286b8db09eefed42ab3a46f6f03fa3c89b48cfe75fa3439ab"
+    "sourceCodeHash": "0x7024dabd2286101cc07920561f0fa5ce511739345533f939e3d5489c845e0bd9"
   },
   "src/L1/proofs/AnchorStateRegistry.sol:AnchorStateRegistry": {
     "initCodeHash": "0x6f3afd2d0ef97a82ca3111976322b99343a270e54cd4a405028f2f29c75f7fb1",
-    "sourceCodeHash": "0xc0027a6919b4682bc6ea3750974999840e8d879b20f168b6f600f1a01544256a"
+    "sourceCodeHash": "0x1094b0fcee1b6f22dfc3f2c0d22826a4273282a9b67dc604c1be518157e59e8a"
   },
   "src/L1/proofs/DelayedWETH.sol:DelayedWETH": {
     "initCodeHash": "0x592a6e22e1d02797eeb6fa622806e58f867bb6066944852e120b5871d3110825",
@@ -41,7 +41,7 @@
   },
   "src/L1/proofs/DisputeGameFactory.sol:DisputeGameFactory": {
     "initCodeHash": "0x727de8dbfd3432d95e19c39ece5ac7aec183dd67a09db769791d0e835e365d88",
-    "sourceCodeHash": "0x52926494b37fbf68ce1110d8097a399a23d15eb6e1a878eb56b0bed62c5cb926"
+    "sourceCodeHash": "0xf6ca679ff7463ade68e1ad1ae49f5b406e0c723ec1a2a718828f6bec12c8e8a6"
   },
   "src/L1/proofs/tee/NitroEnclaveVerifier.sol:NitroEnclaveVerifier": {
     "initCodeHash": "0x82f42b4d578bfcf9dc35eaa2c4ada04a45e1eca63021bceceb2ec794b12a9dd6",
@@ -49,19 +49,11 @@
   },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
     "initCodeHash": "0xfd1942e1c2f59b0aa72b33d698a948a53b6e4cf1040106f173fb5d89f63f57b0",
-    "sourceCodeHash": "0x410542b3899800d884a2281ef234a28d2dbb707576f2ad7d21f2d36de6290ca1"
+    "sourceCodeHash": "0x131566fd89b381672f1c39928e5155b0b8acf1a9259be91fbd0511626470de38"
   },
   "src/L1/proofs/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0x655576cc21cc5c603d55fb4dd2a2f0ef57b11deeaabd3e539b0a70a5f7e2c9af",
     "sourceCodeHash": "0x6c1d839e48cc8497af7b0d74a9566e76000599b14d7db7b3163a69e774a91bb3"
-  },
-  "src/L1/proofs/v2/FaultDisputeGameV2.sol:FaultDisputeGameV2": {
-    "initCodeHash": "0x6fc59e2da083c9e2093e42b0fda705e8215cc216e4dcedbf728c08f69ec2d3bd",
-    "sourceCodeHash": "0x71fab473524447aee26c5b9111732e99ce1f9949d9db755fdaca32b4310808f3"
-  },
-  "src/L1/proofs/v2/PermissionedDisputeGameV2.sol:PermissionedDisputeGameV2": {
-    "initCodeHash": "0x9896fd04e9a3f9fe4f1d6e93eb298b37a6bfa33424aa705e68cc58d0ba7f3f90",
-    "sourceCodeHash": "0xbfc32e0a21423ed579d7b1b46836a7c85f58bc05656c11d67111ae9072e8d3db"
   },
   "src/L1/proofs/zk/ZKVerifier.sol:ZKVerifier": {
     "initCodeHash": "0xcdc5bd5fa8ffad76358b8f34a53b8c0cb36540176c31f82d52546373d0bd5245",
@@ -122,14 +114,6 @@
   "src/L2/WETH.sol:WETH": {
     "initCodeHash": "0xbc2cd025153720943e51b79822c2dc374d270a78b92cf47d49548c468e218e46",
     "sourceCodeHash": "0x734a6b2aa6406bc145d848ad6071d3af1d40852aeb8f4b2f6f51beaad476e2d3"
-  },
-  "src/cannon/MIPS64.sol:MIPS64": {
-    "initCodeHash": "0x6a649986370d18e5fddcd89df73e520063fb373f7dba2f731a2b7e79a1c132a5",
-    "sourceCodeHash": "0x0d895592a6b55990ef70b8e9edde4d6970d161ebeb3776e370e9ccaa2c59a965"
-  },
-  "src/cannon/PreimageOracle.sol:PreimageOracle": {
-    "initCodeHash": "0x6af5b0e83b455aab8d0946c160a4dc049a4e03be69f8a2a9e87b574f27b25a66",
-    "sourceCodeHash": "0x39ce48ebad31c0eeebb231fc9ca03a6c43663349285b178a62daea6b84b3fd30"
   },
   "src/universal/OptimismMintableERC20.sol:OptimismMintableERC20": {
     "initCodeHash": "0x3c85eed0d017dca8eda6396aa842ddc12492587b061e8c756a8d32c4610a9658",

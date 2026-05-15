@@ -11,7 +11,6 @@ install-foundry:
 deps: clean-lib
   forge install --no-git \
     github.com/foundry-rs/forge-std@6853b9ec7df5dc0c213b05ae67785ad4f4baa0ea \
-    github.com/ethereum-optimism/lib-keccak@3b1e7bbb4cc23e9228097cfebe42aedaf3b8f2b9 \
     github.com/OpenZeppelin/openzeppelin-contracts@ecd2ca2cd7cac116f7a37d0e474bbb3d7d5e1c4d \
     github.com/OpenZeppelin/openzeppelin-contracts-upgradeable@0a2cb9a445c365870ed7a8ab461b12acf3e27d63 \
     github.com/transmissions11/solmate@8f9b23f8838670afda0fd8983f2c41e8037ae6bc \
@@ -128,7 +127,7 @@ prepare-upgrade-env *ARGS : build-go-ffi
   export FORK_BACKOFF=1000
   export FORK_TEST=true
   {{ARGS}} \
-  --match-path "test/{L1,dispute,cannon}/**"
+  --match-path "test/L1/**"
 
 # Runs upgrade path variant of contract tests.
 test-upgrade *ARGS:
@@ -151,7 +150,7 @@ test-upgrade-against-anvil *ARGS: build-go-ffi
   export FORK_RPC_URL=http://127.0.0.1:8545
   export FORK_TEST=true
   forge test {{ARGS}} \
-  --match-path "test/{L1,dispute,cannon}/**"
+  --match-path "test/L1/**"
 
 # Runs standard contract tests with rerun flag.
 test-rerun: build-go-ffi

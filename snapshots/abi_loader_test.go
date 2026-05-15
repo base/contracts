@@ -13,8 +13,6 @@ func TestLoadABIs(t *testing.T) {
 		method   func() *abi.ABI
 	}{
 		{"DisputeGameFactory", LoadDisputeGameFactoryABI},
-		{"PreimageOracle", LoadPreimageOracleABI},
-		{"MIPS", LoadMIPSABI},
 		{"DelayedWETH", LoadDelayedWETHABI},
 	}
 	for _, test := range tests {

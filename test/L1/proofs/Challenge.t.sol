@@ -4,7 +4,8 @@ pragma solidity 0.8.15;
 import { ClaimAlreadyResolved } from "src/libraries/bridge/Errors.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
-import { Claim, GameStatus, Hash } from "src/libraries/bridge/Types.sol";
+import { GameStatus, Hash } from "src/libraries/bridge/Types.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { Verifier } from "src/L1/proofs/Verifier.sol";

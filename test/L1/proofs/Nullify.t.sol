@@ -2,7 +2,8 @@
 pragma solidity 0.8.15;
 
 import { ClaimAlreadyResolved } from "src/libraries/bridge/Errors.sol";
-import { Claim, GameStatus } from "src/libraries/bridge/Types.sol";
+import { GameStatus } from "src/libraries/bridge/Types.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 

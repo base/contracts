@@ -2,7 +2,8 @@
 pragma solidity ^0.8.0;
 
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
-import { GameId, Timestamp, Claim, Hash, GameType } from "src/libraries/bridge/Types.sol";
+import { Hash, GameType } from "src/libraries/bridge/Types.sol";
+import { Timestamp, Claim, GameId } from "src/libraries/bridge/LibUDT.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { IReinitializableBase } from "interfaces/universal/IReinitializableBase.sol";
 

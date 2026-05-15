@@ -16,7 +16,8 @@ import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { Claim, GameStatus, GameType, Hash, Proposal, Timestamp } from "src/libraries/bridge/Types.sol";
+import { GameStatus, GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { Timestamp, Claim } from "src/libraries/bridge/LibUDT.sol";
 
 // Solady
 import { Clone } from "lib/solady/src/utils/Clone.sol";
