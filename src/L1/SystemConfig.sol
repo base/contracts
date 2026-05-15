@@ -476,10 +476,10 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     }
 
     /// @notice Internal function for updating the DA footprint gas scalar.
-    function _setDAFootprintGasScalar(uint16 _dAFootprintGasScalar) internal {
-        daFootprintGasScalar = _dAFootprintGasScalar;
+    function _setDAFootprintGasScalar(uint16 _daFootprintGasScalar) internal {
+        daFootprintGasScalar = _daFootprintGasScalar;
 
-        bytes memory data = abi.encode(_dAFootprintGasScalar);
+        bytes memory data = abi.encode(_daFootprintGasScalar);
         emit ConfigUpdate(VERSION, UpdateType.DA_FOOTPRINT_GAS_SCALAR, data);
     }
 

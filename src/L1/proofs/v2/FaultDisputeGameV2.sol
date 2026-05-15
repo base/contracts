@@ -564,7 +564,7 @@ contract FaultDisputeGameV2 is Clone, ISemver {
     }
 
     /// @notice Defend an agreed upon `Claim`.
-    /// @notice _disputed The `Claim` being defended.
+    /// @param _disputed The `Claim` being defended.
     /// @param _parentIndex Index of the claim to defend in the `claimData` array. This must match the `_disputed`
     /// claim.
     /// @param _claim The `Claim` at the relative defense position.
@@ -572,7 +572,7 @@ contract FaultDisputeGameV2 is Clone, ISemver {
         move(_disputed, _parentIndex, _claim, false);
     }
 
-    /// @notice Posts the requested local data to the VM's `PreimageOralce`.
+    /// @notice Posts the requested local data to the VM's `PreimageOracle`.
     /// @param _ident The local identifier of the data to post.
     /// @param _execLeafIdx The index of the leaf claim in an execution subgame that requires the local data for a step.
     /// @param _partOffset The offset of the data to post.
