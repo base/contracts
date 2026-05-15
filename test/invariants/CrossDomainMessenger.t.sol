@@ -21,7 +21,7 @@ contract RelayActor {
     Vm internal immutable vm;
     bool internal immutable doFail;
 
-    constructor(address _op, IL1CrossDomainMessenger _xdm, Vm _vm, bool _doFail) {
+    constructor(address _op, IL1CrossDomainMessenger _xdm, Vm _vm, bytes32 _l2SenderSlot, bool _doFail) {
         op = _op;
         xdm = _xdm;
         vm = _vm;
@@ -29,8 +29,7 @@ contract RelayActor {
 
         // Set op.l2Sender() once to the L2 Cross Domain Messenger. Nothing in the fuzzed
         // surface modifies this slot, so we don't need to re-write it on every relay.
-        uint256 senderSlotIndex = ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender").slot;
-        vm.store(_op, bytes32(senderSlotIndex), bytes32(abi.encode(Predeploys.L2_CROSS_DOMAIN_MESSENGER)));
+        vm.store(_op, _l2SenderSlot, bytes32(abi.encode(Predeploys.L2_CROSS_DOMAIN_MESSENGER)));
     }
 
     function relay(uint8 _version, uint8 _value, bytes memory _message) external {
@@ -89,7 +88,8 @@ contract XDM_MinGasLimits is CommonTest {
     function init(bool doFail) internal {
         super.setUp();
 
-        actor = new RelayActor(address(optimismPortal2), l1CrossDomainMessenger, vm, doFail);
+        bytes32 l2SenderSlot = bytes32(ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender").slot);
+        actor = new RelayActor(address(optimismPortal2), l1CrossDomainMessenger, vm, l2SenderSlot, doFail);
 
         vm.deal(address(optimismPortal2), type(uint128).max);
 
