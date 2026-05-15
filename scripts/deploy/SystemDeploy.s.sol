@@ -78,21 +78,16 @@ contract SystemDeploy is Script {
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
         address nitroEnclaveVerifier;
-        uint256 l2ChainID;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
         ISP1Verifier sp1Verifier;
         address teeProposer;
         address teeChallenger;
-        ISuperchainConfig superchainConfigProxy;
-        IProxyAdmin superchainProxyAdmin;
         address guardian;
         address incidentResponder;
     }
 
     struct DeployInput {
-        bool deploySuperchain;
-        bool deployImplementations;
         bool saveArtifacts;
         SuperchainInput superchainInput;
         ISuperchainConfig superchainConfigProxy;
@@ -111,12 +106,12 @@ contract SystemDeploy is Script {
         bool saveArtifacts;
         ISuperchainConfig superchainConfigProxy;
         Types.Implementations implementations;
-        ISystemConfig[] systemConfigProxies;
+        ISystemConfig systemConfigProxy;
     }
 
     struct UpgradeOutput {
         bool superchainConfigUpgraded;
-        uint256 chainsUpgraded;
+        bool chainUpgraded;
     }
 
     struct AggregateVerifierInput {
@@ -129,7 +124,7 @@ contract SystemDeploy is Script {
         bytes32 zkRangeHash;
         bytes32 zkAggregationHash;
         bytes32 multiproofConfigHash;
-        uint256 l2ChainID;
+        uint256 l2ChainId;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
     }
@@ -149,8 +144,7 @@ contract SystemDeploy is Script {
     error InvalidRoleAddress(string role);
     error InvalidStartingAnchorRoot();
     error MissingImplementations();
-    error PrestateNotSet();
-    error SuperchainConfigNeedsUpgrade(uint256 index);
+    error SuperchainConfigNeedsUpgrade();
 
     /// @notice Sets up the shared deployment config and artifact registry.
     function setUp() public virtual {
@@ -201,10 +195,7 @@ contract SystemDeploy is Script {
 
     /// @notice Deploys implementation contracts from the active deploy config and saves their artifact names.
     function deployImplementations() public returns (Types.Implementations memory output_) {
-        ISuperchainConfig superchainConfigProxy = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
-        IProxyAdmin superchainProxyAdmin = superchainConfigProxy.proxyAdmin();
-
-        output_ = _deployImplementations(_configuredImplementationsInput(superchainConfigProxy, superchainProxyAdmin));
+        output_ = _deployImplementations(_configuredImplementationsInput());
         _saveUpgradeArtifacts(output_);
     }
 
@@ -248,8 +239,6 @@ contract SystemDeploy is Script {
     function _deployInput() internal view returns (DeployInput memory input_) {
         Types.Implementations memory emptyImpls;
         input_ = DeployInput({
-            deploySuperchain: true,
-            deployImplementations: true,
             saveArtifacts: true,
             superchainInput: SuperchainInput({
                 guardian: cfg.superchainConfigGuardian(),
@@ -257,22 +246,13 @@ contract SystemDeploy is Script {
                 superchainProxyAdminOwner: cfg.finalSystemOwner()
             }),
             superchainConfigProxy: ISuperchainConfig(address(0)),
-            implementationsInput: _configuredImplementationsInput(
-                ISuperchainConfig(address(0)), IProxyAdmin(address(0))
-            ),
+            implementationsInput: _configuredImplementationsInput(),
             implementations: emptyImpls,
             opChainInput: _configuredOPChainInput()
         });
     }
 
-    function _configuredImplementationsInput(
-        ISuperchainConfig _superchainConfigProxy,
-        IProxyAdmin _superchainProxyAdmin
-    )
-        internal
-        view
-        returns (ImplementationInput memory input_)
-    {
+    function _configuredImplementationsInput() internal view returns (ImplementationInput memory input_) {
         input_ = ImplementationInput({
             withdrawalDelaySeconds: cfg.delayedWETHWithdrawalDelay(),
             proofMaturityDelaySeconds: cfg.proofMaturityDelaySeconds(),
@@ -283,14 +263,11 @@ contract SystemDeploy is Script {
             multiproofConfigHash: cfg.multiproofConfigHash(),
             multiproofGameType: cfg.multiproofGameType(),
             nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
-            l2ChainID: cfg.l2ChainId(),
             multiproofBlockInterval: cfg.multiproofBlockInterval(),
             multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
             sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
             teeProposer: cfg.teeProposer(),
             teeChallenger: cfg.teeChallenger(),
-            superchainConfigProxy: _superchainConfigProxy,
-            superchainProxyAdmin: _superchainProxyAdmin,
             guardian: cfg.superchainConfigGuardian(),
             incidentResponder: cfg.superchainConfigIncidentResponder()
         });
@@ -311,17 +288,14 @@ contract SystemDeploy is Script {
                 root: Hash.wrap(cfg.multiproofGenesisOutputRoot()), l2SequenceNumber: cfg.multiproofGenesisBlockNumber()
             }),
             saltMixer: "salt mixer",
-            gasLimit: uint64(cfg.l2GenesisBlockGasLimit()),
-            disputeGameType: GameTypes.AGGREGATE_VERIFIER
+            gasLimit: uint64(cfg.l2GenesisBlockGasLimit())
         });
     }
 
     function deploy(DeployInput memory _input) public returns (DeployOutput memory output_) {
-        _assertValidDeployInput(_input);
-
         output_.superchain = _deployOrLoadSuperchain(_input);
-        if (_input.deployImplementations) {
-            output_.impls = _deployImplementations(_withSuperchainImplementationsInput(_input, output_.superchain));
+        if (_implementationsEmpty(_input.implementations)) {
+            output_.impls = _deployImplementations(_input.implementationsInput);
         } else {
             _assertValidImplementations(_input.implementations);
             output_.impls = _input.implementations;
@@ -332,7 +306,7 @@ contract SystemDeploy is Script {
             _input: _input.opChainInput,
             _superchainConfig: output_.superchain.superchainConfigProxy,
             _impls: output_.impls,
-            _implementationsInput: _withSuperchainImplementationsInput(_input, output_.superchain)
+            _implementationsInput: _input.implementationsInput
         });
         output_.impls = implementations;
 
@@ -351,19 +325,19 @@ contract SystemDeploy is Script {
                 _upgradeSuperchainConfigIfNeeded(_input.superchainConfigProxy, _input.implementations);
         }
 
-        for (uint256 i = 0; i < _input.systemConfigProxies.length; i++) {
-            ISystemConfig systemConfigProxy = _input.systemConfigProxies[i];
+        if (address(_input.systemConfigProxy) != address(0)) {
+            ISystemConfig systemConfigProxy = _input.systemConfigProxy;
             DeployUtils.assertValidContractAddress(address(systemConfigProxy));
 
             ISuperchainConfig superchainConfig = systemConfigProxy.superchainConfig();
             if (SemverComp.lt(
                     superchainConfig.version(), ISuperchainConfig(_input.implementations.superchainConfigImpl).version()
                 )) {
-                revert SuperchainConfigNeedsUpgrade(i);
+                revert SuperchainConfigNeedsUpgrade();
             }
 
             _upgradeOPChain(systemConfigProxy, _input.implementations);
-            output_.chainsUpgraded++;
+            output_.chainUpgraded = true;
         }
 
         if (_input.saveArtifacts) {
@@ -372,26 +346,13 @@ contract SystemDeploy is Script {
     }
 
     function _deployOrLoadSuperchain(DeployInput memory _input) internal returns (SuperchainOutput memory output_) {
-        if (_input.deploySuperchain) {
+        if (address(_input.superchainConfigProxy) == address(0)) {
             output_ = _deploySuperchain(_input.superchainInput);
         } else {
             DeployUtils.assertValidContractAddress(address(_input.superchainConfigProxy));
             output_.superchainConfigProxy = _input.superchainConfigProxy;
             output_.superchainProxyAdmin = _input.superchainConfigProxy.proxyAdmin();
         }
-    }
-
-    function _withSuperchainImplementationsInput(
-        DeployInput memory _input,
-        SuperchainOutput memory _superchain
-    )
-        internal
-        pure
-        returns (ImplementationInput memory input_)
-    {
-        input_ = _input.implementationsInput;
-        input_.superchainConfigProxy = _superchain.superchainConfigProxy;
-        input_.superchainProxyAdmin = _superchain.superchainProxyAdmin;
     }
 
     function _deploySuperchain(SuperchainInput memory _input) internal returns (SuperchainOutput memory output_) {
@@ -525,6 +486,7 @@ contract SystemDeploy is Script {
             IDisputeGameFactory(_deployProxy(_input, output_.opChainProxyAdmin, "DisputeGameFactory"));
         output_.anchorStateRegistryProxy =
             IAnchorStateRegistry(_deployProxy(_input, output_.opChainProxyAdmin, "AnchorStateRegistry"));
+        output_.delayedWETHProxy = IDelayedWETH(payable(_deployProxy(_input, output_.opChainProxyAdmin, "DelayedWETH")));
 
         output_.l1StandardBridgeProxy = IL1StandardBridge(
             payable(_createDeterministic(
@@ -558,7 +520,6 @@ contract SystemDeploy is Script {
 
         _initializeOPChain(_input, _superchainConfig, impls_, output_);
 
-        output_.delayedWETHProxy = IDelayedWETH(payable(_deployProxy(_input, output_.opChainProxyAdmin, "DelayedWETH")));
         _upgradeToAndCall(
             output_.opChainProxyAdmin,
             address(output_.delayedWETHProxy),
@@ -676,7 +637,6 @@ contract SystemDeploy is Script {
         upgraded_ = true;
     }
 
-    // TODO: upgrade multiproofs here too
     function _upgradeOPChain(ISystemConfig _systemConfigProxy, Types.Implementations memory _impls) internal {
         IProxyAdmin proxyAdmin = _systemConfigProxy.proxyAdmin();
         uint256 l2ChainId = _systemConfigProxy.l2ChainId();
@@ -692,13 +652,43 @@ contract SystemDeploy is Script {
 
         IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(_systemConfigProxy.disputeGameFactory());
         _upgradeTo(proxyAdmin, address(disputeGameFactory), _impls.disputeGameFactoryImpl);
+        _upgradeMultiproofContracts(_systemConfigProxy, disputeGameFactory, _impls);
 
         ISystemConfig.Addresses memory opChainAddrs = _systemConfigProxy.getAddresses();
         _upgradeTo(proxyAdmin, opChainAddrs.l1CrossDomainMessenger, _impls.l1CrossDomainMessengerImpl);
         _upgradeTo(proxyAdmin, opChainAddrs.l1StandardBridge, _impls.l1StandardBridgeImpl);
         _upgradeTo(proxyAdmin, opChainAddrs.l1ERC721Bridge, _impls.l1ERC721BridgeImpl);
+        if (opChainAddrs.delayedWETH != address(0)) {
+            _upgradeTo(proxyAdmin, opChainAddrs.delayedWETH, _impls.delayedWETHImpl);
+        }
 
         emit Upgraded(l2ChainId, _systemConfigProxy, msg.sender);
+    }
+
+    function _upgradeMultiproofContracts(
+        ISystemConfig _systemConfigProxy,
+        IDisputeGameFactory _disputeGameFactory,
+        Types.Implementations memory _impls
+    )
+        internal
+    {
+        IDisputeGame currentGameImpl = _disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER);
+        if (address(currentGameImpl) == address(0)) return;
+
+        if (_impls.teeProverRegistryImpl != address(0)) {
+            AggregateVerifier currentAggregateVerifier = AggregateVerifier(address(currentGameImpl));
+            TEEProverRegistry teeProverRegistry =
+                TEEVerifier(address(currentAggregateVerifier.TEE_VERIFIER())).TEE_PROVER_REGISTRY();
+            _upgradeTo(_systemConfigProxy.proxyAdmin(), address(teeProverRegistry), _impls.teeProverRegistryImpl);
+        }
+
+        if (_impls.aggregateVerifierImpl != address(0) && address(currentGameImpl) != _impls.aggregateVerifierImpl) {
+            DeployUtils.assertValidContractAddress(_impls.aggregateVerifierImpl);
+            vm.broadcast(msg.sender);
+            _disputeGameFactory.setImplementation(
+                GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(_impls.aggregateVerifierImpl))
+            );
+        }
     }
 
     function _encodeSystemConfigInitializer(
@@ -716,7 +706,7 @@ contract SystemDeploy is Script {
             l1StandardBridge: address(_output.l1StandardBridgeProxy),
             optimismPortal: address(_output.optimismPortalProxy),
             optimismMintableERC20Factory: address(_output.optimismMintableERC20FactoryProxy),
-            delayedWETH: address(0)
+            delayedWETH: address(_output.delayedWETHProxy)
         });
 
         return abi.encodeCall(
@@ -965,7 +955,7 @@ contract SystemDeploy is Script {
         internal
         returns (MultiproofOutput memory output_)
     {
-        _assertValidMultiproofInput(_opChainInput, _input);
+        _assertValidMultiproofInput(_input);
 
         GameType gameType = GameType.wrap(uint32(_input.multiproofGameType));
 
@@ -1017,7 +1007,7 @@ contract SystemDeploy is Script {
                 zkRangeHash: _input.zkRangeHash,
                 zkAggregationHash: _input.zkAggregationHash,
                 multiproofConfigHash: _input.multiproofConfigHash,
-                l2ChainID: _input.l2ChainID,
+                l2ChainId: _opChainInput.l2ChainId,
                 multiproofBlockInterval: _input.multiproofBlockInterval,
                 multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval
             })
@@ -1046,21 +1036,11 @@ contract SystemDeploy is Script {
                     _input.teeImageHash,
                     AggregateVerifier.ZkHashes(_input.zkRangeHash, _input.zkAggregationHash),
                     _input.multiproofConfigHash,
-                    _input.l2ChainID,
+                    _input.l2ChainId,
                     _input.multiproofBlockInterval,
                     _input.multiproofIntermediateBlockInterval
                 )
             )
-        );
-    }
-
-    function _assertValidDeployInput(DeployInput memory _input) internal pure {
-        require(
-            _input.deploySuperchain || address(_input.superchainConfigProxy) != address(0),
-            "SystemDeploy: no superchain"
-        );
-        require(
-            _input.deployImplementations || !_implementationsEmpty(_input.implementations), "SystemDeploy: no impls"
         );
     }
 
@@ -1075,26 +1055,17 @@ contract SystemDeploy is Script {
         }
     }
 
-    // TODO: add multiproof checks
     function _assertValidImplementationInput(ImplementationInput memory _input) internal pure {
         require(_input.withdrawalDelaySeconds != 0, "SystemDeploy: withdrawalDelaySeconds not set");
         require(_input.proofMaturityDelaySeconds != 0, "SystemDeploy: proofMaturityDelaySeconds not set");
         require(_input.disputeGameFinalityDelaySeconds != 0, "SystemDeploy: finality delay not set");
-        require(address(_input.superchainConfigProxy) != address(0), "SystemDeploy: superchainConfigProxy not set");
-        require(address(_input.superchainProxyAdmin) != address(0), "SystemDeploy: superchainProxyAdmin not set");
     }
 
     function _multiproofEnabled(ImplementationInput memory _input) internal pure returns (bool) {
         return _input.multiproofConfigHash != bytes32(0);
     }
 
-    function _assertValidMultiproofInput(
-        Types.DeployInput memory _opChainInput,
-        ImplementationInput memory _input
-    )
-        internal
-        view
-    {
+    function _assertValidMultiproofInput(ImplementationInput memory _input) internal view {
         require(_input.teeImageHash != bytes32(0), "SystemDeploy: teeImageHash not set");
         require(_input.zkRangeHash != bytes32(0), "SystemDeploy: zkRangeHash not set");
         require(_input.zkAggregationHash != bytes32(0), "SystemDeploy: zkAggregationHash not set");
@@ -1104,7 +1075,6 @@ contract SystemDeploy is Script {
         require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
         DeployUtils.assertValidContractAddress(_input.nitroEnclaveVerifier);
         DeployUtils.assertValidContractAddress(address(_input.sp1Verifier));
-        require(_input.l2ChainID == _opChainInput.l2ChainId, "SystemDeploy: multiproof l2ChainID mismatch");
         require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
         require(
             _input.multiproofIntermediateBlockInterval != 0, "SystemDeploy: multiproof intermediate interval not set"

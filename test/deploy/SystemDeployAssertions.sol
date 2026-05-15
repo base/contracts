@@ -35,6 +35,7 @@ abstract contract SystemDeployAssertions is Test {
         IAnchorStateRegistry anchorStateRegistry;
         ISuperchainConfig superchainConfig;
         Types.Implementations implementations;
+        IDelayedWETH delayedWETH;
         IETHLockbox ethLockbox;
         address proxyAdminOwner;
         uint256 l2ChainId;
@@ -83,6 +84,7 @@ abstract contract SystemDeployAssertions is Test {
         assertEq(address(sysCfg.superchainConfig()), address(_expected.superchainConfig), "SYSCON-130");
         assertEq(sysCfg.batchInbox(), Types.chainIdToBatchInboxAddress(_expected.l2ChainId), "SYSCON-140");
         assertEq(sysCfg.l2ChainId(), _expected.l2ChainId, "SYSCON-150");
+        assertEq(sysCfg.delayedWETH(), address(_expected.delayedWETH), "SYSCON-160");
     }
 
     function _assertBridgeAndPortalWiring(

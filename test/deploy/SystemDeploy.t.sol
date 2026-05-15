@@ -8,8 +8,6 @@ import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Types } from "scripts/libraries/Types.sol";
 import { SystemDeployAssertions } from "test/deploy/SystemDeployAssertions.sol";
 
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
-import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
@@ -18,7 +16,7 @@ import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
-import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 contract MockNitroEnclaveVerifier {
@@ -145,20 +143,17 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     function test_upgrade_withoutManagerDelegatecall_succeeds() public {
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_defaultDeployInput());
 
-        ISystemConfig[] memory systemConfigProxies = new ISystemConfig[](1);
-        systemConfigProxies[0] = output.opChain.systemConfigProxy;
-
         SystemDeploy.UpgradeOutput memory upgradeOutput = systemDeploy.upgrade(
             SystemDeploy.UpgradeInput({
                 saveArtifacts: false,
                 superchainConfigProxy: output.superchain.superchainConfigProxy,
                 implementations: output.impls,
-                systemConfigProxies: systemConfigProxies
+                systemConfigProxy: output.opChain.systemConfigProxy
             })
         );
 
         assertFalse(upgradeOutput.superchainConfigUpgraded, "superchain already current");
-        assertEq(upgradeOutput.chainsUpgraded, 1, "chains upgraded");
+        assertTrue(upgradeOutput.chainUpgraded, "chain upgraded");
         _assertUpgradedProxyImplementations(output);
         assertValidStandardSystem(_expected(output, _defaultDeployInput()));
     }
@@ -167,13 +162,10 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_defaultDeployInput());
 
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
-        input.deploySuperchain = false;
-        input.deployImplementations = false;
         input.saveArtifacts = true;
         input.superchainConfigProxy = output.superchain.superchainConfigProxy;
         input.implementations = output.impls;
         input.opChainInput.l2ChainId = l2ChainId + 1;
-        input.implementationsInput.l2ChainID = input.opChainInput.l2ChainId;
         input.opChainInput.saltMixer = "system-deploy-reuse-test";
 
         vm.mockCallRevert(
@@ -187,8 +179,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     }
 
     function _defaultDeployInput() internal view returns (SystemDeploy.DeployInput memory input_) {
-        input_.deploySuperchain = true;
-        input_.deployImplementations = true;
         input_.saveArtifacts = false;
         input_.superchainInput = SystemDeploy.SuperchainInput({
             guardian: guardian, incidentResponder: incidentResponder, superchainProxyAdminOwner: owner
@@ -203,14 +193,11 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             multiproofConfigHash: bytes32(uint256(4)),
             multiproofGameType: 621,
             nitroEnclaveVerifier: address(nitroEnclaveVerifier),
-            l2ChainID: l2ChainId,
             multiproofBlockInterval: 100,
             multiproofIntermediateBlockInterval: 10,
             sp1Verifier: ISP1Verifier(address(sp1Verifier)),
             teeProposer: proposer,
             teeChallenger: challenger,
-            superchainConfigProxy: ISuperchainConfig(address(0)),
-            superchainProxyAdmin: IProxyAdmin(address(0)),
             guardian: guardian,
             incidentResponder: incidentResponder
         });
@@ -226,8 +213,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             l2ChainId: l2ChainId,
             startingAnchorRoot: Proposal({ root: Hash.wrap(bytes32(uint256(1))), l2SequenceNumber: 0 }),
             saltMixer: "system-deploy-test",
-            gasLimit: 60_000_000,
-            disputeGameType: GameTypes.AGGREGATE_VERIFIER
+            gasLimit: 60_000_000
         });
     }
 
@@ -372,6 +358,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             anchorStateRegistry: _output.opChain.anchorStateRegistryProxy,
             superchainConfig: _output.superchain.superchainConfigProxy,
             implementations: _output.impls,
+            delayedWETH: _output.opChain.delayedWETHProxy,
             ethLockbox: _output.opChain.ethLockboxProxy,
             proxyAdminOwner: _input.opChainInput.roles.opChainProxyAdminOwner,
             l2ChainId: _input.opChainInput.l2ChainId,

@@ -199,8 +199,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         SystemDeploy systemDeploy = new SystemDeploy();
         Types.Implementations memory implementations = _latestImplementations();
 
-        ISystemConfig[] memory systemConfigProxies = new ISystemConfig[](1);
-        systemConfigProxies[0] = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
+        ISystemConfig systemConfigProxy = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
 
         ISuperchainConfig superchainConfig = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
         IProxyAdmin superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
@@ -214,7 +213,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
                 saveArtifacts: false,
                 superchainConfigProxy: superchainConfig,
                 implementations: implementations,
-                systemConfigProxies: new ISystemConfig[](0)
+                systemConfigProxy: ISystemConfig(address(0))
             })
         );
 
@@ -225,7 +224,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
                 saveArtifacts: false,
                 superchainConfigProxy: ISuperchainConfig(address(0)),
                 implementations: implementations,
-                systemConfigProxies: systemConfigProxies
+                systemConfigProxy: systemConfigProxy
             })
         );
     }

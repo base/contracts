@@ -18,7 +18,7 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 
-import { GameType, Proposal } from "src/libraries/bridge/Types.sol";
+import { Proposal } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 library Types {
@@ -39,7 +39,6 @@ library Types {
         Proposal startingAnchorRoot;
         string saltMixer;
         uint64 gasLimit;
-        GameType disputeGameType;
     }
 
     /// @notice The full set of outputs from deploying a new OP Stack chain.
