@@ -218,6 +218,198 @@ contract NitroEnclaveVerifierTest is Test {
         verifier.revokeCert(INTERMEDIATE_CERT_1);
     }
 
+    function testRevokeCertSetsDurableSentinel() public {
+        assertFalse(verifier.revokedCerts(INTERMEDIATE_CERT_1));
+        verifier.revokeCert(INTERMEDIATE_CERT_1);
+        assertTrue(verifier.revokedCerts(INTERMEDIATE_CERT_1));
+    }
+
+    // ============ unrevokeCert Tests ============
+
+    function testUnrevokeCertClearsSentinel() public {
+        verifier.revokeCert(INTERMEDIATE_CERT_1);
+        assertTrue(verifier.revokedCerts(INTERMEDIATE_CERT_1));
+
+        vm.expectEmit(false, false, false, true);
+        emit NitroEnclaveVerifier.CertUnrevoked(INTERMEDIATE_CERT_1);
+        verifier.unrevokeCert(INTERMEDIATE_CERT_1);
+
+        assertFalse(verifier.revokedCerts(INTERMEDIATE_CERT_1));
+        // Cached expiry is intentionally not restored: the next successful
+        // verification re-caches it via _cacheNewCert with the journal-supplied
+        // notAfter timestamp.
+        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
+    }
+
+    function testUnrevokeCertRevertsIfNotRevoked() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(NitroEnclaveVerifier.CertificateNotRevoked.selector, INTERMEDIATE_CERT_1)
+        );
+        verifier.unrevokeCert(INTERMEDIATE_CERT_1);
+    }
+
+    function testUnrevokeCertRevertsIfNotOwner() public {
+        verifier.revokeCert(INTERMEDIATE_CERT_1);
+        vm.prank(revokerAddr);
+        vm.expectRevert();
+        verifier.unrevokeCert(INTERMEDIATE_CERT_1);
+    }
+
+    function testUnrevokeCertThenReproveRestoresCache() public {
+        _setUpRiscZeroConfig();
+        verifier.revokeCert(INTERMEDIATE_CERT_1);
+        verifier.unrevokeCert(INTERMEDIATE_CERT_1);
+
+        // Submit a verification whose chain re-introduces INTERMEDIATE_CERT_1
+        // in the suffix; _cacheNewCert should now restore the cached expiry
+        // because the sentinel is clear.
+        VerifierJournal memory journal = _createSuccessJournal();
+        bytes32[] memory certs = new bytes32[](3);
+        certs[0] = ROOT_CERT;
+        certs[1] = INTERMEDIATE_CERT_1; // in the suffix (prefixLen = 1)
+        certs[2] = keccak256("leaf");
+        journal.certs = certs;
+
+        uint64[] memory expiries = new uint64[](3);
+        expiries[0] = INTERMEDIATE_CERT_1_EXPIRY + 100_000_000;
+        expiries[1] = INTERMEDIATE_CERT_1_EXPIRY;
+        expiries[2] = NEW_LEAF_CERT_EXPIRY;
+        journal.certExpiries = expiries;
+        journal.trustedCertsPrefixLen = 1;
+
+        bytes memory output = abi.encode(journal);
+        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+
+        vm.prank(submitter);
+        VerifierJournal memory result = verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+
+        assertEq(uint8(result.result), uint8(VerificationResult.Success));
+        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), INTERMEDIATE_CERT_1_EXPIRY);
+    }
+
+    // ============ Durable Revocation: production prefixLen = 1 bypass ============
+
+    /// Reproduces the Immunefi #75608 attack shape: with the production
+    /// `trustedCertsPrefixLen = 1`, a chain whose revoked intermediate sits in
+    /// the suffix would previously pass `_verifyJournal` and be silently
+    /// re-cached by `_cacheNewCert`. The suffix-side `revokedCerts` guard now
+    /// rejects the verification and leaves the cache zeroed.
+    function testVerifyRejectsRevokedCertInSuffixUnderProductionPrefixLen() public {
+        _setUpRiscZeroConfig();
+        verifier.revokeCert(INTERMEDIATE_CERT_1);
+
+        VerifierJournal memory journal = _createSuccessJournal();
+        bytes32[] memory certs = new bytes32[](3);
+        certs[0] = ROOT_CERT;
+        certs[1] = INTERMEDIATE_CERT_1; // revoked, lives in the suffix
+        certs[2] = keccak256("attacker-leaf");
+        journal.certs = certs;
+
+        uint64[] memory expiries = new uint64[](3);
+        expiries[0] = INTERMEDIATE_CERT_1_EXPIRY + 100_000_000;
+        expiries[1] = INTERMEDIATE_CERT_1_EXPIRY;
+        expiries[2] = NEW_LEAF_CERT_EXPIRY;
+        journal.certExpiries = expiries;
+        journal.trustedCertsPrefixLen = 1; // production default — only root in prefix
+
+        bytes memory output = abi.encode(journal);
+        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+
+        vm.prank(submitter);
+        VerifierJournal memory result = verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+
+        assertEq(uint8(result.result), uint8(VerificationResult.IntermediateCertsNotTrusted));
+        // Cache must remain zeroed — _cacheNewCert never ran.
+        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
+        // And the durable sentinel must still be set.
+        assertTrue(verifier.revokedCerts(INTERMEDIATE_CERT_1));
+    }
+
+    /// Direct exercise of `_cacheNewCert`'s revocation skip: a verification
+    /// where the suffix contains both a revoked entry and an unrelated new cert
+    /// should leave the revoked cache zeroed but still cache the new cert.
+    /// Drives this through verify() because _cacheNewCert is internal.
+    function testCacheNewCertSkipsRevokedEntries() public {
+        _setUpRiscZeroConfig();
+        bytes32 freshCert = keccak256("fresh-intermediate");
+
+        // Seed: cache INTERMEDIATE_CERT_2 by running a successful verification
+        // whose chain passes through it.
+        _seedIntermediateCert2();
+
+        // Revoke INTERMEDIATE_CERT_2, then submit a journal whose suffix re-presents
+        // it alongside `freshCert`. The verification must reject (because the suffix
+        // contains a revoked entry), and neither cache rewrite must happen.
+        verifier.revokeCert(INTERMEDIATE_CERT_2);
+
+        VerifierJournal memory result = _verifySuffixWithRevokedAndFresh(freshCert);
+
+        assertEq(uint8(result.result), uint8(VerificationResult.IntermediateCertsNotTrusted));
+        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_2), 0);
+        assertEq(verifier.trustedIntermediateCerts(freshCert), 0);
+    }
+
+    function _seedIntermediateCert2() private {
+        VerifierJournal memory j = _createSuccessJournal();
+        bytes32[] memory c = new bytes32[](3);
+        c[0] = ROOT_CERT;
+        c[1] = INTERMEDIATE_CERT_1;
+        c[2] = INTERMEDIATE_CERT_2;
+        j.certs = c;
+        uint64[] memory e = new uint64[](3);
+        e[0] = INTERMEDIATE_CERT_1_EXPIRY + 100_000_000;
+        e[1] = INTERMEDIATE_CERT_1_EXPIRY;
+        e[2] = INTERMEDIATE_CERT_2_EXPIRY;
+        j.certExpiries = e;
+        j.trustedCertsPrefixLen = 2;
+
+        bytes memory output = abi.encode(j);
+        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+        vm.prank(submitter);
+        verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_2), INTERMEDIATE_CERT_2_EXPIRY);
+    }
+
+    function _verifySuffixWithRevokedAndFresh(bytes32 freshCert) private returns (VerifierJournal memory) {
+        VerifierJournal memory j = _createSuccessJournal();
+        bytes32[] memory c = new bytes32[](4);
+        c[0] = ROOT_CERT;
+        c[1] = INTERMEDIATE_CERT_1;
+        c[2] = INTERMEDIATE_CERT_2; // revoked
+        c[3] = freshCert;
+        j.certs = c;
+        uint64[] memory e = new uint64[](4);
+        e[0] = INTERMEDIATE_CERT_1_EXPIRY + 100_000_000;
+        e[1] = INTERMEDIATE_CERT_1_EXPIRY;
+        e[2] = INTERMEDIATE_CERT_2_EXPIRY;
+        e[3] = uint64(REALISTIC_TIMESTAMP + 86_400);
+        j.certExpiries = e;
+        j.trustedCertsPrefixLen = 2;
+
+        bytes memory output = abi.encode(j);
+        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+        vm.prank(submitter);
+        return verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+    }
+
+    function testCheckTrustedIntermediateCertsBreaksAtRevokedEntry() public {
+        // INTERMEDIATE_CERT_1 is initially trusted; revoke it and confirm the
+        // off-chain helper no longer counts it.
+        verifier.revokeCert(INTERMEDIATE_CERT_1);
+
+        bytes32[][] memory reportCerts = new bytes32[][](1);
+        reportCerts[0] = new bytes32[](2);
+        reportCerts[0][0] = ROOT_CERT;
+        reportCerts[0][1] = INTERMEDIATE_CERT_1; // revoked
+
+        uint8[] memory results = verifier.checkTrustedIntermediateCerts(reportCerts);
+        assertEq(results[0], 1);
+    }
+
     // ============ Revoker Role Tests ============
 
     function testConstructorSetsRevoker() public view {

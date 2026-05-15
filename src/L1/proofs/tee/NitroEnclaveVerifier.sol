@@ -70,6 +70,19 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Mapping from ZkCoProcessorType to its corresponding verifierProofId representation
     mapping(ZkCoProcessorType => bytes32) private _verifierProofIds;
 
+    /// @dev Persistent revocation sentinel for intermediate certificates.
+    ///
+    /// `revokeCert` zeroes `trustedIntermediateCerts[certHash]`, but the suffix-cache
+    /// path in `_cacheNewCert` would otherwise restore that entry on the next
+    /// successful verification whose chain traverses the revoked hash. This
+    /// mapping survives `_cacheNewCert` overwrites and is consulted in
+    /// `_verifyJournal`, `_cacheNewCert`, and `checkTrustedIntermediateCerts`,
+    /// making `revokeCert` durable independently of the journal's `trustedCertsPrefixLen`.
+    ///
+    /// Re-trust requires an explicit `unrevokeCert` admin call; it is never
+    /// granted as a side effect of verification.
+    mapping(bytes32 => bool) public revokedCerts;
+
     // ============ Custom Errors ============
 
     /// @dev Error thrown when an unsupported or unknown ZK coprocessor type is used
@@ -114,6 +127,9 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Thrown when caller is neither the owner nor the revoker
     error CallerNotOwnerOrRevoker();
 
+    /// @dev Thrown when `unrevokeCert` is called for a hash that is not currently revoked
+    error CertificateNotRevoked(bytes32 certHash);
+
     // ============ Events ============
 
     /// @dev Emitted when a new verifier program ID is added/updated
@@ -145,6 +161,9 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
 
     /// @dev Event emitted when a certificate is revoked
     event CertRevoked(bytes32 certHash);
+
+    /// @dev Event emitted when a previously revoked certificate is explicitly re-trusted
+    event CertUnrevoked(bytes32 certHash);
 
     /// @dev Event emitted when the maximum time difference is updated
     event MaxTimeDiffUpdated(uint64 newMaxTimeDiff);
@@ -265,6 +284,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
                 revert RootCertMismatch(rootCertHash, certs[0]);
             }
             for (uint256 j = 1; j < certs.length; j++) {
+                // Stop counting at any revoked entry so off-chain callers cannot derive a
+                // prefix-len that walks past a revoked cert and then claim it as the trusted boundary.
+                if (revokedCerts[certs[j]]) {
+                    break;
+                }
                 uint64 expiry = trustedIntermediateCerts[certs[j]];
                 if (block.timestamp > expiry) {
                     break;
@@ -332,7 +356,7 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     }
 
     /**
-     * @dev Revokes a trusted intermediate certificate
+     * @dev Revokes a trusted intermediate certificate.
      * @param certHash Hash of the certificate to revoke
      *
      * Requirements:
@@ -342,14 +366,44 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      * This function allows the owner or revoker to revoke compromised intermediate certificates
      * without affecting the root certificate or other trusted certificates.
      *
-     * Note: A revoked cert can be trusted again by reproving it.
+     * Durability: in addition to clearing `trustedIntermediateCerts[certHash]`, this
+     * function flips the persistent `revokedCerts[certHash]` sentinel. The sentinel
+     * survives subsequent `_cacheNewCert` overwrites and causes both `_verifyJournal`
+     * and `checkTrustedIntermediateCerts` to reject any chain whose suffix traverses
+     * the revoked hash, regardless of the journal's `trustedCertsPrefixLen`. Reproving
+     * the same chain therefore cannot silently restore trust; re-trust requires an
+     * explicit `unrevokeCert` call by the owner.
      */
     function revokeCert(bytes32 certHash) external onlyOwnerOrRevoker {
         if (trustedIntermediateCerts[certHash] == 0) {
             revert CertificateNotFound(certHash);
         }
         delete trustedIntermediateCerts[certHash];
+        revokedCerts[certHash] = true;
         emit CertRevoked(certHash);
+    }
+
+    /**
+     * @dev Explicitly re-trusts a previously revoked intermediate certificate.
+     * @param certHash Hash of the certificate to un-revoke
+     *
+     * Requirements:
+     * - Only callable by contract owner
+     * - Certificate must currently be marked as revoked
+     *
+     * Clearing the revocation sentinel does not by itself restore the cached
+     * expiry; the next successful verification whose chain traverses `certHash`
+     * will re-cache it via `_cacheNewCert`. This two-step design (admin clears
+     * the sentinel, verification re-caches the expiry) keeps re-trust an
+     * explicit, owner-only action while still letting the normal cache path
+     * supply the up-to-date `notAfter` timestamp.
+     */
+    function unrevokeCert(bytes32 certHash) external onlyOwner {
+        if (!revokedCerts[certHash]) {
+            revert CertificateNotRevoked(certHash);
+        }
+        delete revokedCerts[certHash];
+        emit CertUnrevoked(certHash);
     }
 
     /**
@@ -570,10 +624,17 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      * This function automatically adds any certificates beyond the trusted length
      * to the trusted intermediate certificates set. This optimizes future verifications
      * by expanding the known trusted certificate set based on successful verifications.
+     *
+     * Revoked entries are skipped: once `revokedCerts[certHash]` is set by `revokeCert`,
+     * no successful verification will silently restore the cache, regardless of the
+     * journal's `trustedCertsPrefixLen`. Re-trust requires an explicit `unrevokeCert`.
      */
     function _cacheNewCert(VerifierJournal memory journal) internal {
         for (uint256 i = journal.trustedCertsPrefixLen; i < journal.certs.length; i++) {
             bytes32 certHash = journal.certs[i];
+            if (revokedCerts[certHash]) {
+                continue;
+            }
             trustedIntermediateCerts[certHash] = journal.certExpiries[i];
         }
     }
@@ -586,9 +647,19 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      * This function performs comprehensive validation:
      * 1. Checks if the initial ZK verification was successful
      * 2. Validates the root certificate matches the trusted root
-     * 3. Ensures all trusted certificates are still valid (not revoked)
-     * 4. Validates the attestation timestamp is within acceptable range
-     * 5. Caches newly discovered certificates for future use
+     * 3. Ensures all trusted certificates in the prefix are still valid (not revoked, not expired)
+     * 4. Ensures no certificate in the suffix has been revoked, regardless of `trustedCertsPrefixLen`
+     * 5. Validates the attestation timestamp is within acceptable range
+     * 6. Caches newly discovered certificates for future use
+     *
+     * The suffix-side revocation check (step 4) is the load-bearing fix for the
+     * `revokeCert` durability gap exposed under the production
+     * `trustedCertsPrefixLen = 1` configuration. Without it, Pass 1 only walks
+     * the root and a journal whose chain traverses a revoked intermediate in
+     * the suffix would succeed and then re-cache the revoked entry via
+     * `_cacheNewCert`. Rejecting any suffix entry present in `revokedCerts`
+     * makes revocation durable independently of the journal-supplied prefix
+     * length.
      *
      * The timestamp validation converts milliseconds to seconds and checks:
      * - Attestation is not too old (timestamp + maxTimeDiff > block.timestamp)
@@ -605,7 +676,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
             journal.result = VerificationResult.RootCertNotTrusted;
             return journal;
         }
-        // Check every trusted certificate to ensure none have been revoked
+        // Pass 1: trusted prefix — root must match the on-chain root, and every
+        // intermediate must still hold a non-expired cached entry.
         for (uint256 i = 0; i < journal.trustedCertsPrefixLen; i++) {
             bytes32 certHash = journal.certs[i];
             if (i == 0) {
@@ -615,14 +687,31 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
                 }
                 continue;
             }
+            // `revokeCert` zeroes `trustedIntermediateCerts[certHash]`, so the
+            // expiry check below already catches a revoked cert reached through
+            // the prefix path. The explicit `revokedCerts` guard is retained as
+            // defense-in-depth against future code paths that might re-cache
+            // before this loop runs.
+            if (revokedCerts[certHash]) {
+                journal.result = VerificationResult.IntermediateCertsNotTrusted;
+                return journal;
+            }
             uint64 expiry = trustedIntermediateCerts[certHash];
             if (block.timestamp > expiry) {
                 journal.result = VerificationResult.IntermediateCertsNotTrusted;
                 return journal;
             }
         }
-        // Check any remaining certificates in the chain that are not yet trusted
+        // Pass 2: suffix — journal-supplied expiries plus a hard reject on any
+        // cert that the operator has explicitly revoked. This is the path that
+        // closes the production `trustedCertsPrefixLen = 1` bypass: a revoked
+        // intermediate in the suffix can no longer pass verification and then
+        // be silently re-cached.
         for (uint256 i = journal.trustedCertsPrefixLen; i < journal.certs.length; i++) {
+            if (revokedCerts[journal.certs[i]]) {
+                journal.result = VerificationResult.IntermediateCertsNotTrusted;
+                return journal;
+            }
             uint64 expiry = journal.certExpiries[i];
             if (block.timestamp > expiry) {
                 journal.result = VerificationResult.InvalidTimestamp;
@@ -702,8 +791,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.3.0
+    /// @custom:semver 0.4.0
     function version() public pure virtual returns (string memory) {
-        return "0.3.0";
+        return "0.4.0";
     }
 }

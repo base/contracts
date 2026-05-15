@@ -168,6 +168,26 @@ interface INitroEnclaveVerifier {
     function revoker() external view returns (address);
 
     /**
+     * @dev Returns whether the given intermediate certificate hash has been revoked.
+     * @param _certHash Hash of the certificate
+     * @return `true` if the certificate is currently marked as revoked
+     *
+     * The revocation sentinel is persistent across `_cacheNewCert` overwrites and
+     * blocks both verification (via `_verifyJournal`) and the off-chain
+     * `checkTrustedIntermediateCerts` helper from re-trusting the hash. Re-trust
+     * requires an explicit `unrevokeCert` call.
+     */
+    function revokedCerts(bytes32 _certHash) external view returns (bool);
+
+    /**
+     * @dev Returns the cached `notAfter` timestamp (seconds) for an intermediate certificate.
+     * @param _certHash Hash of the certificate
+     * @return Cached expiry timestamp; `0` indicates the certificate is not currently
+     *         cached (either never seen, expired-and-evicted, or revoked).
+     */
+    function trustedIntermediateCerts(bytes32 _certHash) external view returns (uint64);
+
+    /**
      * @dev Retrieves the configuration for a specific coprocessor
      * @param _zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
      * @return ZkCoProcessorConfig Configuration parameters including program IDs and verifier address
@@ -261,14 +281,35 @@ interface INitroEnclaveVerifier {
         external;
 
     /**
-     * @dev Revokes a trusted intermediate certificate
+     * @dev Revokes a trusted intermediate certificate.
      * @param _certHash Hash of the certificate to revoke
      *
      * Requirements:
      * - Only callable by contract owner or revoker
      * - Certificate must exist in the trusted set
+     *
+     * In addition to clearing the cached entry, this flips a persistent
+     * revocation sentinel that survives later cache writes. Subsequent
+     * verifications whose chain traverses the revoked hash are rejected
+     * regardless of the journal-supplied `trustedCertsPrefixLen`. Re-trust
+     * requires an explicit `unrevokeCert` call.
      */
     function revokeCert(bytes32 _certHash) external;
+
+    /**
+     * @dev Explicitly re-trusts a previously revoked intermediate certificate.
+     * @param _certHash Hash of the certificate to un-revoke
+     *
+     * Requirements:
+     * - Only callable by contract owner
+     * - Certificate must currently be marked as revoked
+     *
+     * Clears the persistent revocation sentinel. The cached expiry is not
+     * restored here; the next successful verification whose chain traverses
+     * `_certHash` will re-cache it via `_cacheNewCert` with the journal-supplied
+     * `notAfter` timestamp.
+     */
+    function unrevokeCert(bytes32 _certHash) external;
 
     /**
      * @dev Updates the verifier program ID, adding the new version to the supported set
