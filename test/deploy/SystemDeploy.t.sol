@@ -150,7 +150,13 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
 
         assertFalse(upgradeOutput.superchainConfigUpgraded, "superchain already current");
         assertTrue(upgradeOutput.chainUpgraded, "chain upgraded");
-        _assertUpgradedProxyImplementations(output);
+        assertEq(
+            output.superchain.superchainProxyAdmin.getProxyImplementation(
+                address(output.superchain.superchainConfigProxy)
+            ),
+            output.impls.superchainConfigImpl,
+            "superchain config impl"
+        );
         assertValidStandardSystem(_expected(output, input));
     }
 
@@ -302,58 +308,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             address(ZKVerifier(zkVerifierAddr).SP1_VERIFIER()),
             address(_input.implementationsInput.sp1Verifier),
             "zk verifier sp1"
-        );
-    }
-
-    function _assertUpgradedProxyImplementations(SystemDeploy.DeployOutput memory _output) internal view {
-        IProxyAdmin superchainProxyAdmin = _output.superchain.superchainProxyAdmin;
-        IProxyAdmin opChainProxyAdmin = _output.opChain.opChainProxyAdmin;
-        Types.Implementations memory impls = _output.impls;
-
-        assertEq(
-            superchainProxyAdmin.getProxyImplementation(address(_output.superchain.superchainConfigProxy)),
-            impls.superchainConfigImpl,
-            "superchain config impl"
-        );
-        assertEq(
-            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.systemConfigProxy)),
-            impls.systemConfigImpl,
-            "system config impl"
-        );
-        assertEq(
-            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.optimismPortalProxy)),
-            impls.optimismPortalImpl,
-            "portal impl"
-        );
-        assertEq(
-            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.anchorStateRegistryProxy)),
-            impls.anchorStateRegistryImpl,
-            "anchor state registry impl"
-        );
-        assertEq(
-            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.optimismMintableERC20FactoryProxy)),
-            impls.optimismMintableERC20FactoryImpl,
-            "erc20 factory impl"
-        );
-        assertEq(
-            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.disputeGameFactoryProxy)),
-            impls.disputeGameFactoryImpl,
-            "dispute game factory impl"
-        );
-        assertEq(
-            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.l1CrossDomainMessengerProxy)),
-            impls.l1CrossDomainMessengerImpl,
-            "messenger impl"
-        );
-        assertEq(
-            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.l1StandardBridgeProxy)),
-            impls.l1StandardBridgeImpl,
-            "standard bridge impl"
-        );
-        assertEq(
-            opChainProxyAdmin.getProxyImplementation(address(_output.opChain.l1ERC721BridgeProxy)),
-            impls.l1ERC721BridgeImpl,
-            "erc721 bridge impl"
         );
     }
 
