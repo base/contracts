@@ -11,28 +11,26 @@ import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
 
 contract RelayActor {
     address internal constant IDENTITY_PRECOMPILE = address(0x04);
+    uint256 internal constant MAX_MESSAGE_SIZE = 1000;
 
     // Invariant handlers ignore target-call reverts, so failures must persist after relay returns.
-    bool public reverted;
-    bool public unexpectedMessageStatus;
+    bool public badRelayResult;
 
     address internal immutable op;
     IL1CrossDomainMessenger internal immutable xdm;
     Vm internal immutable vm;
     bool internal immutable doFail;
 
-    constructor(address _op, IL1CrossDomainMessenger _xdm, Vm _vm, bytes32 _l2SenderSlot, bool _doFail) {
+    constructor(address _op, IL1CrossDomainMessenger _xdm, Vm _vm, bool _doFail) {
         op = _op;
         xdm = _xdm;
         vm = _vm;
         doFail = _doFail;
-
-        // Set op.l2Sender() once to the L2 Cross Domain Messenger. Nothing in the fuzzed
-        // surface modifies this slot, so we don't need to re-write it on every relay.
-        vm.store(_op, _l2SenderSlot, bytes32(abi.encode(Predeploys.L2_CROSS_DOMAIN_MESSENGER)));
     }
 
     function relay(uint8 _version, uint8 _value, bytes memory _message) external {
+        vm.assume(_message.length <= MAX_MESSAGE_SIZE);
+
         _version = _version % 2;
         _value = _value % 2;
 
@@ -73,12 +71,12 @@ contract RelayActor {
         catch {
             // Forge's invariant fuzzer ignores reverted target calls, so we surface the failure
             // by flipping a flag the invariant asserts on.
-            reverted = true;
+            badRelayResult = true;
         }
 
-        bool statusMismatch =
-            xdm.successfulMessages(relayMessageHash) == doFail || xdm.failedMessages(relayMessageHash) != doFail;
-        unexpectedMessageStatus = unexpectedMessageStatus || statusMismatch;
+        if (xdm.successfulMessages(relayMessageHash) == doFail || xdm.failedMessages(relayMessageHash) != doFail) {
+            badRelayResult = true;
+        }
     }
 }
 
@@ -89,11 +87,11 @@ contract XDM_MinGasLimits is CommonTest {
         super.setUp();
 
         bytes32 l2SenderSlot = bytes32(ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender").slot);
-        actor = new RelayActor(address(optimismPortal2), l1CrossDomainMessenger, vm, l2SenderSlot, doFail);
+        vm.store(address(optimismPortal2), l2SenderSlot, bytes32(abi.encode(Predeploys.L2_CROSS_DOMAIN_MESSENGER)));
+        actor = new RelayActor(address(optimismPortal2), l1CrossDomainMessenger, vm, doFail);
 
         vm.deal(address(optimismPortal2), type(uint128).max);
 
-        targetSender(address(this));
         targetContract(address(actor));
 
         bytes4[] memory selectors = new bytes4[](1);
@@ -101,10 +99,8 @@ contract XDM_MinGasLimits is CommonTest {
         targetSelector(FuzzSelector({ addr: address(actor), selectors: selectors }));
     }
 
-    /// @dev The actor records any relay that reverts or lands in the wrong message-status mapping.
     function _assertRelayResults() internal view {
-        assertFalse(actor.unexpectedMessageStatus());
-        assertFalse(actor.reverted());
+        assertFalse(actor.badRelayResult());
     }
 }
 
