@@ -141,7 +141,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     }
 
     function test_upgrade_withoutManagerDelegatecall_succeeds() public {
-        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_defaultDeployInput());
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
 
         SystemDeploy.UpgradeOutput memory upgradeOutput = systemDeploy.upgrade(
             SystemDeploy.UpgradeInput({
@@ -155,7 +156,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertFalse(upgradeOutput.superchainConfigUpgraded, "superchain already current");
         assertTrue(upgradeOutput.chainUpgraded, "chain upgraded");
         _assertUpgradedProxyImplementations(output);
-        assertValidStandardSystem(_expected(output, _defaultDeployInput()));
+        assertValidStandardSystem(_expected(output, input));
     }
 
     function test_deploy_reusingImplementations_doesNotSaveZeroImplementationOnlyArtifacts() public {
@@ -239,8 +240,12 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertEq(impls.aggregateVerifierImpl, aggregateVerifierAddr, "aggregate verifier impl");
         assertEq(impls.teeVerifierImpl, teeVerifierAddr, "tee verifier impl");
         assertEq(impls.zkVerifierImpl, zkVerifierAddr, "zk verifier impl");
-        assertEq(address(_output.opChain.nitroEnclaveVerifier), _input.implementationsInput.nitroEnclaveVerifier);
-        assertEq(address(_output.opChain.sp1Verifier), address(_input.implementationsInput.sp1Verifier));
+        assertEq(
+            address(_output.opChain.nitroEnclaveVerifier),
+            _input.implementationsInput.nitroEnclaveVerifier,
+            "nitro enclave verifier"
+        );
+        assertEq(address(_output.opChain.sp1Verifier), address(_input.implementationsInput.sp1Verifier), "sp1 verifier");
         assertEq(
             _output.opChain.opChainProxyAdmin.getProxyImplementation(teeProverRegistryProxyAddr),
             impls.teeProverRegistryImpl,
@@ -259,15 +264,23 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             address(_output.opChain.anchorStateRegistryProxy),
             "aggregate verifier asr"
         );
-        assertEq(address(aggregateVerifier.DISPUTE_GAME_FACTORY()), address(_output.opChain.disputeGameFactoryProxy));
-        assertEq(address(aggregateVerifier.DELAYED_WETH()), address(_output.opChain.delayedWETHProxy));
-        assertEq(address(aggregateVerifier.TEE_VERIFIER()), teeVerifierAddr);
-        assertEq(address(aggregateVerifier.ZK_VERIFIER()), zkVerifierAddr);
-        assertEq(aggregateVerifier.TEE_IMAGE_HASH(), _input.implementationsInput.teeImageHash);
-        assertEq(aggregateVerifier.ZK_RANGE_HASH(), _input.implementationsInput.zkRangeHash);
-        assertEq(aggregateVerifier.ZK_AGGREGATE_HASH(), _input.implementationsInput.zkAggregationHash);
-        assertEq(aggregateVerifier.CONFIG_HASH(), _input.implementationsInput.multiproofConfigHash);
-        assertEq(aggregateVerifier.L2_CHAIN_ID(), _input.opChainInput.l2ChainId);
+        assertEq(
+            address(aggregateVerifier.DISPUTE_GAME_FACTORY()),
+            address(_output.opChain.disputeGameFactoryProxy),
+            "aggregate verifier dgf"
+        );
+        assertEq(address(aggregateVerifier.DELAYED_WETH()), address(_output.opChain.delayedWETHProxy), "delayed weth");
+        assertEq(address(aggregateVerifier.TEE_VERIFIER()), teeVerifierAddr, "aggregate verifier tee");
+        assertEq(address(aggregateVerifier.ZK_VERIFIER()), zkVerifierAddr, "aggregate verifier zk");
+        assertEq(aggregateVerifier.TEE_IMAGE_HASH(), _input.implementationsInput.teeImageHash, "tee image hash");
+        assertEq(aggregateVerifier.ZK_RANGE_HASH(), _input.implementationsInput.zkRangeHash, "zk range hash");
+        assertEq(
+            aggregateVerifier.ZK_AGGREGATE_HASH(), _input.implementationsInput.zkAggregationHash, "zk aggregation hash"
+        );
+        assertEq(
+            aggregateVerifier.CONFIG_HASH(), _input.implementationsInput.multiproofConfigHash, "multiproof config hash"
+        );
+        assertEq(aggregateVerifier.L2_CHAIN_ID(), _input.opChainInput.l2ChainId, "l2 chain id");
 
         TEEProverRegistry teeProverRegistry = TEEProverRegistry(teeProverRegistryProxyAddr);
         assertEq(teeProverRegistry.owner(), _input.opChainInput.roles.opChainProxyAdminOwner, "tee registry owner");
@@ -290,7 +303,11 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             teeProverRegistryProxyAddr,
             "tee verifier registry"
         );
-        assertEq(address(ZKVerifier(zkVerifierAddr).SP1_VERIFIER()), address(_input.implementationsInput.sp1Verifier));
+        assertEq(
+            address(ZKVerifier(zkVerifierAddr).SP1_VERIFIER()),
+            address(_input.implementationsInput.sp1Verifier),
+            "zk verifier sp1"
+        );
     }
 
     function _assertUpgradedProxyImplementations(SystemDeploy.DeployOutput memory _output) internal view {
