@@ -19,7 +19,7 @@ import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
-import { Claim, Duration } from "src/libraries/bridge/LibUDT.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 contract MockNitroEnclaveVerifier {
     address public proofSubmitter;

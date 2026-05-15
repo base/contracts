@@ -8,7 +8,7 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
 
 // Libraries
-import { VMStatus, Timestamp } from "src/libraries/bridge/LibUDT.sol";
+import { Timestamp } from "src/libraries/bridge/LibUDT.sol";
 import "src/libraries/bridge/Types.sol";
 import "src/libraries/bridge/Errors.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";

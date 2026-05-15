@@ -19,7 +19,7 @@ import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMin
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 
 import { GameType, Proposal } from "src/libraries/bridge/Types.sol";
-import { Duration, Claim } from "src/libraries/bridge/LibUDT.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 library Types {
     /// @notice Represents the roles that can be set when deploying a standard OP Stack chain.

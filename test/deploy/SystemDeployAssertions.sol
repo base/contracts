@@ -9,7 +9,7 @@ import { Constants } from "src/libraries/Constants.sol";
 import { Features } from "src/libraries/Features.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { GameType, GameTypes, Hash } from "src/libraries/bridge/Types.sol";
-import { Claim, Duration } from "src/libraries/bridge/LibUDT.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";

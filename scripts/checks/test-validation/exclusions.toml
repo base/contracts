@@ -18,7 +18,6 @@
 src_validation = [
     "test/invariants/",                         # Invariant testing framework - no direct src counterpart
     "test/scripts/",                            # Script tests - test deployment/utility scripts, not contracts
-    "test/libraries/bridge/LibClock.t.sol",     # Tests library utilities
     "test/libraries/bridge/LibGameId.t.sol",    # Tests library utilities
     "test/universal/ExtendedPause.t.sol",       # Tests extended functionality
     "test/vendor/Initializable.t.sol",          # Tests external vendor code
