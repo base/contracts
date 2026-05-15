@@ -6,21 +6,24 @@ import { Test } from "lib/forge-std/src/Test.sol";
 import { Vm } from "lib/forge-std/src/Vm.sol";
 import { SafeCall } from "src/libraries/SafeCall.sol";
 
-contract SafeCall_Succeeds_Invariants is Test {
+abstract contract SafeCall_Invariants is Test {
     SafeCaller_Actor actor;
 
-    function setUp() public {
-        // Create a new safe caller actor.
-        actor = new SafeCaller_Actor(vm, false);
-
-        // Set the caller to this contract
+    function _init(bool _shouldFail) internal {
+        actor = new SafeCaller_Actor(vm, _shouldFail);
         targetSender(address(this));
-
-        // Target the safe caller actor.
         targetContract(address(actor));
-
-        // Give the actor some ETH to work with
         vm.deal(address(actor), type(uint128).max);
+    }
+
+    function performSafeCallMinGas(address to, uint64 minGas) external payable {
+        SafeCall.callWithMinGas(to, minGas, msg.value, hex"");
+    }
+}
+
+contract SafeCall_Succeeds_Invariants is SafeCall_Invariants {
+    function setUp() public {
+        _init(false);
     }
 
     /// @custom:invariant If `callWithMinGas` performs a call, then it must always
@@ -29,29 +32,13 @@ contract SafeCall_Succeeds_Invariants is Test {
     ///                   If the check for remaining gas in `SafeCall.callWithMinGas` passes, the
     ///                   subcontext of the call below it must be provided at least `minGas` gas.
     function invariant_callWithMinGas_alwaysForwardsMinGas_succeeds() public view {
-        assertEq(actor.numCalls(), 0, "no failed calls allowed");
-    }
-
-    function performSafeCallMinGas(address to, uint64 minGas) external payable {
-        SafeCall.callWithMinGas(to, minGas, msg.value, hex"");
+        assertFalse(actor.badCallResult());
     }
 }
 
-contract SafeCall_Fails_Invariants is Test {
-    SafeCaller_Actor actor;
-
+contract SafeCall_Fails_Invariants is SafeCall_Invariants {
     function setUp() public {
-        // Create a new safe caller actor.
-        actor = new SafeCaller_Actor(vm, true);
-
-        // Set the caller to this contract
-        targetSender(address(this));
-
-        // Target the safe caller actor.
-        targetContract(address(actor));
-
-        // Give the actor some ETH to work with
-        vm.deal(address(actor), type(uint128).max);
+        _init(true);
     }
 
     /// @custom:invariant `callWithMinGas` reverts if there is not enough gas to pass
@@ -61,49 +48,47 @@ contract SafeCall_Fails_Invariants is Test {
     ///                   `callWithMinGas` can provide the specified minimum gas limit
     ///                   to the subcontext of the call, then `callWithMinGas` must revert.
     function invariant_callWithMinGas_neverForwardsMinGas_reverts() public view {
-        assertEq(actor.numCalls(), 0, "no successful calls allowed");
-    }
-
-    function performSafeCallMinGas(address to, uint64 minGas) external payable {
-        SafeCall.callWithMinGas(to, minGas, msg.value, hex"");
+        assertFalse(actor.badCallResult());
     }
 }
 
 contract SafeCaller_Actor is StdUtils {
-    bool internal immutable FAILS;
+    address internal constant CONSOLE = 0x000000000000000000636F6e736F6c652e6c6f67;
+    uint64 internal constant MIN_MIN_GAS = 2_500;
+    uint64 internal constant MAX_MIN_GAS = uint64(type(uint48).max);
+    uint64 internal constant CALL_WITH_MIN_GAS_OVERHEAD = 40_000;
+    uint64 internal constant SAFE_CALL_BUFFER = 1_000;
 
-    Vm internal vm;
-    uint256 public numCalls;
+    Vm internal immutable vm;
+    bool internal immutable shouldFail;
 
-    constructor(Vm _vm, bool _fails) {
+    bool public badCallResult;
+
+    constructor(Vm _vm, bool _shouldFail) {
         vm = _vm;
-        FAILS = _fails;
+        shouldFail = _shouldFail;
     }
 
     function performSafeCallMinGas(uint64 gas, uint64 minGas, address to, uint8 value) external {
         // Only send to EOAs - we exclude the console as it has no code but reverts when called
         // with a selector that doesn't exist due to the foundry hook.
-        vm.assume(to.code.length == 0 && to != 0x000000000000000000636F6e736F6c652e6c6f67);
+        vm.assume(to.code.length == 0 && to != CONSOLE);
 
-        // Bound the minimum gas amount to [2500, type(uint48).max]
-        minGas = uint64(bound(minGas, 2500, type(uint48).max));
-        if (FAILS) {
-            // Bound the gas passed to [minGas, ((minGas * 64) / 63)]
-            gas = uint64(bound(gas, minGas, (minGas * 64) / 63));
+        minGas = uint64(bound(minGas, MIN_MIN_GAS, MAX_MIN_GAS));
+        uint64 minCallGas = (minGas * 64) / 63;
+        if (shouldFail) {
+            gas = uint64(bound(gas, minGas, minCallGas));
         } else {
-            // Bound the gas passed to
-            // [((minGas * 64) / 63) + 40_000 + 1000, type(uint64).max]
-            // The extra 1000 gas is to account for the gas used by the `SafeCall.call` call
-            // itself.
-            gas = uint64(bound(gas, ((minGas * 64) / 63) + 40_000 + 1000, type(uint64).max));
+            gas = uint64(bound(gas, minCallGas + CALL_WITH_MIN_GAS_OVERHEAD + SAFE_CALL_BUFFER, type(uint64).max));
+            vm.expectCallMinGas(to, value, minGas, hex"");
         }
 
-        vm.expectCallMinGas(to, value, minGas, hex"");
         bool success = SafeCall.call(
-            msg.sender, gas, value, abi.encodeCall(SafeCall_Succeeds_Invariants.performSafeCallMinGas, (to, minGas))
+            msg.sender, gas, value, abi.encodeCall(SafeCall_Invariants.performSafeCallMinGas, (to, minGas))
         );
 
-        if (success && FAILS) numCalls++;
-        if (!FAILS && !success) numCalls++;
+        if (success == shouldFail) {
+            badCallResult = true;
+        }
     }
 }
