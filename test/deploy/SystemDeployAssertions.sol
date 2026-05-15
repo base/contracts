@@ -8,7 +8,7 @@ import { Types } from "scripts/libraries/Types.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { Features } from "src/libraries/Features.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
-import { GameType, GameTypes, Hash } from "src/libraries/bridge/Types.sol";
+import { GameType, Hash } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
@@ -38,7 +38,14 @@ abstract contract SystemDeployAssertions is Test {
         IDelayedWETH delayedWETH;
         IETHLockbox ethLockbox;
         address proxyAdminOwner;
+        GameType multiproofGameType;
+        bytes32 teeImageHash;
+        bytes32 zkRangeHash;
+        bytes32 zkAggregationHash;
+        bytes32 multiproofConfigHash;
         uint256 l2ChainId;
+        uint256 multiproofBlockInterval;
+        uint256 multiproofIntermediateBlockInterval;
         uint256 withdrawalDelaySeconds;
     }
 
@@ -50,7 +57,7 @@ abstract contract SystemDeployAssertions is Test {
         _assertSystemConfig(_expected, proxyAdmin);
         _assertBridgeAndPortalWiring(_expected, proxyAdmin);
         _assertDisputeGameFactory(_expected, proxyAdmin);
-        _assertGame(_expected, proxyAdmin, GameTypes.AGGREGATE_VERIFIER);
+        _assertGame(_expected, proxyAdmin, _expected.multiproofGameType);
         _assertETHLockbox(_expected, proxyAdmin);
     }
 
@@ -165,7 +172,7 @@ abstract contract SystemDeployAssertions is Test {
         );
         assertEq(address(portal.disputeGameFactory()), address(dgf), "PORTAL-30");
         assertEq(address(portal.systemConfig()), address(sysCfg), "PORTAL-40");
-        IDisputeGame av = dgf.gameImpls(GameTypes.AGGREGATE_VERIFIER);
+        IDisputeGame av = dgf.gameImpls(_expected.multiproofGameType);
         assertEq(address(portal.anchorStateRegistry()), address(av.anchorStateRegistry()), "PORTAL-50");
         assertEq(portal.l2Sender(), Constants.DEFAULT_L2_SENDER, "PORTAL-80");
         assertEq(address(_proxyAdminFor(address(portal))), address(_proxyAdmin), "PORTAL-90");
@@ -224,35 +231,37 @@ abstract contract SystemDeployAssertions is Test {
     {
         IAnchorStateRegistry asr = _aggregateVerifier.anchorStateRegistry();
         IDelayedWETH weth = _aggregateVerifier.DELAYED_WETH();
-        _assertGameImmutableArgs(_expected, _aggregateVerifier);
+        _assertGameImmutableArgs(_expected, _factory, _aggregateVerifier);
 
         (Hash anchorRoot,) = asr.getAnchorRoot();
-        assertNotEq(anchorRoot.raw(), bytes32(0), "AV-120");
+        assertNotEq(anchorRoot.raw(), bytes32(0), "AV-200");
         _assertDelayedWETH(_expected, _proxyAdmin, weth);
         _assertAnchorStateRegistry(_expected, _proxyAdmin, _factory, asr);
     }
 
-    // TODO: adapt this to assert AggregateVerifier args
-    // game type
-    // asr
-    // delayedWETH
-    // tee verifier
-    // zk verifier
-    // tee image hash
-    // zk hashes
-    // config hash
-    // l2 chain id
-    // block interval
-    // intermediate block interval
     function _assertGameImmutableArgs(
         ExpectedSystemDeployState memory _expected,
+        IDisputeGameFactory _factory,
         IAggregateVerifier _aggregateVerifier
     )
         private
         view
     {
-        assertEq(_aggregateVerifier.l2SequenceNumber(), 0, "AV-70");
-        assertEq(address(_aggregateVerifier.anchorStateRegistry()), address(_expected.anchorStateRegistry), "AV-70");
+        assertEq(_aggregateVerifier.gameType().raw(), _expected.multiproofGameType.raw(), "AV-30");
+        assertEq(address(_aggregateVerifier.anchorStateRegistry()), address(_expected.anchorStateRegistry), "AV-40");
+        assertEq(address(_aggregateVerifier.DISPUTE_GAME_FACTORY()), address(_factory), "AV-50");
+        assertEq(address(_aggregateVerifier.DELAYED_WETH()), address(_expected.delayedWETH), "AV-60");
+        assertEq(address(_aggregateVerifier.TEE_VERIFIER()), _expected.implementations.teeVerifierImpl, "AV-70");
+        assertEq(address(_aggregateVerifier.ZK_VERIFIER()), _expected.implementations.zkVerifierImpl, "AV-80");
+        assertEq(_aggregateVerifier.TEE_IMAGE_HASH(), _expected.teeImageHash, "AV-90");
+        assertEq(_aggregateVerifier.ZK_RANGE_HASH(), _expected.zkRangeHash, "AV-100");
+        assertEq(_aggregateVerifier.ZK_AGGREGATE_HASH(), _expected.zkAggregationHash, "AV-110");
+        assertEq(_aggregateVerifier.CONFIG_HASH(), _expected.multiproofConfigHash, "AV-120");
+        assertEq(_aggregateVerifier.L2_CHAIN_ID(), _expected.l2ChainId, "AV-130");
+        assertEq(_aggregateVerifier.BLOCK_INTERVAL(), _expected.multiproofBlockInterval, "AV-140");
+        assertEq(
+            _aggregateVerifier.INTERMEDIATE_BLOCK_INTERVAL(), _expected.multiproofIntermediateBlockInterval, "AV-150"
+        );
     }
 
     function _assertDelayedWETH(

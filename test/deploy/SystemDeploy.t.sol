@@ -361,7 +361,14 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             delayedWETH: _output.opChain.delayedWETHProxy,
             ethLockbox: _output.opChain.ethLockboxProxy,
             proxyAdminOwner: _input.opChainInput.roles.opChainProxyAdminOwner,
+            multiproofGameType: GameType.wrap(uint32(_input.implementationsInput.multiproofGameType)),
+            teeImageHash: _input.implementationsInput.teeImageHash,
+            zkRangeHash: _input.implementationsInput.zkRangeHash,
+            zkAggregationHash: _input.implementationsInput.zkAggregationHash,
+            multiproofConfigHash: _input.implementationsInput.multiproofConfigHash,
             l2ChainId: _input.opChainInput.l2ChainId,
+            multiproofBlockInterval: _input.implementationsInput.multiproofBlockInterval,
+            multiproofIntermediateBlockInterval: _input.implementationsInput.multiproofIntermediateBlockInterval,
             withdrawalDelaySeconds: _input.implementationsInput.withdrawalDelaySeconds
         });
     }
