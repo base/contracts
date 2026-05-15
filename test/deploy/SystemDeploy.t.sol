@@ -9,7 +9,6 @@ import { Types } from "scripts/libraries/Types.sol";
 import { SystemDeployAssertions } from "test/deploy/SystemDeployAssertions.sol";
 
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
-import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
