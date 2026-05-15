@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { StdUtils } from "lib/forge-std/src/StdUtils.sol";
 import { Vm } from "lib/forge-std/src/Vm.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
@@ -12,11 +11,11 @@ import { Encoding } from "src/libraries/Encoding.sol";
 import { Hashing } from "src/libraries/Hashing.sol";
 import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
 
-contract RelayActor is StdUtils {
+contract RelayActor {
     address internal constant IDENTITY_PRECOMPILE = address(0x04);
 
-    bytes32[] public hashes;
     bool public reverted;
+    bool public unexpectedMessageStatus;
 
     IOptimismPortal2 internal immutable op;
     IL1CrossDomainMessenger internal immutable xdm;
@@ -32,13 +31,27 @@ contract RelayActor is StdUtils {
         // Set op.l2Sender() once to the L2 Cross Domain Messenger. Nothing in the fuzzed
         // surface modifies this slot, so we don't need to re-write it on every relay.
         uint256 senderSlotIndex = ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender").slot;
-        vm.store(
-            address(_op), bytes32(senderSlotIndex), bytes32(uint256(uint160(Predeploys.L2_CROSS_DOMAIN_MESSENGER)))
-        );
+        vm.store(address(_op), bytes32(senderSlotIndex), bytes32(abi.encode(Predeploys.L2_CROSS_DOMAIN_MESSENGER)));
     }
 
-    function hashesLength() external view returns (uint256) {
-        return hashes.length;
+    function _hashRelayMessage(
+        uint256 _nonce,
+        uint256 _value,
+        uint256 _minGasLimit,
+        bytes memory _message
+    )
+        internal
+        pure
+        returns (bytes32)
+    {
+        return Hashing.hashCrossDomainMessageV1({
+            _nonce: _nonce,
+            _sender: Predeploys.L2_CROSS_DOMAIN_MESSENGER,
+            _target: IDENTITY_PRECOMPILE,
+            _value: _value,
+            _gasLimit: _minGasLimit,
+            _data: _message
+        });
     }
 
     /// @notice Relays a fuzzed message to the `L1CrossDomainMessenger`.
@@ -62,20 +75,19 @@ contract RelayActor is StdUtils {
 
         // `relayMessage` always re-encodes as a v1 hash after checking the v0 hash hasn't been
         // relayed, so the v1 hash is what we track.
-        uint256 nonce = Encoding.encodeVersionedNonce(0, _version);
-        address sender = Predeploys.L2_CROSS_DOMAIN_MESSENGER;
-        bytes32 _hash =
-            Hashing.hashCrossDomainMessageV1(nonce, sender, IDENTITY_PRECOMPILE, _value, relayMinGasLimit, _message);
+        uint256 nonce = Encoding.encodeVersionedNonce({ _nonce: 0, _version: _version });
 
-        vm.assume(xdm.successfulMessages(_hash) == false && xdm.failedMessages(_hash) == false);
-        hashes.push(_hash);
+        {
+            bytes32 initialHash = _hashRelayMessage(nonce, _value, relayMinGasLimit, _message);
+            vm.assume(xdm.successfulMessages(initialHash) == false && xdm.failedMessages(initialHash) == false);
+        }
 
         vm.startPrank(address(op));
         if (!doFail) {
             vm.expectCallMinGas(IDENTITY_PRECOMPILE, _value, minGasLimit, _message);
         }
         try xdm.relayMessage{ gas: gas, value: _value }(
-            nonce, sender, IDENTITY_PRECOMPILE, _value, relayMinGasLimit, _message
+            nonce, Predeploys.L2_CROSS_DOMAIN_MESSENGER, IDENTITY_PRECOMPILE, _value, relayMinGasLimit, _message
         ) { }
         catch {
             // Forge's invariant fuzzer ignores reverted target calls, so we surface the failure
@@ -83,6 +95,10 @@ contract RelayActor is StdUtils {
             reverted = true;
         }
         vm.stopPrank();
+
+        bytes32 hash = _hashRelayMessage(nonce, _value, relayMinGasLimit, _message);
+        unexpectedMessageStatus =
+            unexpectedMessageStatus || xdm.successfulMessages(hash) == doFail || xdm.failedMessages(hash) != doFail;
     }
 }
 
@@ -112,15 +128,9 @@ contract XDM_MinGasLimits is CommonTest {
         targetSelector(FuzzSelector({ addr: address(actor), selectors: selectors }));
     }
 
-    /// @dev Asserts every relayed hash landed in the expected mapping. `expectSuccess = true`
-    ///      checks `successfulMessages`; `false` checks `failedMessages`.
-    function _assertHashes(bool expectSuccess) internal view {
-        uint256 length = actor.hashesLength();
-        for (uint256 i = 0; i < length; ++i) {
-            bytes32 hash = actor.hashes(i);
-            assertEq(l1CrossDomainMessenger.successfulMessages(hash), expectSuccess);
-            assertEq(l1CrossDomainMessenger.failedMessages(hash), !expectSuccess);
-        }
+    /// @dev The actor records any relay that reverts or lands in the wrong message-status mapping.
+    function _assertRelayResults() internal view {
+        assertFalse(actor.unexpectedMessageStatus());
         assertFalse(actor.reverted());
     }
 }
@@ -130,21 +140,10 @@ contract XDM_MinGasLimits_Succeeds is XDM_MinGasLimits {
         super.init(false);
     }
 
-    /// @custom:invariant A call to `relayMessage` should succeed if at least the minimum gas limit
-    ///                   can be supplied to the target context, there is enough gas to complete
-    ///                   execution of `relayMessage` after the target context's execution is
-    ///                   finished, and the target context did not revert.
-    ///
-    ///                   There are two minimum gas limits here:
-    ///
-    ///                   - The outer min gas limit is for the call from the `OptimismPortal` to the
-    ///                     `L1CrossDomainMessenger`,  and it can be retrieved by calling the xdm's
-    ///                     `baseGas` function with the `message` and inner limit.
-    ///
-    ///                   - The inner min gas limit is for the call from the
-    ///                     `L1CrossDomainMessenger` to the target contract.
-    function invariant_minGasLimits() external view {
-        _assertHashes(true);
+    /// @custom:invariant `relayMessage` should succeed when the outer call has base gas and the
+    ///                   target can receive the inner minimum gas limit.
+    function invariant_relayMessage_forwardsMinGas_succeeds() external view {
+        _assertRelayResults();
     }
 }
 
@@ -153,21 +152,9 @@ contract XDM_MinGasLimits_Reverts is XDM_MinGasLimits {
         super.init(true);
     }
 
-    /// @custom:invariant A call to `relayMessage` should assign the message hash to the
-    ///                   `failedMessages` mapping if not enough gas is supplied to forward
-    ///                   `minGasLimit` to the target context or if there is not enough gas to
-    ///                   complete execution of `relayMessage` after the target context's execution
-    ///                   is finished.
-    ///
-    ///                   There are two minimum gas limits here:
-    ///
-    ///                   - The outer min gas limit is for the call from the `OptimismPortal` to the
-    ///                     `L1CrossDomainMessenger`,  and it can be retrieved by calling the xdm's
-    ///                     `baseGas` function with the `message` and inner limit.
-    ///
-    ///                   - The inner min gas limit is for the call from the
-    ///                     `L1CrossDomainMessenger` to the target contract.
-    function invariant_minGasLimits() external view {
-        _assertHashes(false);
+    /// @custom:invariant `relayMessage` should mark the message failed when the inner minimum gas
+    ///                   limit is too large to forward to the target.
+    function invariant_relayMessage_insufficientMinGas_fails() external view {
+        _assertRelayResults();
     }
 }
