@@ -77,10 +77,8 @@ contract RelayActor {
         // relayed, so the v1 hash is what we track.
         uint256 nonce = Encoding.encodeVersionedNonce({ _nonce: 0, _version: _version });
 
-        {
-            bytes32 initialHash = _hashRelayMessage(nonce, _value, relayMinGasLimit, _message);
-            vm.assume(xdm.successfulMessages(initialHash) == false && xdm.failedMessages(initialHash) == false);
-        }
+        bytes32 relayMessageHash = _hashRelayMessage(nonce, _value, relayMinGasLimit, _message);
+        vm.assume(!xdm.successfulMessages(relayMessageHash) && !xdm.failedMessages(relayMessageHash));
 
         vm.startPrank(address(op));
         if (!doFail) {
@@ -96,16 +94,15 @@ contract RelayActor {
         }
         vm.stopPrank();
 
-        bytes32 hash = _hashRelayMessage(nonce, _value, relayMinGasLimit, _message);
-        unexpectedMessageStatus =
-            unexpectedMessageStatus || xdm.successfulMessages(hash) == doFail || xdm.failedMessages(hash) != doFail;
+        unexpectedMessageStatus = unexpectedMessageStatus || xdm.successfulMessages(relayMessageHash) == doFail
+            || xdm.failedMessages(relayMessageHash) != doFail;
     }
 }
 
 contract XDM_MinGasLimits is CommonTest {
     RelayActor actor;
 
-    function init(bool doFail) public virtual {
+    function init(bool doFail) internal {
         super.setUp();
 
         actor = new RelayActor(optimismPortal2, l1CrossDomainMessenger, vm, doFail);
