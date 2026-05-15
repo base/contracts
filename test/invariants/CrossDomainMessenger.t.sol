@@ -104,10 +104,6 @@ contract XDM_MinGasLimits is CommonTest {
         selectors[0] = actor.relay.selector;
         targetSelector(FuzzSelector({ addr: address(actor), selectors: selectors }));
     }
-
-    function _assertRelayResults() internal view {
-        assertFalse(actor.badRelayResult());
-    }
 }
 
 contract XDM_MinGasLimits_Succeeds is XDM_MinGasLimits {
@@ -118,7 +114,7 @@ contract XDM_MinGasLimits_Succeeds is XDM_MinGasLimits {
     /// @custom:invariant `relayMessage` should succeed when the outer call has base gas and the
     ///                   target can receive the inner minimum gas limit.
     function invariant_relayMessage_forwardsMinGas_succeeds() external view {
-        _assertRelayResults();
+        assertFalse(actor.badRelayResult());
     }
 }
 
@@ -130,6 +126,6 @@ contract XDM_MinGasLimits_Reverts is XDM_MinGasLimits {
     /// @custom:invariant `relayMessage` should mark the message failed when the inner minimum gas
     ///                   limit is too large to forward to the target.
     function invariant_relayMessage_insufficientMinGas_fails() external view {
-        _assertRelayResults();
+        assertFalse(actor.badRelayResult());
     }
 }
