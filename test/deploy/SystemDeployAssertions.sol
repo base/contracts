@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Test, console } from "lib/forge-std/src/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 
 import { Types } from "scripts/libraries/Types.sol";
 
@@ -272,19 +272,14 @@ abstract contract SystemDeployAssertions is Test {
         private
         view
     {
-        string memory prefix = "AV-DWETH";
+        assertEq(_version(address(_weth)), _version(_expected.implementations.delayedWETHImpl), "AV-DWETH-10");
         assertEq(
-            _version(address(_weth)), _version(_expected.implementations.delayedWETHImpl), string.concat(prefix, "-10")
+            _proxyAdmin.getProxyImplementation(address(_weth)), _expected.implementations.delayedWETHImpl, "AV-DWETH-20"
         );
-        assertEq(
-            _proxyAdmin.getProxyImplementation(address(_weth)),
-            _expected.implementations.delayedWETHImpl,
-            string.concat(prefix, "-20")
-        );
-        assertEq(_weth.proxyAdminOwner(), _expected.proxyAdminOwner, string.concat(prefix, "-30"));
-        assertEq(_weth.delay(), _expected.withdrawalDelaySeconds, string.concat(prefix, "-40"));
-        assertEq(address(_weth.systemConfig()), address(_expected.systemConfig), string.concat(prefix, "-50"));
-        assertEq(address(_proxyAdminFor(address(_weth))), address(_proxyAdmin), string.concat(prefix, "-60"));
+        assertEq(_weth.proxyAdminOwner(), _expected.proxyAdminOwner, "AV-DWETH-30");
+        assertEq(_weth.delay(), _expected.withdrawalDelaySeconds, "AV-DWETH-40");
+        assertEq(address(_weth.systemConfig()), address(_expected.systemConfig), "AV-DWETH-50");
+        assertEq(address(_proxyAdminFor(address(_weth))), address(_proxyAdmin), "AV-DWETH-60");
     }
 
     function _assertAnchorStateRegistry(
@@ -296,21 +291,16 @@ abstract contract SystemDeployAssertions is Test {
         private
         view
     {
-        string memory prefix = "AV-ANCHORP";
-        assertEq(
-            _version(address(_asr)),
-            _version(_expected.implementations.anchorStateRegistryImpl),
-            string.concat(prefix, "-10")
-        );
+        assertEq(_version(address(_asr)), _version(_expected.implementations.anchorStateRegistryImpl), "AV-ANCHORP-10");
         assertEq(
             _proxyAdmin.getProxyImplementation(address(_asr)),
             _expected.implementations.anchorStateRegistryImpl,
-            string.concat(prefix, "-20")
+            "AV-ANCHORP-20"
         );
-        assertEq(address(_asr.disputeGameFactory()), address(_factory), string.concat(prefix, "-30"));
-        assertEq(address(_asr.systemConfig()), address(_expected.systemConfig), string.concat(prefix, "-40"));
-        assertEq(address(_proxyAdminFor(address(_asr))), address(_proxyAdmin), string.concat(prefix, "-50"));
-        assertGt(_asr.retirementTimestamp(), 0, string.concat(prefix, "-60"));
+        assertEq(address(_asr.disputeGameFactory()), address(_factory), "AV-ANCHORP-30");
+        assertEq(address(_asr.systemConfig()), address(_expected.systemConfig), "AV-ANCHORP-40");
+        assertEq(address(_proxyAdminFor(address(_asr))), address(_proxyAdmin), "AV-ANCHORP-50");
+        assertGt(_asr.retirementTimestamp(), 0, "AV-ANCHORP-60");
     }
 
     function _assertETHLockbox(ExpectedSystemDeployState memory _expected, IProxyAdmin _proxyAdmin) private view {
