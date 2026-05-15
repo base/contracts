@@ -8,16 +8,14 @@ import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Types } from "scripts/libraries/Types.sol";
 import { SystemDeployAssertions } from "test/deploy/SystemDeployAssertions.sol";
 
-import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
-import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
-import { Claim } from "src/libraries/bridge/LibUDT.sol";
+import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 
 contract MockNitroEnclaveVerifier {
     address public proofSubmitter;
@@ -47,7 +45,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     MockSP1Verifier internal sp1Verifier;
 
     uint256 internal l2ChainId = 901;
-    Claim internal absolutePrestate = Claim.wrap(0x038512e02c4c3f7bdaec27d00edf55b7155e0905301e1a88083e4e0a6764d54c);
 
     function setUp() public {
         systemDeploy = new SystemDeploy();
@@ -79,18 +76,16 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertEq(output.superchainConfigProxy.incidentResponder(), _incidentResponder, "proxy incident responder");
         assertEq(output.superchainConfigImpl.incidentResponder(), _incidentResponder, "impl incident responder");
 
-        vm.startPrank(address(0));
         assertEq(
-            IProxy(payable(address(output.superchainConfigProxy))).implementation(),
+            EIP1967Helper.getImplementation(address(output.superchainConfigProxy)),
             address(output.superchainConfigImpl),
             "implementation"
         );
         assertEq(
-            IProxy(payable(address(output.superchainConfigProxy))).admin(),
+            EIP1967Helper.getAdmin(address(output.superchainConfigProxy)),
             address(output.superchainProxyAdmin),
             "admin"
         );
-        vm.stopPrank();
     }
 
     function test_deploySuperchain_nullInput_reverts() public {
@@ -160,9 +155,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     }
 
     function test_deploy_reusingImplementations_doesNotSaveZeroImplementationOnlyArtifacts() public {
-        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_defaultDeployInput());
-
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+
         input.saveArtifacts = true;
         input.superchainConfigProxy = output.superchain.superchainConfigProxy;
         input.implementations = output.impls;
