@@ -21,7 +21,7 @@ contract RelayActor is StdUtils {
     IOptimismPortal2 op;
     IL1CrossDomainMessenger xdm;
     Vm vm;
-    bool doFail;
+    bool internal immutable doFail;
 
     constructor(IOptimismPortal2 _op, IL1CrossDomainMessenger _xdm, Vm _vm, bool _doFail) {
         op = _op;
