@@ -18,9 +18,9 @@ contract RelayActor is StdUtils {
     bytes32[] public hashes;
     bool public reverted;
 
-    IOptimismPortal2 op;
-    IL1CrossDomainMessenger xdm;
-    Vm vm;
+    IOptimismPortal2 internal immutable op;
+    IL1CrossDomainMessenger internal immutable xdm;
+    Vm internal immutable vm;
     bool internal immutable doFail;
 
     constructor(IOptimismPortal2 _op, IL1CrossDomainMessenger _xdm, Vm _vm, bool _doFail) {
