@@ -7,7 +7,7 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Encoding } from "src/libraries/Encoding.sol";
 import { Hashing } from "src/libraries/Hashing.sol";
-import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
+import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
 
 contract RelayActor {
     address internal constant IDENTITY_PRECOMPILE = address(0x04);
@@ -19,13 +19,13 @@ contract RelayActor {
     address internal immutable op;
     IL1CrossDomainMessenger internal immutable xdm;
     Vm internal immutable vm;
-    bool internal immutable doFail;
+    bool internal immutable shouldFail;
 
-    constructor(address _op, IL1CrossDomainMessenger _xdm, Vm _vm, bool _doFail) {
+    constructor(address _op, IL1CrossDomainMessenger _xdm, Vm _vm, bool _shouldFail) {
         op = _op;
         xdm = _xdm;
         vm = _vm;
-        doFail = _doFail;
+        shouldFail = _shouldFail;
     }
 
     function relay(uint8 _version, uint8 _value, bytes memory _message) external {
@@ -43,7 +43,7 @@ contract RelayActor {
         // because the proxy-to-proxy call overhead (SystemConfig → SuperchainConfig,
         // OptimismPortal) leaves a razor-thin window between "enough to not OOG" and
         // "not enough for hasMinGas to pass".
-        uint32 relayMinGasLimit = doFail ? type(uint32).max : minGasLimit;
+        uint32 relayMinGasLimit = shouldFail ? type(uint32).max : minGasLimit;
 
         // `relayMessage` always re-encodes as a v1 hash after checking the v0 hash hasn't been
         // relayed, so the v1 hash is what we track.
@@ -61,7 +61,7 @@ contract RelayActor {
 
         uint256 gas = xdm.baseGas(_message, minGasLimit);
 
-        if (!doFail) {
+        if (!shouldFail) {
             vm.expectCallMinGas(IDENTITY_PRECOMPILE, _value, minGasLimit, _message);
         }
         vm.prank(op);
@@ -74,7 +74,9 @@ contract RelayActor {
             badRelayResult = true;
         }
 
-        if (xdm.successfulMessages(relayMessageHash) == doFail || xdm.failedMessages(relayMessageHash) != doFail) {
+        bool relaySucceeded = xdm.successfulMessages(relayMessageHash);
+        bool relayFailed = xdm.failedMessages(relayMessageHash);
+        if (relaySucceeded == shouldFail || relayFailed != shouldFail) {
             badRelayResult = true;
         }
     }
@@ -83,12 +85,16 @@ contract RelayActor {
 contract XDM_MinGasLimits is CommonTest {
     RelayActor actor;
 
-    function init(bool doFail) internal {
+    function _init(bool _shouldFail) internal {
         super.setUp();
 
-        bytes32 l2SenderSlot = bytes32(ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender").slot);
-        vm.store(address(optimismPortal2), l2SenderSlot, bytes32(abi.encode(Predeploys.L2_CROSS_DOMAIN_MESSENGER)));
-        actor = new RelayActor(address(optimismPortal2), l1CrossDomainMessenger, vm, doFail);
+        StorageSlot memory l2SenderSlot = ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender");
+        vm.store(
+            address(optimismPortal2),
+            bytes32(l2SenderSlot.slot),
+            bytes32(abi.encode(Predeploys.L2_CROSS_DOMAIN_MESSENGER))
+        );
+        actor = new RelayActor(address(optimismPortal2), l1CrossDomainMessenger, vm, _shouldFail);
 
         vm.deal(address(optimismPortal2), type(uint128).max);
 
@@ -106,7 +112,7 @@ contract XDM_MinGasLimits is CommonTest {
 
 contract XDM_MinGasLimits_Succeeds is XDM_MinGasLimits {
     function setUp() public override {
-        super.init(false);
+        super._init(false);
     }
 
     /// @custom:invariant `relayMessage` should succeed when the outer call has base gas and the
@@ -118,7 +124,7 @@ contract XDM_MinGasLimits_Succeeds is XDM_MinGasLimits {
 
 contract XDM_MinGasLimits_Reverts is XDM_MinGasLimits {
     function setUp() public override {
-        super.init(true);
+        super._init(true);
     }
 
     /// @custom:invariant `relayMessage` should mark the message failed when the inner minimum gas
