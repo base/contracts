@@ -12,6 +12,7 @@ import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
 contract RelayActor {
     address internal constant IDENTITY_PRECOMPILE = address(0x04);
 
+    // Sticky flags make any bad relay visible to the invariant after the handler returns.
     bool public reverted;
     bool public unexpectedMessageStatus;
 
@@ -32,10 +33,8 @@ contract RelayActor {
         vm.store(_op, bytes32(senderSlotIndex), bytes32(abi.encode(Predeploys.L2_CROSS_DOMAIN_MESSENGER)));
     }
 
-    /// @notice Relays a fuzzed message to the `L1CrossDomainMessenger`.
     function relay(uint8 _version, uint8 _value, bytes memory _message) external {
-        // Vary value between 0 and 1 to exercise the with/without-value paths; the ID
-        // precompile accepts value.
+        // Exercise both nonce versions and with/without-value paths; the ID precompile accepts value.
         _version = _version % 2;
         _value = _value % 2;
 
@@ -80,9 +79,7 @@ contract RelayActor {
 
         bool statusMismatch =
             xdm.successfulMessages(relayMessageHash) == doFail || xdm.failedMessages(relayMessageHash) != doFail;
-        if (statusMismatch) {
-            unexpectedMessageStatus = true;
-        }
+        unexpectedMessageStatus = unexpectedMessageStatus || statusMismatch;
     }
 }
 
