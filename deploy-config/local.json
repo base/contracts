@@ -30,7 +30,7 @@
   "p2pSequencerAddress": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
   "proofMaturityDelaySeconds": 604800,
   "proxyAdminOwner": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
-  "respectedGameType": 0,
+  "respectedGameType": 621,
   "sequencerFeeVaultMinimumWithdrawalAmount": "0x8ac7230489e80000",
   "sequencerFeeVaultRecipient": "0xfabb0ac9d68b0b445fb7357272ff202c5651694a",
   "sequencerFeeVaultWithdrawalNetwork": 0,
