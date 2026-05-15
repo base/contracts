@@ -274,7 +274,7 @@ contract SystemDeploy is Script {
         returns (ImplementationInput memory input_)
     {
         input_ = ImplementationInput({
-            withdrawalDelaySeconds: cfg.faultGameWithdrawalDelay(),
+            withdrawalDelaySeconds: cfg.delayedWETHWithdrawalDelay(),
             proofMaturityDelaySeconds: cfg.proofMaturityDelaySeconds(),
             disputeGameFinalityDelaySeconds: cfg.disputeGameFinalityDelaySeconds(),
             teeImageHash: cfg.teeImageHash(),
@@ -558,11 +558,10 @@ contract SystemDeploy is Script {
 
         _initializeOPChain(_input, _superchainConfig, impls_, output_);
 
-        output_.delayedWETHPermissionlessGameProxy =
-            IDelayedWETH(payable(_deployProxy(_input, output_.opChainProxyAdmin, "DelayedWETHPermissionlessGame")));
+        output_.delayedWETHProxy = IDelayedWETH(payable(_deployProxy(_input, output_.opChainProxyAdmin, "DelayedWETH")));
         _upgradeToAndCall(
             output_.opChainProxyAdmin,
-            address(output_.delayedWETHPermissionlessGameProxy),
+            address(output_.delayedWETHProxy),
             _impls.delayedWETHImpl,
             abi.encodeCall(IDelayedWETH.initialize, (output_.systemConfigProxy))
         );
@@ -1011,7 +1010,7 @@ contract SystemDeploy is Script {
             AggregateVerifierInput({
                 multiproofGameType: gameType,
                 anchorStateRegistry: _output.anchorStateRegistryProxy,
-                delayedWETH: _output.delayedWETHPermissionlessGameProxy,
+                delayedWETH: _output.delayedWETHProxy,
                 teeVerifier: output_.teeVerifier,
                 zkVerifier: output_.zkVerifier,
                 teeImageHash: _input.teeImageHash,
@@ -1154,7 +1153,7 @@ contract SystemDeploy is Script {
         artifacts.save("L1CrossDomainMessengerProxy", address(chain.l1CrossDomainMessengerProxy));
         artifacts.save("ETHLockboxProxy", address(chain.ethLockboxProxy));
         artifacts.save("DisputeGameFactoryProxy", address(chain.disputeGameFactoryProxy));
-        artifacts.save("DelayedWETHProxy", address(chain.delayedWETHPermissionlessGameProxy));
+        artifacts.save("DelayedWETHProxy", address(chain.delayedWETHProxy));
         artifacts.save("AnchorStateRegistryProxy", address(chain.anchorStateRegistryProxy));
         artifacts.save("OptimismPortalProxy", address(chain.optimismPortalProxy));
         artifacts.save("OptimismPortal2Proxy", address(chain.optimismPortalProxy));

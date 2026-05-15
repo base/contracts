@@ -207,7 +207,7 @@ abstract contract SystemDeployAssertions is Test {
             _expected: _expected,
             _proxyAdmin: _proxyAdmin,
             _factory: factory,
-            _faultGame: IAggregateVerifier(address(game))
+            _aggregateVerifier: IAggregateVerifier(address(game))
         });
     }
 
@@ -215,14 +215,14 @@ abstract contract SystemDeployAssertions is Test {
         ExpectedSystemDeployState memory _expected,
         IProxyAdmin _proxyAdmin,
         IDisputeGameFactory _factory,
-        IAggregateVerifier _faultGame
+        IAggregateVerifier _aggregateVerifier
     )
         private
         view
     {
-        IAnchorStateRegistry asr = _faultGame.anchorStateRegistry();
-        IDelayedWETH weth = _faultGame.DELAYED_WETH();
-        _assertGameImmutableArgs(_expected, _faultGame);
+        IAnchorStateRegistry asr = _aggregateVerifier.anchorStateRegistry();
+        IDelayedWETH weth = _aggregateVerifier.DELAYED_WETH();
+        _assertGameImmutableArgs(_expected, _aggregateVerifier);
 
         (Hash anchorRoot,) = asr.getAnchorRoot();
         assertNotEq(anchorRoot.raw(), bytes32(0), "AV-120");
@@ -244,13 +244,13 @@ abstract contract SystemDeployAssertions is Test {
     // intermediate block interval
     function _assertGameImmutableArgs(
         ExpectedSystemDeployState memory _expected,
-        IAggregateVerifier _faultGame
+        IAggregateVerifier _aggregateVerifier
     )
         private
         view
     {
-        assertEq(_faultGame.l2SequenceNumber(), 0, "AV-70");
-        assertEq(address(_faultGame.anchorStateRegistry()), address(_expected.anchorStateRegistry), "AV-70");
+        assertEq(_aggregateVerifier.l2SequenceNumber(), 0, "AV-70");
+        assertEq(address(_aggregateVerifier.anchorStateRegistry()), address(_expected.anchorStateRegistry), "AV-70");
     }
 
     function _assertDelayedWETH(

@@ -325,10 +325,6 @@ contract Initializer_Test is CommonTest {
         string[] memory excludes = new string[](20);
         // Periphery contracts don't get deployed as part of the standard deployment script.
         excludes[j++] = "src/periphery/*";
-        // TODO: Deployment script is currently "broken" in the sense that it doesn't properly
-        //       label the FaultDisputeGame, PermissionedDisputeGame
-        //       contracts and instead simply deploys them anonymously. Means that functions like "getInitializedSlot"
-        //       don't work properly. Remove these exclusions once the deployment script is fixed.
         // L2 contract initialization is tested in Predeploys.t.sol
         excludes[j++] = "src/L2/*";
         // Contract is not deployed as part of the standard deployment script.

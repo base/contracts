@@ -174,15 +174,14 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         _saveProxyAndImpl("L1StandardBridge", systemConfigAddresses.l1StandardBridge);
         _saveProxyAndImpl("L1ERC721Bridge", systemConfigAddresses.l1ERC721Bridge);
 
-        // Fault proof proxied contracts
         IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(systemConfig.disputeGameFactory());
         IAggregateVerifier aggregateVerifier =
             IAggregateVerifier(address(disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER)));
-        GameAddresses memory gameAddresses = _permissionedGameAddresses(aggregateVerifier);
+        GameAddresses memory gameAddresses = _aggregateVerifierAddresses(aggregateVerifier);
         _saveProxyAndImpl("AnchorStateRegistry", gameAddresses.anchorStateRegistry);
         _saveProxyAndImpl("DisputeGameFactory", address(disputeGameFactory));
 
-        // Pull the DelayedWETH addresses from the PermissionedDisputeGame so stale local data cannot break this.
+        // Pull DelayedWETH from the AggregateVerifier so stale local data cannot break this.
         artifacts.save("DelayedWETHProxy", gameAddresses.weth);
         artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(gameAddresses.weth));
     }
@@ -293,8 +292,8 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         return address(uint160(uint256(vm.load(_proxy, keccak256(abi.encode(_proxy, uint256(1)))))));
     }
 
-    /// @notice Returns the addresses encoded for the permissioned dispute game.
-    function _permissionedGameAddresses(IAggregateVerifier _aggregateVerifier)
+    /// @notice Returns the addresses used by the AggregateVerifier.
+    function _aggregateVerifierAddresses(IAggregateVerifier _aggregateVerifier)
         internal
         view
         returns (GameAddresses memory game_)

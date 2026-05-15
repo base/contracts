@@ -55,7 +55,7 @@ library Types {
         IOptimismPortal2 optimismPortalProxy;
         IDisputeGameFactory disputeGameFactoryProxy;
         IAnchorStateRegistry anchorStateRegistryProxy;
-        IDelayedWETH delayedWETHPermissionlessGameProxy;
+        IDelayedWETH delayedWETHProxy;
         IVerifier aggregateVerifier;
         ITEEProverRegistry teeProverRegistryProxy;
         IVerifier teeVerifier;

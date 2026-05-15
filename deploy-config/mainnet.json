@@ -4,7 +4,7 @@
   "baseFeeVaultWithdrawalNetwork": 0,
   "batchSenderAddress": "0x6887246668a3b87F54DeB3b94Ba47a6f63F32985",
   "disputeGameFinalityDelaySeconds": 302400,
-  "faultGameWithdrawalDelay": 604800,
+  "delayedWETHWithdrawalDelay": 604800,
   "finalSystemOwner": "0x9BA6e03D8B90dE867373Db8cF1A58d2F7F006b3A",
   "gasPriceOracleBaseFeeScalar": 1368,
   "gasPriceOracleBlobBaseFeeScalar": 810949,

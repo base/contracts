@@ -11,8 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/ethereum-optimism/optimism/cannon/mipsevm/arch"
-	"github.com/ethereum-optimism/optimism/cannon/mipsevm/memory"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/crossdomain"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 )
@@ -56,15 +54,6 @@ var (
 	})
 	proveWithdrawalInputsArgs = abi.Arguments{
 		{Name: "inputs", Type: proveWithdrawalInputs},
-	}
-
-	// cannonMemoryProof inputs tuple (bytes32, bytes)
-	cannonMemoryProof, _ = abi.NewType("tuple", "CannonMemoryProof", []abi.ArgumentMarshaling{
-		{Name: "memRoot", Type: "bytes32"},
-		{Name: "proof", Type: "bytes"},
-	})
-	cannonMemoryProofArgs = abi.Arguments{
-		{Name: "encodedCannonMemoryProof", Type: cannonMemoryProof},
 	}
 
 	// Super root proof tuple (uint8, uint64, OutputRootWithChainId[])
@@ -164,48 +153,6 @@ func DiffTestUtils() {
 	case "getProveWithdrawalTransactionInputs":
 		nonce, sender, target, value, gasLimit, data := parseCrossDomainArgs(args)
 		packTupleAndPrint(proveWithdrawalInputsArgs, buildProveWithdrawalInputs(nonce, sender, target, value, gasLimit, data))
-	case "cannonMemoryProof":
-		// <memAddr0, memValue0, [memAddr1, memValue1], [memAddr2, memValue2]>
-		// Equivalent to the cannon STF prestate proofs of the program counter and memory access for instruction execution.
-		if len(args) != 3 && len(args) != 5 && len(args) != 7 {
-			panic("Error: cannonMemoryProof requires 2, 4, or 6 arguments")
-		}
-		mem := memory.NewMemory()
-		memAddr0 := wordArg(args[1])
-		mem.SetWord(memAddr0, wordArg(args[2]))
-
-		var lastExtraAddr arch.Word
-		for i := 3; i+1 < len(args); i += 2 {
-			lastExtraAddr = wordArg(args[i])
-			mem.SetWord(lastExtraAddr, wordArg(args[i+1]))
-		}
-
-		var proof1 []byte
-		if len(args) >= 5 {
-			p := mem.MerkleProof(lastExtraAddr)
-			proof1 = p[:]
-		}
-		proof0 := mem.MerkleProof(memAddr0)
-
-		packTupleAndPrint(cannonMemoryProofArgs, &cannonMemoryProofOutput{
-			MemRoot: mem.MerkleRoot(),
-			Proof:   append(proof0[:], proof1...),
-		})
-	case "cannonMemoryProof2":
-		// <memAddr0, memValue0, [memAddr1, memValue1], memAddr2>
-		// Generates memory proof of `memAddr2` for a trie containing `memValue0` and `memValue1`
-		if len(args) != 6 {
-			panic("Error: cannonMemoryProof2 requires 5 arguments")
-		}
-		mem := memory.NewMemory()
-		mem.SetWord(wordArg(args[1]), wordArg(args[2]))
-		mem.SetWord(wordArg(args[3]), wordArg(args[4]))
-		memProof := mem.MerkleProof(wordArg(args[5]))
-
-		packTupleAndPrint(cannonMemoryProofArgs, &cannonMemoryProofOutput{
-			MemRoot: mem.MerkleRoot(),
-			Proof:   memProof[:],
-		})
 	case "encodeScalarEcotone":
 		encoded := eth.EncodeScalar(eth.EcotoneScalars{
 			BaseFeeScalar:     uint32(parseUintN(args[1], 32)),

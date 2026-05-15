@@ -50,8 +50,6 @@ There are three modes available in `go-ffi`: `diff`, `trie`, and `merkle`. Each 
 | `hashWithdrawal`                      | Hashes a withdrawal message and prints the digest                                                                  |
 | `hashOutputRootProof`                 | Hashes an output root proof and prints the digest                                                                  |
 | `getProveWithdrawalTransactionInputs` | Generates the inputs for a `getProveWithdrawalTransaction` call to the `OptimismPortal` given a withdrawal message |
-| `cannonMemoryProof`                   | Computes a merkle proof of Cannon's memory                                                                         |
-| `cannonMemoryProof2`                  | Generates a memory proof for a third address against a trie containing two preset values                           |
 | `encodeScalarEcotone`                 | Encodes Ecotone basefee and blob basefee scalars into a single packed scalar                                       |
 | `decodeScalarEcotone`                 | Decodes a packed Ecotone scalar into its basefee and blob basefee scalar components                                |
 | `encodeSuperRootProof`                | ABI-encodes a super root proof                                                                                     |

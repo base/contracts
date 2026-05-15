@@ -36,8 +36,6 @@ contract MockSP1Verifier {
 contract SystemDeploy_Test is Test, SystemDeployAssertions {
     Artifacts internal constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
-    uint256 internal constant STANDARD_MIPS_VERSION = 8;
-
     SystemDeploy internal systemDeploy;
 
     address internal owner = address(this);
@@ -131,7 +129,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertNotEq(address(output.opChain.systemConfigProxy), address(0), "system config");
         assertNotEq(address(output.opChain.optimismPortalProxy), address(0), "portal");
         assertNotEq(address(output.opChain.ethLockboxProxy), address(0), "lockbox");
-        assertNotEq(address(output.opChain.delayedWETHPermissionlessGameProxy), address(0), "permissionless weth");
+        assertNotEq(address(output.opChain.delayedWETHProxy), address(0), "delayed weth");
 
         assertEq(output.opChain.opChainProxyAdmin.owner(), owner, "op chain proxy admin owner");
         assertEq(output.opChain.systemConfigProxy.batchInbox(), Types.chainIdToBatchInboxAddress(l2ChainId), "inbox");
@@ -179,7 +177,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         input.opChainInput.saltMixer = "system-deploy-reuse-test";
 
         vm.mockCallRevert(
-            address(artifacts), abi.encodeCall(Artifacts.save, ("PreimageOracle", address(0))), "zero preimage oracle"
+            address(artifacts),
+            abi.encodeCall(Artifacts.save, ("AggregateVerifier", address(0))),
+            "zero aggregate verifier"
         );
         SystemDeploy.DeployOutput memory reuseOutput = systemDeploy.deploy(input);
 
@@ -274,7 +274,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             "aggregate verifier asr"
         );
         assertEq(address(aggregateVerifier.DISPUTE_GAME_FACTORY()), address(_output.opChain.disputeGameFactoryProxy));
-        assertEq(address(aggregateVerifier.DELAYED_WETH()), address(_output.opChain.delayedWETHPermissionlessGameProxy));
+        assertEq(address(aggregateVerifier.DELAYED_WETH()), address(_output.opChain.delayedWETHProxy));
         assertEq(address(aggregateVerifier.TEE_VERIFIER()), teeVerifierAddr);
         assertEq(address(aggregateVerifier.ZK_VERIFIER()), zkVerifierAddr);
         assertEq(aggregateVerifier.TEE_IMAGE_HASH(), _input.implementationsInput.teeImageHash);

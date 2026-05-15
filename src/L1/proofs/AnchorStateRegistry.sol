@@ -20,9 +20,9 @@ import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 /// @custom:proxied true
 /// @title AnchorStateRegistry
 /// @notice The AnchorStateRegistry is a contract that stores the latest "anchor" state for each available
-///         FaultDisputeGame type. The anchor state is the latest state that has been proposed on L1 and was not
-///         challenged within the challenge period. By using stored anchor states, new FaultDisputeGame instances can
-///         be initialized with a more recent starting state which reduces the amount of required offchain computation.
+///         dispute game type. The anchor state is the latest state that has been proposed on L1 and finalized.
+///         By using stored anchor states, new games can be initialized with a more recent starting state which
+///         reduces the amount of required offchain computation.
 contract AnchorStateRegistry is ProxyAdminOwnedBase, Initializable, ReinitializableBase, ISemver {
     /// @notice Semantic version.
     /// @custom:semver 3.7.0
@@ -338,11 +338,6 @@ contract AnchorStateRegistry is ProxyAdminOwnedBase, Initializable, Reinitializa
     /// @notice Updates the anchor game.
     /// @param _game New candidate anchor game.
     function setAnchorState(IDisputeGame _game) public {
-        // Convert game to FaultDisputeGame.
-        // We can't use FaultDisputeGame in the interface because this function is called from the
-        // FaultDisputeGame contract which can't import IDisputeGame by convention. We should
-        // likely introduce a new interface (e.g., StateDisputeGame) that can act as a more useful
-        // version of IDisputeGame in the future.
         IDisputeGame game = IDisputeGame(address(_game));
 
         // Check if the candidate game claim is valid.

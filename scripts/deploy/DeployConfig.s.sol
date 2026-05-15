@@ -40,7 +40,7 @@ contract DeployConfig is Script {
     uint256 public baseFeeVaultMinimumWithdrawalAmount;
     uint256 public baseFeeVaultWithdrawalNetwork;
     uint256 public disputeGameFinalityDelaySeconds;
-    uint256 public faultGameWithdrawalDelay;
+    uint256 public delayedWETHWithdrawalDelay;
     uint256 public l1ChainId;
     uint256 public l1FeeVaultMinimumWithdrawalAmount;
     uint256 public l1FeeVaultWithdrawalNetwork;
@@ -92,7 +92,7 @@ contract DeployConfig is Script {
         baseFeeVaultMinimumWithdrawalAmount = _json.readUint("$.baseFeeVaultMinimumWithdrawalAmount");
         baseFeeVaultWithdrawalNetwork = _json.readUint("$.baseFeeVaultWithdrawalNetwork");
         disputeGameFinalityDelaySeconds = _json.readUint("$.disputeGameFinalityDelaySeconds");
-        faultGameWithdrawalDelay = _json.readUint("$.faultGameWithdrawalDelay");
+        delayedWETHWithdrawalDelay = _json.readUint("$.delayedWETHWithdrawalDelay");
         l1ChainId = _json.readUint("$.l1ChainId");
         l1FeeVaultMinimumWithdrawalAmount = _json.readUint("$.l1FeeVaultMinimumWithdrawalAmount");
         l1FeeVaultWithdrawalNetwork = _json.readUint("$.l1FeeVaultWithdrawalNetwork");

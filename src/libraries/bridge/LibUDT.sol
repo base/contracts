@@ -50,7 +50,7 @@ library LibGameId {
     }
 }
 
-/// @notice A claim represents an MPT root representing the state of the fault proof program.
+/// @notice A claim represents a proposed output root.
 type Claim is bytes32;
 
 /// @title LibClaim
