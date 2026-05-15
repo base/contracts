@@ -172,8 +172,7 @@ abstract contract SystemDeployAssertions is Test {
         );
         assertEq(address(portal.disputeGameFactory()), address(dgf), "PORTAL-30");
         assertEq(address(portal.systemConfig()), address(sysCfg), "PORTAL-40");
-        IDisputeGame av = dgf.gameImpls(_expected.multiproofGameType);
-        assertEq(address(portal.anchorStateRegistry()), address(av.anchorStateRegistry()), "PORTAL-50");
+        assertEq(address(portal.anchorStateRegistry()), address(_expected.anchorStateRegistry), "PORTAL-50");
         assertEq(portal.l2Sender(), Constants.DEFAULT_L2_SENDER, "PORTAL-80");
         assertEq(address(_proxyAdminFor(address(portal))), address(_proxyAdmin), "PORTAL-90");
     }
@@ -208,9 +207,7 @@ abstract contract SystemDeployAssertions is Test {
         IDisputeGame game = factory.gameImpls(_gameType);
 
         assertNotEq(address(game), address(0), "AV-10");
-        address expectedImpl = _expected.implementations.aggregateVerifierImpl;
-        assertEq(address(game), expectedImpl, "AV-15");
-        assertEq(_version(address(game)), _version(expectedImpl), "AV-20");
+        assertEq(address(game), _expected.implementations.aggregateVerifierImpl, "AV-15");
 
         _assertGameArgsAndContracts({
             _expected: _expected,
