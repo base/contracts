@@ -2,11 +2,9 @@
 pragma solidity 0.8.15;
 
 import { Vm } from "lib/forge-std/src/Vm.sol";
-import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
-import { Constants } from "src/libraries/Constants.sol";
 import { Encoding } from "src/libraries/Encoding.sol";
 import { Hashing } from "src/libraries/Hashing.sol";
 import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
@@ -17,12 +15,12 @@ contract RelayActor {
     bool public reverted;
     bool public unexpectedMessageStatus;
 
-    IOptimismPortal2 internal immutable op;
+    address internal immutable op;
     IL1CrossDomainMessenger internal immutable xdm;
     Vm internal immutable vm;
     bool internal immutable doFail;
 
-    constructor(IOptimismPortal2 _op, IL1CrossDomainMessenger _xdm, Vm _vm, bool _doFail) {
+    constructor(address _op, IL1CrossDomainMessenger _xdm, Vm _vm, bool _doFail) {
         op = _op;
         xdm = _xdm;
         vm = _vm;
@@ -31,27 +29,7 @@ contract RelayActor {
         // Set op.l2Sender() once to the L2 Cross Domain Messenger. Nothing in the fuzzed
         // surface modifies this slot, so we don't need to re-write it on every relay.
         uint256 senderSlotIndex = ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender").slot;
-        vm.store(address(_op), bytes32(senderSlotIndex), bytes32(abi.encode(Predeploys.L2_CROSS_DOMAIN_MESSENGER)));
-    }
-
-    function _hashRelayMessage(
-        uint256 _nonce,
-        uint256 _value,
-        uint256 _minGasLimit,
-        bytes memory _message
-    )
-        internal
-        pure
-        returns (bytes32)
-    {
-        return Hashing.hashCrossDomainMessageV1({
-            _nonce: _nonce,
-            _sender: Predeploys.L2_CROSS_DOMAIN_MESSENGER,
-            _target: IDENTITY_PRECOMPILE,
-            _value: _value,
-            _gasLimit: _minGasLimit,
-            _data: _message
-        });
+        vm.store(_op, bytes32(senderSlotIndex), bytes32(abi.encode(Predeploys.L2_CROSS_DOMAIN_MESSENGER)));
     }
 
     /// @notice Relays a fuzzed message to the `L1CrossDomainMessenger`.
@@ -77,13 +55,20 @@ contract RelayActor {
         // relayed, so the v1 hash is what we track.
         uint256 nonce = Encoding.encodeVersionedNonce({ _nonce: 0, _version: _version });
 
-        bytes32 relayMessageHash = _hashRelayMessage(nonce, _value, relayMinGasLimit, _message);
+        bytes32 relayMessageHash = Hashing.hashCrossDomainMessageV1({
+            _nonce: nonce,
+            _sender: Predeploys.L2_CROSS_DOMAIN_MESSENGER,
+            _target: IDENTITY_PRECOMPILE,
+            _value: _value,
+            _gasLimit: relayMinGasLimit,
+            _data: _message
+        });
         vm.assume(!xdm.successfulMessages(relayMessageHash) && !xdm.failedMessages(relayMessageHash));
 
-        vm.startPrank(address(op));
         if (!doFail) {
             vm.expectCallMinGas(IDENTITY_PRECOMPILE, _value, minGasLimit, _message);
         }
+        vm.prank(op);
         try xdm.relayMessage{ gas: gas, value: _value }(
             nonce, Predeploys.L2_CROSS_DOMAIN_MESSENGER, IDENTITY_PRECOMPILE, _value, relayMinGasLimit, _message
         ) { }
@@ -92,10 +77,12 @@ contract RelayActor {
             // by flipping a flag the invariant asserts on.
             reverted = true;
         }
-        vm.stopPrank();
 
-        unexpectedMessageStatus = unexpectedMessageStatus || xdm.successfulMessages(relayMessageHash) == doFail
-            || xdm.failedMessages(relayMessageHash) != doFail;
+        bool statusMismatch =
+            xdm.successfulMessages(relayMessageHash) == doFail || xdm.failedMessages(relayMessageHash) != doFail;
+        if (statusMismatch) {
+            unexpectedMessageStatus = true;
+        }
     }
 }
 
@@ -105,20 +92,13 @@ contract XDM_MinGasLimits is CommonTest {
     function init(bool doFail) internal {
         super.setUp();
 
-        actor = new RelayActor(optimismPortal2, l1CrossDomainMessenger, vm, doFail);
+        actor = new RelayActor(address(optimismPortal2), l1CrossDomainMessenger, vm, doFail);
 
         // Give the portal some ether to send to `relayMessage`.
         vm.deal(address(optimismPortal2), type(uint128).max);
 
+        targetSender(address(this));
         targetContract(address(actor));
-
-        excludeSender(Constants.ESTIMATION_ADDRESS);
-
-        // Don't allow the predeploys to be the senders.
-        uint160 prefix = uint160(0x420) << 148;
-        for (uint256 i = 0; i < Predeploys.PREDEPLOY_COUNT; i++) {
-            excludeContract(address(prefix | uint160(i)));
-        }
 
         bytes4[] memory selectors = new bytes4[](1);
         selectors[0] = actor.relay.selector;
