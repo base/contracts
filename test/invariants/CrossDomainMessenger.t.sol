@@ -12,7 +12,7 @@ import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
 contract RelayActor {
     address internal constant IDENTITY_PRECOMPILE = address(0x04);
 
-    // Sticky flags make any bad relay visible to the invariant after the handler returns.
+    // Invariant handlers ignore target-call reverts, so failures must persist after relay returns.
     bool public reverted;
     bool public unexpectedMessageStatus;
 
@@ -34,7 +34,6 @@ contract RelayActor {
     }
 
     function relay(uint8 _version, uint8 _value, bytes memory _message) external {
-        // Exercise both nonce versions and with/without-value paths; the ID precompile accepts value.
         _version = _version % 2;
         _value = _value % 2;
 
@@ -48,7 +47,6 @@ contract RelayActor {
         // OptimismPortal) leaves a razor-thin window between "enough to not OOG" and
         // "not enough for hasMinGas to pass".
         uint32 relayMinGasLimit = doFail ? type(uint32).max : minGasLimit;
-        uint256 gas = xdm.baseGas(_message, minGasLimit);
 
         // `relayMessage` always re-encodes as a v1 hash after checking the v0 hash hasn't been
         // relayed, so the v1 hash is what we track.
@@ -63,6 +61,8 @@ contract RelayActor {
             _data: _message
         });
         vm.assume(!xdm.successfulMessages(relayMessageHash) && !xdm.failedMessages(relayMessageHash));
+
+        uint256 gas = xdm.baseGas(_message, minGasLimit);
 
         if (!doFail) {
             vm.expectCallMinGas(IDENTITY_PRECOMPILE, _value, minGasLimit, _message);
@@ -91,7 +91,6 @@ contract XDM_MinGasLimits is CommonTest {
 
         actor = new RelayActor(address(optimismPortal2), l1CrossDomainMessenger, vm, doFail);
 
-        // Give the portal some ether to send to `relayMessage`.
         vm.deal(address(optimismPortal2), type(uint128).max);
 
         targetSender(address(this));
