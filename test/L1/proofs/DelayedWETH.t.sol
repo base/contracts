@@ -17,7 +17,7 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 /// @notice Contract that burns gas in the fallback function.
 contract DelayedWETH_FallbackGasUser_Harness {
     /// @notice Amount of gas to use in the fallback function.
-    uint256 public gas;
+    uint256 public immutable gas;
 
     /// @param _gas Amount of gas to use in the fallback function.
     constructor(uint256 _gas) {
@@ -115,17 +115,14 @@ contract DelayedWETH_Unlock_Test is DelayedWETH_TestBase {
 
     /// @notice Tests that unlocking twice is successful and timestamp/amount is updated.
     function test_unlock_twice_succeeds() public {
-        // Unlock once.
         uint256 ts = block.timestamp;
         delayedWeth.unlock(alice, DEFAULT_AMOUNT);
         (uint256 amount1, uint256 timestamp1) = delayedWeth.withdrawals(address(this), alice);
         assertEq(amount1, DEFAULT_AMOUNT);
         assertEq(timestamp1, ts);
 
-        // Go forward in time.
         vm.warp(ts + 1);
 
-        // Unlock again works.
         delayedWeth.unlock(alice, DEFAULT_AMOUNT);
         (uint256 amount2, uint256 timestamp2) = delayedWeth.withdrawals(address(this), alice);
         assertEq(amount2, 2 * DEFAULT_AMOUNT);
@@ -368,9 +365,7 @@ contract DelayedWETH_Hold_Test is DelayedWETH_TestBase {
         vm.prank(proxyAdminOwner);
         delayedWeth.hold(alice, DEFAULT_AMOUNT);
 
-        uint256 finalBalance = delayedWeth.balanceOf(address(proxyAdminOwner));
-
-        assertEq(finalBalance, initialBalance + DEFAULT_AMOUNT);
+        assertEq(delayedWeth.balanceOf(address(proxyAdminOwner)), initialBalance + DEFAULT_AMOUNT);
     }
 
     /// @notice Tests that holding all WETH succeeds when the amount is omitted.
@@ -380,9 +375,7 @@ contract DelayedWETH_Hold_Test is DelayedWETH_TestBase {
         vm.prank(proxyAdminOwner);
         delayedWeth.hold(alice);
 
-        uint256 finalBalance = delayedWeth.balanceOf(address(proxyAdminOwner));
-
-        assertEq(finalBalance, initialBalance + DEFAULT_AMOUNT);
+        assertEq(delayedWeth.balanceOf(address(proxyAdminOwner)), initialBalance + DEFAULT_AMOUNT);
     }
 
     /// @notice Tests that holding WETH by non-owner fails.
