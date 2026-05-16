@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import { Test } from "lib/forge-std/src/Test.sol";
 
-// Optimism
 import { AnchorStateRegistry } from "src/L1/proofs/AnchorStateRegistry.sol";
 import { DelayedWETH } from "src/L1/proofs/DelayedWETH.sol";
 import { DisputeGameFactory } from "src/L1/proofs/DisputeGameFactory.sol";
@@ -15,7 +14,6 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
-// OpenZeppelin
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 import {
     TransparentUpgradeableProxy
@@ -26,18 +24,14 @@ import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 
-import { LibClone } from "lib/solady/src/utils/LibClone.sol";
-
 contract BaseTest is Test {
-    using LibClone for address;
-
     GameType public constant AGGREGATE_VERIFIER_GAME_TYPE = GameType.wrap(621);
     uint256 public constant L2_CHAIN_ID = 8453;
 
     // AggregateVerifier expects evenly spaced intermediate roots.
     uint256 public constant BLOCK_INTERVAL = 100;
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 10;
-    uint256 public constant INTERMEDIATE_ROOTS_COUNT = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;
+    uint256 private constant INTERMEDIATE_ROOTS_COUNT = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;
 
     uint256 public constant INIT_BOND = 1 ether;
     uint256 public constant DELAYED_WETH_DELAY = 1 days;
@@ -88,20 +82,16 @@ contract BaseTest is Test {
 
         proxyAdmin = new ProxyAdmin(address(this));
 
-        TransparentUpgradeableProxy anchorStateRegistryProxy =
-            new TransparentUpgradeableProxy(address(_anchorStateRegistry), address(proxyAdmin), "");
-        anchorStateRegistry = AnchorStateRegistry(address(anchorStateRegistryProxy));
-
-        TransparentUpgradeableProxy factoryProxy =
-            new TransparentUpgradeableProxy(address(_factory), address(proxyAdmin), "");
-        factory = DisputeGameFactory(address(factoryProxy));
-
-        TransparentUpgradeableProxy delayedWETHProxy =
-            new TransparentUpgradeableProxy(address(_delayedWETH), address(proxyAdmin), "");
-        delayedWETH = DelayedWETH(payable(address(delayedWETHProxy)));
+        anchorStateRegistry = AnchorStateRegistry(_deployProxy(address(_anchorStateRegistry)));
+        factory = DisputeGameFactory(_deployProxy(address(_factory)));
+        delayedWETH = DelayedWETH(payable(_deployProxy(address(_delayedWETH))));
 
         teeVerifier = new MockVerifier(IAnchorStateRegistry(address(anchorStateRegistry)));
         zkVerifier = new MockVerifier(IAnchorStateRegistry(address(anchorStateRegistry)));
+    }
+
+    function _deployProxy(address implementation) private returns (address) {
+        return address(new TransparentUpgradeableProxy(implementation, address(proxyAdmin), ""));
     }
 
     function _initializeProxies() internal {
@@ -159,39 +149,12 @@ contract BaseTest is Test {
         );
     }
 
-    /// @notice Clones the `AggregateVerifier` implementation with the same CWIA layout as `DisputeGameFactory`,
-    ///         initializes it, but does not register the game in the factory (no `_finalizeGameCreation`).
-    function _deployAggregateVerifierCloneWithoutFactoryRegistration(
-        address creator,
-        Claim rootClaim,
-        uint256 l2BlockNumber,
-        address parentAddress,
-        bytes memory proof
-    )
-        internal
-        returns (AggregateVerifier game)
-    {
-        IDisputeGame impl = factory.gameImpls(AGGREGATE_VERIFIER_GAME_TYPE);
-        bytes memory extraData = _aggregateVerifierExtraData(rootClaim, l2BlockNumber, parentAddress);
-        bytes32 l1Head = blockhash(block.number - 1);
-        address clone = address(impl).clone(abi.encodePacked(creator, rootClaim, l1Head, extraData));
-        vm.deal(creator, INIT_BOND);
-        vm.prank(creator);
-        AggregateVerifier(payable(clone)).initializeWithInitData{ value: INIT_BOND }(proof);
-        return AggregateVerifier(payable(clone));
-    }
-
     function _provideProof(AggregateVerifier game, address prover, bytes memory proofBytes) internal {
         vm.prank(prover);
         game.verifyProposalProof(proofBytes);
     }
 
-    /// @notice Generates a properly formatted proof for testing.
-    /// @dev The proof format is: l1OriginHash (32) + l1OriginNumber (32) + additional data.
-    ///      Since MockVerifier always returns true, we just need the correct structure.
-    /// @param salt A salt to make proofs unique.
-    /// @param proofType The type of proof to generate.
-    /// @return proof The formatted proof bytes.
+    /// @dev Encodes proofType || l1OriginHash || l1OriginNumber || mock verifier payload.
     function _generateProof(
         bytes memory salt,
         AggregateVerifier.ProofType proofType
@@ -216,20 +179,20 @@ contract BaseTest is Test {
         pure
         returns (bytes memory)
     {
-        return abi.encodePacked(
-            uint256(l2BlockNumber), parentAddress, _generateIntermediateRootsExceptLast(l2BlockNumber), rootClaim.raw()
-        );
+        return
+            abi.encodePacked(
+                uint256(l2BlockNumber), parentAddress, _generateIntermediateRoots(l2BlockNumber, rootClaim)
+            );
     }
 
-    function _generateIntermediateRootsExceptLast(uint256 l2BlockNumber) internal pure returns (bytes memory) {
-        bytes memory intermediateRoots = new bytes((INTERMEDIATE_ROOTS_COUNT - 1) * 32);
+    function _generateIntermediateRoots(uint256 l2BlockNumber, Claim rootClaim) private pure returns (bytes memory) {
+        bytes memory intermediateRoots = "";
         uint256 startingL2BlockNumber = l2BlockNumber - BLOCK_INTERVAL;
         for (uint256 i = 1; i < INTERMEDIATE_ROOTS_COUNT; i++) {
-            bytes32 root = keccak256(abi.encode(startingL2BlockNumber + INTERMEDIATE_BLOCK_INTERVAL * i));
-            assembly {
-                mstore(add(add(intermediateRoots, 0x20), mul(sub(i, 1), 0x20)), root)
-            }
+            intermediateRoots = abi.encodePacked(
+                intermediateRoots, keccak256(abi.encode(startingL2BlockNumber + INTERMEDIATE_BLOCK_INTERVAL * i))
+            );
         }
-        return intermediateRoots;
+        return abi.encodePacked(intermediateRoots, rootClaim.raw());
     }
 }

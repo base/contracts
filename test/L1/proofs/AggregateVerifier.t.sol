@@ -12,9 +12,13 @@ import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 
+import { LibClone } from "lib/solady/src/utils/LibClone.sol";
+
 import { BaseTest } from "./BaseTest.t.sol";
 
 contract AggregateVerifierTest is BaseTest {
+    using LibClone for address;
+
     AggregateVerifier private aggregateVerifierImpl;
 
     function setUp() public override {
@@ -370,6 +374,29 @@ contract AggregateVerifierTest is BaseTest {
             )
         );
         _deployAggregateVerifierWithIntervals(blockInterval, intermediateBlockInterval);
+    }
+
+    /// @notice Clones the implementation like the factory, but skips `_finalizeGameCreation`.
+    function _deployAggregateVerifierCloneWithoutFactoryRegistration(
+        address creator,
+        Claim rootClaim,
+        uint256 l2BlockNumber,
+        address parentAddress,
+        bytes memory proof
+    )
+        private
+        returns (AggregateVerifier)
+    {
+        IDisputeGame impl = factory.gameImpls(AGGREGATE_VERIFIER_GAME_TYPE);
+        bytes memory extraData = _aggregateVerifierExtraData(rootClaim, l2BlockNumber, parentAddress);
+        bytes32 l1Head = blockhash(block.number - 1);
+        address clone = address(impl).clone(abi.encodePacked(creator, rootClaim, l1Head, extraData));
+
+        vm.deal(creator, INIT_BOND);
+        vm.prank(creator);
+        AggregateVerifier(payable(clone)).initializeWithInitData{ value: INIT_BOND }(proof);
+
+        return AggregateVerifier(payable(clone));
     }
 
     function _deployAggregateVerifierWithIntervals(
