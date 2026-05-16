@@ -13,6 +13,11 @@ abstract contract SafeCall_Invariants is Test {
         actor = new SafeCaller_Actor(vm, _shouldFail);
         targetSender(address(this));
         targetContract(address(actor));
+
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = actor.performSafeCallMinGas.selector;
+        targetSelector(FuzzSelector({ addr: address(actor), selectors: selectors }));
+
         vm.deal(address(actor), type(uint128).max);
     }
 
@@ -62,6 +67,7 @@ contract SafeCaller_Actor is StdUtils {
     Vm internal immutable vm;
     bool internal immutable shouldFail;
 
+    // Invariant handlers ignore target-call reverts, so failures must persist after the call.
     bool public badCallResult;
 
     constructor(Vm _vm, bool _shouldFail) {
