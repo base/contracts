@@ -19,15 +19,10 @@ contract ChallengeTest is BaseTest {
             _createGame(TEE_PROVER, "tee", "tee-proof", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry));
 
         _challengeWithZk(game, "zk");
-        _assertStatus(game, GameStatus.IN_PROGRESS);
-        // 2 proofs so that it can decrease to 1 if ZK is nullified and then the TEE proof can resolve
+        assertEq(uint8(game.status()), uint8(GameStatus.IN_PROGRESS));
         assertEq(game.proofCount(), 2);
 
-        vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
-        _assertResolveStatus(game, GameStatus.CHALLENGER_WINS);
-        assertEq(game.bondRecipient(), ZK_PROVER);
-
-        _claimCreditAfterDelay(game, ZK_PROVER);
+        _resolveAfterSlowDelayAndClaim(game, GameStatus.CHALLENGER_WINS, ZK_PROVER);
     }
 
     function testChallengeFailsIfNoTEEProof() public {
@@ -37,7 +32,7 @@ contract ChallengeTest is BaseTest {
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE)
         );
-        game.challenge(_proofOfType(AggregateVerifier.ProofType.ZK), LAST_INTERMEDIATE_ROOT_INDEX, bytes32(0));
+        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
     function testChallengeFailsIfNotZKProof() public {
@@ -46,7 +41,7 @@ contract ChallengeTest is BaseTest {
         );
 
         vm.expectRevert(AggregateVerifier.InvalidProofType.selector);
-        game.challenge(_proofOfType(AggregateVerifier.ProofType.TEE), LAST_INTERMEDIATE_ROOT_INDEX, bytes32(0));
+        _challenge(game, AggregateVerifier.ProofType.TEE, bytes32(0));
     }
 
     function testChallengeFailsIfGameAlreadyResolved() public {
@@ -57,7 +52,7 @@ contract ChallengeTest is BaseTest {
         game.resolve();
 
         vm.expectRevert(ClaimAlreadyResolved.selector);
-        game.challenge(_proofOfType(AggregateVerifier.ProofType.ZK), LAST_INTERMEDIATE_ROOT_INDEX, bytes32(0));
+        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
     function testChallengeFailsIfParentGameStatusIsChallenged() public {
@@ -71,7 +66,7 @@ contract ChallengeTest is BaseTest {
         anchorStateRegistry.blacklistDisputeGame(IDisputeGame(address(parentGame)));
 
         vm.expectRevert(AggregateVerifier.InvalidParentGame.selector);
-        childGame.challenge(_proofOfType(AggregateVerifier.ProofType.ZK), LAST_INTERMEDIATE_ROOT_INDEX, bytes32(0));
+        _challenge(childGame, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
     function testChallengeFailsIfGameItselfIsBlacklisted() public {
@@ -81,7 +76,7 @@ contract ChallengeTest is BaseTest {
         anchorStateRegistry.blacklistDisputeGame(IDisputeGame(address(game)));
 
         vm.expectRevert(AggregateVerifier.InvalidGame.selector);
-        game.challenge(_proofOfType(AggregateVerifier.ProofType.ZK), LAST_INTERMEDIATE_ROOT_INDEX, bytes32(0));
+        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
     function testChallengeFailsAfterTEENullification() public {
@@ -90,11 +85,10 @@ contract ChallengeTest is BaseTest {
         );
 
         _nullify(game, AggregateVerifier.ProofType.TEE, "tee2");
-        // TEE was nullified, so a ZK challenge cannot find the required TEE proof.
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE)
         );
-        game.challenge(_proofOfType(AggregateVerifier.ProofType.ZK), LAST_INTERMEDIATE_ROOT_INDEX, bytes32(0));
+        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
     function testChallengeFailsAfterZKNullification() public {
@@ -103,9 +97,8 @@ contract ChallengeTest is BaseTest {
 
         _provideProof(game, ZK_PROVER, _proofOfType(AggregateVerifier.ProofType.ZK));
         _nullify(game, AggregateVerifier.ProofType.ZK, "zk2");
-        // ZK was nullified globally, so another ZK challenge proof is rejected by the verifier.
         vm.expectRevert(Verifier.Nullified.selector);
-        game.challenge(_proofOfType(AggregateVerifier.ProofType.ZK), LAST_INTERMEDIATE_ROOT_INDEX, _claim("zk3").raw());
+        _challenge(game, AggregateVerifier.ProofType.ZK, _claim("zk3").raw());
     }
 
     function testChallengeRemovedWhenZkVerifierNullifiedByOtherGame() public {
@@ -114,24 +107,19 @@ contract ChallengeTest is BaseTest {
         );
 
         _challengeWithZk(gameA, "zk-challenge");
-        assertEq(gameA.proofCount(), 2);
-        assertGt(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
+        _assertChallengeRecorded(gameA);
 
         AggregateVerifier gameB =
             _createGame(ZK_PROVER, "zk-only-b", "zk-init-b", AggregateVerifier.ProofType.ZK, address(gameA));
         _nullify(gameB, AggregateVerifier.ProofType.ZK, "zk-nullify-b");
         assertTrue(zkVerifier.nullified());
 
-        _assertResolveStatus(gameA, GameStatus.IN_PROGRESS);
+        _resolveAndAssertStatus(gameA, GameStatus.IN_PROGRESS);
         assertEq(gameA.proofCount(), 1);
         assertEq(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
         assertEq(address(gameA.zkProver()), address(0));
 
-        vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
-        _assertResolveStatus(gameA, GameStatus.DEFENDER_WINS);
-        assertEq(gameA.bondRecipient(), TEE_PROVER);
-
-        _claimCreditAfterDelay(gameA, TEE_PROVER);
+        _resolveAfterSlowDelayAndClaim(gameA, GameStatus.DEFENDER_WINS, TEE_PROVER);
     }
 
     function testChallengeWinsWhenSharedTeeVerifierNullifiedByOtherGame() public {
@@ -144,25 +132,20 @@ contract ChallengeTest is BaseTest {
         );
 
         _challengeWithZk(gameA, "zk-challenge");
-        assertEq(gameA.proofCount(), 2);
-        assertGt(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
+        _assertChallengeRecorded(gameA);
 
         AggregateVerifier gameB =
             _createGame(TEE_PROVER, "tee-only-b", "tee-init-b", AggregateVerifier.ProofType.TEE, address(gameA));
         _nullify(gameB, AggregateVerifier.ProofType.TEE, "tee-nullify-b");
         assertTrue(teeVerifier.nullified());
 
-        _assertResolveStatus(gameA, GameStatus.IN_PROGRESS);
+        _resolveAndAssertStatus(gameA, GameStatus.IN_PROGRESS);
         assertEq(gameA.proofCount(), 1);
         assertGt(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
         assertEq(address(gameA.teeProver()), address(0));
         assertEq(gameA.zkProver(), ZK_PROVER);
 
-        vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
-        _assertResolveStatus(gameA, GameStatus.CHALLENGER_WINS);
-        assertEq(gameA.bondRecipient(), ZK_PROVER);
-
-        _claimCreditAfterDelay(gameA, ZK_PROVER);
+        _resolveAfterSlowDelayAndClaim(gameA, GameStatus.CHALLENGER_WINS, ZK_PROVER);
     }
 
     function _createGame(
@@ -175,16 +158,19 @@ contract ChallengeTest is BaseTest {
         private
         returns (AggregateVerifier)
     {
-        Claim rootClaim = _advanceL2BlockAndClaim(claimSalt);
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        Claim rootClaim = _claim(claimSalt);
         bytes memory proof = _generateProof(proofSalt, proofType);
         return _createAggregateVerifierGame(prover, rootClaim, currentL2BlockNumber, parent, proof);
     }
 
+    function _challenge(AggregateVerifier game, AggregateVerifier.ProofType proofType, bytes32 claimRoot) private {
+        game.challenge(_proofOfType(proofType), LAST_INTERMEDIATE_ROOT_INDEX, claimRoot);
+    }
+
     function _challengeWithZk(AggregateVerifier game, bytes memory claimSalt) private {
         vm.prank(ZK_PROVER);
-        game.challenge(
-            _proofOfType(AggregateVerifier.ProofType.ZK), LAST_INTERMEDIATE_ROOT_INDEX, _claim(claimSalt).raw()
-        );
+        _challenge(game, AggregateVerifier.ProofType.ZK, _claim(claimSalt).raw());
     }
 
     function _nullify(AggregateVerifier game, AggregateVerifier.ProofType proofType, bytes memory claimSalt) private {
@@ -195,21 +181,30 @@ contract ChallengeTest is BaseTest {
         return abi.encodePacked(uint8(proofType), bytes1(0));
     }
 
-    function _advanceL2BlockAndClaim(bytes memory salt) private returns (Claim) {
-        currentL2BlockNumber += BLOCK_INTERVAL;
-        return _claim(salt);
-    }
-
     function _claim(bytes memory salt) private view returns (Claim) {
         return Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, salt)));
     }
 
-    function _assertStatus(AggregateVerifier game, GameStatus expectedStatus) private view {
-        assertEq(uint8(game.status()), uint8(expectedStatus));
+    function _assertChallengeRecorded(AggregateVerifier game) private view {
+        assertEq(game.proofCount(), 2);
+        assertGt(game.counteredByIntermediateRootIndexPlusOne(), 0);
     }
 
-    function _assertResolveStatus(AggregateVerifier game, GameStatus expectedStatus) private {
+    function _resolveAndAssertStatus(AggregateVerifier game, GameStatus expectedStatus) private {
         assertEq(uint8(game.resolve()), uint8(expectedStatus));
+    }
+
+    function _resolveAfterSlowDelayAndClaim(
+        AggregateVerifier game,
+        GameStatus expectedStatus,
+        address recipient
+    )
+        private
+    {
+        vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
+        _resolveAndAssertStatus(game, expectedStatus);
+        assertEq(game.bondRecipient(), recipient);
+        _claimCreditAfterDelay(game, recipient);
     }
 
     function _claimCreditAfterDelay(AggregateVerifier game, address recipient) private {
