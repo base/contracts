@@ -15,29 +15,32 @@ import {
 import { NitroEnclaveVerifier } from "src/L1/proofs/tee/NitroEnclaveVerifier.sol";
 
 contract NitroEnclaveVerifierTest is Test {
-    NitroEnclaveVerifier public verifier;
+    NitroEnclaveVerifier internal verifier;
 
-    address public owner;
-    address public submitter;
-    address public revokerAddr;
-    address public mockRiscZeroVerifier;
-    address public mockSP1Verifier;
+    address internal owner;
+    address internal submitter;
+    address internal revokerAddr;
+    address internal mockRiscZeroVerifier;
+    address internal mockSP1Verifier;
 
-    bytes32 public constant ROOT_CERT = keccak256("root-cert");
-    bytes32 public constant INTERMEDIATE_CERT_1 = keccak256("intermediate-cert-1");
-    bytes32 public constant INTERMEDIATE_CERT_2 = keccak256("intermediate-cert-2");
-    bytes32 public constant VERIFIER_ID = keccak256("verifier-id");
-    bytes32 public constant AGGREGATOR_ID = keccak256("aggregator-id");
-    bytes32 public constant VERIFIER_PROOF_ID = keccak256("verifier-proof-id");
+    bytes32 internal constant ROOT_CERT = keccak256("root-cert");
+    bytes32 internal constant INTERMEDIATE_CERT_1 = keccak256("intermediate-cert-1");
+    bytes32 internal constant INTERMEDIATE_CERT_2 = keccak256("intermediate-cert-2");
+    bytes32 internal constant VERIFIER_ID = keccak256("verifier-id");
+    bytes32 internal constant AGGREGATOR_ID = keccak256("aggregator-id");
+    bytes32 internal constant VERIFIER_PROOF_ID = keccak256("verifier-proof-id");
+    bytes4 internal constant DEFAULT_PROOF_SELECTOR = bytes4(0);
+    bytes4 internal constant RISC_ZERO_VERIFY_SELECTOR = bytes4(keccak256("verify(bytes,bytes32,bytes32)"));
+    bytes4 internal constant SP1_VERIFY_PROOF_SELECTOR = bytes4(keccak256("verifyProof(bytes32,bytes,bytes)"));
 
-    uint64 public constant MAX_TIME_DIFF = 3600; // 1 hour
+    uint64 internal constant MAX_TIME_DIFF = 3600; // 1 hour
 
     // Realistic timestamp so timestamp validation tests work correctly
     uint256 internal constant REALISTIC_TIMESTAMP = 1_700_000_000;
 
     // Expiry timestamps for test certs (well after REALISTIC_TIMESTAMP)
     uint64 internal constant INTERMEDIATE_CERT_1_EXPIRY = 1_800_000_000; // ~2027
-    uint64 internal constant INTERMEDIATE_CERT_2_EXPIRY = 1_750_000_000; // ~2025
+    uint64 internal constant ROOT_CERT_EXPIRY = 1_900_000_000;
     uint64 internal constant NEW_LEAF_CERT_EXPIRY = 1_700_100_000; // ~28 hours after REALISTIC_TIMESTAMP
 
     function setUp() public {
@@ -251,12 +254,6 @@ contract NitroEnclaveVerifierTest is Test {
         assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
     }
 
-    function testOwnerCanStillRevokeCert() public {
-        assertGt(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
-        verifier.revokeCert(INTERMEDIATE_CERT_1);
-        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
-    }
-
     function testSetRevoker() public {
         address newRevoker = makeAddr("new-revoker");
         verifier.setRevoker(newRevoker);
@@ -267,7 +264,6 @@ contract NitroEnclaveVerifierTest is Test {
         verifier.setRevoker(address(0));
         assertEq(verifier.revoker(), address(0));
 
-        // Now revoker (zero address) can't call revokeCert
         vm.prank(revokerAddr);
         vm.expectRevert(NitroEnclaveVerifier.CallerNotOwnerOrRevoker.selector);
         verifier.revokeCert(INTERMEDIATE_CERT_1);
@@ -488,14 +484,13 @@ contract NitroEnclaveVerifierTest is Test {
     // ============ verify — ZkVerifierNotConfigured ============
 
     function testVerifyRevertsIfZkVerifierNotConfigured() public {
-        // Set up config WITHOUT a zkVerifier address (zero)
         ZkCoProcessorConfig memory config =
             ZkCoProcessorConfig({ verifierId: VERIFIER_ID, aggregatorId: AGGREGATOR_ID, zkVerifier: address(0) });
         verifier.setZkConfiguration(ZkCoProcessorType.RiscZero, config, VERIFIER_PROOF_ID);
 
         VerifierJournal memory journal = _createSuccessJournal();
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         vm.prank(submitter);
         vm.expectRevert(
@@ -507,7 +502,6 @@ contract NitroEnclaveVerifierTest is Test {
     // ============ verify — Unknown_Zk_Coprocessor ============
 
     function testVerifyRevertsForUnknownCoprocessor() public {
-        // Use ZkCoProcessorType.Unknown (0) — not RiscZero or Succinct
         ZkCoProcessorConfig memory config = ZkCoProcessorConfig({
             verifierId: VERIFIER_ID, aggregatorId: AGGREGATOR_ID, zkVerifier: mockRiscZeroVerifier
         });
@@ -515,7 +509,7 @@ contract NitroEnclaveVerifierTest is Test {
 
         VerifierJournal memory journal = _createSuccessJournal();
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         vm.prank(submitter);
         vm.expectRevert(NitroEnclaveVerifier.Unknown_Zk_Coprocessor.selector);
@@ -527,13 +521,13 @@ contract NitroEnclaveVerifierTest is Test {
     function testVerifyRevertsIfRouteFrozen() public {
         _setUpRiscZeroConfig();
 
-        bytes4 selector = bytes4(0); // matches the selector in our proofBytes
+        bytes4 selector = DEFAULT_PROOF_SELECTOR;
         verifier.addVerifyRoute(ZkCoProcessorType.RiscZero, selector, makeAddr("route-v"));
         verifier.freezeVerifyRoute(ZkCoProcessorType.RiscZero, selector);
 
         VerifierJournal memory journal = _createSuccessJournal();
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         vm.prank(submitter);
         vm.expectRevert(
@@ -549,7 +543,7 @@ contract NitroEnclaveVerifierTest is Test {
 
         VerifierJournal memory journal = _createSuccessJournal();
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
@@ -565,7 +559,7 @@ contract NitroEnclaveVerifierTest is Test {
         VerifierJournal memory journal = _createSuccessJournal();
         journal.certs[0] = keccak256("wrong-root");
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
@@ -581,7 +575,7 @@ contract NitroEnclaveVerifierTest is Test {
         VerifierJournal memory journal = _createSuccessJournal();
         journal.trustedCertsPrefixLen = 0;
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
@@ -598,7 +592,7 @@ contract NitroEnclaveVerifierTest is Test {
         // Replace trusted intermediate with untrusted one, but keep trustedCertsPrefixLen = 2
         journal.certs[1] = keccak256("untrusted-intermediate");
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
@@ -615,7 +609,7 @@ contract NitroEnclaveVerifierTest is Test {
         // Set timestamp far in the past — more than maxTimeDiff seconds ago (in ms)
         journal.timestamp = uint64(block.timestamp - MAX_TIME_DIFF - 1) * 1000;
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
@@ -632,7 +626,7 @@ contract NitroEnclaveVerifierTest is Test {
         // Set timestamp in the future (converted to ms)
         journal.timestamp = uint64(block.timestamp + 100) * 1000;
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
@@ -648,24 +642,10 @@ contract NitroEnclaveVerifierTest is Test {
         bytes32 newCert = keccak256("new-leaf-cert");
         assertEq(verifier.trustedIntermediateCerts(newCert), 0);
 
-        VerifierJournal memory journal = _createSuccessJournal();
-        // Add a new cert beyond the trusted prefix that will get cached
-        bytes32[] memory certs = new bytes32[](3);
-        certs[0] = ROOT_CERT;
-        certs[1] = INTERMEDIATE_CERT_1;
-        certs[2] = newCert;
-        journal.certs = certs;
-
-        uint64[] memory expiries = new uint64[](3);
-        expiries[0] = INTERMEDIATE_CERT_1_EXPIRY + 100_000_000; // root expiry (doesn't matter for caching)
-        expiries[1] = INTERMEDIATE_CERT_1_EXPIRY;
-        expiries[2] = NEW_LEAF_CERT_EXPIRY;
-        journal.certExpiries = expiries;
-
-        journal.trustedCertsPrefixLen = 2; // only root + 1 intermediate are pre-trusted
+        VerifierJournal memory journal = _createSuccessJournalWithLeaf(newCert, NEW_LEAF_CERT_EXPIRY);
 
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
@@ -681,7 +661,7 @@ contract NitroEnclaveVerifierTest is Test {
         VerifierJournal memory journal = _createSuccessJournal();
         journal.result = VerificationResult.IntermediateCertsNotTrusted;
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
@@ -694,11 +674,9 @@ contract NitroEnclaveVerifierTest is Test {
     // ============ verify — Succinct SP1 happy path ============
 
     function testVerifySuccessfulJournalSP1() public {
-        _setUpSP1Config();
-
         VerifierJournal memory journal = _createSuccessJournal();
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockSP1Verify(VERIFIER_ID, output, proofBytes);
 
@@ -708,17 +686,12 @@ contract NitroEnclaveVerifierTest is Test {
         assertEq(uint8(result.result), uint8(VerificationResult.Success));
     }
 
-    function testVerifyRevertsIfNotProofSubmitterSP1() public {
-        vm.expectRevert(NitroEnclaveVerifier.CallerNotProofSubmitter.selector);
-        verifier.verify("", ZkCoProcessorType.Succinct, "");
-    }
-
     function testVerifyRevertsIfZkVerifierNotConfiguredSP1() public {
         ZkCoProcessorConfig memory config =
             ZkCoProcessorConfig({ verifierId: VERIFIER_ID, aggregatorId: AGGREGATOR_ID, zkVerifier: address(0) });
         verifier.setZkConfiguration(ZkCoProcessorType.Succinct, config, VERIFIER_PROOF_ID);
 
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         vm.prank(submitter);
         vm.expectRevert(
@@ -746,7 +719,7 @@ contract NitroEnclaveVerifierTest is Test {
             BatchVerifierJournal({ verifierVk: VERIFIER_PROOF_ID, outputs: outputs });
 
         bytes memory output = abi.encode(batchJournal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(AGGREGATOR_ID, output, proofBytes);
 
@@ -768,7 +741,7 @@ contract NitroEnclaveVerifierTest is Test {
         BatchVerifierJournal memory batchJournal = BatchVerifierJournal({ verifierVk: wrongVk, outputs: outputs });
 
         bytes memory output = abi.encode(batchJournal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(AGGREGATOR_ID, output, proofBytes);
 
@@ -780,8 +753,6 @@ contract NitroEnclaveVerifierTest is Test {
     }
 
     function testBatchVerifySuccessSP1() public {
-        _setUpSP1Config();
-
         VerifierJournal memory journal = _createSuccessJournal();
         VerifierJournal[] memory outputs = new VerifierJournal[](1);
         outputs[0] = journal;
@@ -790,7 +761,7 @@ contract NitroEnclaveVerifierTest is Test {
             BatchVerifierJournal({ verifierVk: VERIFIER_PROOF_ID, outputs: outputs });
 
         bytes memory output = abi.encode(batchJournal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockSP1Verify(AGGREGATOR_ID, output, proofBytes);
 
@@ -808,9 +779,8 @@ contract NitroEnclaveVerifierTest is Test {
 
         VerifierJournal memory journal = _createSuccessJournal();
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
-        // Revoke the intermediate cert before verification
         verifier.revokeCert(INTERMEDIATE_CERT_1);
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
@@ -830,10 +800,9 @@ contract NitroEnclaveVerifierTest is Test {
         vm.warp(INTERMEDIATE_CERT_1_EXPIRY + 1);
 
         VerifierJournal memory journal = _createSuccessJournal();
-        // Update timestamp to be valid at the new block.timestamp
         journal.timestamp = uint64(block.timestamp - 1) * 1000;
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
@@ -852,7 +821,7 @@ contract NitroEnclaveVerifierTest is Test {
         VerifierJournal memory journal = _createSuccessJournal();
         journal.timestamp = uint64(block.timestamp - 1) * 1000;
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
@@ -868,22 +837,10 @@ contract NitroEnclaveVerifierTest is Test {
 
         bytes32 expiredLeaf = keccak256("expired-untrusted-leaf");
 
-        VerifierJournal memory journal = _createSuccessJournal();
-        bytes32[] memory certs = new bytes32[](3);
-        certs[0] = ROOT_CERT;
-        certs[1] = INTERMEDIATE_CERT_1;
-        certs[2] = expiredLeaf;
-        journal.certs = certs;
-
-        uint64[] memory expiries = new uint64[](3);
-        expiries[0] = INTERMEDIATE_CERT_1_EXPIRY + 100_000_000;
-        expiries[1] = INTERMEDIATE_CERT_1_EXPIRY;
-        expiries[2] = uint64(block.timestamp - 1);
-        journal.certExpiries = expiries;
-        journal.trustedCertsPrefixLen = 2;
+        VerifierJournal memory journal = _createSuccessJournalWithLeaf(expiredLeaf, uint64(block.timestamp - 1));
 
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
@@ -913,23 +870,10 @@ contract NitroEnclaveVerifierTest is Test {
         bytes32 newCert = keccak256("brand-new-cert");
         uint64 newCertExpiry = uint64(REALISTIC_TIMESTAMP + 86_400); // 1 day from now
 
-        VerifierJournal memory journal = _createSuccessJournal();
-        bytes32[] memory certs = new bytes32[](3);
-        certs[0] = ROOT_CERT;
-        certs[1] = INTERMEDIATE_CERT_1;
-        certs[2] = newCert;
-        journal.certs = certs;
-
-        uint64[] memory expiries = new uint64[](3);
-        expiries[0] = INTERMEDIATE_CERT_1_EXPIRY + 100_000_000;
-        expiries[1] = INTERMEDIATE_CERT_1_EXPIRY;
-        expiries[2] = newCertExpiry;
-        journal.certExpiries = expiries;
-
-        journal.trustedCertsPrefixLen = 2;
+        VerifierJournal memory journal = _createSuccessJournalWithLeaf(newCert, newCertExpiry);
 
         bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        bytes memory proofBytes = _proofBytes();
 
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
@@ -937,12 +881,6 @@ contract NitroEnclaveVerifierTest is Test {
         verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
 
         assertEq(verifier.trustedIntermediateCerts(newCert), newCertExpiry);
-    }
-
-    function testRevokeCertSetsExpiryToZero() public {
-        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), INTERMEDIATE_CERT_1_EXPIRY);
-        verifier.revokeCert(INTERMEDIATE_CERT_1);
-        assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
     }
 
     // ============ Helpers ============
@@ -954,10 +892,12 @@ contract NitroEnclaveVerifierTest is Test {
         verifier.setZkConfiguration(ZkCoProcessorType.RiscZero, config, VERIFIER_PROOF_ID);
     }
 
-    function _setUpSP1Config() internal {
-        ZkCoProcessorConfig memory config =
-            ZkCoProcessorConfig({ verifierId: VERIFIER_ID, aggregatorId: AGGREGATOR_ID, zkVerifier: mockSP1Verifier });
-        verifier.setZkConfiguration(ZkCoProcessorType.Succinct, config, VERIFIER_PROOF_ID);
+    function _proofBytes() internal pure returns (bytes memory) {
+        return _proofBytes(DEFAULT_PROOF_SELECTOR);
+    }
+
+    function _proofBytes(bytes4 selector) internal pure returns (bytes memory) {
+        return abi.encodePacked(selector, bytes32(0));
     }
 
     function _createSuccessJournal() internal view returns (VerifierJournal memory) {
@@ -966,7 +906,7 @@ contract NitroEnclaveVerifierTest is Test {
         certs[1] = INTERMEDIATE_CERT_1;
 
         uint64[] memory expiries = new uint64[](2);
-        expiries[0] = INTERMEDIATE_CERT_1_EXPIRY + 100_000_000; // root expiry (far future)
+        expiries[0] = ROOT_CERT_EXPIRY;
         expiries[1] = INTERMEDIATE_CERT_1_EXPIRY;
 
         Pcr[] memory pcrs = new Pcr[](0);
@@ -985,25 +925,42 @@ contract NitroEnclaveVerifierTest is Test {
         });
     }
 
+    function _createSuccessJournalWithLeaf(
+        bytes32 leafCert,
+        uint64 leafExpiry
+    )
+        internal
+        view
+        returns (VerifierJournal memory)
+    {
+        VerifierJournal memory journal = _createSuccessJournal();
+
+        bytes32[] memory certs = new bytes32[](3);
+        certs[0] = ROOT_CERT;
+        certs[1] = INTERMEDIATE_CERT_1;
+        certs[2] = leafCert;
+        journal.certs = certs;
+
+        uint64[] memory expiries = new uint64[](3);
+        expiries[0] = ROOT_CERT_EXPIRY;
+        expiries[1] = INTERMEDIATE_CERT_1_EXPIRY;
+        expiries[2] = leafExpiry;
+        journal.certExpiries = expiries;
+
+        return journal;
+    }
+
     function _mockRiscZeroVerify(bytes32 programId, bytes memory output, bytes memory proofBytes) internal {
-        // IRiscZeroVerifier.verify(proofBytes, programId, sha256(output))
         vm.mockCall(
             mockRiscZeroVerifier,
-            abi.encodeWithSelector(
-                bytes4(keccak256("verify(bytes,bytes32,bytes32)")), proofBytes, programId, sha256(output)
-            ),
+            abi.encodeWithSelector(RISC_ZERO_VERIFY_SELECTOR, proofBytes, programId, sha256(output)),
             ""
         );
     }
 
     function _mockSP1Verify(bytes32 programId, bytes memory output, bytes memory proofBytes) internal {
-        // ISP1Verifier.verifyProof(programVKey, publicValues, proofBytes)
         vm.mockCall(
-            mockSP1Verifier,
-            abi.encodeWithSelector(
-                bytes4(keccak256("verifyProof(bytes32,bytes,bytes)")), programId, output, proofBytes
-            ),
-            ""
+            mockSP1Verifier, abi.encodeWithSelector(SP1_VERIFY_PROOF_SELECTOR, programId, output, proofBytes), ""
         );
     }
 }
