@@ -6,7 +6,6 @@ import { Test } from "lib/forge-std/src/Test.sol";
 import {
     TransparentUpgradeableProxy
 } from "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
@@ -46,7 +45,7 @@ contract TEEProverRegistryTest is Test {
     address public unauthorized;
 
     bytes32 public constant TEST_IMAGE_HASH = keccak256("test-image-hash");
-    uint32 public constant TEST_GAME_TYPE = 621;
+    GameType public constant TEST_GAME_TYPE = GameType.wrap(621);
     string internal constant NOT_OWNER = "OwnableManaged: caller is not the owner";
     string internal constant NOT_OWNER_OR_MANAGER = "OwnableManaged: caller is not the owner or the manager";
 
@@ -61,7 +60,7 @@ contract TEEProverRegistryTest is Test {
         manager = makeAddr("manager");
         unauthorized = makeAddr("unauthorized");
 
-        teeProverRegistry = _deployRegistry(new address[](0), GameType.wrap(TEST_GAME_TYPE));
+        teeProverRegistry = _deployRegistry(new address[](0), TEST_GAME_TYPE);
     }
 
     function _deployRegistry(address[] memory proposers, GameType gameType) internal returns (DevTEEProverRegistry) {
@@ -71,11 +70,9 @@ contract TEEProverRegistryTest is Test {
         DevTEEProverRegistry impl =
             new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(factory)));
 
-        ProxyAdmin proxyAdmin = new ProxyAdmin(address(this));
-
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),
-            address(proxyAdmin),
+            makeAddr("proxy-admin"),
             abi.encodeCall(TEEProverRegistry.initialize, (owner, manager, proposers, gameType))
         );
 
@@ -95,9 +92,14 @@ contract TEEProverRegistryTest is Test {
         vm.stopPrank();
     }
 
-    function _expectRevertFrom(address caller, string memory reason) internal {
+    function _expectNotOwnerRevert(address caller) internal {
         vm.prank(caller);
-        vm.expectRevert(bytes(reason));
+        vm.expectRevert(bytes(NOT_OWNER));
+    }
+
+    function _expectNotOwnerOrManagerRevert(address caller) internal {
+        vm.prank(caller);
+        vm.expectRevert(bytes(NOT_OWNER_OR_MANAGER));
     }
 
     function _assertContains(address[] memory values, address expected) internal {
@@ -123,7 +125,7 @@ contract TEEProverRegistryTest is Test {
         proposers[1] = proposer2;
         proposers[2] = proposer3;
 
-        DevTEEProverRegistry registry2 = _deployRegistry(proposers, GameType.wrap(TEST_GAME_TYPE));
+        DevTEEProverRegistry registry2 = _deployRegistry(proposers, TEST_GAME_TYPE);
         assertTrue(registry2.isValidProposer(proposer1));
         assertTrue(registry2.isValidProposer(proposer2));
         assertTrue(registry2.isValidProposer(proposer3));
@@ -138,7 +140,7 @@ contract TEEProverRegistryTest is Test {
 
         _addDevSigner(signer);
 
-        vm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, false, false, false, address(teeProverRegistry));
         emit SignerDeregistered(signer);
 
         vm.prank(owner);
@@ -161,14 +163,14 @@ contract TEEProverRegistryTest is Test {
     function testDeregisterSignerFailsIfUnauthorized() public {
         address signer = makeAddr("signer");
 
-        _expectRevertFrom(unauthorized, NOT_OWNER_OR_MANAGER);
+        _expectNotOwnerOrManagerRevert(unauthorized);
         teeProverRegistry.deregisterSigner(signer);
     }
 
     function testSetProposer() public {
         address newProposer = makeAddr("proposer");
 
-        vm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, false, false, false, address(teeProverRegistry));
         emit ProposerSet(newProposer, true);
 
         vm.prank(owner);
@@ -180,10 +182,10 @@ contract TEEProverRegistryTest is Test {
     function testSetProposerFailsIfNotOwner() public {
         address newProposer = makeAddr("proposer");
 
-        _expectRevertFrom(manager, NOT_OWNER);
+        _expectNotOwnerRevert(manager);
         teeProverRegistry.setProposer(newProposer, true);
 
-        _expectRevertFrom(unauthorized, NOT_OWNER);
+        _expectNotOwnerRevert(unauthorized);
         teeProverRegistry.setProposer(newProposer, true);
     }
 
@@ -216,10 +218,10 @@ contract TEEProverRegistryTest is Test {
     function testTransferOwnershipFailsIfNotOwner() public {
         address newOwner = makeAddr("newOwner");
 
-        _expectRevertFrom(manager, NOT_OWNER);
+        _expectNotOwnerRevert(manager);
         teeProverRegistry.transferOwnership(newOwner);
 
-        _expectRevertFrom(unauthorized, NOT_OWNER);
+        _expectNotOwnerRevert(unauthorized);
         teeProverRegistry.transferOwnership(newOwner);
     }
 
@@ -250,7 +252,7 @@ contract TEEProverRegistryTest is Test {
     function testTransferManagementFailsIfUnauthorized() public {
         address newManager = makeAddr("newManager");
 
-        _expectRevertFrom(unauthorized, NOT_OWNER_OR_MANAGER);
+        _expectNotOwnerOrManagerRevert(unauthorized);
         teeProverRegistry.transferManagement(newManager);
     }
 
@@ -284,7 +286,7 @@ contract TEEProverRegistryTest is Test {
     function testAddDevSigner() public {
         address signer = makeAddr("dev-signer");
 
-        vm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, false, false, false, address(teeProverRegistry));
         emit SignerRegistered(signer);
 
         vm.prank(owner);
@@ -296,10 +298,10 @@ contract TEEProverRegistryTest is Test {
     function testAddDevSignerFailsIfNotOwner() public {
         address signer = makeAddr("dev-signer");
 
-        _expectRevertFrom(manager, NOT_OWNER);
+        _expectNotOwnerRevert(manager);
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
 
-        _expectRevertFrom(unauthorized, NOT_OWNER);
+        _expectNotOwnerRevert(unauthorized);
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
     }
 
