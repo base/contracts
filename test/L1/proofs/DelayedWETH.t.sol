@@ -3,51 +3,15 @@ pragma solidity ^0.8.15;
 
 // Testing
 import { CommonTest } from "test/setup/CommonTest.sol";
+import { GasBurner, Reverter } from "test/mocks/Callers.sol";
 
 // Libraries
 import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
-import { Burn } from "src/libraries/Burn.sol";
 
 // Interfaces
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-
-/// @title DelayedWETH_FallbackGasUser_Harness
-/// @notice Contract that burns gas in the fallback function.
-contract DelayedWETH_FallbackGasUser_Harness {
-    /// @notice Amount of gas to use in the fallback function.
-    uint256 public immutable gas;
-
-    /// @param _gas Amount of gas to use in the fallback function.
-    constructor(uint256 _gas) {
-        gas = _gas;
-    }
-
-    /// @notice Burn gas on fallback.
-    fallback() external payable {
-        Burn.gas(gas);
-    }
-
-    /// @notice Burn gas on receive.
-    receive() external payable {
-        Burn.gas(gas);
-    }
-}
-
-/// @title DelayedWETH_FallbackReverter_Harness
-/// @notice Contract that reverts in the fallback function.
-contract DelayedWETH_FallbackReverter_Harness {
-    /// @notice Revert on fallback.
-    fallback() external payable {
-        revert("FallbackReverter: revert");
-    }
-
-    /// @notice Revert on receive.
-    receive() external payable {
-        revert("FallbackReverter: revert");
-    }
-}
 
 /// @title DelayedWETH_TestBase
 /// @notice Reusable test utilities for `DelayedWETH` tests.
@@ -57,6 +21,12 @@ abstract contract DelayedWETH_TestBase is CommonTest {
 
     event Approval(address indexed src, address indexed guy, uint256 wad);
     event Withdrawal(address indexed src, uint256 wad);
+
+    function _depositAlice(uint256 _amount) internal returns (uint256 balanceAfterDeposit_) {
+        vm.prank(alice);
+        delayedWeth.deposit{ value: _amount }();
+        balanceAfterDeposit_ = address(alice).balance;
+    }
 }
 
 /// @title DelayedWETH_Initialize_Test
@@ -133,12 +103,6 @@ contract DelayedWETH_Unlock_Test is DelayedWETH_TestBase {
 /// @title DelayedWETH_Withdraw_Test
 /// @notice Tests the `withdraw` function of the `DelayedWETH` contract.
 contract DelayedWETH_Withdraw_Test is DelayedWETH_TestBase {
-    function _depositAlice(uint256 _amount) internal returns (uint256 balanceAfterDeposit_) {
-        vm.prank(alice);
-        delayedWeth.deposit{ value: _amount }();
-        balanceAfterDeposit_ = address(alice).balance;
-    }
-
     function _unlockAlice(uint256 _amount) internal {
         vm.prank(alice);
         delayedWeth.unlock(alice, _amount);
@@ -153,7 +117,7 @@ contract DelayedWETH_Withdraw_Test is DelayedWETH_TestBase {
     }
 
     function _pauseSuperchain() internal {
-        vm.prank(optimismPortal2.guardian());
+        vm.prank(superchainConfig.guardian());
         superchainConfig.pause(address(0));
     }
 
@@ -163,18 +127,11 @@ contract DelayedWETH_Withdraw_Test is DelayedWETH_TestBase {
         _warpPastDelay();
     }
 
-    function _preparePausedWithdrawal() internal {
-        _depositAlice(DEFAULT_AMOUNT);
-        _unlockAlice(DEFAULT_AMOUNT);
-        _warpPastDelay();
-        _pauseSuperchain();
-    }
-
     /// @notice Tests that withdrawing while unlocked and delay has passed is successful.
     function test_withdraw_whileUnlocked_succeeds() public {
         uint256 balance = _prepareUnlockedWithdrawal();
 
-        vm.expectEmit(true, true, false, false);
+        vm.expectEmit(address(delayedWeth));
         emit Withdrawal(address(alice), DEFAULT_AMOUNT);
         vm.prank(alice);
         delayedWeth.withdraw(DEFAULT_AMOUNT);
@@ -215,7 +172,7 @@ contract DelayedWETH_Withdraw_Test is DelayedWETH_TestBase {
 
     /// @notice Tests that withdrawing while paused fails.
     function test_withdraw_whenPaused_fails() public {
-        _preparePausedWithdrawal();
+        _pauseSuperchain();
 
         vm.expectRevert("DelayedWETH: contract is paused");
         vm.prank(alice);
@@ -226,7 +183,7 @@ contract DelayedWETH_Withdraw_Test is DelayedWETH_TestBase {
     function test_withdraw_withdrawFromWhileUnlocked_succeeds() public {
         uint256 balance = _prepareUnlockedWithdrawal();
 
-        vm.expectEmit(true, true, false, false);
+        vm.expectEmit(address(delayedWeth));
         emit Withdrawal(address(alice), DEFAULT_AMOUNT);
         vm.prank(alice);
         delayedWeth.withdraw(alice, DEFAULT_AMOUNT);
@@ -267,7 +224,7 @@ contract DelayedWETH_Withdraw_Test is DelayedWETH_TestBase {
 
     /// @notice Tests that withdrawing while paused fails.
     function test_withdraw_withdrawFromWhenPaused_fails() public {
-        _preparePausedWithdrawal();
+        _pauseSuperchain();
 
         vm.expectRevert("DelayedWETH: contract is paused");
         vm.prank(alice);
@@ -284,16 +241,8 @@ contract DelayedWETH_Recover_Test is DelayedWETH_TestBase {
         vm.mockCall(address(proxyAdmin), abi.encodeCall(IProxyAdmin.owner, ()), abi.encode(_owner));
     }
 
-    /// @notice Tests that recovering WETH succeeds. Makes sure that doing so succeeds with any
-    ///         amount of ETH in the contract and any amount of gas used in the fallback function
-    ///         up to a maximum of 20,000,000 gas. Owner contract should never be using that much
-    ///         gas but we might as well set a very large upper bound for ourselves.
-    /// @param _amount Amount of WETH to recover.
-    /// @param _fallbackGasUsage Amount of gas to use in the fallback function.
-    function testFuzz_recover_succeeds(uint256 _amount, uint256 _fallbackGasUsage) public {
-        _fallbackGasUsage = bound(_fallbackGasUsage, 0, MAX_FALLBACK_GAS_USAGE);
-
-        DelayedWETH_FallbackGasUser_Harness gasUser = new DelayedWETH_FallbackGasUser_Harness(_fallbackGasUsage);
+    function _recoverToGasBurner(uint256 _amount, uint256 _fallbackGasUsage) internal {
+        GasBurner gasUser = new GasBurner(_fallbackGasUsage + 500);
 
         _mockProxyAdminOwner(address(gasUser));
 
@@ -306,6 +255,18 @@ contract DelayedWETH_Recover_Test is DelayedWETH_TestBase {
 
         assertEq(address(delayedWeth).balance, 0);
         assertEq(address(gasUser).balance, initialBalance + _amount);
+    }
+
+    /// @notice Tests that recovering WETH succeeds. Makes sure that doing so succeeds with any
+    ///         amount of ETH in the contract.
+    /// @param _amount Amount of WETH to recover.
+    function testFuzz_recover_succeeds(uint256 _amount) public {
+        _recoverToGasBurner(_amount, 0);
+    }
+
+    /// @notice Tests that recovering WETH succeeds when the recipient uses the maximum allowed fallback gas.
+    function test_recover_withMaxFallbackGas_succeeds() public {
+        _recoverToGasBurner(DEFAULT_AMOUNT, MAX_FALLBACK_GAS_USAGE);
     }
 
     /// @notice Tests that recovering WETH by non-owner fails.
@@ -333,7 +294,7 @@ contract DelayedWETH_Recover_Test is DelayedWETH_TestBase {
 
     /// @notice Tests that recover reverts when recipient reverts.
     function test_recover_whenRecipientReverts_fails() public {
-        DelayedWETH_FallbackReverter_Harness reverter = new DelayedWETH_FallbackReverter_Harness();
+        Reverter reverter = new Reverter();
 
         _mockProxyAdminOwner(address(reverter));
 
@@ -348,20 +309,13 @@ contract DelayedWETH_Recover_Test is DelayedWETH_TestBase {
 /// @title DelayedWETH_Hold_Test
 /// @notice Tests the `hold` function of the `DelayedWETH` contract.
 contract DelayedWETH_Hold_Test is DelayedWETH_TestBase {
-    function _depositAliceAndExpectHoldApproval(uint256 _amount) internal returns (uint256 initialBalance_) {
-        vm.prank(alice);
-        delayedWeth.deposit{ value: _amount }();
-
-        initialBalance_ = delayedWeth.balanceOf(address(proxyAdminOwner));
-
-        vm.expectEmit(true, true, true, false);
-        emit Approval(alice, address(proxyAdminOwner), _amount);
-    }
-
     /// @notice Tests that holding WETH succeeds.
     function test_hold_byOwner_succeeds() public {
-        uint256 initialBalance = _depositAliceAndExpectHoldApproval(DEFAULT_AMOUNT);
+        _depositAlice(DEFAULT_AMOUNT);
+        uint256 initialBalance = delayedWeth.balanceOf(address(proxyAdminOwner));
 
+        vm.expectEmit(address(delayedWeth));
+        emit Approval(alice, address(proxyAdminOwner), DEFAULT_AMOUNT);
         vm.prank(proxyAdminOwner);
         delayedWeth.hold(alice, DEFAULT_AMOUNT);
 
@@ -370,8 +324,11 @@ contract DelayedWETH_Hold_Test is DelayedWETH_TestBase {
 
     /// @notice Tests that holding all WETH succeeds when the amount is omitted.
     function test_hold_withoutAmount_succeeds() public {
-        uint256 initialBalance = _depositAliceAndExpectHoldApproval(DEFAULT_AMOUNT);
+        _depositAlice(DEFAULT_AMOUNT);
+        uint256 initialBalance = delayedWeth.balanceOf(address(proxyAdminOwner));
 
+        vm.expectEmit(address(delayedWeth));
+        emit Approval(alice, address(proxyAdminOwner), DEFAULT_AMOUNT);
         vm.prank(proxyAdminOwner);
         delayedWeth.hold(alice);
 
