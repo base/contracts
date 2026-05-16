@@ -77,8 +77,8 @@ abstract contract DisputeGameFactory_TestInit is CommonTest {
         vm.stopPrank();
     }
 
-    function _expectOwnableRevertFrom(address _caller) internal {
-        vm.prank(_caller);
+    function _expectNonOwnerRevert() internal {
+        vm.prank(NON_OWNER);
         vm.expectRevert("Ownable: caller is not the owner");
     }
 
@@ -109,13 +109,9 @@ abstract contract DisputeGameFactory_TestInit is CommonTest {
 /// @title DisputeGameFactory_Initialize_Test
 /// @notice Tests the `initialize` function of the `DisputeGameFactory` contract.
 contract DisputeGameFactory_Initialize_Test is DisputeGameFactory_TestInit {
-    bytes32 internal initializedSlot;
-
-    function setUp() public override {
-        super.setUp();
-
+    function _initializedSlot() internal view returns (bytes32) {
         StorageSlot memory slot = ForgeArtifacts.getSlot("DisputeGameFactory", "_initialized");
-        initializedSlot = bytes32(slot.slot);
+        return bytes32(slot.slot);
     }
 
     /// @notice Tests that initialization reverts if called by a non-proxy admin or proxy admin
@@ -126,7 +122,7 @@ contract DisputeGameFactory_Initialize_Test is DisputeGameFactory_TestInit {
             _sender != address(disputeGameFactory.proxyAdmin()) && _sender != disputeGameFactory.proxyAdminOwner()
         );
 
-        vm.store(address(disputeGameFactory), initializedSlot, bytes32(0));
+        vm.store(address(disputeGameFactory), _initializedSlot(), bytes32(0));
 
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
         vm.prank(_sender);
@@ -137,7 +133,7 @@ contract DisputeGameFactory_Initialize_Test is DisputeGameFactory_TestInit {
     ///         but confirms that the initValue is not incremented incorrectly if an upgrade
     ///         function is not present.
     function test_initialize_correctInitializerValue_succeeds() public view {
-        bytes32 slotVal = vm.load(address(disputeGameFactory), initializedSlot);
+        bytes32 slotVal = vm.load(address(disputeGameFactory), _initializedSlot());
         uint8 val = uint8(uint256(slotVal) & 0xFF);
 
         assertEq(val, disputeGameFactory.initVersion());
@@ -241,7 +237,8 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         Claim rootClaim = Claim.wrap(bytes32(hex"beef"));
         Proposal memory startingRoot = anchorStateRegistry.getStartingAnchorRoot();
         bytes memory intermediateRoots;
-        for (uint256 i = 1; i < gameImpl.intermediateOutputRootsCount(); i++) {
+        uint256 intermediateRootsCount = gameImpl.intermediateOutputRootsCount();
+        for (uint256 i = 1; i < intermediateRootsCount; i++) {
             intermediateRoots = abi.encodePacked(
                 intermediateRoots,
                 keccak256(abi.encode(startingRoot.l2SequenceNumber + AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL * i))
@@ -258,15 +255,12 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         uint256 bondAmount = disputeGameFactory.initBonds(GameTypes.AGGREGATE_VERIFIER);
         vm.deal(address(this), bondAmount);
 
+        uint256 gameCountBefore = disputeGameFactory.gameCount();
         IDisputeGame proxy = disputeGameFactory.createWithInitData{ value: bondAmount }(
             GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, proof
         );
 
-        (IDisputeGame game, Timestamp timestamp) =
-            disputeGameFactory.games(GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData);
-
-        assertEq(address(game), address(proxy));
-        assertEq(Timestamp.unwrap(timestamp), block.timestamp);
+        _assertCreatedGame(GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, proxy, gameCountBefore);
 
         AggregateVerifier gameV2 = AggregateVerifier(address(proxy));
 
@@ -300,7 +294,7 @@ contract DisputeGameFactory_SetImplementation_Test is DisputeGameFactory_TestIni
 
     /// @notice Tests that the `setImplementation` function reverts when called by a non-owner.
     function test_setImplementation_notOwner_reverts() public {
-        _expectOwnableRevertFrom(NON_OWNER);
+        _expectNonOwnerRevert();
         disputeGameFactory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(1)));
     }
 
@@ -332,7 +326,7 @@ contract DisputeGameFactory_SetImplementation_Test is DisputeGameFactory_TestIni
     function test_setImplementationArgs_notOwner_reverts() public {
         bytes memory args = abi.encode(uint256(123), address(0xdead));
 
-        _expectOwnableRevertFrom(NON_OWNER);
+        _expectNonOwnerRevert();
         disputeGameFactory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(1)), args);
     }
 }
@@ -360,7 +354,7 @@ contract DisputeGameFactory_SetInitBond_Test is DisputeGameFactory_TestInit {
 
     /// @notice Tests that the `setInitBond` function reverts when called by a non-owner.
     function test_setInitBond_notOwner_reverts() public {
-        _expectOwnableRevertFrom(NON_OWNER);
+        _expectNonOwnerRevert();
         disputeGameFactory.setInitBond(GameTypes.AGGREGATE_VERIFIER, 1 ether);
     }
 }
@@ -497,7 +491,7 @@ contract DisputeGameFactory_Uncategorized_Test is DisputeGameFactory_TestInit {
 
     /// @notice Tests that the `transferOwnership` function reverts when called by a non-owner.
     function test_transferOwnership_notOwner_reverts() public {
-        _expectOwnableRevertFrom(NON_OWNER);
+        _expectNonOwnerRevert();
         disputeGameFactory.transferOwnership(address(1));
     }
 }
