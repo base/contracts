@@ -393,5 +393,4 @@ contract AggregateVerifierTest is BaseTest {
             intermediateBlockInterval
         );
     }
-
 }
