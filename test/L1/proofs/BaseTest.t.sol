@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.15;
 
 import { Test } from "lib/forge-std/src/Test.sol";
 
@@ -25,39 +25,38 @@ import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 
 contract BaseTest is Test {
-    GameType public constant AGGREGATE_VERIFIER_GAME_TYPE = GameType.wrap(621);
-    uint256 public constant L2_CHAIN_ID = 8453;
+    GameType internal constant AGGREGATE_VERIFIER_GAME_TYPE = GameType.wrap(621);
+    uint256 internal constant L2_CHAIN_ID = 8453;
 
     // AggregateVerifier expects evenly spaced intermediate roots.
-    uint256 public constant BLOCK_INTERVAL = 100;
-    uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 10;
+    uint256 internal constant BLOCK_INTERVAL = 100;
+    uint256 internal constant INTERMEDIATE_BLOCK_INTERVAL = 10;
     uint256 private constant INTERMEDIATE_ROOTS_COUNT = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;
 
-    uint256 public constant INIT_BOND = 1 ether;
-    uint256 public constant DELAYED_WETH_DELAY = 1 days;
+    uint256 internal constant INIT_BOND = 1 ether;
+    uint256 internal constant DELAYED_WETH_DELAY = 1 days;
     // Finality delay handled by the AggregateVerifier
-    uint256 public constant FINALITY_DELAY = 0 days;
+    uint256 internal constant FINALITY_DELAY = 0 days;
 
-    uint256 public currentL2BlockNumber;
+    uint256 internal currentL2BlockNumber;
 
-    address public immutable TEE_PROVER = makeAddr("tee-prover");
-    address public immutable ZK_PROVER = makeAddr("zk-prover");
-    address public immutable ATTACKER = makeAddr("attacker");
+    address internal immutable TEE_PROVER = makeAddr("tee-prover");
+    address internal immutable ZK_PROVER = makeAddr("zk-prover");
 
-    bytes32 public immutable TEE_IMAGE_HASH = keccak256("tee-image");
-    bytes32 public immutable ZK_RANGE_HASH = keccak256("zk-range");
-    bytes32 public immutable ZK_AGGREGATE_HASH = keccak256("zk-aggregate");
-    bytes32 public immutable CONFIG_HASH = keccak256("config");
+    bytes32 internal immutable TEE_IMAGE_HASH = keccak256("tee-image");
+    bytes32 internal immutable ZK_RANGE_HASH = keccak256("zk-range");
+    bytes32 internal immutable ZK_AGGREGATE_HASH = keccak256("zk-aggregate");
+    bytes32 internal immutable CONFIG_HASH = keccak256("config");
 
-    ProxyAdmin public proxyAdmin;
-    ISystemConfig public systemConfig;
+    ProxyAdmin internal proxyAdmin;
+    ISystemConfig internal systemConfig;
 
-    DisputeGameFactory public factory;
-    AnchorStateRegistry public anchorStateRegistry;
-    DelayedWETH public delayedWETH;
+    DisputeGameFactory internal factory;
+    AnchorStateRegistry internal anchorStateRegistry;
+    DelayedWETH internal delayedWETH;
 
-    MockVerifier public teeVerifier;
-    MockVerifier public zkVerifier;
+    MockVerifier internal teeVerifier;
+    MockVerifier internal zkVerifier;
 
     function setUp() public virtual {
         _deployContractsAndProxies();
@@ -163,11 +162,10 @@ contract BaseTest is Test {
         view
         returns (bytes memory)
     {
-        bytes32 l1OriginHash = blockhash(block.number - 1);
         uint256 l1OriginNumber = block.number - 1;
-        bytes memory signature = abi.encodePacked(salt, bytes32(0), bytes32(0), uint8(27));
+        bytes32 l1OriginHash = blockhash(l1OriginNumber);
 
-        return abi.encodePacked(uint8(proofType), l1OriginHash, l1OriginNumber, signature);
+        return abi.encodePacked(uint8(proofType), l1OriginHash, l1OriginNumber, salt, bytes32(0), bytes32(0), uint8(27));
     }
 
     function _aggregateVerifierExtraData(
@@ -179,20 +177,17 @@ contract BaseTest is Test {
         pure
         returns (bytes memory)
     {
-        return
-            abi.encodePacked(
-                uint256(l2BlockNumber), parentAddress, _generateIntermediateRoots(l2BlockNumber, rootClaim)
-            );
+        return abi.encodePacked(l2BlockNumber, parentAddress, _generateIntermediateRoots(l2BlockNumber, rootClaim));
     }
 
     function _generateIntermediateRoots(uint256 l2BlockNumber, Claim rootClaim) private pure returns (bytes memory) {
-        bytes memory intermediateRoots = "";
+        bytes32[] memory intermediateRoots = new bytes32[](INTERMEDIATE_ROOTS_COUNT);
         uint256 startingL2BlockNumber = l2BlockNumber - BLOCK_INTERVAL;
         for (uint256 i = 1; i < INTERMEDIATE_ROOTS_COUNT; i++) {
-            intermediateRoots = abi.encodePacked(
-                intermediateRoots, keccak256(abi.encode(startingL2BlockNumber + INTERMEDIATE_BLOCK_INTERVAL * i))
-            );
+            intermediateRoots[i - 1] = keccak256(abi.encode(startingL2BlockNumber + INTERMEDIATE_BLOCK_INTERVAL * i));
         }
-        return abi.encodePacked(intermediateRoots, rootClaim.raw());
+        intermediateRoots[INTERMEDIATE_ROOTS_COUNT - 1] = rootClaim.raw();
+
+        return abi.encodePacked(intermediateRoots);
     }
 }
