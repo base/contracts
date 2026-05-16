@@ -29,7 +29,7 @@ contract SafeCall_Succeeds_Invariants is SafeCall_Invariants {
     }
 
     /// @custom:invariant Successful calls always forward at least the requested minimum gas.
-    function invariant_callWithMinGas_alwaysForwardsMinGas_succeeds() public view {
+    function invariant_callWithMinGas_alwaysForwardsMinGas_succeeds() external view {
         assertFalse(actor.badCallResult());
     }
 }
@@ -40,14 +40,18 @@ contract SafeCall_Fails_Invariants is SafeCall_Invariants {
     }
 
     /// @custom:invariant Calls revert when the frame cannot provide the requested minimum gas.
-    function invariant_callWithMinGas_neverForwardsMinGas_reverts() public view {
+    function invariant_callWithMinGas_neverForwardsMinGas_reverts() external view {
         assertFalse(actor.badCallResult());
     }
 }
 
 contract SafeCaller_Actor is Test {
     uint64 internal constant MIN_MIN_GAS = 2_500;
+
+    // Keep the EIP-150 min-gas calculation inside uint64 bounds.
     uint64 internal constant MAX_MIN_GAS = type(uint64).max / 64;
+
+    // `callWithMinGas` reserves 40k call overhead; the extra 1k covers the harness frame.
     uint64 internal constant CALL_WITH_MIN_GAS_BUFFER = 40_000 + 1_000;
 
     address internal immutable safeCallHarness;
