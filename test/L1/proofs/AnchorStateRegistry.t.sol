@@ -107,6 +107,12 @@ abstract contract AnchorStateRegistry_TestInit is BaseTest {
         vm.assume(_caller != superchainConfig.guardian());
     }
 
+    function _expectUnauthorizedGuardianRevert(address _caller) internal {
+        _assumeNotGuardian(_caller);
+        vm.prank(_caller);
+        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_Unauthorized.selector);
+    }
+
     function _updateRetirementTimestampAsGuardian() internal {
         vm.prank(superchainConfig.guardian());
         anchorStateRegistry.updateRetirementTimestamp();
@@ -121,12 +127,21 @@ abstract contract AnchorStateRegistry_TestInit is BaseTest {
         vm.mockCall(address(gameProxy), abi.encodeCall(gameProxy.createdAt, ()), abi.encode(_createdAtTimestamp));
     }
 
-    function _mockDisputeGameBlacklist(IDisputeGame _game, bool _blacklisted) internal {
-        vm.mockCall(
-            address(anchorStateRegistry),
-            abi.encodeCall(anchorStateRegistry.disputeGameBlacklist, (_game)),
-            abi.encode(_blacklisted)
-        );
+    function _mockRetiredGame(uint64 _createdAtTimestamp) internal returns (uint64) {
+        _updateRetirementTimestampAsGuardian();
+        _createdAtTimestamp = uint64(bound(_createdAtTimestamp, 0, anchorStateRegistry.retirementTimestamp()));
+        _mockGameCreatedAt(_createdAtTimestamp);
+        return _createdAtTimestamp;
+    }
+
+    function _mockGameL2SequenceNumber(uint256 _l2BlockNumber) internal {
+        vm.mockCall(address(gameProxy), abi.encodeCall(gameProxy.l2SequenceNumber, ()), abi.encode(_l2BlockNumber));
+    }
+
+    function _expectSetAnchorStateInvalid(IDisputeGame _game, address _caller) internal {
+        vm.prank(_caller);
+        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_InvalidAnchorGame.selector);
+        anchorStateRegistry.setAnchorState(_game);
     }
 
     function _setAnchorStateToGameProxy() internal {
@@ -318,10 +333,7 @@ contract AnchorStateRegistry_SetRespectedGameType_Test is AnchorStateRegistry_Te
     /// @param _gameType The game type to attempt to set
     /// @param _caller The address attempting to call the function
     function testFuzz_setRespectedGameType_notGuardian_reverts(GameType _gameType, address _caller) public {
-        _assumeNotGuardian(_caller);
-
-        vm.prank(_caller);
-        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_Unauthorized.selector);
+        _expectUnauthorizedGuardianRevert(_caller);
         anchorStateRegistry.setRespectedGameType(_gameType);
     }
 }
@@ -351,17 +363,15 @@ contract AnchorStateRegistry_UpdateRetirementTimestamp_Test is AnchorStateRegist
         _updateRetirementTimestampAsGuardian();
 
         // Verify the timestamp was updated
-        assertEq(anchorStateRegistry.retirementTimestamp(), block.timestamp);
-        assertGt(anchorStateRegistry.retirementTimestamp(), firstTimestamp);
+        uint64 secondTimestamp = anchorStateRegistry.retirementTimestamp();
+        assertEq(secondTimestamp, block.timestamp);
+        assertGt(secondTimestamp, firstTimestamp);
     }
 
     /// @notice Tests that updateRetirementTimestamp reverts when not called by the guardian
     /// @param _caller The address attempting to call the function
     function testFuzz_updateRetirementTimestamp_notGuardian_reverts(address _caller) public {
-        _assumeNotGuardian(_caller);
-
-        vm.prank(_caller);
-        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_Unauthorized.selector);
+        _expectUnauthorizedGuardianRevert(_caller);
         anchorStateRegistry.updateRetirementTimestamp();
     }
 }
@@ -382,7 +392,7 @@ contract AnchorStateRegistry_BlacklistDisputeGame_Test is AnchorStateRegistry_Te
     /// @notice Tests that multiple games can be blacklisted
     function test_blacklistDisputeGame_multipleGames_succeeds() public {
         // Create a second game proxy
-        IDisputeGame secondGame = IDisputeGame(address(0x123));
+        IDisputeGame secondGame = IDisputeGame(makeAddr("second-game"));
 
         // Blacklist both games
         vm.startPrank(superchainConfig.guardian());
@@ -398,10 +408,7 @@ contract AnchorStateRegistry_BlacklistDisputeGame_Test is AnchorStateRegistry_Te
     /// @notice Tests that blacklistDisputeGame reverts when not called by the guardian
     /// @param _caller The address attempting to call the function
     function testFuzz_blacklistDisputeGame_notGuardian_reverts(address _caller) public {
-        _assumeNotGuardian(_caller);
-
-        vm.prank(_caller);
-        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_Unauthorized.selector);
+        _expectUnauthorizedGuardianRevert(_caller);
         anchorStateRegistry.blacklistDisputeGame(gameProxy);
     }
 
@@ -490,18 +497,14 @@ contract AnchorStateRegistry_GetStartingAnchorRoot_Test is AnchorStateRegistry_T
     ///         changes.
     function test_getStartingAnchorRoot_afterUpdate_succeeds() public {
         _mockGamePastFinalityWithStatus(GameStatus.DEFENDER_WINS);
+        uint256 expectedL2BlockNumber = validL2BlockNumber + 1;
+        Claim expectedRoot = Claim.wrap(keccak256(abi.encode(123)));
 
         // Mock the game's L2 block number to be greater than the starting anchor root block number.
-        vm.mockCall(
-            address(gameProxy), abi.encodeCall(gameProxy.l2SequenceNumber, ()), abi.encode(validL2BlockNumber + 1)
-        );
+        _mockGameL2SequenceNumber(expectedL2BlockNumber);
 
         // Mock the game's anchor root to be different from the starting anchor root.
-        vm.mockCall(
-            address(gameProxy),
-            abi.encodeCall(gameProxy.rootClaim, ()),
-            abi.encode(Claim.wrap(keccak256(abi.encode(123))))
-        );
+        vm.mockCall(address(gameProxy), abi.encodeCall(gameProxy.rootClaim, ()), abi.encode(expectedRoot));
 
         // Set the anchor game to the game proxy.
         anchorStateRegistry.setAnchorState(gameProxy);
@@ -511,8 +514,8 @@ contract AnchorStateRegistry_GetStartingAnchorRoot_Test is AnchorStateRegistry_T
 
         // Verify the CURRENT anchor root has changed.
         (Hash currentRoot, uint256 currentL2BlockNumber) = anchorStateRegistry.getAnchorRoot();
-        assertEq(currentRoot.raw(), gameProxy.rootClaim().raw());
-        assertEq(currentL2BlockNumber, gameProxy.l2SequenceNumber());
+        assertEq(currentRoot.raw(), expectedRoot.raw());
+        assertEq(currentL2BlockNumber, expectedL2BlockNumber);
 
         // Verify the STARTING anchor root has NOT changed.
         Proposal memory startingAnchorRootAfterUpdate = anchorStateRegistry.getStartingAnchorRoot();
@@ -589,8 +592,7 @@ contract AnchorStateRegistry_IsGameBlacklisted_Test is AnchorStateRegistry_TestI
     }
 
     /// @notice Tests that isGameBlacklisted will return false if the game is not blacklisted.
-    function test_isGameBlacklisted_isNotBlacklisted_succeeds() public {
-        _mockDisputeGameBlacklist(gameProxy, false);
+    function test_isGameBlacklisted_isNotBlacklisted_succeeds() public view {
         assertFalse(anchorStateRegistry.isGameBlacklisted(gameProxy));
     }
 }
@@ -601,14 +603,7 @@ contract AnchorStateRegistry_IsGameRetired_Test is AnchorStateRegistry_TestInit 
     /// @notice Tests that isGameRetired will return true if the game is retired.
     /// @param _createdAtTimestamp The createdAt timestamp to use for the test.
     function testFuzz_isGameRetired_isRetired_succeeds(uint64 _createdAtTimestamp) public {
-        // Set the retirement timestamp to now.
-        _updateRetirementTimestampAsGuardian();
-
-        // Make sure createdAt timestamp is less than or equal to the retirementTimestamp.
-        _createdAtTimestamp = uint64(bound(_createdAtTimestamp, 0, anchorStateRegistry.retirementTimestamp()));
-
-        // Mock the createdAt call.
-        _mockGameCreatedAt(_createdAtTimestamp);
+        _mockRetiredGame(_createdAtTimestamp);
 
         // Game should be retired.
         assertTrue(anchorStateRegistry.isGameRetired(gameProxy));
@@ -720,14 +715,7 @@ contract AnchorStateRegistry_IsGameProper_Test is AnchorStateRegistry_TestInit {
     /// @notice Tests that isGameProper will return false if the game is retired.
     /// @param _createdAtTimestamp The createdAt timestamp to use for the test.
     function testFuzz_isGameProper_isRetired_succeeds(uint64 _createdAtTimestamp) public {
-        // Set the retirement timestamp to now.
-        _updateRetirementTimestampAsGuardian();
-
-        // Make sure createdAt timestamp is less than or equal to the retirementTimestamp.
-        _createdAtTimestamp = uint64(bound(_createdAtTimestamp, 0, anchorStateRegistry.retirementTimestamp()));
-
-        // Mock the call to createdAt.
-        _mockGameCreatedAt(_createdAtTimestamp);
+        _mockRetiredGame(_createdAtTimestamp);
 
         // Game should not be proper.
         assertFalse(anchorStateRegistry.isGameProper(gameProxy));
@@ -825,7 +813,7 @@ contract AnchorStateRegistry_IsGameClaimValid_Test is AnchorStateRegistry_TestIn
 
     /// @notice Tests that isGameClaimValid will return false if the game is blacklisted.
     function test_isGameClaimValid_isBlacklisted_succeeds() public {
-        _mockDisputeGameBlacklist(gameProxy, true);
+        _blacklistDisputeGameAsGuardian(gameProxy);
 
         // Claim should not be valid.
         assertFalse(anchorStateRegistry.isGameClaimValid(gameProxy));
@@ -834,14 +822,7 @@ contract AnchorStateRegistry_IsGameClaimValid_Test is AnchorStateRegistry_TestIn
     /// @notice Tests that isGameClaimValid will return false if the game is retired.
     /// @param _createdAtTimestamp The createdAt timestamp to use for the test.
     function testFuzz_isGameClaimValid_isRetired_succeeds(uint64 _createdAtTimestamp) public {
-        // Set the retirement timestamp to now.
-        _updateRetirementTimestampAsGuardian();
-
-        // Make sure createdAt timestamp is less than or equal to the retirementTimestamp.
-        _createdAtTimestamp = uint64(bound(_createdAtTimestamp, 0, anchorStateRegistry.retirementTimestamp()));
-
-        // Mock the call to createdAt.
-        _mockGameCreatedAt(_createdAtTimestamp);
+        _mockRetiredGame(_createdAtTimestamp);
 
         // Claim should not be valid.
         assertFalse(anchorStateRegistry.isGameClaimValid(gameProxy));
@@ -896,7 +877,7 @@ contract AnchorStateRegistry_SetAnchorState_Test is AnchorStateRegistry_TestInit
         _l2BlockNumber = bound(_l2BlockNumber, validL2BlockNumber, type(uint256).max);
 
         // Mock the l2BlockNumber call.
-        vm.mockCall(address(gameProxy), abi.encodeCall(gameProxy.l2SequenceNumber, ()), abi.encode(_l2BlockNumber));
+        _mockGameL2SequenceNumber(_l2BlockNumber);
 
         _mockGamePastFinalityWithStatus(GameStatus.DEFENDER_WINS);
         _mockGameWasRespected(true);
@@ -908,9 +889,7 @@ contract AnchorStateRegistry_SetAnchorState_Test is AnchorStateRegistry_TestInit
         anchorStateRegistry.setAnchorState(gameProxy);
 
         // Confirm that the anchor state is now the same as the game state.
-        (Hash root, uint256 l2BlockNumber) = anchorStateRegistry.getAnchorRoot();
-        assertEq(l2BlockNumber, gameProxy.l2SequenceNumber());
-        assertEq(root.raw(), gameProxy.rootClaim().raw());
+        _assertAnchorRootEqGame(gameProxy);
 
         // Confirm that the anchor game is now set.
         IDisputeGame anchorGame = anchorStateRegistry.anchorGame();
@@ -928,160 +907,89 @@ contract AnchorStateRegistry_SetAnchorState_Test is AnchorStateRegistry_TestInit
         _l2BlockNumber = bound(_l2BlockNumber, 0, l2BlockNumber);
 
         // Mock the l2BlockNumber call.
-        vm.mockCall(address(gameProxy), abi.encodeCall(gameProxy.l2SequenceNumber, ()), abi.encode(_l2BlockNumber));
+        _mockGameL2SequenceNumber(_l2BlockNumber);
 
         _mockGamePastFinalityWithStatus(GameStatus.DEFENDER_WINS);
         _mockGameWasRespected(true);
 
-        // Try to update the anchor state.
-        vm.prank(address(gameProxy));
-        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_InvalidAnchorGame.selector);
-        anchorStateRegistry.setAnchorState(gameProxy);
+        _expectSetAnchorStateInvalid(gameProxy, address(gameProxy));
 
         _assertCurrentAnchorRootEq(root, l2BlockNumber);
     }
 
     /// @notice Tests that setAnchorState will revert if the game is not registered.
-    /// @param _l2BlockNumber The L2 block number to use for the game.
-    function testFuzz_setAnchorState_notFactoryRegisteredGame_fails(uint256 _l2BlockNumber) public {
+    function test_setAnchorState_notFactoryRegisteredGame_fails() public {
         // Grab block number of the existing anchor root.
         (Hash root, uint256 l2BlockNumber) = anchorStateRegistry.getAnchorRoot();
 
-        // Bound the new block number.
-        _l2BlockNumber = bound(_l2BlockNumber, l2BlockNumber, type(uint256).max);
-
-        // Mock the l2BlockNumber call.
-        vm.mockCall(address(gameProxy), abi.encodeCall(gameProxy.l2SequenceNumber, ()), abi.encode(_l2BlockNumber));
-
-        _mockGameStatus(GameStatus.DEFENDER_WINS);
-        _mockGameWasRespected(true);
         _mockGameNotRegistered();
 
-        // Try to update the anchor state.
-        vm.prank(superchainConfig.guardian());
-        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_InvalidAnchorGame.selector);
-        anchorStateRegistry.setAnchorState(gameProxy);
+        _expectSetAnchorStateInvalid(gameProxy, superchainConfig.guardian());
 
         _assertCurrentAnchorRootEq(root, l2BlockNumber);
     }
 
     /// @notice Tests that setAnchorState will revert if the game is valid and the game status is
     ///         CHALLENGER_WINS.
-    /// @param _l2BlockNumber The L2 block number to use for the game.
-    function testFuzz_setAnchorState_challengerWins_fails(uint256 _l2BlockNumber) public {
+    function test_setAnchorState_challengerWins_fails() public {
         // Grab block number of the existing anchor root.
         (Hash root, uint256 l2BlockNumber) = anchorStateRegistry.getAnchorRoot();
-
-        // Bound the new block number.
-        _l2BlockNumber = bound(_l2BlockNumber, l2BlockNumber, type(uint256).max);
-
-        // Mock the l2BlockNumber call.
-        vm.mockCall(address(gameProxy), abi.encodeCall(gameProxy.l2SequenceNumber, ()), abi.encode(_l2BlockNumber));
 
         _mockGamePastFinalityWithStatus(GameStatus.CHALLENGER_WINS);
         _mockGameWasRespected(true);
 
-        // Try to update the anchor state.
-        vm.prank(address(gameProxy));
-        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_InvalidAnchorGame.selector);
-        anchorStateRegistry.setAnchorState(gameProxy);
+        _expectSetAnchorStateInvalid(gameProxy, address(gameProxy));
 
         _assertCurrentAnchorRootEq(root, l2BlockNumber);
     }
 
     /// @notice Tests that setAnchorState will revert if the game is valid and the game status is
     ///         IN_PROGRESS.
-    /// @param _l2BlockNumber The L2 block number to use for the game.
-    function testFuzz_setAnchorState_inProgress_fails(uint256 _l2BlockNumber) public {
+    function test_setAnchorState_inProgress_fails() public {
         // Grab block number of the existing anchor root.
         (Hash root, uint256 l2BlockNumber) = anchorStateRegistry.getAnchorRoot();
-
-        // Bound the new block number.
-        _l2BlockNumber = bound(_l2BlockNumber, l2BlockNumber, type(uint256).max);
-
-        // Mock the l2BlockNumber call.
-        vm.mockCall(address(gameProxy), abi.encodeCall(gameProxy.l2SequenceNumber, ()), abi.encode(_l2BlockNumber));
 
         _mockGamePastFinalityWithStatus(GameStatus.IN_PROGRESS);
         _mockGameWasRespected(true);
 
-        // Try to update the anchor state.
-        vm.prank(address(gameProxy));
-        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_InvalidAnchorGame.selector);
-        anchorStateRegistry.setAnchorState(gameProxy);
+        _expectSetAnchorStateInvalid(gameProxy, address(gameProxy));
 
         _assertCurrentAnchorRootEq(root, l2BlockNumber);
     }
 
     /// @notice Tests that setAnchorState will revert if the game is not respected.
-    /// @param _l2BlockNumber The L2 block number to use for the game.
-    function testFuzz_setAnchorState_isNotRespectedGame_fails(uint256 _l2BlockNumber) public {
+    function test_setAnchorState_isNotRespectedGame_fails() public {
         // Grab block number of the existing anchor root.
         (Hash root, uint256 l2BlockNumber) = anchorStateRegistry.anchors(gameProxy.gameType());
 
-        // Bound the new block number.
-        _l2BlockNumber = bound(_l2BlockNumber, l2BlockNumber, type(uint256).max);
-
-        // Mock the l2BlockNumber call.
-        vm.mockCall(address(gameProxy), abi.encodeCall(gameProxy.l2SequenceNumber, ()), abi.encode(_l2BlockNumber));
-
-        _mockGamePastFinalityWithStatus(GameStatus.DEFENDER_WINS);
         _mockGameWasRespected(false);
 
-        // Try to update the anchor state.
-        vm.prank(address(gameProxy));
-        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_InvalidAnchorGame.selector);
-        anchorStateRegistry.setAnchorState(gameProxy);
+        _expectSetAnchorStateInvalid(gameProxy, address(gameProxy));
 
         _assertAnchorEq(gameProxy.gameType(), root, l2BlockNumber);
     }
 
     /// @notice Tests that setAnchorState will revert if the game is valid and the game is
     ///         blacklisted.
-    /// @param _l2BlockNumber The L2 block number to use for the game.
-    function testFuzz_setAnchorState_blacklistedGame_fails(uint256 _l2BlockNumber) public {
+    function test_setAnchorState_blacklistedGame_fails() public {
         // Grab block number of the existing anchor root.
         (Hash root, uint256 l2BlockNumber) = anchorStateRegistry.getAnchorRoot();
-
-        // Bound the new block number.
-        _l2BlockNumber = bound(_l2BlockNumber, validL2BlockNumber, type(uint256).max);
-
-        _mockGamePastFinalityWithStatus(GameStatus.DEFENDER_WINS);
-        _mockGameWasRespected(true);
 
         // Blacklist the game.
         _blacklistDisputeGameAsGuardian(gameProxy);
 
-        // Update the anchor state.
-        vm.prank(address(gameProxy));
-        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_InvalidAnchorGame.selector);
-        anchorStateRegistry.setAnchorState(gameProxy);
+        _expectSetAnchorStateInvalid(gameProxy, address(gameProxy));
 
         _assertAnchorEq(gameProxy.gameType(), root, l2BlockNumber);
     }
 
     /// @notice Tests that setAnchorState will revert if the game is retired.
-    /// @param _l2BlockNumber The L2 block number to use for the game.
-    function testFuzz_setAnchorState_retiredGame_fails(uint256 _l2BlockNumber) public {
+    function test_setAnchorState_retiredGame_fails() public {
         // Grab block number of the existing anchor root.
         (Hash root, uint256 l2BlockNumber) = anchorStateRegistry.getAnchorRoot();
 
-        // Bound the new block number.
-        _l2BlockNumber = bound(_l2BlockNumber, validL2BlockNumber, type(uint256).max);
-
-        _mockGameStatus(GameStatus.DEFENDER_WINS);
-        _mockGameWasRespected(true);
-
-        // Set the retirement timestamp.
-        _updateRetirementTimestampAsGuardian();
-
-        // Mock the call to createdAt.
-        _mockGameCreatedAt(anchorStateRegistry.retirementTimestamp() - 1);
-
-        // Update the anchor state.
-        vm.prank(address(gameProxy));
-        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_InvalidAnchorGame.selector);
-        anchorStateRegistry.setAnchorState(gameProxy);
+        _mockRetiredGame(0);
+        _expectSetAnchorStateInvalid(gameProxy, address(gameProxy));
 
         _assertAnchorEq(gameProxy.gameType(), root, l2BlockNumber);
     }
@@ -1091,9 +999,6 @@ contract AnchorStateRegistry_SetAnchorState_Test is AnchorStateRegistry_TestInit
         // Pause the superchain.
         _setPaused(true);
 
-        // Update the anchor state.
-        vm.prank(address(gameProxy));
-        vm.expectRevert(IAnchorStateRegistry.AnchorStateRegistry_InvalidAnchorGame.selector);
-        anchorStateRegistry.setAnchorState(gameProxy);
+        _expectSetAnchorStateInvalid(gameProxy, address(gameProxy));
     }
 }
