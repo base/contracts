@@ -22,6 +22,10 @@ import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 /// @title AnchorStateRegistry_TestInit
 /// @notice Reusable test initialization for `AnchorStateRegistry` tests.
 abstract contract AnchorStateRegistry_TestInit is BaseTest {
+    string internal constant ANCHOR_STATE_REGISTRY_NAME = "AnchorStateRegistry";
+    bytes32 internal constant DUMMY_STARTING_ANCHOR_ROOT =
+        0xDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF;
+
     IDisputeGameFactory disputeGameFactory;
     ISuperchainConfig superchainConfig;
     IDisputeGame gameProxy;
@@ -72,8 +76,14 @@ abstract contract AnchorStateRegistry_TestInit is BaseTest {
 
     function _mockGamePastFinalityWithStatus(GameStatus _status) internal {
         _mockGameResolvedAt(block.timestamp);
-        vm.warp(block.timestamp + anchorStateRegistry.disputeGameFinalityDelaySeconds() + 1);
+        _warpByFinalityDelay();
+        vm.warp(block.timestamp + 1);
         _mockGameStatus(_status);
+    }
+
+    function _warpByFinalityDelay() internal returns (uint256 finalityDelay_) {
+        finalityDelay_ = anchorStateRegistry.disputeGameFinalityDelaySeconds();
+        vm.warp(block.timestamp + finalityDelay_);
     }
 
     function _mockGameWasRespected(bool _wasRespected) internal {
@@ -96,9 +106,7 @@ abstract contract AnchorStateRegistry_TestInit is BaseTest {
         anchorStateRegistry.initialize(
             systemConfig,
             disputeGameFactory,
-            Proposal({
-                root: Hash.wrap(0xDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF), l2SequenceNumber: 0
-            }),
+            Proposal({ root: Hash.wrap(DUMMY_STARTING_ANCHOR_ROOT), l2SequenceNumber: 0 }),
             GameType.wrap(0)
         );
     }
@@ -129,9 +137,9 @@ abstract contract AnchorStateRegistry_TestInit is BaseTest {
 
     function _mockRetiredGame(uint64 _createdAtTimestamp) internal returns (uint64) {
         _updateRetirementTimestampAsGuardian();
-        _createdAtTimestamp = uint64(bound(_createdAtTimestamp, 0, anchorStateRegistry.retirementTimestamp()));
-        _mockGameCreatedAt(_createdAtTimestamp);
-        return _createdAtTimestamp;
+        uint64 createdAtTimestamp = uint64(bound(_createdAtTimestamp, 0, anchorStateRegistry.retirementTimestamp()));
+        _mockGameCreatedAt(createdAtTimestamp);
+        return createdAtTimestamp;
     }
 
     function _mockGameL2SequenceNumber(uint256 _l2BlockNumber) internal {
@@ -180,6 +188,16 @@ contract AnchorStateRegistry_Version_Test is AnchorStateRegistry_TestInit {
 /// @title AnchorStateRegistry_Initialize_Test
 /// @notice Tests the `initialize` function of the `AnchorStateRegistry` contract.
 contract AnchorStateRegistry_Initialize_Test is AnchorStateRegistry_TestInit {
+    StorageSlot internal initializedSlot;
+    StorageSlot internal retirementTimestampSlot;
+
+    function setUp() public override {
+        super.setUp();
+
+        initializedSlot = ForgeArtifacts.getSlot(ANCHOR_STATE_REGISTRY_NAME, "_initialized");
+        retirementTimestampSlot = ForgeArtifacts.getSlot(ANCHOR_STATE_REGISTRY_NAME, "retirementTimestamp");
+    }
+
     /// @notice Tests that initialization is successful.
     function test_initialize_succeeds() public view {
         // Verify starting anchor root.
@@ -197,14 +215,9 @@ contract AnchorStateRegistry_Initialize_Test is AnchorStateRegistry_TestInit {
     ///         initialization but confirms that the initValue is not incremented incorrectly if
     ///         an upgrade function is not present.
     function test_initialize_correctInitializerValue_succeeds() public view {
-        // Get the slot for _initialized.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("AnchorStateRegistry", "_initialized");
-
-        // Get the initializer value.
-        bytes32 slotVal = vm.load(address(anchorStateRegistry), bytes32(slot.slot));
+        bytes32 slotVal = vm.load(address(anchorStateRegistry), bytes32(initializedSlot.slot));
         uint8 val = uint8(uint256(slotVal) & 0xFF);
 
-        // Assert that the initializer value matches the expected value.
         assertEq(val, anchorStateRegistry.initVersion());
     }
 
@@ -213,13 +226,11 @@ contract AnchorStateRegistry_Initialize_Test is AnchorStateRegistry_TestInit {
         (Hash root, uint256 l2SequenceNumber) = anchorStateRegistry.getAnchorRoot();
         GameType startingGameType = anchorStateRegistry.respectedGameType();
 
-        StorageSlot memory initSlot = ForgeArtifacts.getSlot("AnchorStateRegistry", "_initialized");
-        StorageSlot memory retirementSlot = ForgeArtifacts.getSlot("AnchorStateRegistry", "retirementTimestamp");
         address proxyAdminOwner = anchorStateRegistry.proxyAdminOwner();
 
         // Reset initialization and retirement timestamp state.
-        vm.store(address(anchorStateRegistry), bytes32(initSlot.slot), bytes32(0));
-        vm.store(address(anchorStateRegistry), bytes32(retirementSlot.slot), bytes32(0));
+        vm.store(address(anchorStateRegistry), bytes32(initializedSlot.slot), bytes32(0));
+        vm.store(address(anchorStateRegistry), bytes32(retirementTimestampSlot.slot), bytes32(0));
 
         uint256 newTimestamp = block.timestamp + 100;
         vm.warp(newTimestamp);
@@ -241,7 +252,6 @@ contract AnchorStateRegistry_Initialize_Test is AnchorStateRegistry_TestInit {
         (Hash root, uint256 l2SequenceNumber) = anchorStateRegistry.getAnchorRoot();
         GameType startingGameType = anchorStateRegistry.respectedGameType();
 
-        StorageSlot memory initSlot = ForgeArtifacts.getSlot("AnchorStateRegistry", "_initialized");
         address proxyAdminOwner = anchorStateRegistry.proxyAdminOwner();
 
         uint256 initialTimestamp = block.timestamp + 200;
@@ -252,7 +262,7 @@ contract AnchorStateRegistry_Initialize_Test is AnchorStateRegistry_TestInit {
         uint256 reinitTimestamp = block.timestamp + 200;
         vm.warp(reinitTimestamp);
 
-        vm.store(address(anchorStateRegistry), bytes32(initSlot.slot), bytes32(0));
+        vm.store(address(anchorStateRegistry), bytes32(initializedSlot.slot), bytes32(0));
 
         vm.prank(proxyAdminOwner);
         anchorStateRegistry.initialize(
@@ -279,11 +289,8 @@ contract AnchorStateRegistry_Initialize_Test is AnchorStateRegistry_TestInit {
             _sender != address(anchorStateRegistry.proxyAdmin()) && _sender != anchorStateRegistry.proxyAdminOwner()
         );
 
-        // Get the slot for _initialized.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("AnchorStateRegistry", "_initialized");
-
         // Set the initialized slot to 0.
-        vm.store(address(anchorStateRegistry), bytes32(slot.slot), bytes32(0));
+        vm.store(address(anchorStateRegistry), bytes32(initializedSlot.slot), bytes32(0));
 
         // Expect the revert with `ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner` selector.
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
@@ -499,6 +506,7 @@ contract AnchorStateRegistry_GetStartingAnchorRoot_Test is AnchorStateRegistry_T
         _mockGamePastFinalityWithStatus(GameStatus.DEFENDER_WINS);
         uint256 expectedL2BlockNumber = validL2BlockNumber + 1;
         Claim expectedRoot = Claim.wrap(keccak256(abi.encode(123)));
+        Proposal memory startingAnchorRootBeforeUpdate = anchorStateRegistry.getStartingAnchorRoot();
 
         // Mock the game's L2 block number to be greater than the starting anchor root block number.
         _mockGameL2SequenceNumber(expectedL2BlockNumber);
@@ -508,9 +516,6 @@ contract AnchorStateRegistry_GetStartingAnchorRoot_Test is AnchorStateRegistry_T
 
         // Set the anchor game to the game proxy.
         anchorStateRegistry.setAnchorState(gameProxy);
-
-        // Grab the value of the starting anchor root before the update.
-        Proposal memory startingAnchorRootBeforeUpdate = anchorStateRegistry.getStartingAnchorRoot();
 
         // Verify the CURRENT anchor root has changed.
         (Hash currentRoot, uint256 currentL2BlockNumber) = anchorStateRegistry.getAnchorRoot();
@@ -522,9 +527,8 @@ contract AnchorStateRegistry_GetStartingAnchorRoot_Test is AnchorStateRegistry_T
         assertEq(startingAnchorRootAfterUpdate.root.raw(), startingAnchorRootBeforeUpdate.root.raw());
         assertEq(startingAnchorRootAfterUpdate.l2SequenceNumber, startingAnchorRootBeforeUpdate.l2SequenceNumber);
 
-        // Explicitly assert they are different (assuming the new game has different values).
-        assertFalse(currentRoot.raw() == startingAnchorRootAfterUpdate.root.raw());
-        assertFalse(currentL2BlockNumber == startingAnchorRootAfterUpdate.l2SequenceNumber);
+        assertNotEq(currentRoot.raw(), startingAnchorRootAfterUpdate.root.raw());
+        assertNotEq(currentL2BlockNumber, startingAnchorRootAfterUpdate.l2SequenceNumber);
     }
 }
 
@@ -630,14 +634,16 @@ contract AnchorStateRegistry_IsGameRetired_Test is AnchorStateRegistry_TestInit 
 /// @title AnchorStateRegistry_IsGameResolved_Test
 /// @notice Tests the `isGameResolved` function of the `AnchorStateRegistry` contract.
 contract AnchorStateRegistry_IsGameResolved_Test is AnchorStateRegistry_TestInit {
+    function _mockResolvedGame(uint256 _resolvedAtTimestamp, GameStatus _status) internal {
+        _resolvedAtTimestamp = bound(_resolvedAtTimestamp, 1, block.timestamp);
+        _mockGameResolvedAt(_resolvedAtTimestamp);
+        _mockGameStatus(_status);
+    }
+
     /// @notice Tests that isGameResolved will return true if the game is resolved.
     /// @param _resolvedAtTimestamp The resolvedAt timestamp to use for the test.
     function testFuzz_isGameResolved_challengerWins_succeeds(uint256 _resolvedAtTimestamp) public {
-        // Bound resolvedAt to be less than or equal to current timestamp.
-        _resolvedAtTimestamp = bound(_resolvedAtTimestamp, 1, block.timestamp);
-
-        _mockGameResolvedAt(_resolvedAtTimestamp);
-        _mockGameStatus(GameStatus.CHALLENGER_WINS);
+        _mockResolvedGame(_resolvedAtTimestamp, GameStatus.CHALLENGER_WINS);
 
         // Game should be resolved.
         assertTrue(anchorStateRegistry.isGameResolved(gameProxy));
@@ -646,11 +652,7 @@ contract AnchorStateRegistry_IsGameResolved_Test is AnchorStateRegistry_TestInit
     /// @notice Tests that isGameResolved will return true if the game is resolved.
     /// @param _resolvedAtTimestamp The resolvedAt timestamp to use for the test.
     function testFuzz_isGameResolved_defenderWins_succeeds(uint256 _resolvedAtTimestamp) public {
-        // Bound resolvedAt to be less than or equal to current timestamp.
-        _resolvedAtTimestamp = bound(_resolvedAtTimestamp, 1, block.timestamp);
-
-        _mockGameResolvedAt(_resolvedAtTimestamp);
-        _mockGameStatus(GameStatus.DEFENDER_WINS);
+        _mockResolvedGame(_resolvedAtTimestamp, GameStatus.DEFENDER_WINS);
 
         // Game should be resolved.
         assertTrue(anchorStateRegistry.isGameResolved(gameProxy));
@@ -660,11 +662,7 @@ contract AnchorStateRegistry_IsGameResolved_Test is AnchorStateRegistry_TestInit
     ///         resolved.
     /// @param _resolvedAtTimestamp The resolvedAt timestamp to use for the test.
     function testFuzz_isGameResolved_inProgressNotResolved_succeeds(uint256 _resolvedAtTimestamp) public {
-        // Bound resolvedAt to be less than or equal to current timestamp.
-        _resolvedAtTimestamp = bound(_resolvedAtTimestamp, 1, block.timestamp);
-
-        _mockGameResolvedAt(_resolvedAtTimestamp);
-        _mockGameStatus(GameStatus.IN_PROGRESS);
+        _mockResolvedGame(_resolvedAtTimestamp, GameStatus.IN_PROGRESS);
 
         // Game should not be resolved.
         assertFalse(anchorStateRegistry.isGameResolved(gameProxy));
@@ -728,13 +726,11 @@ contract AnchorStateRegistry_IsGameFinalized_Test is AnchorStateRegistry_TestIni
     /// @notice Tests that isGameFinalized will return true if the game is finalized.
     /// @param _resolvedAtTimestamp The resolvedAt timestamp to use for the test.
     function testFuzz_isGameFinalized_isFinalized_succeeds(uint256 _resolvedAtTimestamp) public {
-        // Warp forward by disputeGameFinalityDelaySeconds.
-        vm.warp(block.timestamp + anchorStateRegistry.disputeGameFinalityDelaySeconds());
+        uint256 finalityDelay = _warpByFinalityDelay();
 
         // Bound resolvedAt to be at least disputeGameFinalityDelaySeconds in the past.
         // Must be greater than 0.
-        _resolvedAtTimestamp =
-            bound(_resolvedAtTimestamp, 1, block.timestamp - anchorStateRegistry.disputeGameFinalityDelaySeconds() - 1);
+        _resolvedAtTimestamp = bound(_resolvedAtTimestamp, 1, block.timestamp - finalityDelay - 1);
 
         _mockGameResolvedAt(_resolvedAtTimestamp);
         _mockGameStatus(GameStatus.DEFENDER_WINS);
@@ -746,15 +742,10 @@ contract AnchorStateRegistry_IsGameFinalized_Test is AnchorStateRegistry_TestIni
     /// @notice Tests that isGameFinalized will return false if the game is not finalized.
     /// @param _resolvedAtTimestamp The resolvedAt timestamp to use for the test.
     function testFuzz_isGameFinalized_isNotFinalized_succeeds(uint256 _resolvedAtTimestamp) public {
-        // Warp forward by disputeGameFinalityDelaySeconds.
-        vm.warp(block.timestamp + anchorStateRegistry.disputeGameFinalityDelaySeconds());
+        uint256 finalityDelay = _warpByFinalityDelay();
 
         // Bound resolvedAt to be less than disputeGameFinalityDelaySeconds in the past.
-        _resolvedAtTimestamp = bound(
-            _resolvedAtTimestamp,
-            block.timestamp - anchorStateRegistry.disputeGameFinalityDelaySeconds(),
-            block.timestamp
-        );
+        _resolvedAtTimestamp = bound(_resolvedAtTimestamp, block.timestamp - finalityDelay, block.timestamp);
 
         _mockGameResolvedAt(_resolvedAtTimestamp);
 
@@ -764,8 +755,7 @@ contract AnchorStateRegistry_IsGameFinalized_Test is AnchorStateRegistry_TestIni
 
     /// @notice Tests that isGameFinalized will return false if the game is not resolved.
     function test_isGameFinalized_isNotResolved_succeeds() public {
-        // Warp forward by disputeGameFinalityDelaySeconds.
-        vm.warp(block.timestamp + anchorStateRegistry.disputeGameFinalityDelaySeconds());
+        _warpByFinalityDelay();
 
         _mockGameStatus(GameStatus.IN_PROGRESS);
 
@@ -780,12 +770,10 @@ contract AnchorStateRegistry_IsGameClaimValid_Test is AnchorStateRegistry_TestIn
     /// @notice Tests that isGameClaimValid will return true if the game claim is valid.
     /// @param _resolvedAtTimestamp The resolvedAt timestamp to use for the test.
     function testFuzz_isGameClaimValid_claimIsValid_succeeds(uint256 _resolvedAtTimestamp) public {
-        // Warp forward by disputeGameFinalityDelaySeconds.
-        vm.warp(block.timestamp + anchorStateRegistry.disputeGameFinalityDelaySeconds());
+        uint256 finalityDelay = _warpByFinalityDelay();
 
         // Bound resolvedAt to be at least disputeGameFinalityDelaySeconds in the past.
-        _resolvedAtTimestamp =
-            bound(_resolvedAtTimestamp, 1, block.timestamp - anchorStateRegistry.disputeGameFinalityDelaySeconds() - 1);
+        _resolvedAtTimestamp = bound(_resolvedAtTimestamp, 1, block.timestamp - finalityDelay - 1);
 
         _mockGameWasRespected(true);
         _mockGameResolvedAt(_resolvedAtTimestamp);
@@ -839,15 +827,10 @@ contract AnchorStateRegistry_IsGameClaimValid_Test is AnchorStateRegistry_TestIn
     /// @notice Tests that isGameClaimValid will return false if the game is not finalized.
     /// @param _resolvedAtTimestamp The resolvedAt timestamp to use for the test.
     function testFuzz_isGameClaimValid_notFinalized_succeeds(uint256 _resolvedAtTimestamp) public {
-        // Warp forward by disputeGameFinalityDelaySeconds.
-        vm.warp(block.timestamp + anchorStateRegistry.disputeGameFinalityDelaySeconds());
+        uint256 finalityDelay = _warpByFinalityDelay();
 
         // Bound resolvedAt to be less than disputeGameFinalityDelaySeconds in the past.
-        _resolvedAtTimestamp = bound(
-            _resolvedAtTimestamp,
-            block.timestamp - anchorStateRegistry.disputeGameFinalityDelaySeconds(),
-            block.timestamp
-        );
+        _resolvedAtTimestamp = bound(_resolvedAtTimestamp, block.timestamp - finalityDelay, block.timestamp);
 
         _mockGameResolvedAt(_resolvedAtTimestamp);
 
@@ -996,9 +979,13 @@ contract AnchorStateRegistry_SetAnchorState_Test is AnchorStateRegistry_TestInit
 
     /// @notice Tests that setAnchorState will revert if the superchain is paused.
     function test_setAnchorState_superchainPaused_fails() public {
+        (Hash root, uint256 l2BlockNumber) = anchorStateRegistry.getAnchorRoot();
+
         // Pause the superchain.
         _setPaused(true);
 
         _expectSetAnchorStateInvalid(gameProxy, address(gameProxy));
+
+        _assertCurrentAnchorRootEq(root, l2BlockNumber);
     }
 }
