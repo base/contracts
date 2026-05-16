@@ -11,7 +11,7 @@ import { BaseTest } from "./BaseTest.t.sol";
 
 contract NullifyTest is BaseTest {
     uint256 private constant LAST_INTERMEDIATE_ROOT_INDEX = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1;
-    uint256 private constant NO_PROOF_RESOLUTION_DELAY = 14 days;
+    uint256 private constant NO_PROOF_CREDIT_CLAIM_DELAY = 14 days;
 
     function testNullifyWithTEEProof() public {
         AggregateVerifier game = _createGame(
@@ -21,7 +21,7 @@ contract NullifyTest is BaseTest {
         _nullify(game, "tee-proof-2", AggregateVerifier.ProofType.TEE, "tee2");
         _assertNullifiedToNoProofs(game, TEE_PROVER);
 
-        vm.warp(block.timestamp + NO_PROOF_RESOLUTION_DELAY);
+        vm.warp(block.timestamp + NO_PROOF_CREDIT_CLAIM_DELAY);
         _claimCreditAfterDelay(game);
     }
 
@@ -32,7 +32,7 @@ contract NullifyTest is BaseTest {
         _nullify(game, "zk-proof-2", AggregateVerifier.ProofType.ZK, "zk2");
         _assertNullifiedToNoProofs(game, ZK_PROVER);
 
-        vm.warp(block.timestamp + NO_PROOF_RESOLUTION_DELAY);
+        vm.warp(block.timestamp + NO_PROOF_CREDIT_CLAIM_DELAY);
         _claimCreditAfterDelay(game);
     }
 
@@ -93,58 +93,12 @@ contract NullifyTest is BaseTest {
         _claimCreditAfterDelay(game);
     }
 
-    /// @notice `resolve` runs `_updateProofCount`; when the shared TEE verifier was nullified by another game,
-    ///         refutation persists and `resolve` returns early `IN_PROGRESS` (no `Resolved` event) instead of
-    /// reverting. @dev All clones share the same `MockVerifier` TEE instance; `Verifier.nullify` requires a proper
-    /// factory game.
     function testResolveEarlyReturnWhenSharedTeeVerifierNullifiedByAnotherGame() public {
-        AggregateVerifier gameA = _createGame(
-            TEE_PROVER, "game-a", "tee-proof-a", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
-        );
-
-        AggregateVerifier gameB =
-            _createGame(TEE_PROVER, "game-b", "tee-proof-b", AggregateVerifier.ProofType.TEE, address(gameA));
-
-        vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
-        assertTrue(gameA.gameOver());
-        assertEq(gameA.proofCount(), 1);
-
-        _nullify(gameB, "tee-nullify-b", AggregateVerifier.ProofType.TEE, "nullify-b");
-
-        assertTrue(teeVerifier.nullified());
-        assertEq(gameA.proofCount(), 1);
-
-        _resolveAndAssertStatus(gameA, GameStatus.IN_PROGRESS);
-        assertEq(gameA.proofCount(), 0);
-        assertEq(gameA.expectedResolution().raw(), type(uint64).max);
-
-        vm.expectRevert(AggregateVerifier.GameNotOver.selector);
-        gameA.resolve();
+        _assertResolveEarlyReturnWhenSharedVerifierNullifiedByAnotherGame(TEE_PROVER, AggregateVerifier.ProofType.TEE);
     }
 
     function testResolveEarlyReturnWhenSharedZkVerifierNullifiedByAnotherGame() public {
-        AggregateVerifier gameA = _createGame(
-            ZK_PROVER, "zk-game-a", "zk-proof-a", AggregateVerifier.ProofType.ZK, address(anchorStateRegistry)
-        );
-
-        AggregateVerifier gameB =
-            _createGame(ZK_PROVER, "zk-game-b", "zk-proof-b", AggregateVerifier.ProofType.ZK, address(gameA));
-
-        vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
-        assertTrue(gameA.gameOver());
-        assertEq(gameA.proofCount(), 1);
-
-        _nullify(gameB, "zk-nullify-b", AggregateVerifier.ProofType.ZK, "zk-nullify-b");
-
-        assertTrue(zkVerifier.nullified());
-        assertEq(gameA.proofCount(), 1);
-
-        _resolveAndAssertStatus(gameA, GameStatus.IN_PROGRESS);
-        assertEq(gameA.proofCount(), 0);
-        assertEq(gameA.expectedResolution().raw(), type(uint64).max);
-
-        vm.expectRevert(AggregateVerifier.GameNotOver.selector);
-        gameA.resolve();
+        _assertResolveEarlyReturnWhenSharedVerifierNullifiedByAnotherGame(ZK_PROVER, AggregateVerifier.ProofType.ZK);
     }
 
     /// @notice With TEE + ZK, the fast window is 1 day. Another game nullifies the shared ZK verifier; the first
@@ -169,12 +123,12 @@ contract NullifyTest is BaseTest {
         _nullify(gameB, "zk-nullify-dual", AggregateVerifier.ProofType.ZK, "dual-nullify-b");
         assertTrue(zkVerifier.nullified());
 
-        _resolveAndAssertStatus(gameA, GameStatus.IN_PROGRESS);
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
         assertEq(gameA.proofCount(), 1);
         assertEq(gameA.expectedResolution().raw(), block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
 
         vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
-        _resolveAndAssertStatus(gameA, GameStatus.DEFENDER_WINS);
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.DEFENDER_WINS));
         _assertStatus(gameA, GameStatus.DEFENDER_WINS);
     }
 
@@ -220,16 +174,45 @@ contract NullifyTest is BaseTest {
         assertEq(uint8(game.status()), uint8(expectedStatus));
     }
 
-    function _resolveAndAssertStatus(AggregateVerifier game, GameStatus expectedStatus) private {
-        assertEq(uint8(game.resolve()), uint8(expectedStatus));
+    /// @notice When a shared verifier is nullified by another game, `resolve` persists the refutation and returns
+    ///         early `IN_PROGRESS` instead of reverting.
+    function _assertResolveEarlyReturnWhenSharedVerifierNullifiedByAnotherGame(
+        address prover,
+        AggregateVerifier.ProofType proofType
+    )
+        private
+    {
+        AggregateVerifier gameA = _createGame(prover, "game-a", "proof-a", proofType, address(anchorStateRegistry));
+        AggregateVerifier gameB = _createGame(prover, "game-b", "proof-b", proofType, address(gameA));
+
+        vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
+        assertTrue(gameA.gameOver());
+        assertEq(gameA.proofCount(), 1);
+
+        _nullify(gameB, "nullify-proof", proofType, "nullify-claim");
+
+        if (proofType == AggregateVerifier.ProofType.TEE) {
+            assertTrue(teeVerifier.nullified());
+        } else {
+            assertTrue(zkVerifier.nullified());
+        }
+        assertEq(gameA.proofCount(), 1);
+
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
+        assertEq(gameA.proofCount(), 0);
+        assertEq(gameA.expectedResolution().raw(), type(uint64).max);
+
+        vm.expectRevert(AggregateVerifier.GameNotOver.selector);
+        gameA.resolve();
     }
 
     function _claimCreditAfterDelay(AggregateVerifier game) private {
-        uint256 balanceBefore = game.gameCreator().balance;
+        address recipient = game.gameCreator();
+        uint256 balanceBefore = recipient.balance;
         game.claimCredit();
         vm.warp(block.timestamp + DELAYED_WETH_DELAY);
         game.claimCredit();
-        assertEq(game.gameCreator().balance, balanceBefore + INIT_BOND);
+        assertEq(recipient.balance, balanceBefore + INIT_BOND);
         assertEq(delayedWETH.balanceOf(address(game)), 0);
     }
 }
