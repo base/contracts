@@ -61,8 +61,7 @@ contract TEEVerifierTest is Test {
             address(impl),
             makeAddr("proxy-admin"),
             abi.encodeCall(
-                TEEProverRegistry.initialize,
-                (address(this), address(this), new address[](0), TEST_GAME_TYPE)
+                TEEProverRegistry.initialize, (address(this), address(this), new address[](0), TEST_GAME_TYPE)
             )
         );
 
