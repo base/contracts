@@ -41,13 +41,13 @@ contract NullifyTest is BaseTest {
             TEE_PROVER, "tee1", "tee-proof-1", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
         );
 
-        _provideProof(game, ZK_PROVER, _proof("zk-proof-2", AggregateVerifier.ProofType.ZK));
+        _provideProof(game, ZK_PROVER, _generateProof("zk-proof-2", AggregateVerifier.ProofType.ZK));
 
         assertEq(game.expectedResolution().raw(), block.timestamp + game.FAST_FINALIZATION_DELAY());
 
         _nullify(game, "tee-proof-2", AggregateVerifier.ProofType.TEE, "tee2");
 
-        assertEq(uint8(game.status()), uint8(GameStatus.IN_PROGRESS));
+        _assertStatus(game, GameStatus.IN_PROGRESS);
         assertEq(game.bondRecipient(), TEE_PROVER);
         assertEq(game.proofCount(), 1);
         assertEq(game.expectedResolution().raw(), block.timestamp + game.SLOW_FINALIZATION_DELAY());
@@ -80,7 +80,7 @@ contract NullifyTest is BaseTest {
 
         vm.prank(ZK_PROVER);
         game.challenge(
-            _proof("zk-proof", AggregateVerifier.ProofType.ZK), LAST_INTERMEDIATE_ROOT_INDEX, _claim("zk").raw()
+            _generateProof("zk-proof", AggregateVerifier.ProofType.ZK), LAST_INTERMEDIATE_ROOT_INDEX, _claim("zk").raw()
         );
 
         _nullify(game, "zk-proof-2", AggregateVerifier.ProofType.ZK, "tee1");
@@ -114,7 +114,7 @@ contract NullifyTest is BaseTest {
         assertTrue(teeVerifier.nullified());
         assertEq(gameA.proofCount(), 1);
 
-        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
+        _resolveAndAssertStatus(gameA, GameStatus.IN_PROGRESS);
         assertEq(gameA.proofCount(), 0);
         assertEq(gameA.expectedResolution().raw(), type(uint64).max);
 
@@ -122,8 +122,6 @@ contract NullifyTest is BaseTest {
         gameA.resolve();
     }
 
-    /// @notice Same as `testResolveEarlyReturnWhenSharedTeeVerifierNullifiedByAnotherGame` but for the shared ZK
-    /// verifier.
     function testResolveEarlyReturnWhenSharedZkVerifierNullifiedByAnotherGame() public {
         AggregateVerifier gameA = _createGame(
             ZK_PROVER, "zk-game-a", "zk-proof-a", AggregateVerifier.ProofType.ZK, address(anchorStateRegistry)
@@ -141,7 +139,7 @@ contract NullifyTest is BaseTest {
         assertTrue(zkVerifier.nullified());
         assertEq(gameA.proofCount(), 1);
 
-        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
+        _resolveAndAssertStatus(gameA, GameStatus.IN_PROGRESS);
         assertEq(gameA.proofCount(), 0);
         assertEq(gameA.expectedResolution().raw(), type(uint64).max);
 
@@ -157,7 +155,7 @@ contract NullifyTest is BaseTest {
             TEE_PROVER, "dual-a", "tee-dual-a", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
         );
 
-        _provideProof(gameA, ZK_PROVER, _proof("zk-dual-a", AggregateVerifier.ProofType.ZK));
+        _provideProof(gameA, ZK_PROVER, _generateProof("zk-dual-a", AggregateVerifier.ProofType.ZK));
 
         assertEq(gameA.proofCount(), 2);
         assertEq(gameA.expectedResolution().raw(), block.timestamp + gameA.FAST_FINALIZATION_DELAY());
@@ -171,13 +169,13 @@ contract NullifyTest is BaseTest {
         _nullify(gameB, "zk-nullify-dual", AggregateVerifier.ProofType.ZK, "dual-nullify-b");
         assertTrue(zkVerifier.nullified());
 
-        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
+        _resolveAndAssertStatus(gameA, GameStatus.IN_PROGRESS);
         assertEq(gameA.proofCount(), 1);
         assertEq(gameA.expectedResolution().raw(), block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
 
         vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
-        assertEq(uint8(gameA.resolve()), uint8(GameStatus.DEFENDER_WINS));
-        assertEq(uint8(gameA.status()), uint8(GameStatus.DEFENDER_WINS));
+        _resolveAndAssertStatus(gameA, GameStatus.DEFENDER_WINS);
+        _assertStatus(gameA, GameStatus.DEFENDER_WINS);
     }
 
     function _createGame(
@@ -192,16 +190,12 @@ contract NullifyTest is BaseTest {
     {
         currentL2BlockNumber += BLOCK_INTERVAL;
         return _createAggregateVerifierGame(
-            prover, _claim(claimSalt), currentL2BlockNumber, parent, _proof(proofSalt, proofType)
+            prover, _claim(claimSalt), currentL2BlockNumber, parent, _generateProof(proofSalt, proofType)
         );
     }
 
     function _claim(bytes memory salt) private view returns (Claim) {
         return Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, salt)));
-    }
-
-    function _proof(bytes memory salt, AggregateVerifier.ProofType proofType) private view returns (bytes memory) {
-        return _generateProof(salt, proofType);
     }
 
     function _nullify(
@@ -212,14 +206,22 @@ contract NullifyTest is BaseTest {
     )
         private
     {
-        game.nullify(_proof(proofSalt, proofType), LAST_INTERMEDIATE_ROOT_INDEX, _claim(claimSalt).raw());
+        game.nullify(_generateProof(proofSalt, proofType), LAST_INTERMEDIATE_ROOT_INDEX, _claim(claimSalt).raw());
     }
 
     function _assertNullifiedToNoProofs(AggregateVerifier game, address expectedBondRecipient) private view {
-        assertEq(uint8(game.status()), uint8(GameStatus.IN_PROGRESS));
+        _assertStatus(game, GameStatus.IN_PROGRESS);
         assertEq(game.bondRecipient(), expectedBondRecipient);
         assertEq(game.proofCount(), 0);
         assertEq(game.expectedResolution().raw(), type(uint64).max);
+    }
+
+    function _assertStatus(AggregateVerifier game, GameStatus expectedStatus) private view {
+        assertEq(uint8(game.status()), uint8(expectedStatus));
+    }
+
+    function _resolveAndAssertStatus(AggregateVerifier game, GameStatus expectedStatus) private {
+        assertEq(uint8(game.resolve()), uint8(expectedStatus));
     }
 
     function _claimCreditAfterDelay(AggregateVerifier game) private {
