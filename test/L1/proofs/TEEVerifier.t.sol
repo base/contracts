@@ -18,7 +18,6 @@ import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 
-/// @notice Mock AggregateVerifier that returns a fixed TEE_IMAGE_HASH.
 contract MockAggregateVerifierForVerifier {
     bytes32 public immutable TEE_IMAGE_HASH;
 
@@ -27,7 +26,6 @@ contract MockAggregateVerifierForVerifier {
     }
 }
 
-/// @notice Mock DisputeGameFactory that returns a fixed game implementation.
 contract MockDisputeGameFactoryForVerifier {
     IDisputeGame internal immutable _impl;
 
@@ -43,12 +41,11 @@ contract MockDisputeGameFactoryForVerifier {
 contract TEEVerifierTest is Test {
     TEEVerifier public verifier;
     DevTEEProverRegistry public teeProverRegistry;
-    MockAnchorStateRegistry public anchorStateRegistry;
 
     uint256 internal constant SIGNER_PRIVATE_KEY = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
     bytes32 internal constant IMAGE_ID = keccak256("test-image-id");
     bytes32 internal constant TEST_JOURNAL = keccak256("test-journal");
-    uint32 internal constant TEST_GAME_TYPE = 621;
+    GameType internal constant TEST_GAME_TYPE = GameType.wrap(621);
     address internal immutable PROPOSER = makeAddr("proposer");
 
     function setUp() public {
@@ -65,7 +62,7 @@ contract TEEVerifierTest is Test {
             makeAddr("proxy-admin"),
             abi.encodeCall(
                 TEEProverRegistry.initialize,
-                (address(this), address(this), new address[](0), GameType.wrap(TEST_GAME_TYPE))
+                (address(this), address(this), new address[](0), TEST_GAME_TYPE)
             )
         );
 
@@ -73,15 +70,14 @@ contract TEEVerifierTest is Test {
         teeProverRegistry.addDevSigner(signerAddress, IMAGE_ID);
         teeProverRegistry.setProposer(PROPOSER, true);
 
-        anchorStateRegistry = new MockAnchorStateRegistry();
+        MockAnchorStateRegistry anchorStateRegistry = new MockAnchorStateRegistry();
         verifier = new TEEVerifier(
             TEEProverRegistry(address(teeProverRegistry)), IAnchorStateRegistry(address(anchorStateRegistry))
         );
     }
 
     function testVerifyValidSignature() public view {
-        bool result = verifier.verify(_proofFor(PROPOSER, SIGNER_PRIVATE_KEY, TEST_JOURNAL), IMAGE_ID, TEST_JOURNAL);
-        assertTrue(result);
+        assertTrue(verifier.verify(_proofFor(PROPOSER, SIGNER_PRIVATE_KEY, TEST_JOURNAL), IMAGE_ID, TEST_JOURNAL));
     }
 
     function testVerifyFailsWithInvalidSignature() public {
