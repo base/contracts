@@ -55,7 +55,7 @@ contract AggregateVerifierTest is BaseTest {
         vm.expectRevert(GameNotResolved.selector);
         game.claimCredit();
 
-        vm.warp(block.timestamp + _slowFinalizationDelay());
+        vm.warp(block.timestamp + aggregateVerifierImpl.SLOW_FINALIZATION_DELAY());
         game.resolve();
         _assertStatus(game, GameStatus.DEFENDER_WINS);
 
@@ -74,7 +74,7 @@ contract AggregateVerifierTest is BaseTest {
             ZK_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
         );
 
-        vm.warp(block.timestamp + _slowFinalizationDelay());
+        vm.warp(block.timestamp + aggregateVerifierImpl.SLOW_FINALIZATION_DELAY());
         game.resolve();
         _assertStatus(game, GameStatus.DEFENDER_WINS);
 
@@ -97,7 +97,7 @@ contract AggregateVerifierTest is BaseTest {
         _provideProof(game, ZK_PROVER, zkProof);
         assertEq(game.proofCount(), 2);
 
-        vm.warp(block.timestamp + _fastFinalizationDelay());
+        vm.warp(block.timestamp + aggregateVerifierImpl.FAST_FINALIZATION_DELAY());
         game.resolve();
         _assertStatus(game, GameStatus.DEFENDER_WINS);
 
@@ -112,7 +112,7 @@ contract AggregateVerifierTest is BaseTest {
         Claim rootClaim = _advanceL2BlockAndClaim();
         bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
         bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
-        uint256 slowDelay = _slowFinalizationDelay();
+        uint256 slowDelay = aggregateVerifierImpl.SLOW_FINALIZATION_DELAY();
 
         AggregateVerifier game = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), teeProof
@@ -245,7 +245,7 @@ contract AggregateVerifierTest is BaseTest {
         uint256 l1OriginNumber = block.number - 260;
         bytes32 expectedHash = keccak256(abi.encodePacked("mock-blockhash", l1OriginNumber));
 
-        vm.mockCall(_eip2935Contract(), abi.encode(l1OriginNumber), abi.encode(expectedHash));
+        vm.mockCall(aggregateVerifierImpl.EIP2935_CONTRACT(), abi.encode(l1OriginNumber), abi.encode(expectedHash));
 
         bytes memory proofBytes = _teeProof(expectedHash, l1OriginNumber, rootClaim);
 
@@ -255,16 +255,9 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function testDeployWithInvalidBlockIntervals() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, 0, INTERMEDIATE_BLOCK_INTERVAL)
-        );
-        _deployAggregateVerifierWithIntervals(0, INTERMEDIATE_BLOCK_INTERVAL);
-
-        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, BLOCK_INTERVAL, 0));
-        _deployAggregateVerifierWithIntervals(BLOCK_INTERVAL, 0);
-
-        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, 3, 2));
-        _deployAggregateVerifierWithIntervals(3, 2);
+        _expectDeployWithInvalidBlockIntervalsReverts(0, INTERMEDIATE_BLOCK_INTERVAL);
+        _expectDeployWithInvalidBlockIntervalsReverts(BLOCK_INTERVAL, 0);
+        _expectDeployWithInvalidBlockIntervalsReverts(3, 2);
     }
 
     function _advanceL2BlockAndClaim() private returns (Claim rootClaim) {
@@ -365,6 +358,20 @@ contract AggregateVerifierTest is BaseTest {
         return abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, rootClaim.raw());
     }
 
+    function _expectDeployWithInvalidBlockIntervalsReverts(
+        uint256 blockInterval,
+        uint256 intermediateBlockInterval
+    )
+        private
+    {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AggregateVerifier.InvalidBlockInterval.selector, blockInterval, intermediateBlockInterval
+            )
+        );
+        _deployAggregateVerifierWithIntervals(blockInterval, intermediateBlockInterval);
+    }
+
     function _deployAggregateVerifierWithIntervals(
         uint256 blockInterval,
         uint256 intermediateBlockInterval
@@ -387,19 +394,4 @@ contract AggregateVerifierTest is BaseTest {
         );
     }
 
-    function _aggregateVerifierImpl() private view returns (AggregateVerifier) {
-        return aggregateVerifierImpl;
-    }
-
-    function _slowFinalizationDelay() private view returns (uint256) {
-        return _aggregateVerifierImpl().SLOW_FINALIZATION_DELAY();
-    }
-
-    function _fastFinalizationDelay() private view returns (uint256) {
-        return _aggregateVerifierImpl().FAST_FINALIZATION_DELAY();
-    }
-
-    function _eip2935Contract() private view returns (address) {
-        return _aggregateVerifierImpl().EIP2935_CONTRACT();
-    }
 }
