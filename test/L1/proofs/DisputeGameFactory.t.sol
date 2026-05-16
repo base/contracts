@@ -45,7 +45,10 @@ contract DisputeGameFactory_FakeClone_Harness {
 abstract contract DisputeGameFactory_TestInit is CommonTest {
     uint256 internal constant DEFAULT_INIT_BOND = 0.08 ether;
     uint256 internal constant L2_CHAIN_ID = 111;
+    uint256 internal constant AGGREGATE_BLOCK_INTERVAL = 100;
+    uint256 internal constant AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL = 10;
     uint32 internal constant MAX_GAME_TYPE = 8;
+    address internal constant NON_OWNER = address(0xBEEF);
 
     DisputeGameFactory_FakeClone_Harness fakeClone;
 
@@ -72,6 +75,34 @@ abstract contract DisputeGameFactory_TestInit is CommonTest {
         disputeGameFactory.setImplementation(_gameType, IDisputeGame(_gameImpl));
         disputeGameFactory.setInitBond(_gameType, _initBond);
         vm.stopPrank();
+    }
+
+    function _expectOwnableRevertFrom(address _caller) internal {
+        vm.prank(_caller);
+        vm.expectRevert("Ownable: caller is not the owner");
+    }
+
+    function _assertCreatedGame(
+        GameType _gameType,
+        Claim _rootClaim,
+        bytes memory _extraData,
+        IDisputeGame _proxy,
+        uint256 _index
+    )
+        internal
+        view
+    {
+        (IDisputeGame game, Timestamp timestamp) = disputeGameFactory.games(_gameType, _rootClaim, _extraData);
+
+        assertEq(address(game), address(_proxy));
+        assertEq(Timestamp.unwrap(timestamp), block.timestamp);
+        assertEq(disputeGameFactory.gameCount(), _index + 1);
+
+        (GameType gameType, Timestamp timestampAtIndex, IDisputeGame gameAtIndex) =
+            disputeGameFactory.gameAtIndex(_index);
+        assertEq(GameType.unwrap(gameType), GameType.unwrap(_gameType));
+        assertEq(address(gameAtIndex), address(_proxy));
+        assertEq(Timestamp.unwrap(timestampAtIndex), block.timestamp);
     }
 }
 
@@ -137,16 +168,7 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         emit DisputeGameCreated(address(0), gt, rootClaim);
         IDisputeGame proxy = disputeGameFactory.create{ value: _value }(gt, rootClaim, extraData);
 
-        (IDisputeGame game, Timestamp timestamp) = disputeGameFactory.games(gt, rootClaim, extraData);
-
-        assertEq(address(game), address(proxy));
-        assertEq(Timestamp.unwrap(timestamp), block.timestamp);
-        assertEq(disputeGameFactory.gameCount(), gameCountBefore + 1);
-
-        (, Timestamp timestamp2, IDisputeGame game2) = disputeGameFactory.gameAtIndex(gameCountBefore);
-        assertEq(address(game2), address(proxy));
-        assertEq(Timestamp.unwrap(timestamp2), block.timestamp);
-
+        _assertCreatedGame(gt, rootClaim, extraData, proxy, gameCountBefore);
         assertEq(address(proxy).balance, _value);
     }
 
@@ -169,8 +191,8 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
     /// @notice Tests that the `create` function reverts when there is no implementation set for
     ///         the given `GameType`.
     function testFuzz_create_noImpl_reverts(uint32 gameType, Claim rootClaim, bytes calldata extraData) public {
-        // Game type 0 is configured by the deploy script, so choose an out-of-range type.
-        GameType gt = GameType.wrap(uint32(bound(gameType, MAX_GAME_TYPE + 1, type(uint32).max)));
+        GameType gt = GameType.wrap(gameType);
+        vm.assume(address(disputeGameFactory.gameImpls(gt)) == address(0));
 
         vm.expectRevert(abi.encodeWithSelector(IDisputeGameFactory.NoImplementation.selector, gt));
         disputeGameFactory.create(gt, rootClaim, extraData);
@@ -186,11 +208,9 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
 
         vm.expectEmit(false, true, true, false);
         emit DisputeGameCreated(address(0), gt, rootClaim);
+        uint256 gameCountBefore = disputeGameFactory.gameCount();
         IDisputeGame proxy = disputeGameFactory.create{ value: bondAmount }(gt, rootClaim, extraData);
-
-        (IDisputeGame game, Timestamp timestamp) = disputeGameFactory.games(gt, rootClaim, extraData);
-        assertEq(address(game), address(proxy));
-        assertEq(Timestamp.unwrap(timestamp), block.timestamp);
+        _assertCreatedGame(gt, rootClaim, extraData, proxy, gameCountBefore);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -213,8 +233,8 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
             AggregateVerifier.ZkHashes(bytes32(uint256(2)), bytes32(uint256(3))),
             bytes32(uint256(4)),
             L2_CHAIN_ID,
-            100,
-            10
+            AGGREGATE_BLOCK_INTERVAL,
+            AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL
         );
         _setGame(address(gameImpl), GameTypes.AGGREGATE_VERIFIER);
 
@@ -222,12 +242,15 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         Proposal memory startingRoot = anchorStateRegistry.getStartingAnchorRoot();
         bytes memory intermediateRoots;
         for (uint256 i = 1; i < gameImpl.intermediateOutputRootsCount(); i++) {
-            intermediateRoots =
-                abi.encodePacked(intermediateRoots, keccak256(abi.encode(startingRoot.l2SequenceNumber + 10 * i)));
+            intermediateRoots = abi.encodePacked(
+                intermediateRoots,
+                keccak256(abi.encode(startingRoot.l2SequenceNumber + AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL * i))
+            );
         }
         intermediateRoots = abi.encodePacked(intermediateRoots, rootClaim.raw());
-        bytes memory extraData =
-            abi.encodePacked(startingRoot.l2SequenceNumber + 100, address(anchorStateRegistry), intermediateRoots);
+        bytes memory extraData = abi.encodePacked(
+            startingRoot.l2SequenceNumber + AGGREGATE_BLOCK_INTERVAL, address(anchorStateRegistry), intermediateRoots
+        );
         bytes memory proof = abi.encodePacked(
             uint8(AggregateVerifier.ProofType.TEE), blockhash(block.number - 1), block.number - 1, bytes32(0)
         );
@@ -251,13 +274,13 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         assertEq(gameV2.extraData(), extraData);
         assertEq(gameV2.L2_CHAIN_ID(), L2_CHAIN_ID);
         assertEq(address(gameV2.gameCreator()), address(this));
-        assertEq(gameV2.l2SequenceNumber(), startingRoot.l2SequenceNumber + 100);
+        assertEq(gameV2.l2SequenceNumber(), startingRoot.l2SequenceNumber + AGGREGATE_BLOCK_INTERVAL);
         assertEq(gameV2.parentAddress(), address(anchorStateRegistry));
         assertEq(address(gameV2.DELAYED_WETH()), address(delayedWeth));
         assertEq(address(gameV2.anchorStateRegistry()), address(anchorStateRegistry));
         assertEq(GameType.unwrap(gameV2.gameType()), GameType.unwrap(GameTypes.AGGREGATE_VERIFIER));
-        assertEq(gameV2.BLOCK_INTERVAL(), 100);
-        assertEq(gameV2.INTERMEDIATE_BLOCK_INTERVAL(), 10);
+        assertEq(gameV2.BLOCK_INTERVAL(), AGGREGATE_BLOCK_INTERVAL);
+        assertEq(gameV2.INTERMEDIATE_BLOCK_INTERVAL(), AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL);
     }
 }
 
@@ -277,8 +300,7 @@ contract DisputeGameFactory_SetImplementation_Test is DisputeGameFactory_TestIni
 
     /// @notice Tests that the `setImplementation` function reverts when called by a non-owner.
     function test_setImplementation_notOwner_reverts() public {
-        vm.prank(address(0));
-        vm.expectRevert("Ownable: caller is not the owner");
+        _expectOwnableRevertFrom(NON_OWNER);
         disputeGameFactory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(1)));
     }
 
@@ -310,8 +332,7 @@ contract DisputeGameFactory_SetImplementation_Test is DisputeGameFactory_TestIni
     function test_setImplementationArgs_notOwner_reverts() public {
         bytes memory args = abi.encode(uint256(123), address(0xdead));
 
-        vm.prank(address(0));
-        vm.expectRevert("Ownable: caller is not the owner");
+        _expectOwnableRevertFrom(NON_OWNER);
         disputeGameFactory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(1)), args);
     }
 }
@@ -339,8 +360,7 @@ contract DisputeGameFactory_SetInitBond_Test is DisputeGameFactory_TestInit {
 
     /// @notice Tests that the `setInitBond` function reverts when called by a non-owner.
     function test_setInitBond_notOwner_reverts() public {
-        vm.prank(address(0));
-        vm.expectRevert("Ownable: caller is not the owner");
+        _expectOwnableRevertFrom(NON_OWNER);
         disputeGameFactory.setInitBond(GameTypes.AGGREGATE_VERIFIER, 1 ether);
     }
 }
@@ -363,6 +383,9 @@ contract DisputeGameFactory_GetGameUUID_Test is DisputeGameFactory_TestInit {
 /// @title DisputeGameFactory_FindLatestGames_Test
 /// @notice Tests the `findLatestGames` function of the `DisputeGameFactory` contract.
 contract DisputeGameFactory_FindLatestGames_Test is DisputeGameFactory_TestInit {
+    GameType internal constant FIND_LATEST_SEARCH_GAME_TYPE = GameType.wrap(type(uint32).max);
+    GameType internal constant FIND_LATEST_OTHER_GAME_TYPE = GameType.wrap(type(uint32).max - 1);
+
     function setUp() public override {
         super.setUp();
 
@@ -390,63 +413,36 @@ contract DisputeGameFactory_FindLatestGames_Test is DisputeGameFactory_TestInit 
 
         uint256 gameCount = disputeGameFactory.gameCount();
 
-        IDisputeGameFactory.GameSearchResult[] memory games;
-
         uint256 start = gameCount - 1;
 
-        games = disputeGameFactory.findLatestGames(GameType.wrap(1), start, 1);
-        assertEq(games.length, 1);
-
-        assertEq(games[0].index, start);
-        (GameType gameType, Timestamp createdAt,) = games[0].metadata.unpack();
-        assertEq(gameType.raw(), 1);
-        assertEq(createdAt.raw(), block.timestamp);
-
-        games = disputeGameFactory.findLatestGames(GameType.wrap(0), start, 1);
-        assertEq(games.length, 1);
-
-        assertEq(games[0].index, start - 1);
-        (gameType, createdAt,) = games[0].metadata.unpack();
-        assertEq(gameType.raw(), 0);
-        assertEq(createdAt.raw(), block.timestamp);
-
-        games = disputeGameFactory.findLatestGames(GameType.wrap(2), start, 1);
-        assertEq(games.length, 1);
-
-        assertEq(games[0].index, start - 2);
-        (gameType, createdAt,) = games[0].metadata.unpack();
-        assertEq(gameType.raw(), 2);
-        assertEq(createdAt.raw(), block.timestamp);
+        _assertLatestGameResult(GameType.wrap(1), start, start);
+        _assertLatestGameResult(GameType.wrap(0), start, start - 1);
+        _assertLatestGameResult(GameType.wrap(2), start, start - 2);
     }
 
     /// @notice Tests that `findLatestGames` returns the correct games, if there are less than `_n`
     ///         games of the given type available.
     function test_findLatestGames_lessThanNAvailable_succeeds() public {
-        // Fork tests inherit existing games, which would make this bounded scan unnecessarily large.
-        if (isForkTest()) {
-            vm.store(
-                address(disputeGameFactory),
-                bytes32(ForgeArtifacts.getSlot("DisputeGameFactory", "_disputeGameList").slot),
-                bytes32(0)
-            );
-        }
+        _setGame(address(fakeClone), FIND_LATEST_SEARCH_GAME_TYPE, 0);
+        _setGame(address(fakeClone), FIND_LATEST_OTHER_GAME_TYPE, 0);
 
-        disputeGameFactory.create(GameType.wrap(1), Claim.wrap(bytes32(0)), abi.encode(0));
-        disputeGameFactory.create(GameType.wrap(1), Claim.wrap(bytes32(uint256(1))), abi.encode(1));
+        uint256 firstSearchGameIndex = disputeGameFactory.gameCount();
+        disputeGameFactory.create(FIND_LATEST_SEARCH_GAME_TYPE, Claim.wrap(bytes32(0)), abi.encode(0));
+        disputeGameFactory.create(FIND_LATEST_SEARCH_GAME_TYPE, Claim.wrap(bytes32(uint256(1))), abi.encode(1));
         for (uint256 i; i < 1 << 3; i++) {
-            disputeGameFactory.create(GameType.wrap(0), Claim.wrap(bytes32(i)), abi.encode(i));
+            disputeGameFactory.create(FIND_LATEST_OTHER_GAME_TYPE, Claim.wrap(bytes32(i)), abi.encode(i));
         }
 
         uint256 gameCount = disputeGameFactory.gameCount();
 
         IDisputeGameFactory.GameSearchResult[] memory games;
-        games = disputeGameFactory.findLatestGames(GameType.wrap(2), gameCount - 1, 5);
+        games = disputeGameFactory.findLatestGames(GameType.wrap(type(uint32).max - 2), gameCount - 1, 5);
         assertEq(games.length, 0);
 
-        games = disputeGameFactory.findLatestGames(GameType.wrap(1), gameCount - 1, 5);
+        games = disputeGameFactory.findLatestGames(FIND_LATEST_SEARCH_GAME_TYPE, gameCount - 1, 5);
         assertEq(games.length, 2);
-        assertEq(games[0].index, 1);
-        assertEq(games[1].index, 0);
+        assertEq(games[0].index, firstSearchGameIndex + 1);
+        assertEq(games[1].index, firstSearchGameIndex);
     }
 
     /// @notice Tests that the expected number of games are returned when `findLatestGames` is
@@ -472,6 +468,16 @@ contract DisputeGameFactory_FindLatestGames_Test is DisputeGameFactory_TestInit 
             disputeGameFactory.findLatestGames(GameType.wrap(0), start, _n);
         assertEq(games.length, _n);
     }
+
+    function _assertLatestGameResult(GameType _gameType, uint256 _start, uint256 _expectedIndex) internal view {
+        IDisputeGameFactory.GameSearchResult[] memory games = disputeGameFactory.findLatestGames(_gameType, _start, 1);
+        assertEq(games.length, 1);
+
+        assertEq(games[0].index, _expectedIndex);
+        (GameType gameType, Timestamp createdAt,) = games[0].metadata.unpack();
+        assertEq(GameType.unwrap(gameType), GameType.unwrap(_gameType));
+        assertEq(Timestamp.unwrap(createdAt), block.timestamp);
+    }
 }
 
 /// @title DisputeGameFactory_Uncategorized_Test
@@ -491,8 +497,7 @@ contract DisputeGameFactory_Uncategorized_Test is DisputeGameFactory_TestInit {
 
     /// @notice Tests that the `transferOwnership` function reverts when called by a non-owner.
     function test_transferOwnership_notOwner_reverts() public {
-        vm.prank(address(0));
-        vm.expectRevert("Ownable: caller is not the owner");
+        _expectOwnableRevertFrom(NON_OWNER);
         disputeGameFactory.transferOwnership(address(1));
     }
 }
