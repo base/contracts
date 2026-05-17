@@ -5,7 +5,7 @@ pragma solidity 0.8.15;
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { Reverter, GasBurner } from "test/mocks/Callers.sol";
 import { stdError } from "lib/forge-std/src/StdError.sol";
-import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
+import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
 
 // Libraries
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
@@ -19,29 +19,10 @@ import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
-/// @title L1CrossDomainMessenger_Encoding_Harness
-/// @notice A harness contract for testing internal functions of the Encoding library.
-contract L1CrossDomainMessenger_Encoding_Harness {
-    function encodeCrossDomainMessage(
-        uint256 nonce,
-        address sender,
-        address target,
-        uint256 value,
-        uint256 gasLimit,
-        bytes memory data
-    )
-        external
-        pure
-        returns (bytes memory)
-    {
-        return Encoding.encodeCrossDomainMessage(nonce, sender, target, value, gasLimit, data);
-    }
-}
-
 /// @title L1CrossDomainMessenger_TestInit
 /// @notice Reusable test initialization for L1CrossDomainMessenger tests.
 abstract contract L1CrossDomainMessenger_TestInit is CommonTest {
-    address internal recipient = address(0xabbaacdc);
+    address internal constant recipient = address(0xabbaacdc);
 }
 
 /// @title L1CrossDomainMessenger_Constructor_Test
@@ -67,21 +48,20 @@ contract L1CrossDomainMessenger_Constructor_Test is L1CrossDomainMessenger_TestI
 /// @title L1CrossDomainMessenger_Initialize_Test
 /// @notice Tests for the `initialize` function of the L1CrossDomainMessenger.
 contract L1CrossDomainMessenger_Initialize_Test is L1CrossDomainMessenger_TestInit {
-    uint256 internal initializedSlotIndex;
+    StorageSlot internal initializedSlot;
 
     function setUp() public virtual override {
         super.setUp();
-        initializedSlotIndex = ForgeArtifacts.getSlot("L1CrossDomainMessenger", "_initialized").slot;
+        initializedSlot = ForgeArtifacts.getSlot("L1CrossDomainMessenger", "_initialized");
     }
 
     function _resetInitialized() internal {
-        vm.store(address(l1CrossDomainMessenger), bytes32(initializedSlotIndex), bytes32(0));
+        vm.store(address(l1CrossDomainMessenger), bytes32(initializedSlot.slot), bytes32(0));
     }
 
     function _initializedValue() internal view returns (uint8) {
-        bytes32 slotVal = vm.load(address(l1CrossDomainMessenger), bytes32(initializedSlotIndex));
-        // L1CrossDomainMessenger stores _initialized at byte offset 20.
-        return uint8((uint256(slotVal) >> 20 * 8) & 0xFF);
+        bytes32 slotVal = vm.load(address(l1CrossDomainMessenger), bytes32(initializedSlot.slot));
+        return uint8((uint256(slotVal) >> (initializedSlot.offset * 8)) & 0xFF);
     }
 
     /// @notice Tests that the proxy is initialized correctly.
@@ -307,7 +287,9 @@ contract L1CrossDomainMessenger_SendMessage_Test is L1CrossDomainMessenger_TestI
 ///         but are testing functionality of the CrossDomainMessenger contract that is inherited
 ///         from.
 contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_TestInit {
-    uint256 internal senderSlotIndex;
+    StorageSlot internal senderSlot;
+    StorageSlot internal successfulMessagesSlot;
+    StorageSlot internal failedMessagesSlot;
 
     bool reentrancyAttacked;
     uint256 constant reentrancyMessageValue = 50;
@@ -318,7 +300,9 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
 
     function setUp() public virtual override {
         super.setUp();
-        senderSlotIndex = ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender").slot;
+        senderSlot = ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender");
+        successfulMessagesSlot = ForgeArtifacts.getSlot("L1CrossDomainMessenger", "successfulMessages");
+        failedMessagesSlot = ForgeArtifacts.getSlot("L1CrossDomainMessenger", "failedMessages");
 
         reentrancyTarget = address(this);
         reentrancySender = Predeploys.L2_CROSS_DOMAIN_MESSENGER;
@@ -334,7 +318,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
     }
 
     function _setPortalL2Sender(address _sender) internal {
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(_sender)));
+        vm.store(address(optimismPortal2), bytes32(senderSlot.slot), bytes32(abi.encode(_sender)));
     }
 
     function _assertMessageStatus(bytes32 _hash, bool _successful, bool _failed) internal view {
@@ -616,25 +600,29 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
             _message
         );
 
-        // Count the number of non-zero bytes in the message.
-        uint256 zeroBytesInCalldata = 0;
+        // Count calldata bytes so the EIP-7623 floor can be checked against actual encoded data.
         uint256 nonzeroBytesInCalldata = 0;
         for (uint256 i = 0; i < encoded.length; i++) {
             if (encoded[i] != bytes1(0)) {
                 nonzeroBytesInCalldata++;
-            } else {
-                zeroBytesInCalldata++;
             }
         }
 
+        uint256 zeroBytesInCalldata = encoded.length - nonzeroBytesInCalldata;
+        uint256 calldataTokens = zeroBytesInCalldata + nonzeroBytesInCalldata * 4;
+        uint256 floorCost = l1CrossDomainMessenger.TX_BASE_GAS() + calldataTokens
+            * (l1CrossDomainMessenger.FLOOR_CALLDATA_OVERHEAD() / 4);
+
         // Base gas must always be sufficient to cover the floor cost from EIP-7623.
-        assertGt(baseGas, 21000 + ((zeroBytesInCalldata + nonzeroBytesInCalldata * 4) * 10));
+        assertGt(baseGas, floorCost);
 
         // Actual gas on L2 will be the base gas minus the intrinsic gas cost. Note that even after
         // EIP-7623, we still deduct 21k + 16 gas per calldata token from the gas limit before
         // execution happens. After execution, if the message didn't spend enough in execution gas,
         // the EVM will floor the cost of the transaction to 21k + 40 gas per calldata token.
-        uint256 gasSupplied = baseGas - (21000 + ((zeroBytesInCalldata + nonzeroBytesInCalldata * 4) * 4));
+        uint256 intrinsicCost = l1CrossDomainMessenger.TX_BASE_GAS() + calldataTokens
+            * (l1CrossDomainMessenger.MIN_GAS_CALLDATA_OVERHEAD() / 4);
+        uint256 gasSupplied = baseGas - intrinsicCost;
 
         // We'll trigger the L2CrossDomainMessenger as if we're the L1CrossDomainMessenger
         address caller = AddressAliasHelper.applyL1ToL2Alias(address(l1CrossDomainMessenger));
@@ -690,28 +678,13 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         bytes memory _message
     )
         external
+        view
     {
-        L1CrossDomainMessenger_Encoding_Harness encoding = new L1CrossDomainMessenger_Encoding_Harness();
-
-        // Make sure that unexpected nonces aren't being used right now.
-        // Prevents people from forgetting to update this test if a new version is ever used.
-        if (_version > 2) {
-            vm.expectRevert("Encoding: unknown cross domain message version");
-            encoding.encodeCrossDomainMessage(
-                Encoding.encodeVersionedNonce({ _nonce: 0, _version: _version }),
-                _sender,
-                _target,
-                _value,
-                _minGasLimit,
-                _message
-            );
-        }
-
         // Clamp the version to 0 or 1.
         _version = _version % 2;
 
         // Encode the message.
-        bytes memory encoded = encoding.encodeCrossDomainMessage(
+        bytes memory encoded = Encoding.encodeCrossDomainMessage(
             Encoding.encodeVersionedNonce({ _nonce: _nonce, _version: _version }),
             _sender,
             _target,
@@ -861,9 +834,8 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
 
         _setPortalL2Sender(sender);
         // Mark legacy message as already relayed.
-        uint256 successfulMessagesSlot = 203;
         bytes32 oldHash = Hashing.hashCrossDomainMessageV0(target, sender, hex"1111", 0);
-        bytes32 slot = keccak256(abi.encode(oldHash, successfulMessagesSlot));
+        bytes32 slot = keccak256(abi.encode(oldHash, successfulMessagesSlot.slot));
         vm.store(address(l1CrossDomainMessenger), slot, bytes32(uint256(1)));
 
         // Expect revert.
@@ -1124,7 +1096,11 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
 
         // A requisite for the attack is that the message has already been attempted and written
         // to the failedMessages mapping, so that it can be replayed.
-        vm.store(address(l1CrossDomainMessenger), keccak256(abi.encode(reentrancyHash, 206)), bytes32(uint256(1)));
+        vm.store(
+            address(l1CrossDomainMessenger),
+            keccak256(abi.encode(reentrancyHash, failedMessagesSlot.slot)),
+            bytes32(uint256(1))
+        );
         assertTrue(l1CrossDomainMessenger.failedMessages(reentrancyHash));
 
         vm.expectEmit(address(l1CrossDomainMessenger));
