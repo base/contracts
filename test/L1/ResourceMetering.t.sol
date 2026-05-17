@@ -1,32 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-// Testing
-import { Test } from "lib/forge-std/src/Test.sol";
-
-// Contracts
+import { Test, stdError } from "lib/forge-std/src/Test.sol";
 import { ResourceMetering } from "src/L1/ResourceMetering.sol";
-
-// Libraries
 import { Constants } from "src/libraries/Constants.sol";
-
-// Interfaces
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
+
+function defaultResourceConfig() pure returns (ResourceMetering.ResourceConfig memory) {
+    IResourceMetering.ResourceConfig memory rcfg = Constants.DEFAULT_RESOURCE_CONFIG();
+    return ResourceMetering.ResourceConfig({
+        maxResourceLimit: rcfg.maxResourceLimit,
+        elasticityMultiplier: rcfg.elasticityMultiplier,
+        baseFeeMaxChangeDenominator: rcfg.baseFeeMaxChangeDenominator,
+        minimumBaseFee: rcfg.minimumBaseFee,
+        systemTxMaxGas: rcfg.systemTxMaxGas,
+        maximumBaseFee: rcfg.maximumBaseFee
+    });
+}
 
 contract MeterUser is ResourceMetering {
     ResourceMetering.ResourceConfig public innerConfig;
 
     constructor() {
         initialize();
-        IResourceMetering.ResourceConfig memory rcfg = Constants.DEFAULT_RESOURCE_CONFIG();
-        innerConfig = ResourceMetering.ResourceConfig({
-            maxResourceLimit: rcfg.maxResourceLimit,
-            elasticityMultiplier: rcfg.elasticityMultiplier,
-            baseFeeMaxChangeDenominator: rcfg.baseFeeMaxChangeDenominator,
-            minimumBaseFee: rcfg.minimumBaseFee,
-            systemTxMaxGas: rcfg.systemTxMaxGas,
-            maximumBaseFee: rcfg.maximumBaseFee
-        });
+        innerConfig = defaultResourceConfig();
     }
 
     function initialize() public initializer {
@@ -58,9 +55,6 @@ contract MeterUser is ResourceMetering {
 /// @notice A simple wrapper around `ResourceMetering` that allows the initial params to be set in
 ///         the constructor.
 contract CustomMeterUser is ResourceMetering {
-    uint256 public startGas;
-    uint256 public endGas;
-
     constructor(uint128 _prevBaseFee, uint64 _prevBoughtGas, uint64 _prevBlockNum) {
         params = ResourceMetering.ResourceParams({
             prevBaseFee: _prevBaseFee, prevBoughtGas: _prevBoughtGas, prevBlockNum: _prevBlockNum
@@ -68,15 +62,7 @@ contract CustomMeterUser is ResourceMetering {
     }
 
     function _resourceConfig() internal pure override returns (ResourceMetering.ResourceConfig memory) {
-        IResourceMetering.ResourceConfig memory rcfg = Constants.DEFAULT_RESOURCE_CONFIG();
-        return ResourceMetering.ResourceConfig({
-            maxResourceLimit: rcfg.maxResourceLimit,
-            elasticityMultiplier: rcfg.elasticityMultiplier,
-            baseFeeMaxChangeDenominator: rcfg.baseFeeMaxChangeDenominator,
-            minimumBaseFee: rcfg.minimumBaseFee,
-            systemTxMaxGas: rcfg.systemTxMaxGas,
-            maximumBaseFee: rcfg.maximumBaseFee
-        });
+        return defaultResourceConfig();
     }
 
     function use(uint64 _amount) public returns (uint256) {
@@ -135,7 +121,7 @@ contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
         meter.use(uint64(target));
         (uint128 prevBaseFee, uint64 prevBoughtGas, uint64 prevBlockNum) = meter.params();
 
-        assertEq(prevBaseFee, 1000000000);
+        assertEq(prevBaseFee, rcfg.minimumBaseFee);
         assertEq(prevBoughtGas, target);
         assertEq(prevBlockNum, initialBlockNum);
     }
@@ -143,13 +129,12 @@ contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
     /// @notice Tests that the meter params are set correctly for the maximum gas delta.
     function test_metered_useMax_succeeds() external {
         ResourceMetering.ResourceConfig memory rcfg = meter.resourceConfig();
-        uint64 target = uint64(rcfg.maxResourceLimit) / uint64(rcfg.elasticityMultiplier);
-        uint64 elasticityMultiplier = uint64(rcfg.elasticityMultiplier);
+        uint64 maxResourceLimit = uint64(rcfg.maxResourceLimit);
 
-        meter.use(target * elasticityMultiplier);
+        meter.use(maxResourceLimit);
 
         (, uint64 prevBoughtGas,) = meter.params();
-        assertEq(prevBoughtGas, target * elasticityMultiplier);
+        assertEq(prevBoughtGas, maxResourceLimit);
 
         vm.roll(initialBlockNum + 1);
         meter.use(0);
@@ -163,14 +148,13 @@ contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
     ///         computed as 0.
     function test_metered_denominatorEq1_reverts() external {
         ResourceMetering.ResourceConfig memory rcfg = meter.resourceConfig();
-        uint64 target = uint64(rcfg.maxResourceLimit) / uint64(rcfg.elasticityMultiplier);
-        uint64 elasticityMultiplier = uint64(rcfg.elasticityMultiplier);
+        uint64 maxResourceLimit = uint64(rcfg.maxResourceLimit);
         rcfg.baseFeeMaxChangeDenominator = 1;
         meter.setParams(rcfg);
-        meter.use(target * elasticityMultiplier);
+        meter.use(maxResourceLimit);
 
         (, uint64 prevBoughtGas,) = meter.params();
-        assertEq(prevBoughtGas, target * elasticityMultiplier);
+        assertEq(prevBoughtGas, maxResourceLimit);
 
         vm.roll(initialBlockNum + 2);
 
@@ -181,11 +165,9 @@ contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
     /// @notice Tests that the metered modifier reverts if the value is greater than allowed.
     function test_metered_useMoreThanMax_reverts() external {
         ResourceMetering.ResourceConfig memory rcfg = meter.resourceConfig();
-        uint64 target = uint64(rcfg.maxResourceLimit) / uint64(rcfg.elasticityMultiplier);
-        uint64 elasticityMultiplier = uint64(rcfg.elasticityMultiplier);
 
         vm.expectRevert(ResourceMetering.OutOfGas.selector);
-        meter.use(target * elasticityMultiplier + 1);
+        meter.use(uint64(rcfg.maxResourceLimit) + 1);
     }
 
     /// @notice Tests that resource metering can handle large gaps between deposits.
@@ -195,10 +177,8 @@ contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
         _blockDiff = uint256(bound(_blockDiff, 0, 433576281058164217753225238677900874458690));
 
         ResourceMetering.ResourceConfig memory rcfg = meter.resourceConfig();
-        uint64 target = uint64(rcfg.maxResourceLimit) / uint64(rcfg.elasticityMultiplier);
-        uint64 elasticityMultiplier = uint64(rcfg.elasticityMultiplier);
 
-        _amount = uint64(bound(_amount, 0, target * elasticityMultiplier));
+        _amount = uint64(bound(_amount, 0, rcfg.maxResourceLimit));
 
         vm.roll(initialBlockNum + _blockDiff);
         meter.use(_amount);
@@ -298,35 +278,7 @@ contract ResourceMetering_ResourceMeteringInit_Test is ResourceMetering_TestInit
 ///         information about how much gas is used and how expensive it is in USD terms to purchase
 ///         the deposit gas.
 contract ArtifactResourceMetering_Metered_Test is Test {
-    uint128 internal minimumBaseFee;
-    uint128 internal maximumBaseFee;
-    uint64 internal maxResourceLimit;
-    uint64 internal targetResourceLimit;
-
     string internal outfile;
-
-    // keccak256(abi.encodeWithSignature("Error(string)", "ResourceMetering: cannot buy more gas
-    // than available gas limit"))
-    bytes32 internal cannotBuyMoreGas = 0x84edc668cfd5e050b8999f43ff87a1faaa93e5f935b20bc1dd4d3ff157ccf429;
-    // keccak256(abi.encodeWithSignature("Panic(uint256)", 0x11))
-    bytes32 internal overflowErr = 0x1ca389f2c8264faa4377de9ce8e14d6263ef29c68044a9272d405761bab2db27;
-    // keccak256(hex"")
-    bytes32 internal emptyReturnData = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
-
-    /// @notice Sets up the tests with constants from the ResourceMetering contract.
-    function setUp() public {
-        vm.roll(1_000_000);
-
-        MeterUser base = new MeterUser();
-        ResourceMetering.ResourceConfig memory rcfg = base.resourceConfig();
-        minimumBaseFee = uint128(rcfg.minimumBaseFee);
-        maximumBaseFee = rcfg.maximumBaseFee;
-        maxResourceLimit = uint64(rcfg.maxResourceLimit);
-        targetResourceLimit = uint64(rcfg.maxResourceLimit) / uint64(rcfg.elasticityMultiplier);
-
-        outfile = string.concat(vm.projectRoot(), "/.resource-metering.csv");
-        try vm.removeFile(outfile) { } catch { }
-    }
 
     /// @notice Generates a CSV file. No more than the L1 block gas limit should be supplied to the
     ///         `meter` function to avoid long execution time. This test is skipped because there
@@ -335,6 +287,16 @@ contract ArtifactResourceMetering_Metered_Test is Test {
     ///         that the gas usage needs to be analyzed, the skip may be removed.
     function test_meter_generateArtifact_succeeds() external {
         vm.skip({ skipTest: true });
+
+        vm.roll(1_000_000);
+
+        ResourceMetering.ResourceConfig memory rcfg = defaultResourceConfig();
+        uint128 minimumBaseFee = uint128(rcfg.minimumBaseFee);
+        uint128 maximumBaseFee = rcfg.maximumBaseFee;
+        uint64 maxResourceLimit = uint64(rcfg.maxResourceLimit);
+        uint64 targetResourceLimit = uint64(rcfg.maxResourceLimit) / uint64(rcfg.elasticityMultiplier);
+        outfile = string.concat(vm.projectRoot(), "/.resource-metering.csv");
+        try vm.removeFile(outfile) { } catch { }
 
         vm.writeLine(
             outfile,
@@ -348,10 +310,6 @@ contract ArtifactResourceMetering_Metered_Test is Test {
         prevBaseFees[2] = uint128(50 gwei);
         prevBaseFees[3] = uint128(100 gwei);
         prevBaseFees[4] = uint128(200 gwei);
-
-        // prevBoughtGas value in ResourceParams
-        uint64[] memory prevBoughtGases = new uint64[](1);
-        prevBoughtGases[0] = uint64(0);
 
         // prevBlockNum diff, simulates blocks with no deposits when non zero
         uint64[] memory prevBlockNumDiffs = new uint64[](2);
@@ -378,79 +336,80 @@ contract ArtifactResourceMetering_Metered_Test is Test {
 
         // Iterate over all of the test values and run a test
         for (uint256 i; i < prevBaseFees.length; i++) {
-            for (uint256 j; j < prevBoughtGases.length; j++) {
-                for (uint256 k; k < prevBlockNumDiffs.length; k++) {
-                    for (uint256 l; l < requestedGases.length; l++) {
-                        for (uint256 m; m < l1BaseFees.length; m++) {
-                            for (uint256 n; n < ethPrices.length; n++) {
-                                uint256 snapshotId = vm.snapshot();
+            for (uint256 k; k < prevBlockNumDiffs.length; k++) {
+                for (uint256 l; l < requestedGases.length; l++) {
+                    for (uint256 m; m < l1BaseFees.length; m++) {
+                        for (uint256 n; n < ethPrices.length; n++) {
+                            uint256 snapshotId = vm.snapshot();
 
-                                uint128 prevBaseFee = prevBaseFees[i];
-                                uint64 prevBoughtGas = prevBoughtGases[j];
-                                uint64 prevBlockNumDiff = prevBlockNumDiffs[k];
-                                uint64 requestedGas = requestedGases[l];
-                                uint256 l1BaseFee = l1BaseFees[m];
-                                uint256 ethPrice = ethPrices[n];
-                                string memory result = "success";
+                            uint128 prevBaseFee = prevBaseFees[i];
+                            uint64 prevBoughtGas = 0;
+                            uint64 prevBlockNumDiff = prevBlockNumDiffs[k];
+                            uint64 requestedGas = requestedGases[l];
+                            uint256 l1BaseFee = l1BaseFees[m];
+                            uint256 ethPrice = ethPrices[n];
+                            string memory result = "success";
 
-                                vm.fee(l1BaseFee);
+                            vm.fee(l1BaseFee);
 
-                                CustomMeterUser meter = new CustomMeterUser({
-                                    _prevBaseFee: prevBaseFee,
-                                    _prevBoughtGas: prevBoughtGas,
-                                    _prevBlockNum: uint64(block.number)
-                                });
+                            CustomMeterUser meter = new CustomMeterUser({
+                                _prevBaseFee: prevBaseFee,
+                                _prevBoughtGas: prevBoughtGas,
+                                _prevBlockNum: uint64(block.number)
+                            });
 
-                                vm.roll(block.number + prevBlockNumDiff);
+                            vm.roll(block.number + prevBlockNumDiff);
 
-                                // Call the metering code and catch the various
-                                // types of errors.
-                                uint256 gasConsumed = 0;
-                                try meter.use{ gas: 30_000_000 }(requestedGas) returns (uint256 gasConsumed_) {
-                                    gasConsumed = gasConsumed_;
-                                } catch (bytes memory err) {
-                                    bytes32 hash = keccak256(err);
-                                    if (hash == cannotBuyMoreGas) {
-                                        result = "ResourceMetering: cannot buy more gas than available gas limit";
-                                    } else if (hash == overflowErr) {
-                                        result = "arithmetic overflow/underflow";
-                                    } else if (hash == emptyReturnData) {
-                                        result = "out of gas";
-                                    } else {
-                                        result = "UNKNOWN ERROR";
+                            uint256 gasConsumed = 0;
+                            try meter.use{ gas: 30_000_000 }(requestedGas) returns (uint256 gasConsumed_) {
+                                gasConsumed = gasConsumed_;
+                            } catch (bytes memory err) {
+                                bytes4 selector;
+                                if (err.length >= 4) {
+                                    assembly {
+                                        selector := mload(add(err, 0x20))
                                     }
                                 }
 
-                                // Compute the USD cost of the gas used
-                                uint256 usdCost = (gasConsumed * l1BaseFee * ethPrice) / 1 ether;
-
-                                vm.writeLine(
-                                    outfile,
-                                    string.concat(
-                                        vm.toString(prevBaseFee),
-                                        ",",
-                                        vm.toString(prevBoughtGas),
-                                        ",",
-                                        vm.toString(prevBlockNumDiff),
-                                        ",",
-                                        vm.toString(l1BaseFee),
-                                        ",",
-                                        vm.toString(requestedGas),
-                                        ",",
-                                        vm.toString(gasConsumed),
-                                        ",",
-                                        "$",
-                                        vm.toString(ethPrice),
-                                        ",",
-                                        "$",
-                                        vm.toString(usdCost),
-                                        ",",
-                                        result
-                                    )
-                                );
-
-                                assertTrue(vm.revertTo(snapshotId));
+                                if (selector == ResourceMetering.OutOfGas.selector) {
+                                    result = "ResourceMetering: cannot buy more gas than available gas limit";
+                                } else if (keccak256(err) == keccak256(stdError.arithmeticError)) {
+                                    result = "arithmetic overflow/underflow";
+                                } else if (err.length == 0) {
+                                    result = "out of gas";
+                                } else {
+                                    result = "UNKNOWN ERROR";
+                                }
                             }
+
+                            uint256 usdCost = (gasConsumed * l1BaseFee * ethPrice) / 1 ether;
+
+                            vm.writeLine(
+                                outfile,
+                                string.concat(
+                                    vm.toString(prevBaseFee),
+                                    ",",
+                                    vm.toString(prevBoughtGas),
+                                    ",",
+                                    vm.toString(prevBlockNumDiff),
+                                    ",",
+                                    vm.toString(l1BaseFee),
+                                    ",",
+                                    vm.toString(requestedGas),
+                                    ",",
+                                    vm.toString(gasConsumed),
+                                    ",",
+                                    "$",
+                                    vm.toString(ethPrice),
+                                    ",",
+                                    "$",
+                                    vm.toString(usdCost),
+                                    ",",
+                                    result
+                                )
+                            );
+
+                            assertTrue(vm.revertTo(snapshotId));
                         }
                     }
                 }
