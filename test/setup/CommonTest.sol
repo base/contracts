@@ -12,18 +12,18 @@ import { FFIInterface } from "test/setup/FFIInterface.sol";
 // Contracts
 import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-import { console } from "lib/forge-std/src/console.sol";
+import { console2 as console } from "lib/forge-std/src/console2.sol";
 
 // Interfaces
 import { IOptimismMintableERC20Full } from "interfaces/universal/IOptimismMintableERC20Full.sol";
 
 /// @title CommonTest
-/// @dev An extension to `Test` that sets up the optimism smart contracts.
+/// @dev An extension to `Test` that sets up the Optimism smart contracts.
 abstract contract CommonTest is Test, Setup, Events {
     address alice;
     address bob;
 
-    bytes32 constant nonZeroHash = keccak256(abi.encode("NON_ZERO"));
+    uint256 constant DEFAULT_TEST_BALANCE = 10_000 ether;
 
     FFIInterface constant ffi = FFIInterface(address(uint160(uint256(keccak256(abi.encode("optimism.ffi"))))));
 
@@ -52,8 +52,8 @@ abstract contract CommonTest is Test, Setup, Events {
 
         alice = makeAddr("alice");
         bob = makeAddr("bob");
-        vm.deal(alice, 10000 ether);
-        vm.deal(bob, 10000 ether);
+        vm.deal(alice, DEFAULT_TEST_BALANCE);
+        vm.deal(bob, DEFAULT_TEST_BALANCE);
 
         // Override the config after the deploy script initialized the config
         if (useUpgradedFork) {
@@ -76,23 +76,18 @@ abstract contract CommonTest is Test, Setup, Events {
         excludeContract(address(deploy));
         excludeContract(address(deploy.cfg()));
 
-        // Deploy L1
         Setup.L1();
-        // Deploy L2
         Setup.L2();
 
-        // Call bridge initializer setup function
         bridgeInitializerSetUp();
     }
 
-    function bridgeInitializerSetUp() public {
+    function bridgeInitializerSetUp() internal {
         L1Token = new ERC20("Native L1 Token", "L1T");
 
         if (isForkTest()) {
-            console.log("CommonTest: fork test detected, skipping L2 setup");
             L2Token = IOptimismMintableERC20Full(makeAddr("L2Token"));
         } else {
-            // Deploy the L2 ERC20 now
             L2Token = IOptimismMintableERC20Full(
                 l2OptimismMintableERC20Factory.createStandardL2Token(
                     address(L1Token),
@@ -104,23 +99,18 @@ abstract contract CommonTest is Test, Setup, Events {
 
         NativeL2Token = new ERC20("Native L2 Token", "L2T");
 
+        string memory remoteL1TokenName = string(abi.encodePacked("L1-", NativeL2Token.name()));
+        string memory remoteL1TokenSymbol = string(abi.encodePacked("L1-", NativeL2Token.symbol()));
+
         RemoteL1Token = IOptimismMintableERC20Full(
             l1OptimismMintableERC20Factory.createStandardL2Token(
-                address(NativeL2Token),
-                string(abi.encodePacked("L1-", NativeL2Token.name())),
-                string(abi.encodePacked("L1-", NativeL2Token.symbol()))
+                address(NativeL2Token), remoteL1TokenName, remoteL1TokenSymbol
             )
         );
 
         BadL1Token = ERC20(
-            l1OptimismMintableERC20Factory.createStandardL2Token(
-                address(1),
-                string(abi.encodePacked("L1-", NativeL2Token.name())),
-                string(abi.encodePacked("L1-", NativeL2Token.symbol()))
-            )
+            l1OptimismMintableERC20Factory.createStandardL2Token(address(1), remoteL1TokenName, remoteL1TokenSymbol)
         );
-
-        console.log("CommonTest: SetUp complete!");
     }
 
     /// @dev Helper function that wraps `TransactionDeposited` event.
@@ -151,9 +141,9 @@ abstract contract CommonTest is Test, Setup, Events {
     }
 
     /// @dev Disables upgrade mode for testing. By default the fork testing env will be upgraded to the latest
-    ///      implementation. This can be used to disable the upgrade which, is useful for tests targeting the upgrade
+    ///      implementation. This can be used to disable the upgrade, which is useful for tests targeting the upgrade
     ///      process itself.
-    function disableUpgradedFork() public {
+    function disableUpgradedFork() internal {
         _checkNotDeployed("non-upgraded fork");
 
         useUpgradedFork = false;
