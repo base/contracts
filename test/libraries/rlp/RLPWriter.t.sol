@@ -125,10 +125,22 @@ contract RLPWriter_writeUint_Test is Test {
         assertGt(encoded.length, 0);
     }
 }
+
+/// @title RLPWriter_TestInit
+/// @notice Reusable helpers for `RLPWriter` tests.
+abstract contract RLPWriter_TestInit is Test {
+    function encodedThreeStringList() internal pure returns (bytes[] memory list_) {
+        list_ = new bytes[](3);
+        list_[0] = RLPWriter.writeString("asdf");
+        list_[1] = RLPWriter.writeString("qwer");
+        list_[2] = RLPWriter.writeString("zxcv");
+    }
+}
+
 /// @title RLPWriter_writeList_Test
 /// @notice Tests the `writeList` function of the `RLPWriter` library.
 
-contract RLPWriter_writeList_Test is Test {
+contract RLPWriter_writeList_Test is RLPWriter_TestInit {
     /// @notice Tests that the `writeList` function returns the correct RLP encoding when given an
     ///         empty list.
     function test_writeList_empty_succeeds() external pure {
@@ -186,16 +198,11 @@ contract RLPWriter_writeList_Test is Test {
     ///         long list containing nested lists.
     function test_writeList_longlist1_succeeds() external pure {
         bytes[] memory list = new bytes[](4);
-        bytes[] memory list2 = new bytes[](3);
+        bytes memory nestedList = RLPWriter.writeList(encodedThreeStringList());
 
-        list2[0] = RLPWriter.writeString("asdf");
-        list2[1] = RLPWriter.writeString("qwer");
-        list2[2] = RLPWriter.writeString("zxcv");
-
-        list[0] = RLPWriter.writeList(list2);
-        list[1] = RLPWriter.writeList(list2);
-        list[2] = RLPWriter.writeList(list2);
-        list[3] = RLPWriter.writeList(list2);
+        for (uint256 i = 0; i < list.length; i++) {
+            list[i] = nestedList;
+        }
 
         assertEq(
             RLPWriter.writeList(list),
@@ -207,14 +214,10 @@ contract RLPWriter_writeList_Test is Test {
     ///         very long list with 32 nested lists.
     function test_writeList_longlist2_succeeds() external pure {
         bytes[] memory list = new bytes[](32);
-        bytes[] memory list2 = new bytes[](3);
-
-        list2[0] = RLPWriter.writeString("asdf");
-        list2[1] = RLPWriter.writeString("qwer");
-        list2[2] = RLPWriter.writeString("zxcv");
+        bytes memory nestedList = RLPWriter.writeList(encodedThreeStringList());
 
         for (uint256 i = 0; i < 32; i++) {
-            list[i] = RLPWriter.writeList(list2);
+            list[i] = nestedList;
         }
 
         assertEq(
@@ -229,12 +232,13 @@ contract RLPWriter_writeList_Test is Test {
         // [ [ [], [] ], [] ]
         bytes[] memory list = new bytes[](2);
         bytes[] memory list2 = new bytes[](2);
+        bytes memory emptyList = RLPWriter.writeList(new bytes[](0));
 
-        list2[0] = RLPWriter.writeList(new bytes[](0));
-        list2[1] = RLPWriter.writeList(new bytes[](0));
+        list2[0] = emptyList;
+        list2[1] = emptyList;
 
         list[0] = RLPWriter.writeList(list2);
-        list[1] = RLPWriter.writeList(new bytes[](0));
+        list[1] = emptyList;
 
         assertEq(RLPWriter.writeList(list), hex"c4c2c0c0c0");
     }
@@ -243,16 +247,17 @@ contract RLPWriter_writeList_Test is Test {
     ///         complex nested list structure.
     function test_writeList_listoflists2_succeeds() external pure {
         // [ [], [[]], [ [], [[]] ] ]
+        bytes memory emptyList = RLPWriter.writeList(new bytes[](0));
         bytes[] memory list = new bytes[](3);
-        list[0] = RLPWriter.writeList(new bytes[](0));
+        list[0] = emptyList;
 
         bytes[] memory list2 = new bytes[](1);
-        list2[0] = RLPWriter.writeList(new bytes[](0));
+        list2[0] = emptyList;
 
         list[1] = RLPWriter.writeList(list2);
 
         bytes[] memory list3 = new bytes[](2);
-        list3[0] = RLPWriter.writeList(new bytes[](0));
+        list3[0] = emptyList;
         list3[1] = RLPWriter.writeList(list2);
 
         list[2] = RLPWriter.writeList(list3);
@@ -316,7 +321,7 @@ contract RLPWriter_writeAddress_Test is Test {
     function testFuzz_writeAddress_anyAddress_succeeds(address _addr) external pure {
         bytes memory encoded = RLPWriter.writeAddress(_addr);
         assertEq(encoded.length, 21);
-        assertEq(uint8(encoded[0]), 0x94);
+        assertEq(encoded[0], bytes1(0x94));
     }
 }
 
