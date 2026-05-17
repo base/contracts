@@ -16,95 +16,55 @@ contract InitializerOZv5_Test is Test {
     /// keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Initializable")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant INITIALIZABLE_STORAGE = 0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00;
 
-    /// @notice Contains the address of an `Initializable` contract and the calldata
-    ///         used to initialize it.
-    struct InitializeableContract {
+    struct InitializableContract {
         address target;
         bytes initCalldata;
     }
 
-    /// @notice Contains the addresses of the contracts to test as well as the calldata
-    ///         used to initialize them.
-    InitializeableContract[] contracts;
+    InitializableContract[] private contracts;
 
     function setUp() public {
-        // Initialize the `contracts` array with the addresses of the contracts to test and the
-        // calldata used to initialize them
+        bytes memory constructorArgs = DeployUtils.encodeConstructor(abi.encodeCall(IFeeVault.__constructor__, ()));
+        bytes memory initCalldata = abi.encodeCall(IFeeVault.initialize, (address(0), 0, Types.WithdrawalNetwork.L1));
 
-        // BaseFeeVault
         contracts.push(
-            InitializeableContract({
-                target: address(
-                    DeployUtils.create1({
-                        _name: "BaseFeeVault",
-                        _args: DeployUtils.encodeConstructor(abi.encodeCall(IFeeVault.__constructor__, ()))
-                    })
-                ),
-                initCalldata: abi.encodeCall(IFeeVault.initialize, (address(0), 0, Types.WithdrawalNetwork.L1))
+            InitializableContract({
+                target: address(DeployUtils.create1({ _name: "BaseFeeVault", _args: constructorArgs })),
+                initCalldata: initCalldata
             })
         );
 
-        // OperatorFeeVault
         contracts.push(
-            InitializeableContract({
-                target: address(
-                    DeployUtils.create1({
-                        _name: "OperatorFeeVault",
-                        _args: DeployUtils.encodeConstructor(abi.encodeCall(IFeeVault.__constructor__, ()))
-                    })
-                ),
-                initCalldata: abi.encodeCall(IFeeVault.initialize, (address(0), 0, Types.WithdrawalNetwork.L1))
+            InitializableContract({
+                target: address(DeployUtils.create1({ _name: "OperatorFeeVault", _args: constructorArgs })),
+                initCalldata: initCalldata
             })
         );
 
-        // SequencerFeeVault
         contracts.push(
-            InitializeableContract({
-                target: address(
-                    DeployUtils.create1({
-                        _name: "SequencerFeeVault",
-                        _args: DeployUtils.encodeConstructor(abi.encodeCall(IFeeVault.__constructor__, ()))
-                    })
-                ),
-                initCalldata: abi.encodeCall(IFeeVault.initialize, (address(0), 0, Types.WithdrawalNetwork.L1))
+            InitializableContract({
+                target: address(DeployUtils.create1({ _name: "SequencerFeeVault", _args: constructorArgs })),
+                initCalldata: initCalldata
             })
         );
 
-        // L1FeeVault
         contracts.push(
-            InitializeableContract({
-                target: address(
-                    DeployUtils.create1({
-                        _name: "L1FeeVault",
-                        _args: DeployUtils.encodeConstructor(abi.encodeCall(IFeeVault.__constructor__, ()))
-                    })
-                ),
-                initCalldata: abi.encodeCall(IFeeVault.initialize, (address(0), 0, Types.WithdrawalNetwork.L1))
+            InitializableContract({
+                target: address(DeployUtils.create1({ _name: "L1FeeVault", _args: constructorArgs })),
+                initCalldata: initCalldata
             })
         );
     }
 
-    /// @notice Tests that:
-    ///         1. The `initialized` flag of each contract is properly set to `type(uint64).max`,
-    ///            signifying that the contracts are initialized.
-    ///         2. The `initialize()` function of each contract cannot be called more than once.
-    ///         3. Returns the correct error when attempting to re-initialize a contract.
+    /// @notice Ensures OZ v5 initializers are disabled on deployed FeeVault contracts.
     function test_cannotReinitialize_succeeds() public {
-        // Attempt to re-initialize all contracts within the `contracts` array.
         for (uint256 i; i < contracts.length; i++) {
-            InitializeableContract memory _contract = contracts[i];
-            uint256 size;
-            address target = _contract.target;
-            assembly {
-                size := extcodesize(target)
-            }
+            InitializableContract memory _contract = contracts[i];
 
-            // Assert that the contract is already initialized.
             bytes32 slotVal = vm.load(_contract.target, INITIALIZABLE_STORAGE);
             uint64 initialized = uint64(uint256(slotVal));
             assertEq(initialized, type(uint64).max);
 
-            // Then, attempt to re-initialize the contract. This should fail.
             (bool success, bytes memory returnData) = _contract.target.call(_contract.initCalldata);
             assertFalse(success);
             assertEq(bytes4(returnData), Initializable.InvalidInitialization.selector);
