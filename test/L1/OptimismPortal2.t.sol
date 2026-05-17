@@ -19,7 +19,6 @@ import { Types } from "src/libraries/Types.sol";
 import { Hashing } from "src/libraries/Hashing.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
-import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { Features } from "src/libraries/Features.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import "src/libraries/bridge/Types.sol";
@@ -32,7 +31,6 @@ import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol"
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 
@@ -157,14 +155,14 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
 
     /// @notice Checks if the ETHLockbox feature is enabled.
     /// @return bool True if the ETHLockbox feature is enabled.
-    function isUsingLockbox() public view returns (bool) {
+    function isUsingLockbox() internal view returns (bool) {
         return
             systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX) && address(optimismPortal2.ethLockbox()) != address(0);
     }
 
     /// @notice Enables the ETHLockbox feature if not enabled.
     /// @param _lockbox Address of the lockbox to enable.
-    function forceEnableLockbox(address _lockbox) public {
+    function forceEnableLockbox(address _lockbox) internal {
         if (!isSysFeatureEnabled(Features.ETH_LOCKBOX)) {
             vm.prank(address(proxyAdmin));
             systemConfig.setFeature(Features.ETH_LOCKBOX, true);
@@ -200,7 +198,6 @@ contract OptimismPortal2_Constructor_Test is OptimismPortal2_TestInit {
         assertEq(address(opImpl.anchorStateRegistry()), address(0));
         assertEq(address(opImpl.systemConfig()), address(0));
         assertEq(opImpl.l2Sender(), address(0));
-        assertEq(address(opImpl.anchorStateRegistry()), address(0));
         assertEq(address(opImpl.ethLockbox()), address(0));
     }
 }
@@ -565,10 +562,8 @@ contract OptimismPortal2_DonateETH_Test is OptimismPortal2_TestInit {
         optimismPortal2.donateETH{ value: _amount }();
         VmSafe.AccountAccess[] memory accountAccesses = vm.stopAndReturnStateDiff();
 
-        // not necessary since it's checked below
         assertEq(address(optimismPortal2).balance, preBalance + _amount);
 
-        // check that the ETHLockbox balance is unchanged
         assertEq(address(ethLockbox).balance, lockboxBalanceBefore);
 
         // 0 for extcodesize of proxy before being called by this test,
@@ -578,28 +573,13 @@ contract OptimismPortal2_DonateETH_Test is OptimismPortal2_TestInit {
         assertEq(uint8(accountAccesses[1].kind), uint8(VmSafe.AccountAccessKind.Call));
         assertEq(uint8(accountAccesses[2].kind), uint8(VmSafe.AccountAccessKind.DelegateCall));
 
-        // to of 1 is the optimism portal proxy
         assertEq(accountAccesses[1].account, address(optimismPortal2));
-
-        // accessor is the pranked address
         assertEq(accountAccesses[1].accessor, alice);
-
-        // value is the amount of ETH donated
         assertEq(accountAccesses[1].value, _amount);
-
-        // old balance is the balance of the optimism portal before the donation
         assertEq(accountAccesses[1].oldBalance, preBalance);
-
-        // new balance is the balance of the optimism portal after the donation
         assertEq(accountAccesses[1].newBalance, preBalance + _amount);
-
-        // data is the selector of the donateETH function
         assertEq(accountAccesses[1].data, abi.encodePacked(optimismPortal2.donateETH.selector));
-
-        // reverted of alice call to proxy is false
         assertEq(accountAccesses[1].reverted, false);
-
-        // reverted of delegate call of proxy to impl is false
         assertEq(accountAccesses[2].reverted, false);
 
         // storage accesses of delegate call of proxy to impl is empty (No storage read or write!)
