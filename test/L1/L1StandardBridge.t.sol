@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 // Testing
-import { stdStorage, StdStorage } from "lib/forge-std/src/Test.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
 
@@ -195,6 +194,23 @@ contract L1StandardBridge_Constructor_Test is CommonTest {
 /// @title L1StandardBridge_Initialize_Test
 /// @notice Tests the `initialize` function of the `L1StandardBridge` contract.
 contract L1StandardBridge_Initialize_Test is CommonTest {
+    StorageSlot internal initializedSlot;
+
+    function setUp() public override {
+        super.setUp();
+
+        initializedSlot = ForgeArtifacts.getSlot("L1StandardBridge", "_initialized");
+    }
+
+    function _resetInitialized() internal {
+        vm.store(address(l1StandardBridge), bytes32(initializedSlot.slot), bytes32(0));
+    }
+
+    function _initializedValue() internal view returns (uint8) {
+        bytes32 slotVal = vm.load(address(l1StandardBridge), bytes32(initializedSlot.slot));
+        return uint8((uint256(slotVal) >> (initializedSlot.offset * 8)) & 0xFF);
+    }
+
     /// @notice Test that the initialize function sets the correct values.
     function test_initialize_succeeds() external view {
         assertEq(address(l1StandardBridge.systemConfig()), address(systemConfig));
@@ -210,8 +226,7 @@ contract L1StandardBridge_Initialize_Test is CommonTest {
     function testFuzz_initialize_notProxyAdminOrProxyAdminOwner_reverts(address _sender) public {
         vm.assume(_sender != address(proxyAdmin) && _sender != proxyAdminOwner);
 
-        StorageSlot memory slot = ForgeArtifacts.getSlot("L1StandardBridge", "_initialized");
-        vm.store(address(l1StandardBridge), bytes32(slot.slot), bytes32(0));
+        _resetInitialized();
 
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
         vm.prank(_sender);
@@ -222,15 +237,7 @@ contract L1StandardBridge_Initialize_Test is CommonTest {
     ///         but confirms that the initValue is not incremented incorrectly if an upgrade
     ///         function is not present.
     function test_initialize_correctInitializerValue_succeeds() public view {
-        // Get the slot for _initialized.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("L1StandardBridge", "_initialized");
-
-        // Get the initializer value.
-        bytes32 slotVal = vm.load(address(l1StandardBridge), bytes32(slot.slot));
-        uint8 val = uint8(uint256(slotVal) & 0xFF);
-
-        // Assert that the initializer value matches the expected value.
-        assertEq(val, l1StandardBridge.initVersion());
+        assertEq(_initializedValue(), l1StandardBridge.initVersion());
     }
 }
 
@@ -461,12 +468,6 @@ contract L1StandardBridge_DepositETHTo_Test is L1StandardBridge_TestInit {
 /// @title L1StandardBridge_DepositERC20_Test
 /// @notice Tests the `depositERC20` function of the `L1StandardBridge` contract.
 contract L1StandardBridge_DepositERC20_Test is CommonTest {
-    // depositERC20
-    // - updates bridge.deposits
-    // - emits ERC20DepositInitiated
-    // - calls optimismPortal.depositTransaction
-    // - only callable by EOA
-
     /// @notice Tests that depositing ERC20 to the bridge succeeds.
     ///         Bridge deposits are updated.
     ///         Emits ERC20DepositInitiated event.
@@ -621,10 +622,6 @@ contract L1StandardBridge_DepositERC20To_Test is CommonTest {
 
     /// @notice Verifies depositERC20To succeeds with zero amount
     function test_depositERC20To_zeroAmount_succeeds() external {
-        deal(address(L1Token), alice, 1000);
-        vm.prank(alice);
-        L1Token.approve(address(l1StandardBridge), 0);
-
         vm.prank(alice);
         l1StandardBridge.depositERC20To(address(L1Token), address(L2Token), bob, 0, 10000, hex"");
         assertEq(l1StandardBridge.deposits(address(L1Token), address(L2Token)), 0);
@@ -662,8 +659,6 @@ contract L1StandardBridge_FinalizeETHWithdrawal_Test is L1StandardBridge_TestIni
 /// @title L1StandardBridge_FinalizeERC20Withdrawal_Test
 /// @notice Tests the `finalizeERC20Withdrawal` function of the `L1StandardBridge` contract.
 contract L1StandardBridge_FinalizeERC20Withdrawal_Test is L1StandardBridge_TestInit {
-    using stdStorage for StdStorage;
-
     /// @notice Tests that finalizing an ERC20 withdrawal succeeds.
     ///         Bridge deposits are updated.
     ///         Emits ERC20WithdrawalFinalized event.
@@ -671,10 +666,11 @@ contract L1StandardBridge_FinalizeERC20Withdrawal_Test is L1StandardBridge_TestI
     function test_finalizeERC20Withdrawal_succeeds() external {
         deal(address(L1Token), address(l1StandardBridge), 100);
 
-        uint256 slot = stdstore.target(address(l1StandardBridge)).sig("deposits(address,address)")
-            .with_key(address(L1Token)).with_key(address(L2Token)).find();
+        StorageSlot memory depositsSlot = ForgeArtifacts.getSlot("L1StandardBridge", "deposits");
+        bytes32 localTokenDepositsSlot = keccak256(abi.encode(address(L1Token), uint256(depositsSlot.slot)));
+        bytes32 depositSlot = keccak256(abi.encode(address(L2Token), localTokenDepositsSlot));
 
-        vm.store(address(l1StandardBridge), bytes32(slot), bytes32(uint256(100)));
+        vm.store(address(l1StandardBridge), depositSlot, bytes32(uint256(100)));
         assertEq(l1StandardBridge.deposits(address(L1Token), address(L2Token)), 100);
 
         vm.expectEmit(address(l1StandardBridge));
@@ -720,12 +716,12 @@ contract L1StandardBridge_FinalizeERC20Withdrawal_Test is L1StandardBridge_TestI
 contract L1StandardBridge_Uncategorized_Test is L1StandardBridge_TestInit {
     /// @notice Test that the accessors return the correct initialized values.
     function test_getters_succeeds() external view {
-        assert(l1StandardBridge.l2TokenBridge() == address(l2StandardBridge));
-        assert(address(l1StandardBridge.OTHER_BRIDGE()) == address(l2StandardBridge));
-        assert(address(l1StandardBridge.messenger()) == address(l1CrossDomainMessenger));
-        assert(address(l1StandardBridge.MESSENGER()) == address(l1CrossDomainMessenger));
-        assert(l1StandardBridge.systemConfig() == systemConfig);
-        assert(l1StandardBridge.superchainConfig() == systemConfig.superchainConfig());
+        assertEq(l1StandardBridge.l2TokenBridge(), address(l2StandardBridge));
+        assertEq(address(l1StandardBridge.OTHER_BRIDGE()), address(l2StandardBridge));
+        assertEq(address(l1StandardBridge.messenger()), address(l1CrossDomainMessenger));
+        assertEq(address(l1StandardBridge.MESSENGER()), address(l1CrossDomainMessenger));
+        assertEq(address(l1StandardBridge.systemConfig()), address(systemConfig));
+        assertEq(address(l1StandardBridge.superchainConfig()), address(systemConfig.superchainConfig()));
     }
 
     /// @notice Tests that bridging ETH succeeds.
