@@ -7,9 +7,14 @@ import { OptimismMintableERC721 } from "src/L2/OptimismMintableERC721.sol";
 /// @title OptimismMintableERC721Factory_TestInit
 /// @notice Reusable test initialization for `OptimismMintableERC721Factory` tests.
 abstract contract OptimismMintableERC721Factory_TestInit is CommonTest {
+    address internal constant REMOTE_TOKEN = address(1234);
+    string internal constant TOKEN_NAME = "L2Token";
+    string internal constant TOKEN_SYMBOL = "L2T";
+
     event OptimismMintableERC721Created(address indexed localToken, address indexed remoteToken, address deployer);
 
-    function calculateTokenAddress(
+    /// @notice Precalculates the address of the token contract.
+    function _calculateTokenAddress(
         address _remote,
         string memory _name,
         string memory _symbol
@@ -47,29 +52,22 @@ contract OptimismMintableERC721Factory_Constructor_Test is OptimismMintableERC72
 contract OptimismMintableERC721Factory_CreateOptimismMintableERC721_Test is OptimismMintableERC721Factory_TestInit {
     /// @notice Tests that the `createOptimismMintableERC721` function succeeds.
     function test_createOptimismMintableERC721_succeeds() external {
-        address remote = address(1234);
-        address local = calculateTokenAddress(address(1234), "L2Token", "L2T");
+        address local = _calculateTokenAddress(REMOTE_TOKEN, TOKEN_NAME, TOKEN_SYMBOL);
 
-        // Expect a token creation event.
         vm.expectEmit(address(l2OptimismMintableERC721Factory));
-        emit OptimismMintableERC721Created(local, remote, alice);
+        emit OptimismMintableERC721Created(local, REMOTE_TOKEN, alice);
 
-        // Create the token.
         vm.prank(alice);
         OptimismMintableERC721 created = OptimismMintableERC721(
-            l2OptimismMintableERC721Factory.createOptimismMintableERC721(remote, "L2Token", "L2T")
+            l2OptimismMintableERC721Factory.createOptimismMintableERC721(REMOTE_TOKEN, TOKEN_NAME, TOKEN_SYMBOL)
         );
 
-        // Token address should be correct.
         assertEq(address(created), local);
-
-        // Should be marked as created by the factory.
         assertTrue(l2OptimismMintableERC721Factory.isOptimismMintableERC721(address(created)));
 
-        // Token should've been constructed correctly.
-        assertEq(created.name(), "L2Token");
-        assertEq(created.symbol(), "L2T");
-        assertEq(created.REMOTE_TOKEN(), remote);
+        assertEq(created.name(), TOKEN_NAME);
+        assertEq(created.symbol(), TOKEN_SYMBOL);
+        assertEq(created.REMOTE_TOKEN(), REMOTE_TOKEN);
         assertEq(created.BRIDGE(), address(l2ERC721Bridge));
         assertEq(created.REMOTE_CHAIN_ID(), deploy.cfg().l1ChainId());
     }
@@ -77,22 +75,19 @@ contract OptimismMintableERC721Factory_CreateOptimismMintableERC721_Test is Opti
     /// @notice Tests that the `createOptimismMintableERC721` function reverts if the same token is
     ///         created twice.
     function test_createOptimismMintableERC721_sameTwice_reverts() external {
-        address remote = address(1234);
-
         vm.prank(alice);
-        l2OptimismMintableERC721Factory.createOptimismMintableERC721(remote, "L2Token", "L2T");
+        l2OptimismMintableERC721Factory.createOptimismMintableERC721(REMOTE_TOKEN, TOKEN_NAME, TOKEN_SYMBOL);
 
         vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
 
         vm.prank(alice);
-        l2OptimismMintableERC721Factory.createOptimismMintableERC721(remote, "L2Token", "L2T");
+        l2OptimismMintableERC721Factory.createOptimismMintableERC721(REMOTE_TOKEN, TOKEN_NAME, TOKEN_SYMBOL);
     }
 
     /// @notice Tests that the `createOptimismMintableERC721` function reverts if the remote token
     ///         address is zero.
     function test_createOptimismMintableERC721_zeroRemoteToken_reverts() external {
-        // Try to create a token with a zero remote token address.
         vm.expectRevert("OptimismMintableERC721Factory: L1 token address cannot be address(0)");
-        l2OptimismMintableERC721Factory.createOptimismMintableERC721(address(0), "L2Token", "L2T");
+        l2OptimismMintableERC721Factory.createOptimismMintableERC721(address(0), TOKEN_NAME, TOKEN_SYMBOL);
     }
 }
