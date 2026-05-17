@@ -6,16 +6,15 @@ import { ResourceMetering } from "src/L1/ResourceMetering.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 
+uint256 constant MAX_EMPTY_BLOCK_GAP = 433_576_281_058_164_217_753_225_238_677_900_874_458_690;
+
 function defaultResourceConfig() pure returns (ResourceMetering.ResourceConfig memory) {
     IResourceMetering.ResourceConfig memory rcfg = Constants.DEFAULT_RESOURCE_CONFIG();
-    return ResourceMetering.ResourceConfig({
-        maxResourceLimit: rcfg.maxResourceLimit,
-        elasticityMultiplier: rcfg.elasticityMultiplier,
-        baseFeeMaxChangeDenominator: rcfg.baseFeeMaxChangeDenominator,
-        minimumBaseFee: rcfg.minimumBaseFee,
-        systemTxMaxGas: rcfg.systemTxMaxGas,
-        maximumBaseFee: rcfg.maximumBaseFee
-    });
+    ResourceMetering.ResourceConfig memory config;
+    assembly ("memory-safe") {
+        config := rcfg
+    }
+    return config;
 }
 
 contract MeterUser is ResourceMetering {
@@ -40,6 +39,12 @@ contract MeterUser is ResourceMetering {
 
     function use(uint64 _amount) public metered(_amount) { }
 
+    function measuredUse(uint64 _amount) public returns (uint256) {
+        uint256 initialGas = gasleft();
+        _metered(_amount, initialGas);
+        return initialGas - gasleft();
+    }
+
     function set(uint128 _prevBaseFee, uint64 _prevBoughtGas, uint64 _prevBlockNum) public {
         params = ResourceMetering.ResourceParams({
             prevBaseFee: _prevBaseFee, prevBoughtGas: _prevBoughtGas, prevBlockNum: _prevBlockNum
@@ -51,37 +56,14 @@ contract MeterUser is ResourceMetering {
     }
 }
 
-/// @title CustomMeterUser
-/// @notice A simple wrapper around `ResourceMetering` that allows the initial params to be set in
-///         the constructor.
-contract CustomMeterUser is ResourceMetering {
-    constructor(uint128 _prevBaseFee, uint64 _prevBoughtGas, uint64 _prevBlockNum) {
-        params = ResourceMetering.ResourceParams({
-            prevBaseFee: _prevBaseFee, prevBoughtGas: _prevBoughtGas, prevBlockNum: _prevBlockNum
-        });
-    }
-
-    function _resourceConfig() internal pure override returns (ResourceMetering.ResourceConfig memory) {
-        return defaultResourceConfig();
-    }
-
-    function use(uint64 _amount) public returns (uint256) {
-        uint256 initialGas = gasleft();
-        _metered(_amount, initialGas);
-        return initialGas - gasleft();
-    }
-}
-
 /// @title ResourceMetering_TestInit
 /// @notice Reusable test initialization for `ResourceMetering` tests.
 abstract contract ResourceMetering_TestInit is Test {
     MeterUser internal meter;
-    uint64 initialBlockNum;
 
     /// @notice Sets up the test contract.
     function setUp() public {
         meter = new MeterUser();
-        initialBlockNum = uint64(block.number);
     }
 }
 
@@ -105,13 +87,14 @@ contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
     /// @notice Tests that updating after multiple empty blocks maintains correct base fee.
     function testFuzz_metered_emptyBlocks_succeeds(uint256 _blockDiff) external {
         _blockDiff = bound(_blockDiff, 1, 100);
-        vm.roll(initialBlockNum + _blockDiff);
+        uint256 startBlock = block.number;
+        vm.roll(startBlock + _blockDiff);
         meter.use(0);
         (uint128 prevBaseFee, uint64 prevBoughtGas, uint64 prevBlockNum) = meter.params();
 
         assertEq(prevBaseFee, 1 gwei);
         assertEq(prevBoughtGas, 0);
-        assertEq(prevBlockNum, initialBlockNum + _blockDiff);
+        assertEq(prevBlockNum, startBlock + _blockDiff);
     }
 
     /// @notice Tests that updating the gas delta sets the meter params correctly.
@@ -123,7 +106,7 @@ contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
 
         assertEq(prevBaseFee, rcfg.minimumBaseFee);
         assertEq(prevBoughtGas, target);
-        assertEq(prevBlockNum, initialBlockNum);
+        assertEq(prevBlockNum, block.number);
     }
 
     /// @notice Tests that the meter params are set correctly for the maximum gas delta.
@@ -136,7 +119,7 @@ contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
         (, uint64 prevBoughtGas,) = meter.params();
         assertEq(prevBoughtGas, maxResourceLimit);
 
-        vm.roll(initialBlockNum + 1);
+        vm.roll(block.number + 1);
         meter.use(0);
         (uint128 postBaseFee,,) = meter.params();
         assertEq(postBaseFee, 2125000000);
@@ -156,7 +139,7 @@ contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
         (, uint64 prevBoughtGas,) = meter.params();
         assertEq(prevBoughtGas, maxResourceLimit);
 
-        vm.roll(initialBlockNum + 2);
+        vm.roll(block.number + 2);
 
         vm.expectRevert("UNDEFINED");
         meter.use(0);
@@ -172,15 +155,14 @@ contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
 
     /// @notice Tests that resource metering can handle large gaps between deposits.
     function testFuzz_metered_largeBlockDiff_succeeds(uint64 _amount, uint256 _blockDiff) external {
-        // This test fails if the following line is commented out.
-        // At 12 seconds per block, this number is effectively unreachable.
-        _blockDiff = uint256(bound(_blockDiff, 0, 433576281058164217753225238677900874458690));
+        // Bounds the empty block gap to values that keep the base fee decay math in range.
+        _blockDiff = uint256(bound(_blockDiff, 0, MAX_EMPTY_BLOCK_GAP));
 
         ResourceMetering.ResourceConfig memory rcfg = meter.resourceConfig();
 
         _amount = uint64(bound(_amount, 0, rcfg.maxResourceLimit));
 
-        vm.roll(initialBlockNum + _blockDiff);
+        vm.roll(block.number + _blockDiff);
         meter.use(_amount);
     }
 
@@ -254,7 +236,7 @@ contract ResourceMetering_ResourceMeteringInit_Test is ResourceMetering_TestInit
 
         assertEq(prevBaseFee, rcfg.minimumBaseFee);
         assertEq(prevBoughtGas, 0);
-        assertEq(prevBlockNum, initialBlockNum);
+        assertEq(prevBlockNum, block.number);
     }
 
     /// @notice Tests that reinitializing the resource params are set correctly.
@@ -352,16 +334,13 @@ contract ArtifactResourceMetering_Metered_Test is Test {
 
                             vm.fee(l1BaseFee);
 
-                            CustomMeterUser meter = new CustomMeterUser({
-                                _prevBaseFee: prevBaseFee,
-                                _prevBoughtGas: prevBoughtGas,
-                                _prevBlockNum: uint64(block.number)
-                            });
+                            MeterUser meter = new MeterUser();
+                            meter.set(prevBaseFee, prevBoughtGas, uint64(block.number));
 
                             vm.roll(block.number + prevBlockNumDiff);
 
                             uint256 gasConsumed = 0;
-                            try meter.use{ gas: 30_000_000 }(requestedGas) returns (uint256 gasConsumed_) {
+                            try meter.measuredUse{ gas: 30_000_000 }(requestedGas) returns (uint256 gasConsumed_) {
                                 gasConsumed = gasConsumed_;
                             } catch (bytes memory err) {
                                 bytes4 selector;
