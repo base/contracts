@@ -53,6 +53,12 @@ abstract contract L1StandardBridge_TestInit is CommonTest {
         _mockXDomainMessageSender(address(l1StandardBridge.OTHER_BRIDGE()));
     }
 
+    function _setupFinalizeBridgeETH() internal returns (address messenger) {
+        messenger = address(l1StandardBridge.messenger());
+        _mockOtherBridge();
+        vm.deal(messenger, 100);
+    }
+
     /// @notice Asserts the expected calls and events for bridging ETH depending on whether the
     ///         bridge call is legacy or not.
     function _preBridgeETH(bool isLegacy, uint256 value) internal {
@@ -244,17 +250,20 @@ contract L1StandardBridge_Initialize_Test is CommonTest {
 /// @title L1StandardBridge_Paused_Test
 /// @notice Tests the `paused` function of the `L1StandardBridge` contract.
 contract L1StandardBridge_Paused_Test is L1StandardBridge_TestInit {
-    /// @notice Sets up the test by pausing the bridge, giving ether to the bridge and mocking the
-    ///         calls to the xDomainMessageSender so that it returns the correct value.
-    function _setupPausedBridge() internal {
+    /// @notice Pauses the bridge and mocks the xDomainMessageSender to return the other bridge.
+    function _pauseBridge() internal {
         vm.startPrank(systemConfig.guardian());
         systemConfig.superchainConfig().pause(address(0));
         vm.stopPrank();
         assertTrue(l1StandardBridge.paused());
 
-        vm.deal(address(l1StandardBridge.messenger()), 1 ether);
-
         _mockOtherBridge();
+    }
+
+    /// @notice Pauses the bridge and funds the messenger for payable ETH finalization tests.
+    function _setupPausedBridge() internal {
+        _pauseBridge();
+        vm.deal(address(l1StandardBridge.messenger()), 1 ether);
     }
 
     /// @notice Verifies that the `paused` accessor returns the same value as the `paused` function
@@ -309,7 +318,7 @@ contract L1StandardBridge_Paused_Test is L1StandardBridge_TestInit {
     /// @notice Confirms that the `finalizeERC20Withdrawal` function reverts when the bridge is
     ///         paused.
     function test_paused_finalizeERC20Withdrawal_reverts() external {
-        _setupPausedBridge();
+        _pauseBridge();
 
         vm.prank(address(l1StandardBridge.messenger()));
         vm.expectRevert("StandardBridge: paused");
@@ -325,7 +334,7 @@ contract L1StandardBridge_Paused_Test is L1StandardBridge_TestInit {
 
     /// @notice Confirms that the `finalizeBridgeERC20` function reverts when the bridge is paused.
     function test_paused_finalizeBridgeERC20_reverts() external {
-        _setupPausedBridge();
+        _pauseBridge();
 
         vm.prank(address(l1StandardBridge.messenger()));
         vm.expectRevert("StandardBridge: paused");
@@ -370,7 +379,7 @@ contract L1StandardBridge_Receive_Test is L1StandardBridge_TestInit {
 
         vm.prank(alice, alice);
         (bool success,) = address(l1StandardBridge).call{ value: 100 }(hex"");
-        assertEq(success, true);
+        assertTrue(success);
 
         _assertETHBridgeCustody(portalBalanceBefore, ethLockboxBalanceBefore, 100);
     }
@@ -380,7 +389,7 @@ contract L1StandardBridge_Receive_Test is L1StandardBridge_TestInit {
         vm.etch(alice, hex"ffff");
         vm.deal(alice, 100);
         vm.prank(alice);
-        vm.expectRevert(bytes("StandardBridge: function can only be called from an EOA"));
+        vm.expectRevert("StandardBridge: function can only be called from an EOA");
         (bool revertsAsExpected,) = address(l1StandardBridge).call{ value: 100 }(hex"");
         assertTrue(revertsAsExpected, "expectRevert: call did not revert");
     }
@@ -407,8 +416,8 @@ contract L1StandardBridge_DepositETH_Test is L1StandardBridge_TestInit {
     /// @notice Tests that depositing ETH succeeds for an EOA using 7702 delegation.
     function test_depositETH_fromEOA7702_succeeds() external {
         skipIfSysFeatureEnabled(Features.CUSTOM_GAS_TOKEN);
-        // Set alice to have 7702 code.
-        vm.etch(alice, abi.encodePacked(hex"EF0100", address(0)));
+        // EIP-7702 treats address(0) as revocation, so use a non-zero delegation target.
+        vm.etch(alice, abi.encodePacked(hex"EF0100", address(1)));
 
         _preBridgeETH({ isLegacy: true, value: 500 });
         uint256 portalBalanceBefore = address(optimismPortal2).balance;
@@ -479,7 +488,7 @@ contract L1StandardBridge_DepositERC20_Test is CommonTest {
 
         deal(address(L1Token), alice, 100000);
         vm.prank(alice);
-        L1Token.approve(address(l1StandardBridge), type(uint256).max);
+        L1Token.approve(address(l1StandardBridge), 100);
 
         // The l1StandardBridge should transfer alice's tokens to itself
         vm.expectCall(address(L1Token), abi.encodeCall(ERC20.transferFrom, (alice, address(l1StandardBridge), 100)));
@@ -581,7 +590,7 @@ contract L1StandardBridge_DepositERC20To_Test is CommonTest {
         deal(address(L1Token), alice, 100000);
 
         vm.prank(alice);
-        L1Token.approve(address(l1StandardBridge), type(uint256).max);
+        L1Token.approve(address(l1StandardBridge), 1000);
 
         vm.expectEmit(address(l1StandardBridge));
         emit ERC20DepositInitiated(address(L1Token), address(L2Token), alice, bob, 1000, hex"");
@@ -645,10 +654,8 @@ contract L1StandardBridge_FinalizeETHWithdrawal_Test is L1StandardBridge_TestIni
 
         vm.expectCall(alice, hex"");
 
-        _mockOtherBridge();
-        // ensure that the messenger has ETH to call with
-        vm.deal(address(l1StandardBridge.messenger()), 100);
-        vm.prank(address(l1StandardBridge.messenger()));
+        address messenger = _setupFinalizeBridgeETH();
+        vm.prank(messenger);
         l1StandardBridge.finalizeETHWithdrawal{ value: 100 }(alice, alice, 100, hex"");
 
         assertEq(address(l1StandardBridge.messenger()).balance, 0);
@@ -694,7 +701,6 @@ contract L1StandardBridge_FinalizeERC20Withdrawal_Test is L1StandardBridge_TestI
     function testFuzz_finalizeERC20Withdrawal_notMessenger_reverts(address _caller) external {
         vm.assume(_caller != address(l1StandardBridge.messenger()));
 
-        _mockOtherBridge();
         vm.expectRevert("StandardBridge: function can only be called from the other bridge");
         vm.prank(_caller);
         l1StandardBridge.finalizeERC20Withdrawal(address(L1Token), address(L2Token), alice, alice, 100, hex"");
@@ -756,9 +762,7 @@ contract L1StandardBridge_Uncategorized_Test is L1StandardBridge_TestInit {
 
     /// @notice Tests that finalizing bridged ETH succeeds.
     function test_finalizeBridgeETH_succeeds() external {
-        address messenger = address(l1StandardBridge.messenger());
-        _mockOtherBridge();
-        vm.deal(messenger, 100);
+        address messenger = _setupFinalizeBridgeETH();
         vm.prank(messenger);
 
         vm.expectEmit(address(l1StandardBridge));
@@ -769,9 +773,7 @@ contract L1StandardBridge_Uncategorized_Test is L1StandardBridge_TestInit {
 
     /// @notice Tests that finalizing bridged ETH reverts if the amount is incorrect.
     function test_finalizeBridgeETH_incorrectValue_reverts() external {
-        address messenger = address(l1StandardBridge.messenger());
-        _mockOtherBridge();
-        vm.deal(messenger, 100);
+        address messenger = _setupFinalizeBridgeETH();
         vm.prank(messenger);
         vm.expectRevert("StandardBridge: amount sent does not match amount required");
         l1StandardBridge.finalizeBridgeETH{ value: 50 }(alice, alice, 100, hex"");
@@ -779,9 +781,7 @@ contract L1StandardBridge_Uncategorized_Test is L1StandardBridge_TestInit {
 
     /// @notice Tests that finalizing bridged ETH reverts if the destination is the L1 bridge.
     function test_finalizeBridgeETH_sendToSelf_reverts() external {
-        address messenger = address(l1StandardBridge.messenger());
-        _mockOtherBridge();
-        vm.deal(messenger, 100);
+        address messenger = _setupFinalizeBridgeETH();
         vm.prank(messenger);
         vm.expectRevert("StandardBridge: cannot send to self");
         l1StandardBridge.finalizeBridgeETH{ value: 100 }(alice, address(l1StandardBridge), 100, hex"");
@@ -789,9 +789,7 @@ contract L1StandardBridge_Uncategorized_Test is L1StandardBridge_TestInit {
 
     /// @notice Tests that finalizing bridged ETH reverts if the destination is the messenger.
     function test_finalizeBridgeETH_sendToMessenger_reverts() external {
-        address messenger = address(l1StandardBridge.messenger());
-        _mockOtherBridge();
-        vm.deal(messenger, 100);
+        address messenger = _setupFinalizeBridgeETH();
         vm.prank(messenger);
         vm.expectRevert("StandardBridge: cannot send to messenger");
         l1StandardBridge.finalizeBridgeETH{ value: 100 }(alice, messenger, 100, hex"");
