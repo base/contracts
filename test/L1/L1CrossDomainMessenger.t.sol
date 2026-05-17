@@ -5,7 +5,7 @@ pragma solidity 0.8.15;
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { Reverter, GasBurner } from "test/mocks/Callers.sol";
 import { stdError } from "lib/forge-std/src/StdError.sol";
-import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
+import { ForgeArtifacts } from "scripts/libraries/ForgeArtifacts.sol";
 
 // Libraries
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
@@ -41,20 +41,7 @@ contract L1CrossDomainMessenger_Encoding_Harness {
 /// @title L1CrossDomainMessenger_TestInit
 /// @notice Reusable test initialization for L1CrossDomainMessenger tests.
 abstract contract L1CrossDomainMessenger_TestInit is CommonTest {
-    /// @dev The receiver address
-    address recipient = address(0xabbaacdc);
-
-    /// @dev The storage slot of the l2Sender
-    uint256 senderSlotIndex;
-
-    /// @dev Encoding library harness.
-    L1CrossDomainMessenger_Encoding_Harness encoding;
-
-    function setUp() public virtual override {
-        super.setUp();
-        senderSlotIndex = ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender").slot;
-        encoding = new L1CrossDomainMessenger_Encoding_Harness();
-    }
+    address internal recipient = address(0xabbaacdc);
 }
 
 /// @title L1CrossDomainMessenger_Constructor_Test
@@ -80,6 +67,23 @@ contract L1CrossDomainMessenger_Constructor_Test is L1CrossDomainMessenger_TestI
 /// @title L1CrossDomainMessenger_Initialize_Test
 /// @notice Tests for the `initialize` function of the L1CrossDomainMessenger.
 contract L1CrossDomainMessenger_Initialize_Test is L1CrossDomainMessenger_TestInit {
+    uint256 internal initializedSlotIndex;
+
+    function setUp() public virtual override {
+        super.setUp();
+        initializedSlotIndex = ForgeArtifacts.getSlot("L1CrossDomainMessenger", "_initialized").slot;
+    }
+
+    function _resetInitialized() internal {
+        vm.store(address(l1CrossDomainMessenger), bytes32(initializedSlotIndex), bytes32(0));
+    }
+
+    function _initializedValue() internal view returns (uint8) {
+        bytes32 slotVal = vm.load(address(l1CrossDomainMessenger), bytes32(initializedSlotIndex));
+        // L1CrossDomainMessenger stores _initialized at byte offset 20.
+        return uint8((uint256(slotVal) >> 20 * 8) & 0xFF);
+    }
+
     /// @notice Tests that the proxy is initialized correctly.
     function test_initialize_succeeds() external view {
         assertEq(address(l1CrossDomainMessenger.systemConfig()), address(systemConfig));
@@ -94,17 +98,7 @@ contract L1CrossDomainMessenger_Initialize_Test is L1CrossDomainMessenger_TestIn
     ///         initialization but confirms that the initValue is not incremented incorrectly if
     ///         an upgrade function is not present.
     function test_initialize_correctInitializerValue_succeeds() public view {
-        // Get the slot for _initialized.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("L1CrossDomainMessenger", "_initialized");
-
-        // Get the initializer value.
-        // Note that for L1CrossDomainMessenger the initialized value is stored at offset 20 so
-        // this test is slightly different from other similar tests.
-        bytes32 slotVal = vm.load(address(l1CrossDomainMessenger), bytes32(slot.slot));
-        uint8 val = uint8((uint256(slotVal) >> 20 * 8) & 0xFF);
-
-        // Assert that the initializer value matches the expected value.
-        assertEq(val, l1CrossDomainMessenger.initVersion());
+        assertEq(_initializedValue(), l1CrossDomainMessenger.initVersion());
     }
 
     /// @notice Tests that the initialize function reverts if called by a non-proxy admin or owner.
@@ -113,11 +107,7 @@ contract L1CrossDomainMessenger_Initialize_Test is L1CrossDomainMessenger_TestIn
         // Prank as the not ProxyAdmin or ProxyAdmin owner.
         vm.assume(_sender != address(proxyAdmin) && _sender != proxyAdminOwner);
 
-        // Get the slot for _initialized.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("L1CrossDomainMessenger", "_initialized");
-
-        // Set the initialized slot to 0.
-        vm.store(address(l1CrossDomainMessenger), bytes32(slot.slot), bytes32(0));
+        _resetInitialized();
 
         // Expect the revert with `ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner` selector
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
@@ -130,11 +120,7 @@ contract L1CrossDomainMessenger_Initialize_Test is L1CrossDomainMessenger_TestIn
     /// @notice Fuzz test for initialize with any system config address.
     /// @param _systemConfig The system config address to test.
     function testFuzz_initialize_anySystemConfig_succeeds(address _systemConfig) external {
-        // Get the slot for _initialized.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("L1CrossDomainMessenger", "_initialized");
-
-        // Set the initialized slot to 0.
-        vm.store(address(l1CrossDomainMessenger), bytes32(slot.slot), bytes32(0));
+        _resetInitialized();
 
         // Initialize with the fuzzed system config address
         vm.prank(address(proxyAdmin));
@@ -148,11 +134,7 @@ contract L1CrossDomainMessenger_Initialize_Test is L1CrossDomainMessenger_TestIn
     /// @notice Fuzz test for initialize with any portal address.
     /// @param _portal The portal address to test.
     function testFuzz_initialize_anyPortal_succeeds(address _portal) external {
-        // Get the slot for _initialized.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("L1CrossDomainMessenger", "_initialized");
-
-        // Set the initialized slot to 0.
-        vm.store(address(l1CrossDomainMessenger), bytes32(slot.slot), bytes32(0));
+        _resetInitialized();
 
         // Initialize with the fuzzed portal address
         vm.prank(address(proxyAdmin));
@@ -219,20 +201,19 @@ contract L1CrossDomainMessenger_SendMessage_Test is L1CrossDomainMessenger_TestI
     /// TODO: this same test needs to be done with the legacy message type
     ///       by setting the message version to 0
     function test_sendMessage_succeeds() external {
+        uint32 minGasLimit = 100;
+        bytes memory message = hex"ff";
+        uint256 nonce = l1CrossDomainMessenger.messageNonce();
+        uint64 baseGas = l1CrossDomainMessenger.baseGas(message, minGasLimit);
+        bytes memory xDomainCalldata =
+            Encoding.encodeCrossDomainMessage(nonce, alice, recipient, 0, minGasLimit, message);
+
         // deposit transaction on the optimism portal should be called
         vm.expectCall(
             address(optimismPortal2),
             abi.encodeCall(
                 IOptimismPortal2.depositTransaction,
-                (
-                    Predeploys.L2_CROSS_DOMAIN_MESSENGER,
-                    0,
-                    l1CrossDomainMessenger.baseGas(hex"ff", 100),
-                    false,
-                    Encoding.encodeCrossDomainMessage(
-                        l1CrossDomainMessenger.messageNonce(), alice, recipient, 0, 100, hex"ff"
-                    )
-                )
+                (Predeploys.L2_CROSS_DOMAIN_MESSENGER, 0, baseGas, false, xDomainCalldata)
             )
         );
 
@@ -243,21 +224,21 @@ contract L1CrossDomainMessenger_SendMessage_Test is L1CrossDomainMessenger_TestI
             Predeploys.L2_CROSS_DOMAIN_MESSENGER,
             0,
             0,
-            l1CrossDomainMessenger.baseGas(hex"ff", 100),
+            baseGas,
             false,
-            Encoding.encodeCrossDomainMessage(l1CrossDomainMessenger.messageNonce(), alice, recipient, 0, 100, hex"ff")
+            xDomainCalldata
         );
 
         // SentMessage event
         vm.expectEmit(address(l1CrossDomainMessenger));
-        emit SentMessage(recipient, alice, hex"ff", l1CrossDomainMessenger.messageNonce(), 100);
+        emit SentMessage(recipient, alice, message, nonce, minGasLimit);
 
         // SentMessageExtension1 event
         vm.expectEmit(address(l1CrossDomainMessenger));
         emit SentMessageExtension1(alice, 0);
 
         vm.prank(alice);
-        l1CrossDomainMessenger.sendMessage(recipient, hex"ff", uint32(100));
+        l1CrossDomainMessenger.sendMessage(recipient, message, minGasLimit);
     }
 
     /// @notice Fuzz test for sendMessage with various gas limits and message data.
@@ -326,7 +307,8 @@ contract L1CrossDomainMessenger_SendMessage_Test is L1CrossDomainMessenger_TestI
 ///         but are testing functionality of the CrossDomainMessenger contract that is inherited
 ///         from.
 contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_TestInit {
-    // Variables for reentrancy test
+    uint256 internal senderSlotIndex;
+
     bool reentrancyAttacked;
     uint256 constant reentrancyMessageValue = 50;
     bytes reentrancySelector;
@@ -336,7 +318,8 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
 
     function setUp() public virtual override {
         super.setUp();
-        // Setup for reentrancy test variables (balance setup moved to specific test)
+        senderSlotIndex = ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender").slot;
+
         reentrancyTarget = address(this);
         reentrancySender = Predeploys.L2_CROSS_DOMAIN_MESSENGER;
         reentrancySelector = abi.encodeCall(this.reinitAndReenter, ());
@@ -350,8 +333,17 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         );
     }
 
+    function _setPortalL2Sender(address _sender) internal {
+        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(_sender)));
+    }
+
+    function _assertMessageStatus(bytes32 _hash, bool _successful, bool _failed) internal view {
+        assertEq(l1CrossDomainMessenger.successfulMessages(_hash), _successful);
+        assertEq(l1CrossDomainMessenger.failedMessages(_hash), _failed);
+    }
+
     /// @notice This method will be called by the relayed message, and will attempt to reenter the
-    ///         `relayMessage` function exactly one.
+    ///         `relayMessage` function once.
     function reinitAndReenter() external payable {
         // only attempt the attack once
         if (!reentrancyAttacked) {
@@ -394,8 +386,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         address target = address(0xabcd);
         address sender = Predeploys.L2_CROSS_DOMAIN_MESSENGER;
 
-        // Set the value of op.l2Sender() to be the L2 Cross Domain Messenger.
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
 
         // Expect a revert.
         vm.expectRevert("CrossDomainMessenger: only version 0 or 1 messages are supported at this time");
@@ -420,8 +411,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
 
         vm.expectCall(target, hex"1111");
 
-        // set the value of op.l2Sender() to be the L2 Cross Domain Messenger.
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
         vm.prank(address(optimismPortal2));
 
         vm.expectEmit(address(l1CrossDomainMessenger));
@@ -441,10 +431,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
             hex"1111"
         );
 
-        // the message hash is in the successfulMessages mapping
-        assert(l1CrossDomainMessenger.successfulMessages(hash));
-        // it is not in the received messages mapping
-        assertEq(l1CrossDomainMessenger.failedMessages(hash), false);
+        _assertMessageStatus(hash, true, false);
     }
 
     /// @notice Fuzz test for relaying messages with various parameters.
@@ -469,8 +456,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
 
         address sender = Predeploys.L2_CROSS_DOMAIN_MESSENGER;
 
-        // set the value of op.l2Sender() to be the L2 Cross Domain Messenger.
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
 
         bytes32 hash = Hashing.hashCrossDomainMessage(
             Encoding.encodeVersionedNonce({ _nonce: 0, _version: 1 }), sender, _target, 0, _minGasLimit, _message
@@ -492,8 +478,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         address sender = Predeploys.L2_CROSS_DOMAIN_MESSENGER;
         bytes memory message = hex"1111";
 
-        // set the value of op.l2Sender() to be the L2CrossDomainMessenger.
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
 
         // correctly sending as OptimismPortal but amount does not match msg.value
         vm.deal(address(optimismPortal2), 10 ether);
@@ -511,8 +496,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         address sender = Predeploys.L2_CROSS_DOMAIN_MESSENGER;
         bytes memory message = hex"1111";
 
-        // set the value of op.l2Sender() to be the L2 Cross Domain Messenger.
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
 
         // make a failed message
         vm.etch(target, hex"fe");
@@ -535,7 +519,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         address sender = Predeploys.L2_CROSS_DOMAIN_MESSENGER;
         bytes memory message = hex"1111";
 
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
 
         vm.prank(address(optimismPortal2));
         vm.expectRevert("CrossDomainMessenger: cannot send message to blocked system address");
@@ -555,7 +539,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         address sender = Predeploys.L2_CROSS_DOMAIN_MESSENGER;
         bytes memory message = hex"1111";
 
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
 
         vm.prank(address(optimismPortal2));
         vm.expectRevert("CrossDomainMessenger: cannot send message to blocked system address");
@@ -571,7 +555,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         address sender = Predeploys.L2_CROSS_DOMAIN_MESSENGER;
         bytes memory message = hex"1111";
 
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
 
         vm.prank(bob);
         vm.expectRevert("CrossDomainMessenger: message cannot be replayed");
@@ -662,8 +646,9 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         assertTrue(success, "L2CrossDomainMessenger call should not fail");
 
         // Message should either be in the failed or successful messages mapping.
-        bool inFailedMessages = l2CrossDomainMessenger.failedMessages(keccak256(encoded));
-        bool inSuccessfulMessages = l2CrossDomainMessenger.successfulMessages(keccak256(encoded));
+        bytes32 encodedHash = keccak256(encoded);
+        bool inFailedMessages = l2CrossDomainMessenger.failedMessages(encodedHash);
+        bool inSuccessfulMessages = l2CrossDomainMessenger.successfulMessages(encodedHash);
         assertTrue(
             inFailedMessages || inSuccessfulMessages, "message should be in either failed or successful messages"
         );
@@ -706,6 +691,8 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
     )
         external
     {
+        L1CrossDomainMessenger_Encoding_Harness encoding = new L1CrossDomainMessenger_Encoding_Harness();
+
         // Make sure that unexpected nonces aren't being used right now.
         // Prevents people from forgetting to update this test if a new version is ever used.
         if (_version > 2) {
@@ -745,7 +732,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
 
         address sender = Predeploys.L2_CROSS_DOMAIN_MESSENGER;
 
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
         vm.prank(address(optimismPortal2));
         l1CrossDomainMessenger.relayMessage(
             Encoding.encodeVersionedNonce({ _nonce: 0, _version: 1 }), address(0), address(0), 0, 0, hex""
@@ -755,9 +742,11 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         l1CrossDomainMessenger.xDomainMessageSender();
     }
 
-    /// @notice Tests that xDomainMessageSender is never set during sendMessage.
-    function test_xDomainMessageSender_duringSend_reverts() external {
-        // XDomainMessageSender is only set during relayMessage, not sendMessage
+    /// @notice Tests that xDomainMessageSender remains unset after sendMessage.
+    function test_xDomainMessageSender_afterSend_reverts() external {
+        vm.prank(alice);
+        l1CrossDomainMessenger.sendMessage(recipient, hex"1234", 100);
+
         vm.expectRevert("CrossDomainMessenger: xDomainMessageSender is not set");
         l1CrossDomainMessenger.xDomainMessageSender();
     }
@@ -776,8 +765,8 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
             Encoding.encodeVersionedNonce({ _nonce: 0, _version: 1 }), sender, target, value, 0, hex"1111"
         );
 
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
-        vm.etch(target, address(new Reverter()).code);
+        _setPortalL2Sender(sender);
+        vm.etch(target, type(Reverter).runtimeCode);
         vm.deal(address(optimismPortal2), value);
         vm.prank(address(optimismPortal2));
         l1CrossDomainMessenger.relayMessage{ value: value }(
@@ -791,8 +780,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
 
         assertEq(address(l1CrossDomainMessenger).balance, value);
         assertEq(address(target).balance, 0);
-        assertEq(l1CrossDomainMessenger.successfulMessages(hash), false);
-        assertEq(l1CrossDomainMessenger.failedMessages(hash), true);
+        _assertMessageStatus(hash, false, true);
 
         vm.expectEmit(address(l1CrossDomainMessenger));
 
@@ -811,8 +799,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
 
         assertEq(address(l1CrossDomainMessenger).balance, 0);
         assertEq(address(target).balance, value);
-        assertEq(l1CrossDomainMessenger.successfulMessages(hash), true);
-        assertEq(l1CrossDomainMessenger.failedMessages(hash), true);
+        _assertMessageStatus(hash, true, true);
     }
 
     /// @notice Tests that `relayMessage` should successfully call the target contract after the
@@ -833,8 +820,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
             hex"1111"
         );
 
-        // Set the value of op.l2Sender() to be the L2 Cross Domain Messenger.
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
 
         // Target should be called with expected data.
         vm.expectCall(target, hex"1111");
@@ -854,9 +840,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
             hex"1111"
         );
 
-        // Message was successfully relayed.
-        assertEq(l1CrossDomainMessenger.successfulMessages(hash), true);
-        assertEq(l1CrossDomainMessenger.failedMessages(hash), false);
+        _assertMessageStatus(hash, true, false);
     }
 
     /// @notice Tests that `relayMessage` should revert if the message is already replayed.
@@ -875,8 +859,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
             hex"1111"
         );
 
-        // Set the value of op.l2Sender() to be the L2 Cross Domain Messenger.
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
         // Mark legacy message as already relayed.
         uint256 successfulMessagesSlot = 203;
         bytes32 oldHash = Hashing.hashCrossDomainMessageV0(target, sender, hex"1111", 0);
@@ -897,9 +880,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
             hex"1111"
         );
 
-        // Message was not relayed.
-        assertEq(l1CrossDomainMessenger.successfulMessages(hash), false);
-        assertEq(l1CrossDomainMessenger.failedMessages(hash), false);
+        _assertMessageStatus(hash, false, false);
     }
 
     /// @notice Tests that `relayMessage` can be retried after a failure with a legacy message.
@@ -919,11 +900,9 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
             hex"1111"
         );
 
-        // Set the value of op.l2Sender() to be the L2 Cross Domain Messenger.
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
 
-        // Turn the target into a Reverter.
-        vm.etch(target, address(new Reverter()).code);
+        vm.etch(target, type(Reverter).runtimeCode);
 
         // Target should be called with expected data.
         vm.expectCall(target, hex"1111");
@@ -947,8 +926,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         // Message failed.
         assertEq(address(l1CrossDomainMessenger).balance, value);
         assertEq(address(target).balance, 0);
-        assertEq(l1CrossDomainMessenger.successfulMessages(hash), false);
-        assertEq(l1CrossDomainMessenger.failedMessages(hash), true);
+        _assertMessageStatus(hash, false, true);
 
         // Make the target not revert anymore.
         vm.etch(target, address(0).code);
@@ -974,8 +952,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         // Message was successfully relayed.
         assertEq(address(l1CrossDomainMessenger).balance, 0);
         assertEq(address(target).balance, value);
-        assertEq(l1CrossDomainMessenger.successfulMessages(hash), true);
-        assertEq(l1CrossDomainMessenger.failedMessages(hash), true);
+        _assertMessageStatus(hash, true, true);
     }
 
     /// @notice Tests that `relayMessage` cannot be retried after success with a legacy message.
@@ -995,8 +972,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
             hex"1111"
         );
 
-        // Set the value of op.l2Sender() to be the L2 Cross Domain Messenger.
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
 
         // Target should be called with expected data.
         vm.expectCall(target, hex"1111");
@@ -1020,8 +996,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         // Message was successfully relayed.
         assertEq(address(l1CrossDomainMessenger).balance, 0);
         assertEq(address(target).balance, value);
-        assertEq(l1CrossDomainMessenger.successfulMessages(hash), true);
-        assertEq(l1CrossDomainMessenger.failedMessages(hash), false);
+        _assertMessageStatus(hash, true, false);
 
         // Expect a revert.
         vm.expectRevert("CrossDomainMessenger: message cannot be replayed");
@@ -1055,11 +1030,9 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
             hex"1111"
         );
 
-        // Set the value of op.l2Sender() to be the L2 Cross Domain Messenger.
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
 
-        // Turn the target into a Reverter.
-        vm.etch(target, address(new Reverter()).code);
+        vm.etch(target, type(Reverter).runtimeCode);
 
         // Target should be called with expected data.
         vm.expectCall(target, hex"1111");
@@ -1079,8 +1052,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         // Message failed.
         assertEq(address(l1CrossDomainMessenger).balance, value);
         assertEq(address(target).balance, 0);
-        assertEq(l1CrossDomainMessenger.successfulMessages(hash), false);
-        assertEq(l1CrossDomainMessenger.failedMessages(hash), true);
+        _assertMessageStatus(hash, false, true);
 
         // Make the target not revert anymore.
         vm.etch(target, address(0).code);
@@ -1106,8 +1078,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         // Message was successfully relayed.
         assertEq(address(l1CrossDomainMessenger).balance, 0);
         assertEq(address(target).balance, value);
-        assertEq(l1CrossDomainMessenger.successfulMessages(hash), true);
-        assertEq(l1CrossDomainMessenger.failedMessages(hash), true);
+        _assertMessageStatus(hash, true, true);
 
         // Expect a revert.
         vm.expectRevert("CrossDomainMessenger: message has already been relayed");
@@ -1124,8 +1095,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
         );
     }
 
-    /// @notice Tests that the relayMessage function is able to relay a message successfully by
-    ///         calling the target contract.
+    /// @notice Tests that relayMessage reverts while the messenger is paused.
     function test_relayMessage_paused_reverts() external {
         vm.prank(superchainConfig.guardian());
         superchainConfig.pause(address(0));
