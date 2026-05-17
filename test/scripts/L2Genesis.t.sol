@@ -6,10 +6,6 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { L2Genesis } from "scripts/L2Genesis.s.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { LATEST_FORK } from "scripts/libraries/Config.sol";
-import { ISequencerFeeVault } from "interfaces/L2/ISequencerFeeVault.sol";
-import { IBaseFeeVault } from "interfaces/L2/IBaseFeeVault.sol";
-import { IL1FeeVault } from "interfaces/L2/IL1FeeVault.sol";
-import { IOperatorFeeVault } from "interfaces/L2/IOperatorFeeVault.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IOptimismMintableERC721Factory } from "interfaces/L2/IOptimismMintableERC721Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
@@ -28,12 +24,9 @@ abstract contract L2Genesis_TestInit is Test {
         genesis = new L2Genesis();
     }
 
-    function testProxyAdmin() internal view {
-        // Verify owner in the proxy
+    function _assertProxyAdmin() internal view {
         assertEq(input.opChainProxyAdminOwner, IProxyAdmin(Predeploys.PROXY_ADMIN).owner());
 
-        // Verify owner in the implementation to catch storage shifting issues
-        // The implementation is stored in the code namespace
         address proxyAdminImpl = Predeploys.predeployToCodeNamespace(Predeploys.PROXY_ADMIN);
         assertEq(
             input.opChainProxyAdminOwner,
@@ -42,71 +35,77 @@ abstract contract L2Genesis_TestInit is Test {
         );
     }
 
-    function testPredeploys() internal view {
+    function _assertPredeploys() internal view {
         uint160 prefix = uint160(0x420) << 148;
 
         for (uint256 i = 0; i < Predeploys.PREDEPLOY_COUNT; i++) {
             address addr = address(prefix | uint160(i));
-            // If it's not proxied, skip next checks.
             if (Predeploys.notProxied(addr)) {
                 continue;
             }
 
-            // All predeploys should have code
             assertGt(addr.code.length, 0);
-            // All proxied predeploys should have the 1967 admin slot set to the ProxyAdmin
             assertEq(Predeploys.PROXY_ADMIN, EIP1967Helper.getAdmin(addr));
 
-            // If it's not a supported predeploy, skip next checks.
             if (!Predeploys.isSupportedPredeploy(addr)) {
                 continue;
             }
 
-            // All proxied predeploys should have the 1967 admin slot set to the ProxyAdmin
-            // predeploy
             address impl = Predeploys.predeployToCodeNamespace(addr);
+            assertEq(impl, EIP1967Helper.getImplementation(addr));
             assertGt(impl.code.length, 0);
         }
 
         assertGt(Predeploys.WETH.code.length, 0);
     }
 
-    function testVaultsWithoutRevenueShare() internal view {
-        IBaseFeeVault baseFeeVault = IBaseFeeVault(payable(Predeploys.BASE_FEE_VAULT));
-        IL1FeeVault l1FeeVault = IL1FeeVault(payable(Predeploys.L1_FEE_VAULT));
-        ISequencerFeeVault sequencerFeeVault = ISequencerFeeVault(payable(Predeploys.SEQUENCER_FEE_WALLET));
-        IOperatorFeeVault operatorFeeVault = IOperatorFeeVault(payable(Predeploys.OPERATOR_FEE_VAULT));
-
-        assertEq(baseFeeVault.RECIPIENT(), input.baseFeeVaultRecipient);
-        assertEq(baseFeeVault.recipient(), input.baseFeeVaultRecipient);
-        assertEq(baseFeeVault.MIN_WITHDRAWAL_AMOUNT(), input.baseFeeVaultMinimumWithdrawalAmount);
-        assertEq(baseFeeVault.minWithdrawalAmount(), input.baseFeeVaultMinimumWithdrawalAmount);
-        assertEq(uint8(baseFeeVault.WITHDRAWAL_NETWORK()), uint8(input.baseFeeVaultWithdrawalNetwork));
-        assertEq(uint8(baseFeeVault.withdrawalNetwork()), uint8(input.baseFeeVaultWithdrawalNetwork));
-
-        assertEq(l1FeeVault.RECIPIENT(), input.l1FeeVaultRecipient);
-        assertEq(l1FeeVault.recipient(), input.l1FeeVaultRecipient);
-        assertEq(l1FeeVault.MIN_WITHDRAWAL_AMOUNT(), input.l1FeeVaultMinimumWithdrawalAmount);
-        assertEq(l1FeeVault.minWithdrawalAmount(), input.l1FeeVaultMinimumWithdrawalAmount);
-        assertEq(uint8(l1FeeVault.WITHDRAWAL_NETWORK()), uint8(input.l1FeeVaultWithdrawalNetwork));
-        assertEq(uint8(l1FeeVault.withdrawalNetwork()), uint8(input.l1FeeVaultWithdrawalNetwork));
-
-        assertEq(sequencerFeeVault.RECIPIENT(), input.sequencerFeeVaultRecipient);
-        assertEq(sequencerFeeVault.recipient(), input.sequencerFeeVaultRecipient);
-        assertEq(sequencerFeeVault.MIN_WITHDRAWAL_AMOUNT(), input.sequencerFeeVaultMinimumWithdrawalAmount);
-        assertEq(sequencerFeeVault.minWithdrawalAmount(), input.sequencerFeeVaultMinimumWithdrawalAmount);
-        assertEq(uint8(sequencerFeeVault.WITHDRAWAL_NETWORK()), uint8(input.sequencerFeeVaultWithdrawalNetwork));
-        assertEq(uint8(sequencerFeeVault.withdrawalNetwork()), uint8(input.sequencerFeeVaultWithdrawalNetwork));
-
-        assertEq(operatorFeeVault.RECIPIENT(), input.operatorFeeVaultRecipient);
-        assertEq(operatorFeeVault.recipient(), input.operatorFeeVaultRecipient);
-        assertEq(operatorFeeVault.MIN_WITHDRAWAL_AMOUNT(), input.operatorFeeVaultMinimumWithdrawalAmount);
-        assertEq(operatorFeeVault.minWithdrawalAmount(), input.operatorFeeVaultMinimumWithdrawalAmount);
-        assertEq(uint8(operatorFeeVault.WITHDRAWAL_NETWORK()), uint8(input.operatorFeeVaultWithdrawalNetwork));
-        assertEq(uint8(operatorFeeVault.withdrawalNetwork()), uint8(input.operatorFeeVaultWithdrawalNetwork));
+    function _assertFeeVaultsWithoutRevenueShare() internal view {
+        _assertFeeVault(
+            Predeploys.BASE_FEE_VAULT,
+            input.baseFeeVaultRecipient,
+            input.baseFeeVaultMinimumWithdrawalAmount,
+            input.baseFeeVaultWithdrawalNetwork
+        );
+        _assertFeeVault(
+            Predeploys.L1_FEE_VAULT,
+            input.l1FeeVaultRecipient,
+            input.l1FeeVaultMinimumWithdrawalAmount,
+            input.l1FeeVaultWithdrawalNetwork
+        );
+        _assertFeeVault(
+            Predeploys.SEQUENCER_FEE_WALLET,
+            input.sequencerFeeVaultRecipient,
+            input.sequencerFeeVaultMinimumWithdrawalAmount,
+            input.sequencerFeeVaultWithdrawalNetwork
+        );
+        _assertFeeVault(
+            Predeploys.OPERATOR_FEE_VAULT,
+            input.operatorFeeVaultRecipient,
+            input.operatorFeeVaultMinimumWithdrawalAmount,
+            input.operatorFeeVaultWithdrawalNetwork
+        );
     }
 
-    function testFactories() internal view {
+    function _assertFeeVault(
+        address _vault,
+        address _recipient,
+        uint256 _minWithdrawalAmount,
+        uint256 _withdrawalNetwork
+    )
+        internal
+        view
+    {
+        IFeeVault vault = IFeeVault(payable(_vault));
+
+        assertEq(vault.RECIPIENT(), _recipient);
+        assertEq(vault.recipient(), _recipient);
+        assertEq(vault.MIN_WITHDRAWAL_AMOUNT(), _minWithdrawalAmount);
+        assertEq(vault.minWithdrawalAmount(), _minWithdrawalAmount);
+        assertEq(uint256(vault.WITHDRAWAL_NETWORK()), _withdrawalNetwork);
+        assertEq(uint256(vault.withdrawalNetwork()), _withdrawalNetwork);
+    }
+
+    function _assertFactories() internal view {
         IOptimismMintableERC20Factory erc20Factory =
             IOptimismMintableERC20Factory(payable(Predeploys.OPTIMISM_MINTABLE_ERC20_FACTORY));
         IOptimismMintableERC721Factory erc721Factory =
@@ -117,12 +116,12 @@ abstract contract L2Genesis_TestInit is Test {
         assertEq(erc721Factory.remoteChainID(), input.l1ChainID);
     }
 
-    function testForks() internal view {
-        // The fork should be set to Isthmus at least. Check by validating the GasPriceOracle
+    function _assertForks() internal view {
         IGasPriceOracle gasPriceOracle = IGasPriceOracle(payable(Predeploys.GAS_PRICE_ORACLE));
-        assertEq(gasPriceOracle.isEcotone(), true);
-        assertEq(gasPriceOracle.isFjord(), true);
-        assertEq(gasPriceOracle.isIsthmus(), true);
+        assertTrue(gasPriceOracle.isEcotone());
+        assertTrue(gasPriceOracle.isFjord());
+        assertTrue(gasPriceOracle.isIsthmus());
+        assertTrue(gasPriceOracle.isJovian());
     }
 }
 
@@ -131,26 +130,26 @@ abstract contract L2Genesis_TestInit is Test {
 contract L2Genesis_Run_Test is L2Genesis_TestInit {
     function setUp() public override {
         super.setUp();
-        // Set up default input configuration
+
         input = L2Genesis.Input({
             l1ChainID: 1,
             l2ChainID: 2,
-            l1CrossDomainMessengerProxy: payable(address(0x0000000000000000000000000000000000000001)),
-            l1StandardBridgeProxy: payable(address(0x0000000000000000000000000000000000000002)),
-            l1ERC721BridgeProxy: payable(address(0x0000000000000000000000000000000000000003)),
-            opChainProxyAdminOwner: address(0x0000000000000000000000000000000000000004),
-            sequencerFeeVaultRecipient: address(0x0000000000000000000000000000000000000005),
+            l1CrossDomainMessengerProxy: payable(makeAddr("L1CrossDomainMessengerProxy")),
+            l1StandardBridgeProxy: payable(makeAddr("L1StandardBridgeProxy")),
+            l1ERC721BridgeProxy: payable(makeAddr("L1ERC721BridgeProxy")),
+            opChainProxyAdminOwner: makeAddr("ProxyAdminOwner"),
+            sequencerFeeVaultRecipient: makeAddr("SequencerFeeVaultRecipient"),
             sequencerFeeVaultMinimumWithdrawalAmount: 1,
-            sequencerFeeVaultWithdrawalNetwork: 1,
-            baseFeeVaultRecipient: address(0x0000000000000000000000000000000000000006),
+            sequencerFeeVaultWithdrawalNetwork: uint256(Types.WithdrawalNetwork.L2),
+            baseFeeVaultRecipient: makeAddr("BaseFeeVaultRecipient"),
             baseFeeVaultMinimumWithdrawalAmount: 1,
-            baseFeeVaultWithdrawalNetwork: 1,
-            l1FeeVaultRecipient: address(0x0000000000000000000000000000000000000007),
+            baseFeeVaultWithdrawalNetwork: uint256(Types.WithdrawalNetwork.L2),
+            l1FeeVaultRecipient: makeAddr("L1FeeVaultRecipient"),
             l1FeeVaultMinimumWithdrawalAmount: 1,
-            l1FeeVaultWithdrawalNetwork: 1,
-            operatorFeeVaultRecipient: address(0x0000000000000000000000000000000000000008),
+            l1FeeVaultWithdrawalNetwork: uint256(Types.WithdrawalNetwork.L2),
+            operatorFeeVaultRecipient: makeAddr("OperatorFeeVaultRecipient"),
             operatorFeeVaultMinimumWithdrawalAmount: 1,
-            operatorFeeVaultWithdrawalNetwork: 1,
+            operatorFeeVaultWithdrawalNetwork: uint256(Types.WithdrawalNetwork.L2),
             fork: uint256(LATEST_FORK),
             fundDevAccounts: true
         });
@@ -159,9 +158,10 @@ contract L2Genesis_Run_Test is L2Genesis_TestInit {
     function test_run_succeeds() external {
         genesis.run(input);
 
-        testProxyAdmin();
-        testPredeploys();
-        testFactories();
-        testForks();
+        _assertProxyAdmin();
+        _assertPredeploys();
+        _assertFeeVaultsWithoutRevenueShare();
+        _assertFactories();
+        _assertForks();
     }
 }
