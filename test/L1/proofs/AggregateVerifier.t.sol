@@ -97,8 +97,8 @@ contract AggregateVerifierTest is BaseTest {
         vm.expectRevert(GameNotResolved.selector);
         game.claimCredit();
 
-        // Resolve after 7 days
-        vm.warp(block.timestamp + 7 days);
+        // Resolve after SLOW_FINALIZATION_DELAY
+        vm.warp(block.timestamp + SLOW_FINALIZATION_DELAY);
         game.resolve();
         assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
 
@@ -127,8 +127,8 @@ contract AggregateVerifierTest is BaseTest {
             ZK_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
         );
 
-        // Resolve after 7 days
-        vm.warp(block.timestamp + 7 days);
+        // Resolve after SLOW_FINALIZATION_DELAY
+        vm.warp(block.timestamp + SLOW_FINALIZATION_DELAY);
         game.resolve();
         assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
 
@@ -161,8 +161,8 @@ contract AggregateVerifierTest is BaseTest {
         _provideProof(game, ZK_PROVER, zkProof);
         assertEq(game.proofCount(), 2);
 
-        // Resolve after 1 day (FAST_FINALIZATION_DELAY with 2 proofs)
-        vm.warp(block.timestamp + 1 days);
+        // Resolve after FAST_FINALIZATION_DELAY (2 proofs)
+        vm.warp(block.timestamp + FAST_FINALIZATION_DELAY);
         game.resolve();
         assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
 
@@ -193,9 +193,9 @@ contract AggregateVerifierTest is BaseTest {
         );
 
         Timestamp originalExpectedResolution = game.expectedResolution();
-        assertEq(originalExpectedResolution.raw(), block.timestamp + 7 days);
+        assertEq(originalExpectedResolution.raw(), block.timestamp + SLOW_FINALIZATION_DELAY);
 
-        vm.warp(block.timestamp + 7 days - 1);
+        vm.warp(block.timestamp + SLOW_FINALIZATION_DELAY - 1);
         // Cannot resolve yet
         vm.expectRevert(AggregateVerifier.GameNotOver.selector);
         game.resolve();
