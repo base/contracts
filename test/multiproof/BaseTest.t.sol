@@ -40,6 +40,8 @@ contract BaseTest is Test {
     uint256 public constant DELAYED_WETH_DELAY = 1 days;
     // Finality delay handled by the AggregateVerifier
     uint256 public constant FINALITY_DELAY = 0 days;
+    uint256 public SLOW_FINALIZATION_DELAY;
+    uint256 public FAST_FINALIZATION_DELAY;
 
     uint256 public currentL2BlockNumber = 0;
 
@@ -68,6 +70,11 @@ contract BaseTest is Test {
 
         // Deploy the implementations
         _deployAndSetAggregateVerifier();
+
+        AggregateVerifier aggregateVerifierImpl =
+            AggregateVerifier(address(factory.gameImpls(AGGREGATE_VERIFIER_GAME_TYPE)));
+        SLOW_FINALIZATION_DELAY = aggregateVerifierImpl.SLOW_FINALIZATION_DELAY();
+        FAST_FINALIZATION_DELAY = aggregateVerifierImpl.FAST_FINALIZATION_DELAY();
 
         anchorStateRegistry.setRespectedGameType(AGGREGATE_VERIFIER_GAME_TYPE);
 

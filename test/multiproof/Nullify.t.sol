@@ -84,7 +84,7 @@ contract NullifyTest is BaseTest {
         bytes memory zkProof = _generateProof("zk-proof-2", AggregateVerifier.ProofType.ZK);
         game.verifyProposalProof(zkProof);
 
-        assertEq(game.expectedResolution().raw(), block.timestamp + 1 days);
+        assertEq(game.expectedResolution().raw(), block.timestamp + FAST_FINALIZATION_DELAY);
 
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
         bytes memory teeProof2 = _generateProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
@@ -93,7 +93,7 @@ contract NullifyTest is BaseTest {
         assertEq(uint8(game.status()), uint8(GameStatus.IN_PROGRESS));
         assertEq(game.bondRecipient(), TEE_PROVER);
         assertEq(game.proofCount(), 1);
-        assertEq(game.expectedResolution().raw(), block.timestamp + 7 days);
+        assertEq(game.expectedResolution().raw(), block.timestamp + SLOW_FINALIZATION_DELAY);
     }
 
     function testZKNullifyFailsIfNoZKProof() public {
@@ -124,7 +124,7 @@ contract NullifyTest is BaseTest {
         );
 
         // Resolve game1
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + SLOW_FINALIZATION_DELAY);
         game1.resolve();
 
         // Try to nullify game1
@@ -158,8 +158,8 @@ contract NullifyTest is BaseTest {
 
         assertEq(game1.bondRecipient(), TEE_PROVER);
 
-        // After nullify, only TEE proof remains; expectedResolution = now + 7 days
-        vm.warp(block.timestamp + 7 days);
+        // After nullify, only TEE proof remains; expectedResolution = now + SLOW_FINALIZATION_DELAY
+        vm.warp(block.timestamp + SLOW_FINALIZATION_DELAY);
         game1.resolve();
 
         uint256 balanceBefore = game1.gameCreator().balance;
@@ -190,7 +190,7 @@ contract NullifyTest is BaseTest {
         AggregateVerifier gameB =
             _createAggregateVerifierGame(TEE_PROVER, rootClaimB, currentL2BlockNumber, address(gameA), teeProofB);
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + SLOW_FINALIZATION_DELAY);
         assertTrue(gameA.gameOver());
         assertEq(gameA.proofCount(), 1);
 
@@ -228,7 +228,7 @@ contract NullifyTest is BaseTest {
         AggregateVerifier gameB =
             _createAggregateVerifierGame(ZK_PROVER, rootClaimB, currentL2BlockNumber, address(gameA), zkProofB);
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + SLOW_FINALIZATION_DELAY);
         assertTrue(gameA.gameOver());
         assertEq(gameA.proofCount(), 1);
 
@@ -248,9 +248,9 @@ contract NullifyTest is BaseTest {
         gameA.resolve();
     }
 
-    /// @notice With TEE + ZK, the fast window is 1 day. Another game nullifies the shared ZK verifier; the first
-    ///         `resolve` persists the ZK refutation and returns `IN_PROGRESS`. After `SLOW_FINALIZATION_DELAY`
-    ///         (7 days) from that moment, a second `resolve` finalizes with only the TEE proof.
+    /// @notice With TEE + ZK, the fast window is `FAST_FINALIZATION_DELAY`. Another game nullifies the shared ZK
+    ///         verifier; the first `resolve` persists the ZK refutation and returns `IN_PROGRESS`. After
+    ///         `SLOW_FINALIZATION_DELAY` from that moment, a second `resolve` finalizes with only the TEE proof.
     function testTwoProofsResolveDelayedAfterExternalVerifierNullify() public {
         currentL2BlockNumber += BLOCK_INTERVAL;
 
@@ -265,9 +265,9 @@ contract NullifyTest is BaseTest {
         gameA.verifyProposalProof(zkProofA);
 
         assertEq(gameA.proofCount(), 2);
-        assertEq(gameA.expectedResolution().raw(), block.timestamp + 1 days);
+        assertEq(gameA.expectedResolution().raw(), block.timestamp + FAST_FINALIZATION_DELAY);
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + FAST_FINALIZATION_DELAY);
         assertTrue(gameA.gameOver());
 
         currentL2BlockNumber += BLOCK_INTERVAL;
@@ -284,9 +284,9 @@ contract NullifyTest is BaseTest {
 
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
         assertEq(gameA.proofCount(), 1);
-        assertEq(gameA.expectedResolution().raw(), block.timestamp + 7 days);
+        assertEq(gameA.expectedResolution().raw(), block.timestamp + SLOW_FINALIZATION_DELAY);
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + SLOW_FINALIZATION_DELAY);
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.DEFENDER_WINS));
         assertEq(uint8(gameA.status()), uint8(GameStatus.DEFENDER_WINS));
     }

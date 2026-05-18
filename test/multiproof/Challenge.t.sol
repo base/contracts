@@ -35,7 +35,7 @@ contract ChallengeTest is BaseTest {
         assertEq(game.proofCount(), 2);
 
         // Resolve after SLOW_FINALIZATION_DELAY
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + SLOW_FINALIZATION_DELAY);
         game.resolve();
 
         assertEq(uint8(game.status()), uint8(GameStatus.CHALLENGER_WINS));
@@ -97,7 +97,7 @@ contract ChallengeTest is BaseTest {
         );
 
         // Resolve game1
-        vm.warp(block.timestamp + 7 days + 1);
+        vm.warp(block.timestamp + SLOW_FINALIZATION_DELAY + 1);
         game1.resolve();
 
         // Try to challenge game1
@@ -245,7 +245,7 @@ contract ChallengeTest is BaseTest {
         assertEq(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
         assertEq(address(gameA.zkProver()), address(0));
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + SLOW_FINALIZATION_DELAY);
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.DEFENDER_WINS));
         assertEq(gameA.bondRecipient(), TEE_PROVER);
 
@@ -295,7 +295,7 @@ contract ChallengeTest is BaseTest {
         assertEq(address(gameA.teeProver()), address(0));
         assertEq(gameA.zkProver(), ZK_PROVER);
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + SLOW_FINALIZATION_DELAY);
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.CHALLENGER_WINS));
         assertEq(gameA.bondRecipient(), ZK_PROVER);
 
