@@ -48,7 +48,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     //                         Constants                          //
     ////////////////////////////////////////////////////////////////
     /// @notice The slow finalization delay.
-    uint64 public constant SLOW_FINALIZATION_DELAY = 7 days;
+    uint64 public constant SLOW_FINALIZATION_DELAY = 5 days;
 
     /// @notice The fast finalization delay.
     uint64 public constant FAST_FINALIZATION_DELAY = 1 days;
