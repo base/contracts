@@ -64,7 +64,7 @@ contract RelayActor {
         if (!shouldFail) {
             vm.expectCallMinGas(IDENTITY_PRECOMPILE, _value, minGasLimit, _message);
         }
-        vm.prank(op);
+        vm.prank(op, op);
         try xdm.relayMessage{ gas: gas, value: _value }(
             nonce, Predeploys.L2_CROSS_DOMAIN_MESSENGER, IDENTITY_PRECOMPILE, _value, relayMinGasLimit, _message
         ) { }
