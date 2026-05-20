@@ -6,7 +6,7 @@ import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { GameStatus, Hash } from "src/libraries/bridge/Types.sol";
+import { GameStatus, GameTypes, Hash } from "src/libraries/bridge/Types.sol";
 import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
@@ -23,7 +23,7 @@ contract AggregateVerifierTest is BaseTest {
 
     function setUp() public override {
         super.setUp();
-        aggregateVerifierImpl = AggregateVerifier(address(factory.gameImpls(AGGREGATE_VERIFIER_GAME_TYPE)));
+        aggregateVerifierImpl = AggregateVerifier(address(factory.gameImpls(GameTypes.AGGREGATE_VERIFIER)));
     }
 
     function testInitializeWithTEEProof() public {
@@ -45,7 +45,7 @@ contract AggregateVerifierTest is BaseTest {
 
         vm.prank(TEE_PROVER);
         vm.expectRevert(BadExtraData.selector);
-        factory.createWithInitData{ value: INIT_BOND }(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, initData);
+        factory.createWithInitData{ value: INIT_BOND }(GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, initData);
     }
 
     function testUpdatingAnchorStateRegistryWithTEEProof() public {
@@ -146,7 +146,7 @@ contract AggregateVerifierTest is BaseTest {
             TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), teeProof
         );
 
-        Hash gameId = factory.getGameUUID(AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, game.extraData());
+        Hash gameId = factory.getGameUUID(GameTypes.AGGREGATE_VERIFIER, rootClaim, game.extraData());
         vm.expectRevert(abi.encodeWithSelector(IDisputeGameFactory.GameAlreadyExists.selector, gameId));
         _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), zkProof);
     }
@@ -305,7 +305,7 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(game.l2SequenceNumber(), currentL2BlockNumber);
         assertEq(game.rootClaim().raw(), rootClaim.raw());
         assertEq(game.parentAddress(), address(anchorStateRegistry));
-        assertEq(game.gameType().raw(), AGGREGATE_VERIFIER_GAME_TYPE.raw());
+        assertEq(game.gameType().raw(), GameTypes.AGGREGATE_VERIFIER.raw());
         assertEq(game.gameCreator(), expectedCreator);
         bytes memory intermediateOutputRoots = game.intermediateOutputRoots();
         assertEq(
@@ -387,7 +387,7 @@ contract AggregateVerifierTest is BaseTest {
         private
         returns (AggregateVerifier)
     {
-        IDisputeGame impl = factory.gameImpls(AGGREGATE_VERIFIER_GAME_TYPE);
+        IDisputeGame impl = factory.gameImpls(GameTypes.AGGREGATE_VERIFIER);
         bytes memory extraData = _aggregateVerifierExtraData(rootClaim, l2BlockNumber, parentAddress);
         bytes32 l1Head = blockhash(block.number - 1);
         address clone = address(impl).clone(abi.encodePacked(creator, rootClaim, l1Head, extraData));
@@ -407,7 +407,7 @@ contract AggregateVerifierTest is BaseTest {
         returns (AggregateVerifier)
     {
         return new AggregateVerifier(
-            AGGREGATE_VERIFIER_GAME_TYPE,
+            GameTypes.AGGREGATE_VERIFIER,
             IAnchorStateRegistry(address(anchorStateRegistry)),
             IDelayedWETH(payable(address(delayedWETH))),
             IVerifier(address(teeVerifier)),

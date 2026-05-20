@@ -11,7 +11,7 @@ import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
@@ -25,7 +25,6 @@ import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 
 contract BaseTest is Test {
-    GameType internal constant AGGREGATE_VERIFIER_GAME_TYPE = GameType.wrap(621);
     uint256 internal constant L2_CHAIN_ID = 8453;
 
     // AggregateVerifier expects evenly spaced intermediate roots.
@@ -64,7 +63,7 @@ contract BaseTest is Test {
 
         _deployAndSetAggregateVerifier();
 
-        anchorStateRegistry.setRespectedGameType(AGGREGATE_VERIFIER_GAME_TYPE);
+        anchorStateRegistry.setRespectedGameType(GameTypes.AGGREGATE_VERIFIER);
 
         // Games created at or before the registry's retirement timestamp are invalid.
         vm.warp(block.timestamp + 1);
@@ -108,7 +107,7 @@ contract BaseTest is Test {
 
     function _deployAndSetAggregateVerifier() internal {
         AggregateVerifier aggregateVerifierImpl = new AggregateVerifier(
-            AGGREGATE_VERIFIER_GAME_TYPE,
+            GameTypes.AGGREGATE_VERIFIER,
             IAnchorStateRegistry(address(anchorStateRegistry)),
             IDelayedWETH(payable(address(delayedWETH))),
             IVerifier(address(teeVerifier)),
@@ -121,8 +120,8 @@ contract BaseTest is Test {
             INTERMEDIATE_BLOCK_INTERVAL
         );
 
-        factory.setImplementation(AGGREGATE_VERIFIER_GAME_TYPE, IDisputeGame(address(aggregateVerifierImpl)));
-        factory.setInitBond(AGGREGATE_VERIFIER_GAME_TYPE, INIT_BOND);
+        factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(aggregateVerifierImpl)));
+        factory.setInitBond(GameTypes.AGGREGATE_VERIFIER, INIT_BOND);
     }
 
     function _createAggregateVerifierGame(
@@ -142,7 +141,7 @@ contract BaseTest is Test {
         return AggregateVerifier(
             address(
                 factory.createWithInitData{ value: INIT_BOND }(
-                    AGGREGATE_VERIFIER_GAME_TYPE, rootClaim, extraData, proof
+                    GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, proof
                 )
             )
         );
