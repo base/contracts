@@ -14,10 +14,8 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
+import { Proxy } from "src/universal/Proxy.sol";
 import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
-import {
-    TransparentUpgradeableProxy
-} from "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
@@ -89,7 +87,9 @@ contract BaseTest is Test {
     }
 
     function _deployProxy(address implementation) private returns (address) {
-        return address(new TransparentUpgradeableProxy(implementation, address(proxyAdmin), ""));
+        Proxy proxy = new Proxy(address(proxyAdmin));
+        proxyAdmin.upgrade(payable(address(proxy)), implementation);
+        return address(proxy);
     }
 
     function _initializeProxies() internal {

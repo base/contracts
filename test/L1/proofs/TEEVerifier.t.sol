@@ -3,9 +3,7 @@ pragma solidity 0.8.15;
 
 import { Test } from "lib/forge-std/src/Test.sol";
 
-import {
-    TransparentUpgradeableProxy
-} from "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { Proxy } from "src/universal/Proxy.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
@@ -57,9 +55,11 @@ contract TEEVerifierTest is Test {
         DevTEEProverRegistry impl =
             new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(mockFactory)));
 
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+        address proxyAdmin = makeAddr("proxy-admin");
+        Proxy proxy = new Proxy(proxyAdmin);
+        vm.prank(proxyAdmin);
+        proxy.upgradeToAndCall(
             address(impl),
-            makeAddr("proxy-admin"),
             abi.encodeCall(
                 TEEProverRegistry.initialize, (address(this), address(this), new address[](0), TEST_GAME_TYPE)
             )
