@@ -358,7 +358,14 @@ abstract contract StandardBridge is Initializable {
 
             IOptimismMintableERC20(_localToken).burn(_from, _amount);
         } else {
+            // Reject fee-on-transfer and rebasing tokens by requiring the bridge's balance to
+            // increase by exactly `_amount`. Without this check, the bridge would credit and
+            // forward `_amount` to the remote chain while holding less than `_amount` in escrow,
+            // leading to under-collateralized representations and eventual withdrawal failures.
+            uint256 balanceBefore = IERC20(_localToken).balanceOf(address(this));
             IERC20(_localToken).safeTransferFrom(_from, address(this), _amount);
+            uint256 received = IERC20(_localToken).balanceOf(address(this)) - balanceBefore;
+            require(received == _amount, "StandardBridge: amount received does not match amount transferred");
             deposits[_localToken][_remoteToken] = deposits[_localToken][_remoteToken] + _amount;
         }
 
