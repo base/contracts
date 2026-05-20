@@ -625,15 +625,23 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      * to the trusted intermediate certificates set. This optimizes future verifications
      * by expanding the known trusted certificate set based on successful verifications.
      *
-     * Revoked entries are skipped: once `revokedCerts[certHash]` is set by `revokeCert`,
-     * no successful verification will silently restore the cache, regardless of the
-     * journal's `trustedCertsPrefixLen`. Re-trust requires an explicit `unrevokeCert`.
+     * Revoked entries terminate caching: once `revokedCerts[certHash]` is set by
+     * `revokeCert`, no successful verification will silently restore the cache,
+     * regardless of the journal's `trustedCertsPrefixLen`. Because `certs[i+1]` is
+     * signed by `certs[i]`, every descendant of a revoked cert inherits its trust
+     * from a revoked parent and must not be cached either — so we `break` rather
+     * than `continue` on the first revoked entry, matching `checkTrustedIntermediateCerts`.
+     *
+     * Note: in current control flow this guard is unreachable because `_verifyJournal`
+     * Pass 2 already rejects any journal whose suffix contains a revoked digest before
+     * `_cacheNewCert` is invoked. The check is retained as defense-in-depth against
+     * future refactors. Re-trust requires an explicit `unrevokeCert`.
      */
     function _cacheNewCert(VerifierJournal memory journal) internal {
         for (uint256 i = journal.trustedCertsPrefixLen; i < journal.certs.length; i++) {
             bytes32 certHash = journal.certs[i];
             if (revokedCerts[certHash]) {
-                continue;
+                break;
             }
             trustedIntermediateCerts[certHash] = journal.certExpiries[i];
         }
