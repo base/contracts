@@ -44,6 +44,7 @@ contract NitroEnclaveVerifierTest is Test {
 
     // Expiry timestamps for test certs (well after REALISTIC_TIMESTAMP)
     uint64 internal constant INTERMEDIATE_CERT_1_EXPIRY = 1_800_000_000; // ~2027
+    uint64 internal constant INTERMEDIATE_CERT_2_EXPIRY = 1_750_000_000; // ~2025
     uint64 internal constant ROOT_CERT_EXPIRY = 1_900_000_000;
     uint64 internal constant NEW_LEAF_CERT_EXPIRY = 1_700_100_000; // ~28 hours after REALISTIC_TIMESTAMP
 
