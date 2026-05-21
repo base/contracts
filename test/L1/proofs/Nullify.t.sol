@@ -103,7 +103,7 @@ contract NullifyTest is BaseTest {
 
     /// @notice With TEE + ZK, the fast window is 1 day. Another game nullifies the shared ZK verifier; the first
     ///         `resolve` persists the ZK refutation and returns `IN_PROGRESS`. After `SLOW_FINALIZATION_DELAY`
-    ///         (7 days) from that moment, a second `resolve` finalizes with only the TEE proof.
+    ///         from that moment, a second `resolve` finalizes with only the TEE proof.
     function testTwoProofsResolveDelayedAfterExternalVerifierNullify() public {
         AggregateVerifier gameA = _createGame(
             TEE_PROVER, "dual-a", "tee-dual-a", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
