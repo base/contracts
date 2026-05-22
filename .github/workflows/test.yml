@@ -53,6 +53,25 @@ jobs:
         run: just forge-build
         id: build
 
+      - name: Run Forge coverage
+        run: just coverage-lcov
+        id: coverage
+
+      - name: Check coverage threshold
+        run: |
+          LH=$(grep "^LH:" lcov.info | cut -d: -f2 | paste -sd+ | bc)
+          LF=$(grep "^LF:" lcov.info | cut -d: -f2 | paste -sd+ | bc)
+          echo "Lines covered: $LH / $LF"
+          PERCENT=$((LH * 100 / LF))
+          echo "Coverage: $PERCENT% (threshold: 70%)"
+          if [ "$PERCENT" -lt 70 ]; then echo "FAIL: coverage below 70%"; exit 1; fi
+
+      - name: Run semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: p/security-audit p/severity-high
+        continue-on-error: false
+
       - name: Validate semver-lock
         id: semver-lock
         run: |

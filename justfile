@@ -291,7 +291,7 @@ validate-spacers: build validate-spacers-no-build
 
 # Runs semgrep on the contracts.
 semgrep:
-  cd ../../ && semgrep scan --config .semgrep/rules/ ./packages/contracts-bedrock
+  cd ../../ && semgrep scan --config .semgrep/rules/ ./src
 
 # Runs semgrep tests.
 semgrep-test:
