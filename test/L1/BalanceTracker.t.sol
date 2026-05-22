@@ -17,25 +17,24 @@ contract BalanceTrackerTest is Test {
 
     uint256 constant MAX_SYSTEM_ADDRESS_COUNT = 20;
     uint256 constant INITIAL_BALANCE_TRACKER_BALANCE = 2_000 ether;
+    uint256 constant BATCH_SENDER_TARGET_BALANCE = 1_000 ether;
+    uint256 constant L2_OUTPUT_PROPOSER_TARGET_BALANCE = 100 ether;
 
-    Proxy balanceTrackerProxy;
-    BalanceTracker balanceTrackerImplementation;
+    address payable constant L1_STANDARD_BRIDGE = payable(address(1000));
+    address payable constant PROFIT_WALLET = payable(address(1001));
+    address payable constant BATCH_SENDER = payable(address(1002));
+    address payable constant L2_OUTPUT_PROPOSER = payable(address(1003));
+    address constant PROXY_ADMIN_OWNER = address(2048);
+
     BalanceTracker balanceTracker;
 
-    address payable l1StandardBridge = payable(address(1000));
-    address payable profitWallet = payable(address(1001));
-    address payable batchSender = payable(address(1002));
-    address payable l2OutputProposer = payable(address(1003));
-    uint256 batchSenderTargetBalance = 1_000 ether;
-    uint256 l2OutputProposerTargetBalance = 100 ether;
-    address payable[] systemAddresses = [batchSender, l2OutputProposer];
-    uint256[] targetBalances = [batchSenderTargetBalance, l2OutputProposerTargetBalance];
-    address proxyAdminOwner = address(2048);
+    address payable[] systemAddresses = [BATCH_SENDER, L2_OUTPUT_PROPOSER];
+    uint256[] targetBalances = [BATCH_SENDER_TARGET_BALANCE, L2_OUTPUT_PROPOSER_TARGET_BALANCE];
 
     function setUp() public {
-        balanceTrackerImplementation = new BalanceTracker(profitWallet);
-        balanceTrackerProxy = new Proxy(proxyAdminOwner);
-        vm.prank(proxyAdminOwner);
+        BalanceTracker balanceTrackerImplementation = new BalanceTracker(PROFIT_WALLET);
+        Proxy balanceTrackerProxy = new Proxy(PROXY_ADMIN_OWNER);
+        vm.prank(PROXY_ADMIN_OWNER);
         balanceTrackerProxy.upgradeTo(address(balanceTrackerImplementation));
         balanceTracker = BalanceTracker(payable(address(balanceTrackerProxy)));
     }
@@ -46,10 +45,10 @@ contract BalanceTrackerTest is Test {
     }
 
     function test_constructor_success() external {
-        balanceTracker = new BalanceTracker(profitWallet);
+        BalanceTracker tracker = new BalanceTracker(PROFIT_WALLET);
 
-        assertEq(balanceTracker.MAX_SYSTEM_ADDRESS_COUNT(), MAX_SYSTEM_ADDRESS_COUNT);
-        assertEq(balanceTracker.PROFIT_WALLET(), profitWallet);
+        assertEq(tracker.MAX_SYSTEM_ADDRESS_COUNT(), MAX_SYSTEM_ADDRESS_COUNT);
+        assertEq(tracker.PROFIT_WALLET(), PROFIT_WALLET);
     }
 
     function test_initializer_fail_systemAddresses_zeroLength() external {
@@ -59,12 +58,11 @@ contract BalanceTrackerTest is Test {
     }
 
     function test_initializer_fail_systemAddresses_greaterThanMaxLength() external {
-        for (; systemAddresses.length <= balanceTracker.MAX_SYSTEM_ADDRESS_COUNT();) {
-            systemAddresses.push(payable(address(0)));
-        }
+        address payable[] memory oversizedSystemAddresses = new address payable[](MAX_SYSTEM_ADDRESS_COUNT + 1);
+        uint256[] memory oversizedTargetBalances = new uint256[](MAX_SYSTEM_ADDRESS_COUNT + 1);
 
         vm.expectRevert("BalanceTracker: systemAddresses cannot have a length greater than 20");
-        balanceTracker.initialize(systemAddresses, targetBalances);
+        balanceTracker.initialize(oversizedSystemAddresses, oversizedTargetBalances);
     }
 
     function test_initializer_fail_systemAddresses_lengthNotEqualToTargetBalancesLength() external {
@@ -99,24 +97,20 @@ contract BalanceTrackerTest is Test {
 
     function test_processFees_success_cannotBeReentered() external {
         vm.deal(address(balanceTracker), INITIAL_BALANCE_TRACKER_BALANCE);
-        uint256 expectedProfitWalletBalance = INITIAL_BALANCE_TRACKER_BALANCE - l2OutputProposerTargetBalance;
+        uint256 expectedProfitWalletBalance = INITIAL_BALANCE_TRACKER_BALANCE - L2_OUTPUT_PROPOSER_TARGET_BALANCE;
         address payable reentrancySystemAddress = payable(address(new ReenterProcessFees()));
         systemAddresses[0] = reentrancySystemAddress;
         balanceTracker.initialize(systemAddresses, targetBalances);
 
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(reentrancySystemAddress, false, batchSenderTargetBalance, batchSenderTargetBalance);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(l2OutputProposer, true, l2OutputProposerTargetBalance, l2OutputProposerTargetBalance);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit SentProfit(profitWallet, true, expectedProfitWalletBalance);
+        _expectProcessedFunds(reentrancySystemAddress, false, BATCH_SENDER_TARGET_BALANCE, BATCH_SENDER_TARGET_BALANCE);
+        _expectProcessedFunds(
+            L2_OUTPUT_PROPOSER, true, L2_OUTPUT_PROPOSER_TARGET_BALANCE, L2_OUTPUT_PROPOSER_TARGET_BALANCE
+        );
+        _expectSentProfit(expectedProfitWalletBalance);
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, 0);
-        assertEq(profitWallet.balance, expectedProfitWalletBalance);
-        assertEq(batchSender.balance, 0);
-        assertEq(l2OutputProposer.balance, l2OutputProposerTargetBalance);
+        _assertBalances(0, expectedProfitWalletBalance, 0, L2_OUTPUT_PROPOSER_TARGET_BALANCE);
     }
 
     function test_processFees_fail_whenNotInitialized() external {
@@ -127,131 +121,138 @@ contract BalanceTrackerTest is Test {
 
     function test_processFees_success_continuesWhenSystemAddressReverts() external {
         vm.deal(address(balanceTracker), INITIAL_BALANCE_TRACKER_BALANCE);
-        uint256 expectedProfitWalletBalance = INITIAL_BALANCE_TRACKER_BALANCE - l2OutputProposerTargetBalance;
+        uint256 expectedProfitWalletBalance = INITIAL_BALANCE_TRACKER_BALANCE - L2_OUTPUT_PROPOSER_TARGET_BALANCE;
         balanceTracker.initialize(systemAddresses, targetBalances);
-        vm.mockCallRevert(batchSender, bytes(""), abi.encode("revert message"));
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(batchSender, false, batchSenderTargetBalance, batchSenderTargetBalance);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(l2OutputProposer, true, l2OutputProposerTargetBalance, l2OutputProposerTargetBalance);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit SentProfit(profitWallet, true, expectedProfitWalletBalance);
+        vm.mockCallRevert(BATCH_SENDER, bytes(""), abi.encode("revert message"));
+        _expectProcessedFunds(BATCH_SENDER, false, BATCH_SENDER_TARGET_BALANCE, BATCH_SENDER_TARGET_BALANCE);
+        _expectProcessedFunds(
+            L2_OUTPUT_PROPOSER, true, L2_OUTPUT_PROPOSER_TARGET_BALANCE, L2_OUTPUT_PROPOSER_TARGET_BALANCE
+        );
+        _expectSentProfit(expectedProfitWalletBalance);
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, 0);
-        assertEq(profitWallet.balance, expectedProfitWalletBalance);
-        assertEq(batchSender.balance, 0);
-        assertEq(l2OutputProposer.balance, l2OutputProposerTargetBalance);
+        _assertBalances(0, expectedProfitWalletBalance, 0, L2_OUTPUT_PROPOSER_TARGET_BALANCE);
     }
 
     function test_processFees_success_fundsSystemAddresses() external {
         vm.deal(address(balanceTracker), INITIAL_BALANCE_TRACKER_BALANCE);
         uint256 expectedProfitWalletBalance =
-            INITIAL_BALANCE_TRACKER_BALANCE - batchSenderTargetBalance - l2OutputProposerTargetBalance;
+            INITIAL_BALANCE_TRACKER_BALANCE - BATCH_SENDER_TARGET_BALANCE - L2_OUTPUT_PROPOSER_TARGET_BALANCE;
         balanceTracker.initialize(systemAddresses, targetBalances);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(batchSender, true, batchSenderTargetBalance, batchSenderTargetBalance);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(l2OutputProposer, true, l2OutputProposerTargetBalance, l2OutputProposerTargetBalance);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit SentProfit(profitWallet, true, expectedProfitWalletBalance);
+        _expectProcessedFunds(BATCH_SENDER, true, BATCH_SENDER_TARGET_BALANCE, BATCH_SENDER_TARGET_BALANCE);
+        _expectProcessedFunds(
+            L2_OUTPUT_PROPOSER, true, L2_OUTPUT_PROPOSER_TARGET_BALANCE, L2_OUTPUT_PROPOSER_TARGET_BALANCE
+        );
+        _expectSentProfit(expectedProfitWalletBalance);
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, 0);
-        assertEq(profitWallet.balance, expectedProfitWalletBalance);
-        assertEq(batchSender.balance, batchSenderTargetBalance);
-        assertEq(l2OutputProposer.balance, l2OutputProposerTargetBalance);
+        _assertBalances(0, expectedProfitWalletBalance, BATCH_SENDER_TARGET_BALANCE, L2_OUTPUT_PROPOSER_TARGET_BALANCE);
     }
 
     function test_processFees_success_noFunds() external {
         balanceTracker.initialize(systemAddresses, targetBalances);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(batchSender, true, batchSenderTargetBalance, 0);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(l2OutputProposer, true, l2OutputProposerTargetBalance, 0);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit SentProfit(profitWallet, true, 0);
+        _expectProcessedFunds(BATCH_SENDER, true, BATCH_SENDER_TARGET_BALANCE, 0);
+        _expectProcessedFunds(L2_OUTPUT_PROPOSER, true, L2_OUTPUT_PROPOSER_TARGET_BALANCE, 0);
+        _expectSentProfit(0);
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, 0);
-        assertEq(profitWallet.balance, 0);
-        assertEq(batchSender.balance, 0);
-        assertEq(l2OutputProposer.balance, 0);
+        _assertBalances(0, 0, 0, 0);
     }
 
     function test_processFees_success_partialFunds() external {
         uint256 partialBalanceTrackerBalance = INITIAL_BALANCE_TRACKER_BALANCE / 3;
         vm.deal(address(balanceTracker), partialBalanceTrackerBalance);
         balanceTracker.initialize(systemAddresses, targetBalances);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(batchSender, true, batchSenderTargetBalance, partialBalanceTrackerBalance);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(l2OutputProposer, true, l2OutputProposerTargetBalance, 0);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit SentProfit(profitWallet, true, 0);
+        _expectProcessedFunds(BATCH_SENDER, true, BATCH_SENDER_TARGET_BALANCE, partialBalanceTrackerBalance);
+        _expectProcessedFunds(L2_OUTPUT_PROPOSER, true, L2_OUTPUT_PROPOSER_TARGET_BALANCE, 0);
+        _expectSentProfit(0);
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, 0);
-        assertEq(profitWallet.balance, 0);
-        assertEq(batchSender.balance, partialBalanceTrackerBalance);
-        assertEq(l2OutputProposer.balance, 0);
+        _assertBalances(0, 0, partialBalanceTrackerBalance, 0);
     }
 
     function test_processFees_success_skipsAddressesAtTargetBalance() external {
         vm.deal(address(balanceTracker), INITIAL_BALANCE_TRACKER_BALANCE);
-        vm.deal(batchSender, batchSenderTargetBalance);
-        vm.deal(l2OutputProposer, l2OutputProposerTargetBalance);
+        vm.deal(BATCH_SENDER, BATCH_SENDER_TARGET_BALANCE);
+        vm.deal(L2_OUTPUT_PROPOSER, L2_OUTPUT_PROPOSER_TARGET_BALANCE);
         balanceTracker.initialize(systemAddresses, targetBalances);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(batchSender, false, 0, 0);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ProcessedFunds(l2OutputProposer, false, 0, 0);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit SentProfit(profitWallet, true, INITIAL_BALANCE_TRACKER_BALANCE);
+        _expectProcessedFunds(BATCH_SENDER, false, 0, 0);
+        _expectProcessedFunds(L2_OUTPUT_PROPOSER, false, 0, 0);
+        _expectSentProfit(INITIAL_BALANCE_TRACKER_BALANCE);
 
         balanceTracker.processFees();
 
-        assertEq(address(balanceTracker).balance, 0);
-        assertEq(profitWallet.balance, INITIAL_BALANCE_TRACKER_BALANCE);
-        assertEq(batchSender.balance, batchSenderTargetBalance);
-        assertEq(l2OutputProposer.balance, l2OutputProposerTargetBalance);
+        _assertBalances(
+            0, INITIAL_BALANCE_TRACKER_BALANCE, BATCH_SENDER_TARGET_BALANCE, L2_OUTPUT_PROPOSER_TARGET_BALANCE
+        );
     }
 
     function test_processFees_success_maximumSystemAddresses() external {
         vm.deal(address(balanceTracker), INITIAL_BALANCE_TRACKER_BALANCE);
-        delete systemAddresses;
-        delete targetBalances;
-        for (uint256 i = 0; i < balanceTracker.MAX_SYSTEM_ADDRESS_COUNT(); i++) {
-            // forge-lint: disable-next-line(unsafe-typecast)
-            systemAddresses.push(payable(address(uint160(i + 100))));
-            targetBalances.push(l2OutputProposerTargetBalance);
+        address payable[] memory maxSystemAddresses = new address payable[](MAX_SYSTEM_ADDRESS_COUNT);
+        uint256[] memory maxTargetBalances = new uint256[](MAX_SYSTEM_ADDRESS_COUNT);
+        for (uint256 i = 0; i < MAX_SYSTEM_ADDRESS_COUNT; i++) {
+            maxSystemAddresses[i] = payable(vm.addr(i + 100));
+            maxTargetBalances[i] = L2_OUTPUT_PROPOSER_TARGET_BALANCE;
         }
-        balanceTracker.initialize(systemAddresses, targetBalances);
+        balanceTracker.initialize(maxSystemAddresses, maxTargetBalances);
 
         balanceTracker.processFees();
 
         assertEq(address(balanceTracker).balance, 0);
-        for (uint256 i = 0; i < balanceTracker.MAX_SYSTEM_ADDRESS_COUNT(); i++) {
-            assertEq(systemAddresses[i].balance, l2OutputProposerTargetBalance);
+        for (uint256 i = 0; i < MAX_SYSTEM_ADDRESS_COUNT; i++) {
+            assertEq(maxSystemAddresses[i].balance, L2_OUTPUT_PROPOSER_TARGET_BALANCE);
         }
-        assertEq(profitWallet.balance, 0);
+        assertEq(PROFIT_WALLET.balance, 0);
     }
 
     function test_receive_success() external {
         uint256 value = 100;
-        vm.deal(l1StandardBridge, value);
+        vm.deal(L1_STANDARD_BRIDGE, value);
 
-        vm.prank(l1StandardBridge);
-        vm.expectEmit(true, true, true, true, address(balanceTracker));
-        emit ReceivedFunds(l1StandardBridge, value);
+        vm.prank(L1_STANDARD_BRIDGE);
+        vm.expectEmit(address(balanceTracker));
+        emit ReceivedFunds(L1_STANDARD_BRIDGE, value);
 
         (bool success,) = payable(address(balanceTracker)).call{ value: value }("");
         assertTrue(success);
 
         assertEq(address(balanceTracker).balance, value);
+    }
+
+    function _expectProcessedFunds(
+        address systemAddress,
+        bool success,
+        uint256 balanceNeeded,
+        uint256 balanceSent
+    )
+        internal
+    {
+        vm.expectEmit(address(balanceTracker));
+        emit ProcessedFunds(systemAddress, success, balanceNeeded, balanceSent);
+    }
+
+    function _expectSentProfit(uint256 balanceSent) internal {
+        vm.expectEmit(address(balanceTracker));
+        emit SentProfit(PROFIT_WALLET, true, balanceSent);
+    }
+
+    function _assertBalances(
+        uint256 trackerBalance,
+        uint256 profitWalletBalance,
+        uint256 batchSenderBalance,
+        uint256 l2OutputProposerBalance
+    )
+        internal
+        view
+    {
+        assertEq(address(balanceTracker).balance, trackerBalance);
+        assertEq(PROFIT_WALLET.balance, profitWalletBalance);
+        assertEq(BATCH_SENDER.balance, batchSenderBalance);
+        assertEq(L2_OUTPUT_PROPOSER.balance, l2OutputProposerBalance);
     }
 }

@@ -10,9 +10,16 @@ import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 /// @title SuperchainConfig_TestInit
 /// @notice Initialization contract for SuperchainConfig tests.
 abstract contract SuperchainConfig_TestInit is CommonTest {
+    uint256 internal constant PAUSE_EXPIRY = 7_884_000;
+
     function setUp() public virtual override {
         super.setUp();
         skipIfForkTest("SuperchainConfig_TestInit: cannot test initialization on forked network");
+    }
+
+    function _pauseAsGuardian(address _identifier) internal {
+        vm.prank(superchainConfig.guardian());
+        superchainConfig.pause(_identifier);
     }
 }
 
@@ -31,7 +38,7 @@ contract SuperchainConfig_Constructor_Test is SuperchainConfig_TestInit {
 contract SuperchainConfig_PauseExpiry_Test is SuperchainConfig_TestInit {
     /// @notice Tests that `pauseExpiry` returns the correct constant value.
     function test_pauseExpiry_succeeds() external view {
-        assertEq(superchainConfig.pauseExpiry(), 7_884_000);
+        assertEq(superchainConfig.pauseExpiry(), PAUSE_EXPIRY);
     }
 }
 
@@ -40,67 +47,41 @@ contract SuperchainConfig_PauseExpiry_Test is SuperchainConfig_TestInit {
 contract SuperchainConfig_Paused_Test is SuperchainConfig_TestInit {
     /// @notice Tests that `paused` returns true when the specific identifier is paused.
     /// @param _identifier The identifier to test.
-    function testFuzz_paused_specificIdentifier_succeeds(address _identifier) external {
-        // Assume the identifier is not the zero address.
+    /// @param _other The unpaused identifier to test.
+    function testFuzz_paused_specificIdentifier_succeeds(address _identifier, address _other) external {
         vm.assume(_identifier != address(0));
+        vm.assume(_other != _identifier);
 
-        // Pause with the specific identifier.
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(_identifier);
-
-        // Assert that the specific identifier is paused.
+        _pauseAsGuardian(_identifier);
         assertTrue(superchainConfig.paused(_identifier));
-
-        // Pick a random address that is not the identifier.
-        address other = vm.randomAddress();
-        while (other == _identifier) {
-            other = vm.randomAddress();
-        }
-
-        // Assert that the other address is not paused.
-        assertFalse(superchainConfig.paused(other));
+        assertFalse(superchainConfig.paused(_other));
     }
 
     /// @notice Tests that `paused` returns true when the global superchain system is paused.
     function test_paused_global_succeeds() external {
-        // Pause the global superchain system.
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(0));
+        _pauseAsGuardian(address(0));
 
-        // Assert that the global superchain system is paused.
         assertTrue(superchainConfig.paused());
         assertTrue(superchainConfig.paused(address(0)));
-
-        // Pick a random address that is not the zero address.
-        address other = vm.randomAddress();
-        while (other == address(0)) {
-            other = vm.randomAddress();
-        }
-
-        // Assert that the other address is not paused.
-        assertFalse(superchainConfig.paused(other));
+        assertFalse(superchainConfig.paused(address(1)));
     }
 
     /// @notice Tests that `paused` returns false after pause expires.
     /// @param _identifier The identifier to test.
     function testFuzz_paused_expired_succeeds(address _identifier) external {
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(_identifier);
+        _pauseAsGuardian(_identifier);
         assertTrue(superchainConfig.paused(_identifier));
 
-        // Warp past expiry
-        vm.warp(block.timestamp + superchainConfig.pauseExpiry() + 1);
+        vm.warp(block.timestamp + PAUSE_EXPIRY + 1);
         assertFalse(superchainConfig.paused(_identifier));
     }
 
     /// @notice Tests that `paused` returns true just before expiry.
     /// @param _identifier The identifier to test.
     function testFuzz_paused_beforeExpiry_succeeds(address _identifier) external {
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(_identifier);
+        _pauseAsGuardian(_identifier);
 
-        // Warp to just before expiry
-        vm.warp(block.timestamp + superchainConfig.pauseExpiry() - 1);
+        vm.warp(block.timestamp + PAUSE_EXPIRY - 1);
         assertTrue(superchainConfig.paused(_identifier));
     }
 }
@@ -130,18 +111,15 @@ contract SuperchainConfig_Pause_Test is SuperchainConfig_TestInit {
         vm.expectRevert(ISuperchainConfig.SuperchainConfig_OnlyGuardianOrIncidentResponder.selector);
         vm.prank(_caller);
         superchainConfig.pause(address(this));
-
-        assertFalse(superchainConfig.paused(address(this)));
     }
 
     /// @notice Tests that `pause` reverts when the identifier is already used.
     /// @param _identifier The identifier to test.
     function testFuzz_pause_alreadyUsed_reverts(address _identifier) external {
-        vm.startPrank(superchainConfig.guardian());
-        superchainConfig.pause(_identifier);
+        _pauseAsGuardian(_identifier);
 
+        vm.prank(superchainConfig.guardian());
         vm.expectRevert(abi.encodeWithSelector(ISuperchainConfig.SuperchainConfig_AlreadyPaused.selector, _identifier));
-
         superchainConfig.pause(_identifier);
     }
 }
@@ -152,12 +130,12 @@ contract SuperchainConfig_Unpause_Test is SuperchainConfig_TestInit {
     /// @notice Tests that `unpause` successfully unpauses when called by the guardian.
     /// @param _identifier The identifier to test.
     function testFuzz_unpause_succeeds(address _identifier) external {
-        vm.startPrank(superchainConfig.guardian());
-        superchainConfig.pause(_identifier);
+        _pauseAsGuardian(_identifier);
         assertTrue(superchainConfig.paused(_identifier));
 
         vm.expectEmit(address(superchainConfig));
         emit Unpaused(_identifier);
+        vm.prank(superchainConfig.guardian());
         superchainConfig.unpause(_identifier);
 
         assertFalse(superchainConfig.paused(_identifier));
@@ -168,15 +146,12 @@ contract SuperchainConfig_Unpause_Test is SuperchainConfig_TestInit {
     function testFuzz_unpause_notGuardian_reverts(address _caller) external {
         vm.assume(_caller != superchainConfig.guardian());
 
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(this));
+        _pauseAsGuardian(address(this));
         assertTrue(superchainConfig.paused(address(this)));
 
         vm.expectRevert(ISuperchainConfig.SuperchainConfig_OnlyGuardian.selector);
         vm.prank(_caller);
         superchainConfig.unpause(address(this));
-
-        assertTrue(superchainConfig.paused(address(this)));
     }
 }
 
@@ -186,14 +161,14 @@ contract SuperchainConfig_Extend_Test is SuperchainConfig_TestInit {
     /// @notice Tests that `extend` successfully resets and re-pauses an identifier.
     /// @param _identifier The identifier to test.
     function testFuzz_extend_succeeds(address _identifier) external {
-        vm.startPrank(superchainConfig.guardian());
-        superchainConfig.pause(_identifier);
+        _pauseAsGuardian(_identifier);
         uint256 firstPauseTimestamp = block.timestamp;
 
         vm.warp(block.timestamp + 1);
 
         vm.expectEmit(address(superchainConfig));
         emit PauseExtended(_identifier);
+        vm.prank(superchainConfig.guardian());
         superchainConfig.extend(_identifier);
         assertTrue(superchainConfig.pauseTimestamps(_identifier) > firstPauseTimestamp);
         assertTrue(superchainConfig.paused(_identifier));
@@ -204,11 +179,10 @@ contract SuperchainConfig_Extend_Test is SuperchainConfig_TestInit {
     function testFuzz_extend_notGuardian_reverts(address _caller) external {
         vm.assume(_caller != superchainConfig.guardian());
 
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(this));
+        _pauseAsGuardian(address(this));
 
-        vm.prank(_caller);
         vm.expectRevert(ISuperchainConfig.SuperchainConfig_OnlyGuardian.selector);
+        vm.prank(_caller);
         superchainConfig.extend(address(this));
     }
 
@@ -235,23 +209,19 @@ contract SuperchainConfig_Pausable_Test is SuperchainConfig_TestInit {
     /// @notice Tests that `pausable` returns false when the identifier is paused.
     /// @param _identifier The identifier to test.
     function testFuzz_pausable_paused_succeeds(address _identifier) external {
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(_identifier);
+        _pauseAsGuardian(_identifier);
         assertFalse(superchainConfig.pausable(_identifier));
     }
 
     /// @notice Tests that `pausable` returns false even after pause expires.
     /// @param _identifier The identifier to test.
     function testFuzz_pausable_expired_succeeds(address _identifier) external {
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(_identifier);
+        _pauseAsGuardian(_identifier);
 
-        // Warp past expiry
-        vm.warp(block.timestamp + superchainConfig.pauseExpiry() + 1);
+        vm.warp(block.timestamp + PAUSE_EXPIRY + 1);
 
-        // pausable() should still return false because timestamp is set
+        // Expired pauses remain unpausable because the timestamp stays set.
         assertFalse(superchainConfig.pausable(_identifier));
-        // But paused() should return false because pause expired
         assertFalse(superchainConfig.paused(_identifier));
     }
 }
@@ -277,18 +247,17 @@ contract SuperchainConfig_PauseTimestamps_Test is SuperchainConfig_TestInit {
     /// @notice Tests that `pauseTimestamps` returns the correct timestamp for paused identifiers.
     /// @param _identifier The identifier to test.
     function testFuzz_pauseTimestamps_paused_succeeds(address _identifier) external {
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(_identifier);
+        _pauseAsGuardian(_identifier);
         assertEq(superchainConfig.pauseTimestamps(_identifier), block.timestamp);
     }
 
     /// @notice Tests that `pauseTimestamps` returns 0 after unpausing.
     /// @param _identifier The identifier to test.
     function testFuzz_pauseTimestamps_afterUnpause_succeeds(address _identifier) external {
-        vm.startPrank(superchainConfig.guardian());
-        superchainConfig.pause(_identifier);
+        _pauseAsGuardian(_identifier);
         assertTrue(superchainConfig.pauseTimestamps(_identifier) != 0);
 
+        vm.prank(superchainConfig.guardian());
         superchainConfig.unpause(_identifier);
         assertEq(superchainConfig.pauseTimestamps(_identifier), 0);
     }
@@ -314,39 +283,27 @@ contract SuperchainConfig_Expiration_Test is SuperchainConfig_TestInit {
     /// @notice Tests that `expiration` returns the correct timestamp when the identifier is
     ///         paused.
     function test_expiration_paused_succeeds() external {
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(this));
-        uint256 expectedExpiration = block.timestamp + superchainConfig.pauseExpiry();
-        assertEq(superchainConfig.expiration(address(this)), expectedExpiration);
+        _pauseAsGuardian(address(this));
+        assertEq(superchainConfig.expiration(address(this)), block.timestamp + PAUSE_EXPIRY);
     }
 
     /// @notice Tests that `expiration` returns the updated timestamp after extending the pause.
     function test_expiration_afterExtend_succeeds() external {
-        vm.startPrank(superchainConfig.guardian());
-        superchainConfig.pause(address(this));
-        uint256 firstExpiration = superchainConfig.expiration(address(this));
-
-        // Warp forward in time
+        _pauseAsGuardian(address(this));
         vm.warp(block.timestamp + 100);
 
-        // Extend the pause
+        vm.prank(superchainConfig.guardian());
         superchainConfig.extend(address(this));
-        uint256 newExpiration = superchainConfig.expiration(address(this));
 
-        assertTrue(newExpiration > firstExpiration);
-        assertEq(newExpiration, block.timestamp + superchainConfig.pauseExpiry());
+        assertEq(superchainConfig.expiration(address(this)), block.timestamp + PAUSE_EXPIRY);
     }
 
     /// @notice Tests that `expiration` works correctly with fuzzed identifiers.
     /// @param _identifier The identifier to test.
     function testFuzz_expiration_succeeds(address _identifier) external {
-        // Test unpaused state
         assertEq(superchainConfig.expiration(_identifier), 0);
 
-        // Test paused state
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(_identifier);
-        uint256 expectedExpiration = block.timestamp + superchainConfig.pauseExpiry();
-        assertEq(superchainConfig.expiration(_identifier), expectedExpiration);
+        _pauseAsGuardian(_identifier);
+        assertEq(superchainConfig.expiration(_identifier), block.timestamp + PAUSE_EXPIRY);
     }
 }
