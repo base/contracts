@@ -27,7 +27,60 @@ For contract deployment artifacts, see [base-org/contract-deployments](https://g
 [![GitHub pull requests by-label](https://img.shields.io/github/issues-pr-raw/base-org/contracts)](https://github.com/base/contracts/pulls)
 [![GitHub Issues](https://img.shields.io/github/issues-raw/base-org/contracts.svg)](https://github.com/base/contracts/issues)
 
-### Fixing semver-lock CI failures
+## Contract Architecture
+
+### Bridge Contracts
+
+The bridge contracts enable token transfers between L1 (Ethereum) and L2 (Base). They follow a hierarchical pattern:
+
+- **`StandardBridge`** (`src/universal/StandardBridge.sol`) — Abstract base contract containing shared bridging logic for both L1↔L2 directions. Handles ETH and ERC-20 deposits/withdrawals, including fee calculations and cross-chain message passing.
+- **`L1StandardBridge`** (`src/L1/L1StandardBridge.sol`) — L1-specific bridge that extends `StandardBridge`. Handles deposits from Ethereum to L2 and processes withdrawals from L2 back to Ethereum.
+- **`L2StandardBridge`** (`src/L2/L2StandardBridge.sol`) — L2-specific bridge that extends `StandardBridge`. Handles withdrawals from L2 to Ethereum and processes deposits from L1 on L2.
+
+The corresponding interfaces mirror this hierarchy:
+- `IStandardBridge` → `IL1StandardBridge` and `IL2StandardBridge`
+
+### Key Concepts
+
+- **Proxied contracts**: Many contracts are deployed behind upgradeable proxies (EIP-1967). These are tagged with `@custom:proxied` in their NatSpec.
+- **Predeployed contracts**: Some L2 contracts are pre-installed at fixed addresses (e.g., `0x42000000000000000000000000000000000000XX`). These are tagged with `@custom:predeploy`.
+- **Initialization**: Contracts use OpenZeppelin's `Initializable` pattern instead of constructors, since proxy delegates cannot use constructors. See `ForgeArtifacts.isInitialized` (OZ v4) and `ForgeArtifacts.isInitializedV5` for testing utilities.
+
+### Directory Structure
+
+```
+├── interfaces/          # Solidity interfaces organized by layer
+│   ├── L1/             # L1-specific interfaces
+│   ├── L2/             # L2-specific interfaces
+│   └── universal/       # Shared interfaces used across layers
+├── src/                # Contract implementations
+│   ├── L1/             # L1-specific contracts
+│   ├── L2/             # L2-specific contracts
+│   ├── universal/       # Shared contract logic
+│   └── vendor/          # Third-party contracts (e.g., EAS schema registry)
+├── scripts/            # Deployment and utility scripts
+│   ├── deploy/          # Deployment scripts and config
+│   ├── libraries/       # Shared script libraries (e.g., ForgeArtifacts)
+│   └── multiproof/      # Multiproof deployment scripts
+├── test/               # Foundry test suite
+│   ├── L1/             # L1 contract tests
+│   ├── L2/             # L2 contract tests
+│   ├── universal/       # Shared contract tests
+│   └── setup/           # Test infrastructure (ForkLive, FeatureFlags)
+└── snapshots/          # ABI and storage layout snapshots for semver-lock checks
+    ├── abi/
+    └── storageLayout/
+```
+
+### Testing with Forks
+
+The test suite supports forking live networks via `ForkLive.s.sol`. When `FORK_TEST=true` is set:
+
+1. The test harness loads production addresses instead of deploying from source.
+2. Supported chains: Ethereum mainnet (chainId 1), Sepolia (chainId 11155111), and Base testnet (chainId 560048).
+3. Optionally, state can be loaded from the superchain-ops repo via `SUPERCHAIN_OPS_ALLOCS_PATH`.
+
+## Fixing semver-lock CI failures
 
 If the `semver-lock` CI check fails, regenerate locally and commit:
 
@@ -42,8 +95,17 @@ foundryup
 just semver-lock
 ```
 
-### setup and testing
+## Setup and Testing
 
 - If you don't have foundry installed, run `just install-foundry`.
 - `just deps`
 - Test contracts: `just test`
+
+## Contributing
+
+When adding or modifying contracts, please:
+
+- Add comprehensive NatSpec comments (`@notice`, `@param`, `@return`) to all public/external functions.
+- Use `@custom:proxied` and `@custom:predeploy` tags where applicable.
+- Include inline comments explaining non-obvious logic, assumptions, and design decisions.
+- Update the relevant ABI and storage layout snapshots by running `just semver-lock`.
