@@ -19,47 +19,13 @@ For contract deployment artifacts, see [base-org/contract-deployments](https://g
 [![Website base.org](https://img.shields.io/website-up-down-green-red/https/base.org.svg)](https://base.org)
 [![Blog](https://img.shields.io/badge/blog-up-green)](https://base.mirror.xyz/)
 [![Docs](https://img.shields.io/badge/docs-up-green)](https://docs.base.org/)
-[![Discord](https://img.shields.io/discord/1067165013397286?label=discord)](https://base.org/discord)
+[![Discord](https://img.shields.io/discord/1067165013397213286?label=discord)](https://base.org/discord)
 [![Twitter Base](https://img.shields.io/twitter/follow/Base?style=social)](https://twitter.com/Base)
 
 <!-- Badge row 3 - detailed status -->
 
 [![GitHub pull requests by-label](https://img.shields.io/github/issues-pr-raw/base-org/contracts)](https://github.com/base/contracts/pulls)
 [![GitHub Issues](https://img.shields.io/github/issues-raw/base-org/contracts.svg)](https://github.com/base/contracts/issues)
-
----
-
-## Security Considerations
-
-This section describes the security considerations, trust assumptions, and known limitations of the contracts in this repository.
-
-### Trust Assumptions
-
-- **Proxy Admin Owner**: The bridge contracts are upgradeable via a `ProxyAdmin` owned by the `finalSystemOwner` address. This owner has the ability to upgrade contract implementations, which can change the behavior of bridging, withdrawals, and other critical functions. Users trust that the proxy admin owner acts responsibly and does not deploy malicious implementations.
-- **Cross-Domain Messenger**: The `L1StandardBridge` and `L2StandardBridge` rely on the `CrossDomainMessenger` for authenticating cross-chain messages. Withdrawal finalization on L1 trusts that the messenger correctly verifies the origin of L2 messages. A compromise of the messenger would allow fraudulent withdrawal finalization.
-- **System Config Owner**: The `ISystemConfig` contract is referenced by the L1 bridge and is controlled by a privileged owner who can modify gas limits and other system parameters that affect bridge operations.
-- **TEE Prover Registry**: The multiproof system relies on a `TEEProverRegistry` that validates AWS Nitro enclave attestations. In production, trust is placed in the correctness of the Nitro attestation verification and the integrity of the enclave's signing key. Dev/test deployments bypass this via `addDevSigner()`, which must **never** be used in production.
-- **Superchain Config**: The `ISuperchainConfig` contract governs pause and escalation settings. The config owner can pause bridge deposits and withdrawals system-wide.
-
-### Known Limitations
-
-- **Upgradeability Risk**: All core bridge contracts are behind upgradeable proxies. While this allows for bug fixes and feature additions, it also means that the current contract logic is not immutable. Users should monitor governance actions for any upgrades.
-- **Reinitializable Pattern**: Contracts use a reinitializable pattern with an `initVersion` counter. Re-initialization is possible but gated by version checks. Incorrect initialization sequencing could leave contracts in an unexpected state.
-- **ETH Bridging**: The `depositETH` and `depositETHTo` functions accept ETH via `msg.value`. If a user sends ETH directly to the bridge contract without calling a deposit function, the funds may be irrecoverable.
-- **Withdrawal Proving**: L2-to-L1 withdrawals require proving against an output root published by the L2 output oracle. If the oracle is delayed or censored, withdrawals cannot be finalized until a valid output root is published.
-- **Dev/Test Scripts Not for Production**: The multiproof deployment scripts in `scripts/multiproof/` explicitly bypass attestation checks (`MockDevTEEProverRegistry.addDevSigner()`) and use mock anchor state registries with no access control. These must never be used in production environments.
-
-### Potential Edge Cases
-
-- **Duplicate Deposits**: If a deposit transaction is submitted with the same nonce to both `depositERC20` and `depositERC20To`, they are treated as separate deposits. Users should ensure unique parameters if replay protection is desired.
-- **Finalization Gas Limits**: Withdrawal finalization on L1 requires sufficient gas. If `_minGasLimit` is set too low, the finalization transaction may revert, requiring the user to resubmit with a higher gas limit.
-- **Token Pair Mismatches**: The bridge does not natively enforce that `_l1Token` and `_l2Token` are valid pairs. Depositing with an incorrect or unregistered L2 token address could result in locked or irrecoverable tokens.
-- **Reentrancy in Finalization**: The `finalizeERC20Withdrawal` and `finalizeETHWithdrawal` functions make external calls to token contracts and the cross-domain messenger. While the messenger uses a reentrancy guard, users should be aware of potential reentrancy vectors through malicious token implementations.
-- **Cross-Domain Message Ordering**: Messages sent across domains are ordered by nonce within the messenger. If a lower-nonce message reverts, subsequent messages in the queue are blocked until the failing message is successfully executed or dropped.
-
-For information on reporting vulnerabilities, see [SECURITY.md](./SECURITY.md).
-
----
 
 ### Fixing semver-lock CI failures
 
@@ -81,3 +47,47 @@ just semver-lock
 - If you don't have foundry installed, run `just install-foundry`.
 - `just deps`
 - Test contracts: `just test`
+
+### Security Considerations and Assumptions
+
+This section describes the security considerations, trust assumptions, and known limitations of the contracts in this repository. It is intended to improve transparency and help integrators and auditors understand the design trade-offs.
+
+#### Known Limitations
+
+1. **Withdrawal finality delay**: Withdrawals from L2 to L1 are subject to a challenge period before they can be finalized. During this window, a withdrawal is not yet final and can be disputed. Users should not consider L2-to-L1 assets fully available until the challenge period has elapsed and the withdrawal has been finalized on L1.
+
+2. **Re-entrancy in bridge finalization**: The `StandardBridge` uses a re-entrancy guard on the `finalizeERC20Withdrawal` and `finalizeETHWithdrawal` functions. However, other entry points that do not use the guard should be reviewed carefully if new functionality is added. Re-entrancy risks should always be considered when modifying bridge logic.
+
+3. **Token bridging assumes 1:1 mapping**: The standard bridge assumes a canonical 1:1 mapping between L1 and L2 tokens. If a token on either chain does not conform to the expected interface (e.g., fee-on-transfer tokens, rebasing tokens, or tokens with blocklists), the bridge may not function as expected and funds could be locked or lost.
+
+4. **ETH bridging relies on `msg.value`**: The `depositETH` and `depositETHTo` functions bridge ETH by sending it as `msg.value`. Contracts that receive ETH on L2 via bridging should be aware that the ETH is delivered through a low-level call and may need to handle it appropriately.
+
+5. **Upgradeability**: Many contracts in this repository are deployed behind upgradeable proxies. The proxy admin owner has the ability to upgrade contract implementations, which could change bridge behavior. See the trust assumptions below for details.
+
+#### Trust Assumptions
+
+1. **System owner / proxy admin**: The `finalSystemOwner` (set during deployment) has the ability to upgrade proxy implementations and perform admin actions on core contracts. This is a centralized trust assumption — users trust that the system owner will act responsibly and will not deploy malicious upgrades.
+
+2. **Cross-domain messenger**: The bridge relies on the `L1CrossDomainMessenger` and `L2CrossDomainMessenger` for relaying messages between layers. The security of cross-domain messages depends on the integrity of these messengers and the underlying fault-proof or validity-proof system.
+
+3. **L1 chain security**: The L1 bridge contracts inherit the security of the underlying L1 (Ethereum). A successful attack or consensus failure on L1 could compromise L1-deposited assets.
+
+4. **TEE prover registry (multiproof)**: The multiproof system uses a `TEEProverRegistry` that relies on AWS Nitro enclave attestation. This introduces a trust assumption in the correctness of the Nitro attestation process and the integrity of the enclave environment. In dev/test configurations, a `MockDevTEEProverRegistry` is used that bypasses attestation entirely — this must **never** be used in production.
+
+5. **Superchain configuration**: The `SuperchainConfig` contract can trigger a global pause via the guardian account. Users trust that the guardian will only pause in genuine emergency situations and will unpause promptly when the issue is resolved.
+
+#### Potential Edge Cases
+
+1. **Zero-value deposits**: Depositing zero ETH or zero ERC20 tokens is technically possible but may result in unexpected behavior in downstream contracts or event indexing. Integrators should validate non-zero amounts before calling deposit functions.
+
+2. **Self-bridging**: A user could bridge tokens to their own address on the other layer. This is valid but may interact unexpectedly with contracts that track balances across both layers.
+
+3. **Duplicate withdrawal finalization**: The bridge does not prevent re-finalization of the same withdrawal message if the cross-domain messenger allows replay. The messenger's own nonce and replay protection should prevent this, but integrators should be aware of the dependency.
+
+4. **Gas limit estimation**: Deposits specify a `_minGasLimit` for the L2 execution. If this value is set too low, the deposit may fail on L2, and the user's funds may be locked in the bridge until manually recovered. Users should ensure adequate gas limits.
+
+5. **Token decimals mismatch**: If an L1 token and its corresponding L2 token have different decimals, the bridge will transfer the raw amount without conversion. This could lead to unexpected value differences across layers.
+
+6. **Pause state during deposits/withdrawals**: If the `SuperchainConfig` guardian pauses the system while a deposit or withdrawal is in flight, the cross-domain message may not be relayed until the pause is lifted. Users should check the pause state before initiating large transfers.
+
+For information on reporting vulnerabilities, see [SECURITY.md](./SECURITY.md).
