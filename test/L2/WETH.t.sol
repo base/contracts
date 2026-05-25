@@ -1,54 +1,40 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-// Testing utilities
 import { CommonTest } from "test/setup/CommonTest.sol";
-
-// Libraries
 import { SemverComp } from "src/libraries/SemverComp.sol";
-
-// Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
 
-/// @title WETH_Version_Test
-/// @notice Tests the `version` function of the `WETH` contract.
 contract WETH_Version_Test is CommonTest {
-    /// @notice Tests that the version returns a valid semver string.
-    function test_version_succeeds() external view {
+    function test_version_validFormat_succeeds() external view {
         SemverComp.parse(ISemver(address(weth)).version());
     }
 }
 
-/// @title WETH_Name_Test
-/// @notice Tests the `name` function of the `WETH` contract.
 contract WETH_Name_Test is CommonTest {
-    /// @notice Tests that the `name` function returns the correct value.
     function testFuzz_name_succeeds(string memory _gasPayingTokenName) external {
+        vm.assume(bytes(_gasPayingTokenName).length <= 128);
         vm.mockCall(address(l1Block), abi.encodeCall(l1Block.gasPayingTokenName, ()), abi.encode(_gasPayingTokenName));
 
-        assertEq(string.concat("Wrapped ", _gasPayingTokenName), weth.name());
+        assertEq(weth.name(), string.concat("Wrapped ", _gasPayingTokenName));
     }
 
-    /// @notice Tests that the `name` function returns 'Wrapped Ether' by default.
-    function test_name_ether_succeeds() external view {
-        assertEq(string.concat("Wrapped ", l1Block.gasPayingTokenName()), weth.name());
+    function test_name_defaultGasPayingToken_succeeds() external view {
+        assertEq(weth.name(), string.concat("Wrapped ", l1Block.gasPayingTokenName()));
     }
 }
 
-/// @title WETH_Symbol_Test
-/// @notice Tests the `symbol` function of the `WETH` contract.
 contract WETH_Symbol_Test is CommonTest {
-    /// @notice Tests that the `symbol` function returns the correct value.
     function testFuzz_symbol_succeeds(string memory _gasPayingTokenSymbol) external {
+        vm.assume(bytes(_gasPayingTokenSymbol).length <= 128);
         vm.mockCall(
             address(l1Block), abi.encodeCall(l1Block.gasPayingTokenSymbol, ()), abi.encode(_gasPayingTokenSymbol)
         );
 
-        assertEq(string.concat("W", _gasPayingTokenSymbol), weth.symbol());
+        assertEq(weth.symbol(), string.concat("W", _gasPayingTokenSymbol));
     }
 
-    /// @notice Tests that the `symbol` function returns 'WETH' by default.
-    function test_symbol_ether_succeeds() external view {
-        assertEq(string.concat("W", l1Block.gasPayingTokenSymbol()), weth.symbol());
+    function test_symbol_defaultGasPayingToken_succeeds() external view {
+        assertEq(weth.symbol(), string.concat("W", l1Block.gasPayingTokenSymbol()));
     }
 }

@@ -12,7 +12,6 @@ import { stdError } from "lib/forge-std/src/Test.sol";
 contract GasPriceOracle_Test is CommonTest {
     address depositor;
 
-    // The initial L1 context values
     uint64 constant number = 10;
     uint64 constant timestamp = 11;
     uint256 constant baseFee = 2 * (10 ** 6);
@@ -31,15 +30,43 @@ contract GasPriceOracle_Test is CommonTest {
     uint64 constant MAX_UINT64 = type(uint64).max;
     uint32 constant MAX_UINT32 = type(uint32).max;
 
-    /// @dev Sets up the test suite.
     function setUp() public virtual override {
         super.setUp();
         depositor = l1Block.DEPOSITOR_ACCOUNT();
     }
+
+    function _setEcotoneL1BlockValues() internal {
+        bytes memory calldataPacked = Encoding.encodeSetL1BlockValuesEcotone(
+            baseFeeScalar, blobBaseFeeScalar, sequenceNumber, timestamp, number, baseFee, blobBaseFee, hash, batcherHash
+        );
+
+        vm.prank(depositor);
+        (bool success,) = address(l1Block).call(calldataPacked);
+        require(success, "GasPriceOracle_Test: L1Block setup failed");
+    }
+
+    function _setIsthmusL1BlockValues(uint32 _operatorFeeScalar, uint64 _operatorFeeConstant) internal {
+        bytes memory calldataPacked = Encoding.encodeSetL1BlockValuesIsthmus(
+            baseFeeScalar,
+            blobBaseFeeScalar,
+            sequenceNumber,
+            timestamp,
+            number,
+            baseFee,
+            blobBaseFee,
+            hash,
+            batcherHash,
+            _operatorFeeScalar,
+            _operatorFeeConstant
+        );
+
+        vm.prank(depositor);
+        (bool success,) = address(l1Block).call(calldataPacked);
+        require(success, "GasPriceOracle_Test: L1Block setup failed");
+    }
 }
 
 contract GasPriceOracleBedrock_Test is GasPriceOracle_Test {
-    /// @dev Sets up the test suite.
     function setUp() public virtual override {
         // The gasPriceOracle tests rely on an L2 genesis that is not past Ecotone.
         l2Fork = Fork.DELTA;
@@ -59,42 +86,35 @@ contract GasPriceOracleBedrock_Test is GasPriceOracle_Test {
         });
     }
 
-    /// @dev Tests that `l1BaseFee` is set correctly.
     function test_l1BaseFee_succeeds() external view {
         assertEq(gasPriceOracle.l1BaseFee(), baseFee);
     }
 
-    /// @dev Tests that `gasPrice` is set correctly.
     function test_gasPrice_succeeds() external {
         vm.fee(100);
         uint256 gasPrice = gasPriceOracle.gasPrice();
         assertEq(gasPrice, 100);
     }
 
-    /// @dev Tests that `baseFee` is set correctly.
     function test_baseFee_succeeds() external {
         vm.fee(64);
         uint256 gasPrice = gasPriceOracle.baseFee();
         assertEq(gasPrice, 64);
     }
 
-    /// @dev Tests that `scalar` is set correctly.
     function test_scalar_succeeds() external view {
         assertEq(gasPriceOracle.scalar(), l1FeeScalar);
     }
 
-    /// @dev Tests that `overhead` is set correctly.
     function test_overhead_succeeds() external view {
         assertEq(gasPriceOracle.overhead(), l1FeeOverhead);
     }
 
-    /// @dev Tests that `decimals` is set correctly.
     function test_decimals_succeeds() external view {
         assertEq(gasPriceOracle.decimals(), 6);
         assertEq(gasPriceOracle.DECIMALS(), 6);
     }
 
-    /// @dev Tests that `setGasPrice` reverts since it was removed in bedrock.
     function test_setGasPrice_doesNotExist_reverts() external {
         // nosemgrep: sol-style-use-abi-encodecall
         (bool success, bytes memory returndata) =
@@ -104,7 +124,6 @@ contract GasPriceOracleBedrock_Test is GasPriceOracle_Test {
         assertEq(returndata, hex"");
     }
 
-    /// @dev Tests that `setL1BaseFee` reverts since it was removed in bedrock.
     function test_setL1BaseFee_doesNotExist_reverts() external {
         // nosemgrep: sol-style-use-abi-encodecall
         (bool success, bytes memory returndata) =
@@ -114,21 +133,18 @@ contract GasPriceOracleBedrock_Test is GasPriceOracle_Test {
         assertEq(returndata, hex"");
     }
 
-    /// @dev Tests that Fjord cannot be activated without activating Ecotone
     function test_setFjord_withoutEcotone_reverts() external {
         vm.prank(depositor);
         vm.expectRevert("GasPriceOracle: Fjord can only be activated after Ecotone");
         gasPriceOracle.setFjord();
     }
 
-    /// @dev Tests that Jovian activation requires Isthmus to be active first.
     function test_setJovian_requiresIsthmus_reverts() external {
         vm.prank(depositor);
         vm.expectRevert("GasPriceOracle: Jovian can only be activated after Isthmus");
         gasPriceOracle.setJovian();
     }
 
-    /// @dev Tests that `getL1Fee` returns the expected value when both fjord and ecotone are not active
     function test_getL1Fee_whenFjordAndEcotoneNotActive_succeeds() external {
         vm.store(address(gasPriceOracle), bytes32(uint256(0)), bytes32(0));
         bytes memory data = hex"1111";
@@ -139,7 +155,6 @@ contract GasPriceOracleBedrock_Test is GasPriceOracle_Test {
         // l1FeeScalar(i.e. 10)) / 1e6
     }
 
-    /// @dev Tests that `getL1GasUsed` returns the expected value when both fjord and ecotone are not active
     function test_getL1GasUsed_whenFjordAndEcotoneNotActive_succeeds() external {
         vm.store(address(gasPriceOracle), bytes32(uint256(0)), bytes32(0));
         bytes memory data = hex"1111";
@@ -150,81 +165,62 @@ contract GasPriceOracleBedrock_Test is GasPriceOracle_Test {
 }
 
 contract GasPriceOracleEcotone_Test is GasPriceOracle_Test {
-    /// @dev Sets up the test suite.
     function setUp() public virtual override {
         l2Fork = Fork.ECOTONE;
         super.setUp();
         assertEq(gasPriceOracle.isEcotone(), true);
 
-        bytes memory calldataPacked = Encoding.encodeSetL1BlockValuesEcotone(
-            baseFeeScalar, blobBaseFeeScalar, sequenceNumber, timestamp, number, baseFee, blobBaseFee, hash, batcherHash
-        );
-
-        // Execute the function call
-        vm.prank(depositor);
-        (bool success,) = address(l1Block).call(calldataPacked);
-        require(success, "GasPriceOracleEcotone_Test: Function call failed");
+        _setEcotoneL1BlockValues();
     }
 
-    /// @dev Tests that `setEcotone` is only callable by the depositor.
     function test_setEcotone_wrongCaller_reverts() external {
         vm.expectRevert("GasPriceOracle: only the depositor account can set isEcotone flag");
         gasPriceOracle.setEcotone();
     }
 
-    /// @dev Tests that `gasPrice` is set correctly.
     function test_gasPrice_succeeds() external {
         vm.fee(100);
         uint256 gasPrice = gasPriceOracle.gasPrice();
         assertEq(gasPrice, 100);
     }
 
-    /// @dev Tests that `baseFee` is set correctly.
     function test_baseFee_succeeds() external {
         vm.fee(64);
         uint256 gasPrice = gasPriceOracle.baseFee();
         assertEq(gasPrice, 64);
     }
 
-    /// @dev Tests that `overhead` reverts since it was removed in ecotone.
     function test_overhead_legacyFunction_reverts() external {
         vm.expectRevert("GasPriceOracle: overhead() is deprecated");
         gasPriceOracle.overhead();
     }
 
-    /// @dev Tests that `scalar` reverts since it was removed in ecotone.
     function test_scalar_legacyFunction_reverts() external {
         vm.expectRevert("GasPriceOracle: scalar() is deprecated");
         gasPriceOracle.scalar();
     }
 
-    /// @dev Tests that `l1BaseFee` is set correctly.
     function test_l1BaseFee_succeeds() external view {
         assertEq(gasPriceOracle.l1BaseFee(), baseFee);
     }
 
-    /// @dev Tests that `blobBaseFee` is set correctly.
     function test_blobBaseFee_succeeds() external view {
         assertEq(gasPriceOracle.blobBaseFee(), blobBaseFee);
     }
 
-    /// @dev Tests that `baseFeeScalar` is set correctly.
     function test_baseFeeScalar_succeeds() external view {
         assertEq(gasPriceOracle.baseFeeScalar(), baseFeeScalar);
     }
 
-    /// @dev Tests that `blobBaseFeeScalar` is set correctly.
     function test_blobBaseFeeScalar_succeeds() external view {
         assertEq(gasPriceOracle.blobBaseFeeScalar(), blobBaseFeeScalar);
     }
 
-    /// @dev Tests that `decimals` is set correctly.
     function test_decimals_succeeds() external view {
         assertEq(gasPriceOracle.decimals(), 6);
         assertEq(gasPriceOracle.DECIMALS(), 6);
     }
 
-    /// @dev Tests that `getL1GasUsed` and `getL1Fee` return expected values
     function test_getL1Fee_succeeds() external view {
         bytes memory data = hex"0000010203"; // 2 zero bytes, 3 non-zero bytes
         // (2*4) + (3*16) + (68*16) == 1144
@@ -235,7 +231,6 @@ contract GasPriceOracleEcotone_Test is GasPriceOracle_Test {
         assertEq(price, 48977);
     }
 
-    /// @dev Tests that `setFjord` is only callable by the depositor.
     function test_setFjord_wrongCaller_reverts() external {
         vm.expectRevert("GasPriceOracle: only the depositor account can set isFjord flag");
         gasPriceOracle.setFjord();
@@ -243,81 +238,62 @@ contract GasPriceOracleEcotone_Test is GasPriceOracle_Test {
 }
 
 contract GasPriceOracleFjordActive_Test is GasPriceOracle_Test {
-    /// @dev Sets up the test suite.
     function setUp() public virtual override {
         l2Fork = Fork.FJORD;
         super.setUp();
 
-        bytes memory calldataPacked = Encoding.encodeSetL1BlockValuesEcotone(
-            baseFeeScalar, blobBaseFeeScalar, sequenceNumber, timestamp, number, baseFee, blobBaseFee, hash, batcherHash
-        );
-
-        vm.prank(depositor);
-        (bool success,) = address(l1Block).call(calldataPacked);
-        require(success, "GasPriceOracleFjordActive_Test: Function call failed");
+        _setEcotoneL1BlockValues();
     }
 
-    /// @dev Tests that `setFjord` cannot be called when Fjord is already activate
     function test_setFjord_whenFjordActive_reverts() external {
         vm.expectRevert("GasPriceOracle: Fjord already active");
         vm.prank(depositor);
         gasPriceOracle.setFjord();
     }
 
-    /// @dev Tests that `gasPrice` is set correctly.
     function test_gasPrice_succeeds() external {
         vm.fee(100);
         uint256 gasPrice = gasPriceOracle.gasPrice();
         assertEq(gasPrice, 100);
     }
 
-    /// @dev Tests that `baseFee` is set correctly.
     function test_baseFee_succeeds() external {
         vm.fee(64);
         uint256 gasPrice = gasPriceOracle.baseFee();
         assertEq(gasPrice, 64);
     }
 
-    /// @dev Tests that `overhead` reverts since it was removed in ecotone.
     function test_overhead_legacyFunction_reverts() external {
         vm.expectRevert("GasPriceOracle: overhead() is deprecated");
         gasPriceOracle.overhead();
     }
 
-    /// @dev Tests that `scalar` reverts since it was removed in ecotone.
     function test_scalar_legacyFunction_reverts() external {
         vm.expectRevert("GasPriceOracle: scalar() is deprecated");
         gasPriceOracle.scalar();
     }
 
-    /// @dev Tests that `l1BaseFee` is set correctly.
     function test_l1BaseFee_succeeds() external view {
         assertEq(gasPriceOracle.l1BaseFee(), baseFee);
     }
 
-    /// @dev Tests that `blobBaseFee` is set correctly.
     function test_blobBaseFee_succeeds() external view {
         assertEq(gasPriceOracle.blobBaseFee(), blobBaseFee);
     }
 
-    /// @dev Tests that `baseFeeScalar` is set correctly.
     function test_baseFeeScalar_succeeds() external view {
         assertEq(gasPriceOracle.baseFeeScalar(), baseFeeScalar);
     }
 
-    /// @dev Tests that `blobBaseFeeScalar` is set correctly.
     function test_blobBaseFeeScalar_succeeds() external view {
         assertEq(gasPriceOracle.blobBaseFeeScalar(), blobBaseFeeScalar);
     }
 
-    /// @dev Tests that `decimals` is set correctly.
     function test_decimals_succeeds() external view {
         assertEq(gasPriceOracle.decimals(), 6);
         assertEq(gasPriceOracle.DECIMALS(), 6);
     }
 
-    /// @dev Tests that `getL1GasUsed`, `getL1Fee` and `getL1FeeUpperBound` return expected values
-    ///      for the minimum bound of the linear regression
     function test_getL1FeeMinimumBound_succeeds() external view {
         bytes memory data = hex"0000010203"; // fastlzSize: 74, inc signature
         uint256 gas = gasPriceOracle.getL1GasUsed(data);
@@ -337,8 +313,6 @@ contract GasPriceOracleFjordActive_Test is GasPriceOracle_Test {
         assertEq(upperBound, 68500);
     }
 
-    /// @dev Tests that `getL1GasUsed`, `getL1Fee` and `getL1FeeUpperBound` return expected values
-    ///      for a specific test transaction
     function test_getL1FeeRegression_succeeds() external view {
         // fastlzSize: 235, inc signature
         bytes memory data = hex"1d2c3ec4f5a9b3f3cd2c024e455c1143a74bbd637c324adcbd4f74e346786ac44e23e78f47d932abedd8d1"
@@ -361,7 +335,6 @@ contract GasPriceOracleFjordActive_Test is GasPriceOracle_Test {
         assertEq(upperBound, 111214);
     }
 
-    /// @dev Tests that `operatorFee` is 0 is Isthmus is not activated.
     function test_getOperatorFee_succeeds() external view {
         assertEq(gasPriceOracle.isIsthmus(), false);
         assertEq(gasPriceOracle.getOperatorFee(10), 0);
@@ -369,46 +342,25 @@ contract GasPriceOracleFjordActive_Test is GasPriceOracle_Test {
 }
 
 contract GasPriceOracleIsthmus_Test is GasPriceOracle_Test {
-    /// @dev Sets up the test suite.
     function setUp() public virtual override {
         l2Fork = Fork.ISTHMUS;
         super.setUp();
 
-        bytes memory calldataPacked = Encoding.encodeSetL1BlockValuesIsthmus(
-            baseFeeScalar,
-            blobBaseFeeScalar,
-            sequenceNumber,
-            timestamp,
-            number,
-            baseFee,
-            blobBaseFee,
-            hash,
-            batcherHash,
-            operatorFeeScalar,
-            operatorFeeConstant
-        );
-
-        vm.prank(depositor);
-        (bool success,) = address(l1Block).call(calldataPacked);
-        require(success, "GasPriceOracleIsthmus_Test: Function call failed");
+        _setIsthmusL1BlockValues(operatorFeeScalar, operatorFeeConstant);
     }
 
-    /// @dev Tests that `operatorFee` is set correctly using the Isthmus formula (divide by 1e6).
     function test_getOperatorFee_succeeds() external view {
         assertEq(gasPriceOracle.getOperatorFee(10), 10 * operatorFeeScalar / 1e6 + operatorFeeConstant);
     }
 
-    /// @dev Tests that `setIsthmus` is only callable by the depositor.
     function test_setIsthmus_wrongCaller_reverts() external {
         vm.expectRevert("GasPriceOracle: only the depositor account can set isIsthmus flag");
         gasPriceOracle.setIsthmus();
     }
 
-    /// @dev Tests that Jovian cannot be activated yet (since it's not activated by default).
     function test_setJovian_notActivated_succeeds() external {
         assertEq(gasPriceOracle.isJovian(), false);
 
-        // Activate Jovian
         vm.prank(depositor);
         gasPriceOracle.setJovian();
 
@@ -417,32 +369,14 @@ contract GasPriceOracleIsthmus_Test is GasPriceOracle_Test {
 }
 
 contract GasPriceOracleJovian_Test is GasPriceOracle_Test {
-    /// @dev Sets up the test suite with Isthmus parameters configured.
     function setUp() public virtual override {
         l2Fork = Fork.ISTHMUS;
         super.setUp();
 
-        // Configure Isthmus state on the L1 block.
-        bytes memory calldataPacked = Encoding.encodeSetL1BlockValuesIsthmus(
-            baseFeeScalar,
-            blobBaseFeeScalar,
-            sequenceNumber,
-            timestamp,
-            number,
-            baseFee,
-            blobBaseFee,
-            hash,
-            batcherHash,
-            operatorFeeScalar,
-            operatorFeeConstant
-        );
-
-        vm.prank(depositor);
-        (bool success,) = address(l1Block).call(calldataPacked);
-        require(success, "GasPriceOracleJovian_Test: L1Block setup failed");
+        _setIsthmusL1BlockValues(operatorFeeScalar, operatorFeeConstant);
 
         assertEq(gasPriceOracle.isIsthmus(), true, "Isthmus should be active before enabling Jovian");
-        assertEq(gasPriceOracle.isJovian(), false, "Jovian starts active");
+        assertEq(gasPriceOracle.isJovian(), false, "Jovian starts inactive");
     }
 
     function _activateJovian() internal {
@@ -451,40 +385,16 @@ contract GasPriceOracleJovian_Test is GasPriceOracle_Test {
         assertEq(gasPriceOracle.isJovian(), true, "Jovian activation failed");
     }
 
-    function _setOperatorFeeParams(uint32 _operatorFeeScalar, uint64 _operatorFeeConstant) internal {
-        vm.prank(depositor);
-        (bool success,) = address(l1Block)
-            .call(
-                Encoding.encodeSetL1BlockValuesIsthmus(
-                    baseFeeScalar,
-                    blobBaseFeeScalar,
-                    sequenceNumber,
-                    timestamp,
-                    number,
-                    baseFee,
-                    blobBaseFee,
-                    hash,
-                    batcherHash,
-                    _operatorFeeScalar,
-                    _operatorFeeConstant
-                )
-            );
-        require(success, "GasPriceOracleJovian_Test: L1Block setup failed");
-    }
-
-    /// @dev Tests that `operatorFee` is set correctly using the new Jovian formula (multiply by 100).
     function test_getOperatorFee_succeeds() external {
         _activateJovian();
         assertEq(gasPriceOracle.getOperatorFee(10), 10 * operatorFeeScalar * 100 + operatorFeeConstant);
     }
 
-    /// @dev Tests that `setJovian` is only callable by the depositor.
     function test_setJovian_wrongCaller_reverts() external {
         vm.expectRevert("GasPriceOracle: only the depositor account can set isJovian flag");
         gasPriceOracle.setJovian();
     }
 
-    /// @dev Tests that `setJovian` cannot be activated twice.
     function test_setJovian_alreadyActive_reverts() external {
         _activateJovian();
         vm.prank(depositor);
@@ -492,10 +402,9 @@ contract GasPriceOracleJovian_Test is GasPriceOracle_Test {
         gasPriceOracle.setJovian();
     }
 
-    /// @dev Tests the transition from Isthmus formula to Jovian formula.
     function test_formulaTransition_edgeCases_works() external {
         // Check Isthmus formula with a low gasUsed value (divide by 1e6)
-        _setOperatorFeeParams(operatorFeeScalar, operatorFeeConstant);
+        _setIsthmusL1BlockValues(operatorFeeScalar, operatorFeeConstant);
         uint256 isthmusFee = gasPriceOracle.getOperatorFee(10);
         assertEq(
             isthmusFee,
@@ -506,7 +415,7 @@ contract GasPriceOracleJovian_Test is GasPriceOracle_Test {
         // Use maximum values permitted by data types for scalars.
         // Use maximum value for gasUsed according to client implementations.
         // Assert that the fee is as expected (no overflow).
-        _setOperatorFeeParams(MAX_UINT32, MAX_UINT64);
+        _setIsthmusL1BlockValues(MAX_UINT32, MAX_UINT64);
         isthmusFee = gasPriceOracle.getOperatorFee(MAX_UINT64);
         assertEq(
             isthmusFee,
@@ -516,19 +425,18 @@ contract GasPriceOracleJovian_Test is GasPriceOracle_Test {
 
         // Show that the math saturates if the maximum
         // value for gasUsed (according to data type) is used.
-        _setOperatorFeeParams(1e6, 1);
+        _setIsthmusL1BlockValues(1e6, 1);
         uint256 saturatedIsthmusFee = gasPriceOracle.getOperatorFee(MAX_UINT256);
         assertEq(
             saturatedIsthmusFee,
-            115792089237316195423570985008687907853269984665640564039457584007913130,
+            MAX_UINT256 / 1e6 + 1,
             "Incorrect value for fee under Isthmus (saturating arithmetic triggered)"
         );
 
-        // Activate Jovian
         _activateJovian();
 
         // Check Jovian formula with a low gasUsed value (multiply by 100)
-        _setOperatorFeeParams(operatorFeeScalar, operatorFeeConstant);
+        _setIsthmusL1BlockValues(operatorFeeScalar, operatorFeeConstant);
         uint256 jovianFee = gasPriceOracle.getOperatorFee(10);
         assertEq(
             jovianFee,
@@ -539,7 +447,7 @@ contract GasPriceOracleJovian_Test is GasPriceOracle_Test {
         // Use maximum values permitted by data types for scalars.
         // Use maximum value for gasUsed according to client implementations.
         // Assert that the fee is as expected (no overflow).
-        _setOperatorFeeParams(MAX_UINT32, MAX_UINT64);
+        _setIsthmusL1BlockValues(MAX_UINT32, MAX_UINT64);
         jovianFee = gasPriceOracle.getOperatorFee(MAX_UINT64);
         assertEq(
             jovianFee,
@@ -549,7 +457,7 @@ contract GasPriceOracleJovian_Test is GasPriceOracle_Test {
 
         // Show that a revert is possible if the maximum
         // value for gasUsed (according to data type) is used.
-        _setOperatorFeeParams(1, 1);
+        _setIsthmusL1BlockValues(1, 1);
         vm.expectRevert(stdError.arithmeticError);
         gasPriceOracle.getOperatorFee(MAX_UINT256);
 
