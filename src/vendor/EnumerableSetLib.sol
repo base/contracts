@@ -103,7 +103,7 @@ library EnumerableSetLib {
             let rootPacked := sload(rootSlot)
             let n := shr(160, shl(160, rootPacked))
             result := shr(1, n)
-            for {} iszero(or(iszero(shr(96, rootPacked)), n)) {} {
+            for { } iszero(or(iszero(shr(96, rootPacked)), n)) { } {
                 result := 1
                 if iszero(sload(add(rootSlot, result))) { break }
                 result := 2
@@ -121,7 +121,7 @@ library EnumerableSetLib {
         assembly {
             let n := sload(not(rootSlot))
             result := shr(1, n)
-            for {} iszero(n) {} {
+            for { } iszero(n) { } {
                 result := 0
                 if iszero(sload(add(rootSlot, result))) { break }
                 result := 1
@@ -166,7 +166,7 @@ library EnumerableSetLib {
             }
             if iszero(value) { value := _ZERO_SENTINEL }
             let rootPacked := sload(rootSlot)
-            for {} 1 {} {
+            for { } 1 { } {
                 if iszero(shr(160, shl(160, rootPacked))) {
                     result := 1
                     if eq(shr(96, rootPacked), value) { break }
@@ -193,7 +193,7 @@ library EnumerableSetLib {
                 revert(0x1c, 0x04)
             }
             if iszero(value) { value := _ZERO_SENTINEL }
-            for {} 1 {} {
+            for { } 1 { } {
                 if iszero(sload(not(rootSlot))) {
                     result := 1
                     if eq(sload(rootSlot), value) { break }
@@ -240,7 +240,7 @@ library EnumerableSetLib {
             }
             if iszero(value) { value := _ZERO_SENTINEL }
             let rootPacked := sload(rootSlot)
-            for { let n := shr(160, shl(160, rootPacked)) } 1 {} {
+            for { let n := shr(160, shl(160, rootPacked)) } 1 { } {
                 mstore(0x20, rootSlot)
                 if iszero(n) {
                     let v0 := shr(96, rootPacked)
@@ -302,7 +302,7 @@ library EnumerableSetLib {
                 revert(0x1c, 0x04)
             }
             if iszero(value) { value := _ZERO_SENTINEL }
-            for { let n := sload(not(rootSlot)) } 1 {} {
+            for { let n := sload(not(rootSlot)) } 1 { } {
                 mstore(0x20, rootSlot)
                 if iszero(n) {
                     let v0 := sload(rootSlot)
@@ -382,7 +382,7 @@ library EnumerableSetLib {
             }
             if iszero(value) { value := _ZERO_SENTINEL }
             let rootPacked := sload(rootSlot)
-            for { let n := shr(160, shl(160, rootPacked)) } 1 {} {
+            for { let n := shr(160, shl(160, rootPacked)) } 1 { } {
                 if iszero(n) {
                     result := 1
                     if eq(shr(96, rootPacked), value) {
@@ -433,7 +433,7 @@ library EnumerableSetLib {
                 revert(0x1c, 0x04)
             }
             if iszero(value) { value := _ZERO_SENTINEL }
-            for { let n := sload(not(rootSlot)) } 1 {} {
+            for { let n := sload(not(rootSlot)) } 1 { } {
                 if iszero(n) {
                     result := 1
                     if eq(sload(rootSlot), value) {
@@ -508,7 +508,7 @@ library EnumerableSetLib {
             let o := add(0x20, result)
             let v := shr(96, rootPacked)
             mstore(o, mul(v, iszero(eq(v, zs))))
-            for {} 1 {} {
+            for { } 1 { } {
                 if iszero(n) {
                     if v {
                         n := 1
@@ -547,7 +547,7 @@ library EnumerableSetLib {
             let n := sload(not(rootSlot))
             result := mload(0x40)
             let o := add(0x20, result)
-            for {} 1 {} {
+            for { } 1 { } {
                 if iszero(n) {
                     let v := sload(rootSlot)
                     if v {
@@ -597,7 +597,7 @@ library EnumerableSetLib {
             result := mload(0x40)
             let ptr := add(result, 0x20)
             let o := 0
-            for { let packed := sload(set.slot) } packed {} {
+            for { let packed := sload(set.slot) } packed { } {
                 if iszero(and(packed, 0xffff)) {
                     o := add(o, 16)
                     packed := shr(16, packed)
@@ -650,12 +650,12 @@ library EnumerableSetLib {
         /// @solidity memory-safe-assembly
         assembly {
             let packed := sload(set.slot)
-            for {} 1 {
+            for { } 1 {
                 mstore(0x00, 0x4e23d035) // `IndexOutOfBounds()`.
                 revert(0x1c, 0x04)
             } {
                 if iszero(lt(i, 256)) { continue }
-                for { let j := 0 } iszero(eq(i, j)) {} {
+                for { let j := 0 } iszero(eq(i, j)) { } {
                     packed := xor(packed, and(packed, add(1, not(packed))))
                     j := add(j, 1)
                 }
