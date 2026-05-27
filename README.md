@@ -50,3 +50,4 @@ just semver-lock
 
 ## Contributing
 PRs welcome!
+\n## Improvements\n- Updated gas estimation notes\n- Fixed contract artifact loading typo
