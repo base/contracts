@@ -16,12 +16,6 @@ deps: clean-lib
     github.com/transmissions11/solmate@8f9b23f8838670afda0fd8983f2c41e8037ae6bc \
     github.com/Vectorized/solady@502cc1ea718e6fa73b380635ee0868b0740595f0 \
     github.com/risc0/risc0-ethereum@a78ac4a52fe9cfa14120c3b496430f0d42e1d8d3
-  @# openzeppelin-contracts-v5 and solady-v0.0.245 use the same orgs as their
-  @# counterparts but are pinned to different commits, so we clone them manually.
-  git clone --no-checkout https://github.com/OpenZeppelin/openzeppelin-contracts.git lib/openzeppelin-contracts-v5 && \
-    cd lib/openzeppelin-contracts-v5 && git checkout dbb6104ce834628e473d2173bbc9d47f81a9eec3
-  git clone --no-checkout https://github.com/Vectorized/solady.git lib/solady-v0.0.245 && \
-    cd lib/solady-v0.0.245 && git checkout 8583a6e386b897f3db142a541f86d5953eccd835
 
 # Cleans dependency installs.
 clean-lib:
