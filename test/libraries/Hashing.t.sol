@@ -32,6 +32,36 @@ contract Hashing_Harness {
     }
 }
 
+abstract contract Hashing_TestInit is CommonTest {
+    bytes1 internal constant SUPER_ROOT_VERSION = 0x01;
+    uint256 internal constant MAX_OUTPUT_ROOTS = 50;
+
+    function _outputRoot(uint256 _chainId, bytes32 _root) internal pure returns (Types.OutputRootWithChainId memory) {
+        return Types.OutputRootWithChainId({ chainId: _chainId, root: _root });
+    }
+
+    function _superRootProof(
+        uint64 _timestamp,
+        uint256 _length,
+        uint256 _seed
+    )
+        internal
+        pure
+        returns (Types.SuperRootProof memory proof)
+    {
+        _length = bound(_length, 1, MAX_OUTPUT_ROOTS);
+
+        Types.OutputRootWithChainId[] memory outputRoots = new Types.OutputRootWithChainId[](_length);
+        for (uint256 i = 0; i < _length; i++) {
+            outputRoots[i] = _outputRoot(
+                uint256(keccak256(abi.encode(_seed, uint8(0), i))), keccak256(abi.encode(_seed, uint8(1), i))
+            );
+        }
+
+        proof = Types.SuperRootProof({ version: SUPER_ROOT_VERSION, timestamp: _timestamp, outputRoots: outputRoots });
+    }
+}
+
 /// @title Hashing_hashDepositTransaction_Test
 /// @notice Tests the `hashDepositTransaction` function of the `Hashing` library.
 contract Hashing_hashDepositTransaction_Test is CommonTest {
@@ -57,7 +87,7 @@ contract Hashing_hashDepositTransaction_Test is CommonTest {
                     _mint,
                     _gas,
                     _data,
-                    bytes32(uint256(0)),
+                    bytes32(0),
                     _logIndex
                 )
             ),
@@ -90,15 +120,7 @@ contract Hashing_hashDepositSource_Test is CommonTest {
 /// @title Hashing_hashCrossDomainMessage_Test
 /// @notice Tests the `hashCrossDomainMessage` function of the `Hashing` library.
 contract Hashing_hashCrossDomainMessage_Test is CommonTest {
-    Hashing_Harness internal harness;
-
-    /// @notice Sets up the test.
-    function setUp() public override {
-        super.setUp();
-        harness = new Hashing_Harness();
-    }
     /// @notice Tests that hashCrossDomainMessage returns the correct hash in a simple case.
-
     function testDiff_hashCrossDomainMessage_succeeds(
         uint240 _nonce,
         uint16 _version,
@@ -110,7 +132,6 @@ contract Hashing_hashCrossDomainMessage_Test is CommonTest {
     )
         external
     {
-        // Ensure the version is valid.
         uint16 version = uint16(bound(uint256(_version), 0, 1));
         uint256 nonce = Encoding.encodeVersionedNonce(_nonce, version);
 
@@ -123,28 +144,13 @@ contract Hashing_hashCrossDomainMessage_Test is CommonTest {
     /// @notice Tests that hashCrossDomainMessage reverts with unknown version.
     /// @param _nonce Message nonce base value.
     /// @param _version Invalid version number (will be bounded to 2+).
-    /// @param _sender Address of the sender of the message.
-    /// @param _target Address of the target of the message.
-    /// @param _value ETH value to send to the target.
-    /// @param _gasLimit Gas limit to use for the message.
-    /// @param _data Data to send with the message.
-    function testFuzz_hashCrossDomainMessage_unknownVersion_reverts(
-        uint240 _nonce,
-        uint16 _version,
-        address _sender,
-        address _target,
-        uint256 _value,
-        uint256 _gasLimit,
-        bytes memory _data
-    )
-        external
-    {
-        // Use version 2 or higher (invalid versions)
+    function testFuzz_hashCrossDomainMessage_unknownVersion_reverts(uint240 _nonce, uint16 _version) external {
         uint16 invalidVersion = uint16(bound(uint256(_version), 2, type(uint16).max));
         uint256 nonce = Encoding.encodeVersionedNonce(_nonce, invalidVersion);
+        Hashing_Harness harness = new Hashing_Harness();
 
         vm.expectRevert(bytes("Hashing: unknown cross domain message version"));
-        harness.hashCrossDomainMessage(nonce, _sender, _target, _value, _gasLimit, _data);
+        harness.hashCrossDomainMessage(nonce, address(this), address(this), 1, 100, hex"");
     }
 }
 
@@ -225,49 +231,33 @@ contract Hashing_hashL2toL2CrossDomainMessage_Test is CommonTest {
 
 /// @title Hashing_hashSuperRootProof_Test
 /// @notice Tests the `hashSuperRootProof` function of the `Hashing` library.
-contract Hashing_hashSuperRootProof_Test is CommonTest {
-    Hashing_Harness internal harness;
-
-    /// @notice Sets up the test.
-    function setUp() public override {
-        super.setUp();
-        harness = new Hashing_Harness();
-    }
-
+contract Hashing_hashSuperRootProof_Test is Hashing_TestInit {
     /// @notice Tests that the Solidity impl of hashSuperRootProof matches the FFI impl
-    /// @param _proof The super root proof to test.
-    function testDiff_hashSuperRootProof_succeeds(Types.SuperRootProof memory _proof) external {
-        // Make sure the proof has the right version.
-        _proof.version = 0x01;
+    /// @param _timestamp The timestamp of the super root proof.
+    /// @param _length The number of output roots in the super root proof.
+    /// @param _seed The seed used to generate the output roots.
+    function testDiff_hashSuperRootProof_succeeds(uint64 _timestamp, uint256 _length, uint256 _seed) external {
+        Types.SuperRootProof memory proof = _superRootProof(_timestamp, _length, _seed);
 
-        // Make sure the proof has at least one output root.
-        if (_proof.outputRoots.length == 0) {
-            _proof.outputRoots = new Types.OutputRootWithChainId[](1);
-            _proof.outputRoots[0] = Types.OutputRootWithChainId({
-                chainId: vm.randomUint(0, type(uint64).max), root: bytes32(vm.randomUint())
-            });
-        }
-
-        // Encode using the Solidity implementation
-        bytes32 hash1 = harness.hashSuperRootProof(_proof);
-
-        // Encode using the FFI implementation
-        bytes32 hash2 = ffi.hashSuperRootProof(_proof);
-
-        // Compare the results
-        assertEq(hash1, hash2, "Solidity and FFI implementations should match");
+        assertEq(Hashing.hashSuperRootProof(proof), ffi.hashSuperRootProof(proof), "hash mismatch");
     }
 
     /// @notice Tests that hashSuperRootProof reverts when the version is incorrect.
-    /// @param _proof The super root proof to test.
-    function testFuzz_hashSuperRootProof_wrongVersion_reverts(Types.SuperRootProof memory _proof) external {
-        // 0x01 is the correct version, so we need any other version.
-        if (_proof.version == 0x01) {
-            _proof.version = 0x00;
+    /// @param _version The version to use for the super root proof.
+    /// @param _timestamp The timestamp of the super root proof.
+    function testFuzz_hashSuperRootProof_wrongVersion_reverts(bytes1 _version, uint64 _timestamp) external {
+        if (_version == SUPER_ROOT_VERSION) {
+            _version = 0x00;
         }
 
-        // Should always revert when the version is incorrect.
+        Types.OutputRootWithChainId[] memory outputRoots = new Types.OutputRootWithChainId[](1);
+        outputRoots[0] = _outputRoot(1, bytes32(uint256(1)));
+
+        Types.SuperRootProof memory proof =
+            Types.SuperRootProof({ version: _version, timestamp: _timestamp, outputRoots: outputRoots });
+        Hashing_Harness harness = new Hashing_Harness();
+
         vm.expectRevert(Encoding.Encoding_InvalidSuperRootVersion.selector);
-        harness.hashSuperRootProof(_proof);
+        harness.hashSuperRootProof(proof);
     }
 }

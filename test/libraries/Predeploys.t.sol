@@ -22,11 +22,6 @@ abstract contract Predeploys_TestInit is CommonTest {
         return _addr == Predeploys.L1_BLOCK_ATTRIBUTES || _addr == Predeploys.L2_STANDARD_BRIDGE;
     }
 
-    /// @notice Returns true if the account is not meant to be in the L2 genesis anymore.
-    function _isOmitted(address _addr) internal pure returns (bool) {
-        return _addr == Predeploys.L1_MESSAGE_SENDER;
-    }
-
     /// @notice Returns true if the predeploy is initializable and uses OpenZeppelin v4 storage pattern.
     ///         These contracts have _initialized in the regular storage layout.
     function _isInitializableV4(address _addr) internal pure returns (bool) {
@@ -48,26 +43,20 @@ abstract contract Predeploys_TestInit is CommonTest {
 
     /// @notice Internal test function for predeploys validation across different forks.
     function _test_predeploys() internal view {
-        uint256 count = 2048;
         uint160 prefix = uint160(0x420) << 148;
 
         bytes memory proxyCode = vm.getDeployedCode("src/universal/Proxy.sol:Proxy");
 
-        for (uint256 i = 0; i < count; i++) {
+        for (uint256 i = 0; i < Predeploys.PREDEPLOY_COUNT; i++) {
             address addr = address(prefix | uint160(i));
-            address implAddr = Predeploys.predeployToCodeNamespace(addr);
 
-            if (_isOmitted(addr)) {
-                assertEq(implAddr.code.length, 0, "must have no code");
+            if (addr == Predeploys.L1_MESSAGE_SENDER) {
+                assertEq(Predeploys.predeployToCodeNamespace(addr).code.length, 0, "must have no code");
                 continue;
             }
 
             bool isPredeploy = Predeploys.isSupportedPredeploy(addr);
-
-            bytes memory code = addr.code;
-            if (isPredeploy) assertTrue(code.length > 0);
-
-            bool proxied = Predeploys.notProxied(addr) == false;
+            bool proxied = !Predeploys.notProxied(addr);
 
             if (!isPredeploy) {
                 // All of the predeploys, even if inactive, have their admin set to the proxy admin
@@ -75,13 +64,17 @@ abstract contract Predeploys_TestInit is CommonTest {
                 continue;
             }
 
+            address implAddr = Predeploys.predeployToCodeNamespace(addr);
+            bytes memory code = addr.code;
+            assertTrue(code.length > 0);
+
             string memory cname = Predeploys.getName(addr);
             assertNotEq(cname, "", "must have a name");
 
             bytes memory supposedCode = vm.getDeployedCode(string.concat(cname, ".sol:", cname));
             assertNotEq(supposedCode.length, 0, "must have supposed code");
 
-            if (proxied == false) {
+            if (!proxied) {
                 // can't check bytecode if it's modified with immutables in genesis.
                 if (!_usesImmutables(addr)) {
                     assertEq(code, supposedCode, "non-proxy contract should be deployed in-place");
