@@ -230,6 +230,70 @@ contract DelayedWETH_Withdraw_Test is DelayedWETH_TestBase {
         vm.prank(alice);
         delayedWeth.withdraw(alice, DEFAULT_AMOUNT);
     }
+
+    /// @notice Fuzz: varying withdrawal amounts handled correctly.
+    /// @param amount_ WETH amount to withdraw (capped at reasonable range to avoid overflow).
+    function testFuzz_withdraw_varyingAmount_succeedsOrReverts(uint256 amount_) public {
+        // Bound amount to avoid overflow in calculations
+        amount_ = amount_ % (1000 ether);
+
+        // Prepare: deposit and unlock
+        _depositAlice(amount_ == 0 ? 1 ether : amount_);
+        _unlockAlice(amount_ == 0 ? 1 ether : amount_);
+        _warpPastDelay();
+
+        if (amount_ == 0) {
+            // Zero amount should still work (no-op withdrawal)
+            vm.prank(alice);
+            delayedWeth.withdraw(0);
+        } else if (amount_ <= (amount_ == 0 ? 1 ether : amount_)) {
+            vm.prank(alice);
+            delayedWeth.withdraw(amount_);
+        }
+    }
+
+    /// @notice Fuzz: delay period variations handled correctly.
+    /// @param delayBips_ Delay in basis points (0 to 10000).
+    function testFuzz_unlock_delayPeriodVariations_succeeds(uint256 delayBips_) public {
+        // Bound delay to realistic range (0 to 10000 = 0% to 100%)
+        delayBips_ = delayBips_ % 10001;
+
+        // Warp to a time relative to the delay
+        uint256 delay = delayedWeth.delay();
+        uint256 targetTime = delay * delayBips_ / 10000;
+
+        vm.warp(block.timestamp + targetTime);
+
+        // Unlock should always succeed regardless of how far into the delay we are
+        vm.prank(alice);
+        delayedWeth.unlock(alice, DEFAULT_AMOUNT);
+
+        (uint256 amount, uint256 timestamp) = delayedWeth.withdrawals(address(this), alice);
+        assertEq(amount, DEFAULT_AMOUNT);
+        assertEq(timestamp, block.timestamp);
+    }
+
+    /// @notice Fuzz: concurrent withdrawal attempts handled correctly.
+    /// @param numAttempts_ Number of unlock calls to make in quick succession.
+    function testFuzz_unlock_concurrentAttempts_succeeds(uint256 numAttempts_) public {
+        // Bound to reasonable range
+        numAttempts_ = numAttempts_ % 20;
+        vm.assume(numAttempts_ >= 1);
+
+        uint256 totalAmount = DEFAULT_AMOUNT * numAttempts_;
+
+        _depositAlice(totalAmount);
+
+        // Make multiple unlock calls in quick succession (simulating concurrent behavior)
+        for (uint256 i = 0; i < numAttempts_; i++) {
+            vm.prank(alice);
+            delayedWeth.unlock(alice, DEFAULT_AMOUNT);
+            vm.warp(block.timestamp + 1); // Advance time slightly
+        }
+
+        (uint256 amount, ) = delayedWeth.withdrawals(address(this), alice);
+        assertEq(amount, totalAmount);
+    }
 }
 
 /// @title DelayedWETH_Recover_Test

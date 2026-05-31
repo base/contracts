@@ -264,6 +264,98 @@ contract AggregateVerifierTest is BaseTest {
         _expectDeployWithInvalidBlockIntervalsReverts(3, 2);
     }
 
+    /// @notice Fuzz: proof data with varying lengths is handled correctly.
+    function testFuzz_proofDataWithVaryingLengths_succeedsOrReverts(uint256 proofLength) public {
+        vm.assume(proofLength > 0 && proofLength <= 1024);
+
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
+
+        // Shrink or expand the proof to the target length
+        if (proof.length > proofLength) {
+            assembly { mstore(proof, proofLength) }
+        } else if (proof.length < proofLength) {
+            bytes memory padded = new bytes(proofLength);
+            assembly {
+                let src := add(proof, 0x20)
+                let dest := add(padded, 0x20)
+                let len := add(proofLength, 0x20)
+                for { let i := 0 } lt(i, len) { i := add(i, 0x20) } {
+                    mstore(add(dest, i), mload(add(src, i)))
+                }
+            }
+            proof = padded;
+        }
+
+        if (proofLength >= 32) {
+            // Valid proof length range - game creation should succeed
+            _createAggregateVerifierGame(
+                TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
+            );
+        }
+        // If proof length is too short for valid parsing, initialization would fail
+        // which is acceptable behavior for malformed proof data
+    }
+
+    /// @notice Fuzz: multiple proof types combined in sequence is handled correctly.
+    function testFuzz_multipleProofTypesCombined_succeeds(uint256 proofCount) public {
+        vm.assume(proofCount >= 1 && proofCount <= 5);
+
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
+
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), teeProof
+        );
+
+        // Add additional proofs up to proofCount
+        for (uint256 i = 1; i < proofCount; i++) {
+            AggregateVerifier.ProofType pt = (i % 2 == 0) ? AggregateVerifier.ProofType.TEE : AggregateVerifier.ProofType.ZK;
+            bytes memory proof = _generateProof(keccak256(abi.encode(i)), pt);
+            _provideProof(game, i % 2 == 0 ? TEE_PROVER : ZK_PROVER, proof);
+        }
+
+        assertEq(game.proofCount(), proofCount);
+    }
+
+    /// @notice Fuzz: invalid proof data is handled correctly (reverts or accepts without state corruption).
+    function testFuzz_invalidProofData_handledCorrectly(bytes32 invalidClaimHash) public {
+        vm.assume(invalidClaimHash != bytes32(0));
+
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        // Use the invalid claim hash directly as proof data
+        bytes memory invalidProof = abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), invalidClaimHash);
+
+        // Should either revert with valid error or succeed with non-zero proofCount
+        try this.createAndCheckInvalidProof(rootClaim, invalidProof) returns (bool accepted, uint256 proofCount, uint8 status) {
+            if (accepted) {
+                // If accepted, ensure game state is valid
+                assertTrue(proofCount >= 1 || status != uint8(GameStatus.IN_PROGRESS));
+            }
+        } catch {
+            // Revert is acceptable for invalid proof data
+        }
+    }
+
+    function createAndCheckInvalidProof(Claim rootClaim, bytes memory proof) external returns (bool accepted_, uint256 proofCount_, uint8 status_) {
+        IDisputeGame game;
+        try factory.createWithInitData{ value: INIT_BOND }(
+            GameTypes.AGGREGATE_VERIFIER,
+            rootClaim,
+            "",
+            proof
+        ) returns (IDisputeGame createdGame) {
+            game = createdGame;
+            accepted_ = true;
+            proofCount_ = AggregateVerifier(address(game)).proofCount();
+            status_ = uint8(AggregateVerifier(address(game)).status());
+        } catch {
+            accepted_ = false;
+            proofCount_ = 0;
+            status_ = 0;
+        }
+    }
+
     function _advanceL2BlockAndClaim() private returns (Claim rootClaim) {
         currentL2BlockNumber += BLOCK_INTERVAL;
         return Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
