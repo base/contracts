@@ -3,9 +3,9 @@ pragma solidity 0.8.15;
 
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { EnumerableSetLib } from "lib/solady-v0.0.245/src/utils/EnumerableSetLib.sol";
 
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
+import { EnumerableSetLib } from "src/vendor/EnumerableSetLib.sol";
 
 /// @title DevTEEProverRegistry
 /// @notice Test/development registry that can register signers without Nitro attestation verification.
