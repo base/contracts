@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// Libraries
 import { Burn } from "src/libraries/Burn.sol";
 
 contract CallRecorder {
@@ -35,21 +34,17 @@ contract Reverter {
 
 /// @dev Can be etched in to any address to test making a delegatecall from that address.
 contract DelegateCaller {
-    function dcForward(address _target, bytes memory _data) external {
+    function dcForward(address _target, bytes calldata _data) external {
         assembly {
-            // Perform the delegatecall, make sure to pass all available gas.
-            let success := delegatecall(gas(), _target, add(_data, 0x20), mload(_data), 0x0, 0x0)
+            calldatacopy(0x0, _data.offset, _data.length)
+            let success := delegatecall(gas(), _target, 0x0, _data.length, 0x0, 0x0)
 
-            // Copy returndata into memory at 0x0....returndatasize. Note that this *will*
-            // overwrite the calldata that we just copied into memory but that doesn't really
-            // matter because we'll be returning in a second anyway.
-            returndatacopy(0x0, 0x0, returndatasize())
+            let size := returndatasize()
+            returndatacopy(0x0, 0x0, size)
 
-            // Success == 0 means a revert. We'll revert too and pass the data up.
-            if iszero(success) { revert(0x0, returndatasize()) }
+            if iszero(success) { revert(0x0, size) }
 
-            // Otherwise we'll just return and pass the data up.
-            return(0x0, returndatasize())
+            return(0x0, size)
         }
     }
 }
@@ -57,28 +52,18 @@ contract DelegateCaller {
 /// @title GasBurner
 /// @notice Contract that burns a specified amount of gas on receive or fallback.
 contract GasBurner {
-    /// @notice The amount of gas to burn on receive or fallback.
-    uint256 immutable GAS_TO_BURN;
+    uint256 internal constant GAS_BURN_OVERHEAD = 500;
+    uint256 internal immutable GAS_TO_BURN;
 
-    /// @notice Constructor.
-    /// @param _gas The amount of gas to burn on receive or fallback.
     constructor(uint256 _gas) {
-        // 500 gas buffer for Solidity overhead.
-        GAS_TO_BURN = _gas - 500;
+        GAS_TO_BURN = _gas - GAS_BURN_OVERHEAD;
     }
 
-    /// @notice Receive function that burns the specified amount of gas.
     receive() external payable {
-        _burn();
+        Burn.gas(GAS_TO_BURN);
     }
 
-    /// @notice Fallback function that burns the specified amount of gas.
     fallback() external payable {
-        _burn();
-    }
-
-    /// @notice Internal function that burns the specified amount of gas.
-    function _burn() internal view {
         Burn.gas(GAS_TO_BURN);
     }
 }
