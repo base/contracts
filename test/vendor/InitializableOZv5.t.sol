@@ -2,10 +2,10 @@
 pragma solidity 0.8.25;
 
 import { Test } from "lib/forge-std/src/Test.sol";
-import { Initializable } from "lib/openzeppelin-contracts-v5/contracts/proxy/utils/Initializable.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { IFeeVault } from "interfaces/L2/IFeeVault.sol";
 import { Types } from "src/libraries/Types.sol";
+import { Initializable } from "src/vendor/Initializable.sol";
 
 /// @title InitializerOZv5_Test
 /// @dev Ensures that the `initialize()` function on contracts cannot be called more than
