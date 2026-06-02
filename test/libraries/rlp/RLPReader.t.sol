@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { stdError } from "forge-std/Test.sol";
-import { Test } from "forge-std/Test.sol";
+import { stdError } from "lib/forge-std/src/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 import { RLPReader } from "src/libraries/rlp/RLPReader.sol";
 import "src/libraries/rlp/RLPErrors.sol";
 
 /// @title RLPReader_readBytes_Test
 /// @notice Tests the `readBytes` function of the `RLPReader` library.
-/// @dev Here we allow internal reverts as readRawBytes uses memory allocations and can only be
-///      tested internally.
 contract RLPReader_readBytes_Test is Test {
     /// @notice Tests that the `readBytes` function returns the correct bytes when given a null
     ///         byte.
@@ -66,9 +64,19 @@ contract RLPReader_readBytes_Test is Test {
     }
 }
 
+/// @title RLPReader_TestInit
+/// @notice Reusable helpers for `RLPReader` tests.
+abstract contract RLPReader_TestInit is Test {
+    function assertRepeatedRawBytes(RLPReader.RLPItem[] memory _list, bytes memory _expected) internal pure {
+        for (uint256 i = 0; i < _list.length; i++) {
+            assertEq(RLPReader.readRawBytes(_list[i]), _expected);
+        }
+    }
+}
+
 /// @title RLPReader_readList_Test
 /// @notice Tests the `readList` function of the `RLPReader` library.
-contract RLPReader_readList_Test is Test {
+contract RLPReader_readList_Test is RLPReader_TestInit {
     /// @notice Tests that the `readList` function returns an empty array when given an empty list.
     function test_readList_empty_succeeds() external pure {
         RLPReader.RLPItem[] memory list = RLPReader.readList(hex"c0");
@@ -114,10 +122,7 @@ contract RLPReader_readList_Test is Test {
         );
 
         assertEq(list.length, 4);
-        assertEq(RLPReader.readRawBytes(list[0]), hex"cf84617364668471776572847a786376");
-        assertEq(RLPReader.readRawBytes(list[1]), hex"cf84617364668471776572847a786376");
-        assertEq(RLPReader.readRawBytes(list[2]), hex"cf84617364668471776572847a786376");
-        assertEq(RLPReader.readRawBytes(list[3]), hex"cf84617364668471776572847a786376");
+        assertRepeatedRawBytes(list, hex"cf84617364668471776572847a786376");
     }
 
     /// @notice Tests that the `readList` function correctly parses a very long list with 32 nested
@@ -127,10 +132,7 @@ contract RLPReader_readList_Test is Test {
             hex"f90200cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376cf84617364668471776572847a786376"
         );
         assertEq(list.length, 32);
-
-        for (uint256 i = 0; i < 32; i++) {
-            assertEq(RLPReader.readRawBytes(list[i]), hex"cf84617364668471776572847a786376");
-        }
+        assertRepeatedRawBytes(list, hex"cf84617364668471776572847a786376");
     }
 
     /// @notice Tests that the `readList` function reverts when given a list longer than 32
@@ -196,18 +198,18 @@ contract RLPReader_readList_Test is Test {
         RLPReader.readList(hex"efdebdaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     }
 
-    /// @notice Tests that the `readList` function reverts when given data that causes int32
-    ///         overflow.
+    /// @notice Tests that the `readList` function reverts when the declared string length exceeds
+    ///         the available payload.
     /// forge-config: default.allow_internal_expect_revert = true
-    function test_readList_int32Overflow_reverts() external {
+    function test_readList_declaredStringLengthExceedsPayload_reverts() external {
         vm.expectRevert(ContentLengthMismatch.selector);
         RLPReader.readList(hex"bf0f000000000000021111");
     }
 
-    /// @notice Tests that the `readList` function reverts when given data that causes int32
-    ///         overflow with a different prefix.
+    /// @notice Tests that the `readList` function reverts when the declared list length exceeds
+    ///         the available payload.
     /// forge-config: default.allow_internal_expect_revert = true
-    function test_readList_int32Overflow2_reverts() external {
+    function test_readList_declaredListLengthExceedsPayload_reverts() external {
         vm.expectRevert(ContentLengthMismatch.selector);
         RLPReader.readList(hex"ff0f000000000000021111");
     }

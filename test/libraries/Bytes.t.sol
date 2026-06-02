@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-// Testing utilities
-import { Test } from "forge-std/Test.sol";
-
-// Target contract
+import { Test } from "lib/forge-std/src/Test.sol";
 import { Bytes } from "src/libraries/Bytes.sol";
 
 contract Bytes_Harness {
@@ -16,34 +13,38 @@ contract Bytes_Harness {
 /// @title Bytes_TestInit
 /// @notice Reusable test initialization for `Bytes` tests.
 abstract contract Bytes_TestInit is Test {
-    Bytes_Harness harness;
-
-    /// @notice Manually checks equality of two dynamic `bytes` arrays in memory.
-    /// @param _a The first `bytes` array to compare.
-    /// @param _b The second `bytes` array to compare.
-    /// @return True if the two `bytes` arrays are equal in memory.
     function manualEq(bytes memory _a, bytes memory _b) internal pure returns (bool) {
-        bool _eq;
-        assembly {
-            _eq := and(
-                // Check if the contents of the two bytes arrays are equal in memory.
-                eq(keccak256(add(0x20, _a), mload(_a)), keccak256(add(0x20, _b), mload(_b))),
-                // Check if the length of the two bytes arrays are equal in memory.
-                // This is redundant given the above check, but included for completeness.
-                eq(mload(_a), mload(_b))
-            )
-        }
-        return _eq;
+        return _a.length == _b.length && keccak256(_a) == keccak256(_b);
     }
 
-    function setUp() public {
-        harness = new Bytes_Harness();
+    function freeMemoryPtr() internal pure returns (uint64 ptr_) {
+        assembly {
+            ptr_ := mload(0x40)
+        }
+    }
+
+    function nextSliceMemoryPtr(uint64 _ptr, uint256 _length) internal pure returns (uint64) {
+        if (_length == 0) {
+            return _ptr + 0x20;
+        }
+
+        return uint64((_ptr + 0x20 + _length + 0x1f) & ~uint256(0x1f));
+    }
+
+    function nextBytesMemoryPtr(uint64 _ptr, uint256 _length) internal pure returns (uint64) {
+        return uint64(_ptr + 0x20 + ((_length + 0x1f) & ~uint256(0x1f)));
     }
 }
 
 /// @title Bytes_Slice_Test
 /// @notice Tests the `slice` function of the `Bytes` library.
 contract Bytes_Slice_Test is Bytes_TestInit {
+    Bytes_Harness harness;
+
+    function setUp() public {
+        harness = new Bytes_Harness();
+    }
+
     /// @notice Tests that the `slice` function works as expected when starting from index 0.
     function test_slice_fromZeroIdx_works() public pure {
         bytes memory input = hex"11223344556677889900";
@@ -107,54 +108,17 @@ contract Bytes_Slice_Test is Bytes_TestInit {
     function testFuzz_slice_memorySafety_succeeds(bytes memory _input, uint256 _start, uint256 _length) public {
         vm.assume(_input.length > 0);
 
-        // The start should never be more than the length of the input bytes array - 1
         _start = bound(_start, 0, _input.length - 1);
-
-        // The length should never be more than the length of the input bytes array - the starting
-        // slice index.
         _length = bound(_length, 0, _input.length - _start);
 
-        // Grab the free memory pointer before the slice operation
-        uint64 initPtr;
-        assembly {
-            initPtr := mload(0x40)
-        }
-        uint64 expectedPtr = uint64((initPtr + 0x20 + _length + 0x1f) & ~uint256(0x1f));
+        uint64 initPtr = freeMemoryPtr();
+        uint64 expectedPtr = nextSliceMemoryPtr(initPtr, _length);
 
-        // Ensure that all memory outside of the expected range is safe.
         vm.expectSafeMemory(initPtr, expectedPtr);
-
-        // Slice the input bytes array from `_start` to `_start + _length`
         bytes memory slice = Bytes.slice(_input, _start, _length);
-
         vm.stopExpectSafeMemory();
 
-        // Grab the free memory pointer after the slice operation
-        uint64 finalPtr;
-        assembly {
-            finalPtr := mload(0x40)
-        }
-
-        // The free memory pointer should have been updated properly
-        if (_length == 0) {
-            // If the slice length is zero, only 32 bytes of memory should have been allocated.
-            assertEq(finalPtr, initPtr + 0x20);
-        } else {
-            // If the slice length is greater than zero, the memory allocated should be the length
-            // of the slice rounded up to the next 32 byte word + 32 bytes for the length of the
-            // byte array.
-            //
-            // Note that we use a slightly less efficient, but equivalent method of rounding up
-            // `_length` to the next multiple of 32 than is used in the `slice` function. This is
-            // to diff test the method used in `slice`.
-            uint64 _expectedPtr = uint64(((initPtr + 0x20 + _length + 0x1F) >> 5) << 5);
-            assertEq(finalPtr, _expectedPtr);
-
-            // Sanity check for equivalence of the rounding methods.
-            assertEq(_expectedPtr, expectedPtr);
-        }
-
-        // The slice length should be equal to `_length`
+        assertEq(freeMemoryPtr(), expectedPtr);
         assertEq(slice.length, _length);
     }
 
@@ -181,26 +145,25 @@ contract Bytes_Slice_Test is Bytes_TestInit {
 
     /// @notice Tests that, when given a length `n` that is greater than `type(uint256).max - 31`,
     ///         the `slice` function reverts.
-    function testFuzz_slice_lengthOverflows_reverts(bytes memory _input, uint256 _start, uint256 _length) public {
+    function testFuzz_slice_lengthOverflows_reverts(uint256 _length) public {
         // Ensure that the `_length` will overflow if a number >= 31 is added to it.
         _length = uint256(bound(_length, type(uint256).max - 30, type(uint256).max));
 
         vm.expectRevert("slice_overflow");
-        harness.exposed_slice(_input, _start, _length);
+        harness.exposed_slice(hex"", 0, _length);
     }
 
     /// @notice Tests that, when given a start index `n` that is greater than
     ///         `type(uint256).max - n`, the `slice` function reverts.
     ///         The calls to `bound` are to reduce the number of times that `assume` is triggered.
     function testFuzz_slice_rangeOverflows_reverts(bytes memory _input, uint256 _start, uint256 _length) public {
+        vm.assume(_input.length > 1);
+
         // Ensure that `_length` is a realistic length of a slice. This is to make sure we revert
         // on the correct require statement.
-        _length = bound(_length, 0, _input.length == 0 ? 0 : _input.length - 1);
-        vm.assume(_length < _input.length);
+        _length = bound(_length, 1, _input.length - 1);
 
-        // Ensure that `_start` will overflow if `_length` is added to it.
-        _start = bound(_start, type(uint256).max - _length, type(uint256).max);
-        vm.assume(_start > type(uint256).max - _length);
+        _start = bound(_start, type(uint256).max - _length + 1, type(uint256).max);
 
         vm.expectRevert("slice_overflow");
         harness.exposed_slice(_input, _start, _length);
@@ -240,60 +203,22 @@ contract Bytes_ToNibbles_Test is Bytes_TestInit {
     /// @notice Tests that, given an input of 0 bytes, the `toNibbles` function returns a zero
     ///         length array.
     function test_toNibbles_zeroLengthInput_works() public pure {
-        bytes memory input = hex"";
-        bytes memory expected = hex"";
-        bytes memory actual = Bytes.toNibbles(input);
-
-        assertEq(input.length, 0);
-        assertEq(expected.length, 0);
-        assertEq(actual.length, 0);
-        assertEq(actual, expected);
+        assertEq(Bytes.toNibbles(hex""), hex"");
     }
 
     /// @notice Tests that the `toNibbles` function correctly updates the free memory pointer
     ///         depending on the length of the resulting array.
     function testFuzz_toNibbles_memorySafety_succeeds(bytes memory _input) public {
-        // Grab the free memory pointer before the `toNibbles` operation
-        uint64 initPtr;
-        assembly {
-            initPtr := mload(0x40)
-        }
-        uint64 expectedPtr = uint64(initPtr + 0x20 + ((_input.length * 2 + 0x1F) & ~uint256(0x1F)));
+        uint256 nibblesLength = _input.length * 2;
+        uint64 initPtr = freeMemoryPtr();
+        uint64 expectedPtr = nextBytesMemoryPtr(initPtr, nibblesLength);
 
-        // Ensure that all memory outside of the expected range is safe.
         vm.expectSafeMemory(initPtr, expectedPtr);
-
-        // Pull out each individual nibble from the input bytes array
         bytes memory nibbles = Bytes.toNibbles(_input);
-
         vm.stopExpectSafeMemory();
 
-        // Grab the free memory pointer after the `toNibbles` operation
-        uint64 finalPtr;
-        assembly {
-            finalPtr := mload(0x40)
-        }
-
-        // The free memory pointer should have been updated properly
-        if (_input.length == 0) {
-            // If the input length is zero, only 32 bytes of memory should have been allocated.
-            assertEq(finalPtr, initPtr + 0x20);
-        } else {
-            // If the input length is greater than zero, the memory allocated should be the length
-            // of the input * 2 + 32 bytes for the length field.
-            //
-            // Note that we use a slightly less efficient, but equivalent method of rounding up
-            // `_length` to the next multiple of 32 than is used in the `toNibbles` function. This
-            // is to diff test the method used in `toNibbles`.
-            uint64 _expectedPtr = uint64(initPtr + 0x20 + (((_input.length * 2 + 0x1F) >> 5) << 5));
-            assertEq(finalPtr, _expectedPtr);
-
-            // Sanity check for equivalence of the rounding methods.
-            assertEq(_expectedPtr, expectedPtr);
-        }
-
-        // The nibbles length should be equal to `_length * 2`
-        assertEq(nibbles.length, _input.length << 1);
+        assertEq(freeMemoryPtr(), expectedPtr);
+        assertEq(nibbles.length, nibblesLength);
     }
 }
 

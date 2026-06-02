@@ -2,41 +2,30 @@
 pragma solidity ^0.8.0;
 
 // Forge
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 
 // Testing
 import { Setup } from "test/setup/Setup.sol";
 import { Events } from "test/setup/Events.sol";
 import { FFIInterface } from "test/setup/FFIInterface.sol";
 
-// Scripts
-import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
-
 // Contracts
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-// Libraries
-import { Config } from "scripts/libraries/Config.sol";
-import { console } from "forge-std/console.sol";
+import { console2 as console } from "lib/forge-std/src/console2.sol";
 
 // Interfaces
 import { IOptimismMintableERC20Full } from "interfaces/universal/IOptimismMintableERC20Full.sol";
-import { ILegacyMintableERC20Full } from "interfaces/legacy/ILegacyMintableERC20Full.sol";
 
 /// @title CommonTest
-/// @dev An extension to `Test` that sets up the optimism smart contracts.
+/// @dev An extension to `Test` that sets up the Optimism smart contracts.
 abstract contract CommonTest is Test, Setup, Events {
     address alice;
     address bob;
 
-    bytes32 constant nonZeroHash = keccak256(abi.encode("NON_ZERO"));
+    uint256 constant DEFAULT_TEST_BALANCE = 10_000 ether;
 
     FFIInterface constant ffi = FFIInterface(address(uint160(uint256(keccak256(abi.encode("optimism.ffi"))))));
-
-    bool useAltDAOverride;
-    bool useInteropOverride;
-    bool useRevenueShareOverride;
-    bool useCustomGasToken;
 
     /// @dev This value is only used in forked tests. During forked tests, the default is to perform the upgrade before
     ///      running the tests.
@@ -44,14 +33,9 @@ abstract contract CommonTest is Test, Setup, Events {
     ///      itself, rather than simply ensuring that the tests pass after the upgrade.
     bool useUpgradedFork = true;
 
-    // Needed for testing purposes to check the contracts were properly deployed and setup.
-    address chainFeesRecipient = makeAddr("chainFeesRecipient");
-    address l1FeesDepositor = makeAddr("l1FeesDepositor");
-
     ERC20 L1Token;
     ERC20 BadL1Token;
     IOptimismMintableERC20Full L2Token;
-    ILegacyMintableERC20Full LegacyL2Token;
     ERC20 NativeL2Token;
     IOptimismMintableERC20Full RemoteL1Token;
 
@@ -68,48 +52,15 @@ abstract contract CommonTest is Test, Setup, Events {
 
         alice = makeAddr("alice");
         bob = makeAddr("bob");
-        vm.deal(alice, 10000 ether);
-        vm.deal(bob, 10000 ether);
+        vm.deal(alice, DEFAULT_TEST_BALANCE);
+        vm.deal(bob, DEFAULT_TEST_BALANCE);
 
         // Override the config after the deploy script initialized the config
-        if (useAltDAOverride) {
-            deploy.cfg().setUseAltDA(true);
-        }
-        if (useInteropOverride) {
-            deploy.cfg().setUseInterop(true);
-        }
-        if (useRevenueShareOverride) {
-            // Revenue share is not supported when custom gas token is enabled
-            if (Config.sysFeatureCustomGasToken()) {
-                vm.skip(true);
-            }
-
-            console.log("CommonTest: enabling revenue share");
-            deploy.cfg().setUseRevenueShare(true);
-            deploy.cfg().setChainFeesRecipient(chainFeesRecipient);
-            deploy.cfg().setL1FeesDepositor(l1FeesDepositor);
-        }
         if (useUpgradedFork) {
             deploy.cfg().setUseUpgradedFork(true);
         }
-        if (Config.sysFeatureCustomGasToken()) {
-            console.log("CommonTest: enabling custom gas token");
-            deploy.cfg().setUseCustomGasToken(true);
-            deploy.cfg().setGasPayingTokenName("Custom Gas Token");
-            deploy.cfg().setGasPayingTokenSymbol("CGT");
-            deploy.cfg().setNativeAssetLiquidityAmount(type(uint248).max);
-            deploy.cfg().setBaseFeeVaultWithdrawalNetwork(1);
-            deploy.cfg().setL1FeeVaultWithdrawalNetwork(1);
-            deploy.cfg().setSequencerFeeVaultWithdrawalNetwork(1);
-            deploy.cfg().setOperatorFeeVaultWithdrawalNetwork(1);
-        }
 
-        if (isForkTest()) {
-            // Skip any test suite which uses a nonstandard configuration.
-            if (useAltDAOverride || useInteropOverride) {
-                vm.skip(true);
-            }
-        } else {
+        if (!isForkTest()) {
             // Modifying these values on a fork test causes issues.
             vm.warp(deploy.cfg().l2OutputOracleStartingTimestamp() + 1);
             vm.roll(deploy.cfg().l2OutputOracleStartingBlockNumber() + 1);
@@ -125,41 +76,18 @@ abstract contract CommonTest is Test, Setup, Events {
         excludeContract(address(deploy));
         excludeContract(address(deploy.cfg()));
 
-        // Deploy L1
         Setup.L1();
-        // Deploy L2
         Setup.L2();
 
-        // Call bridge initializer setup function
         bridgeInitializerSetUp();
     }
 
-    function bridgeInitializerSetUp() public {
+    function bridgeInitializerSetUp() internal {
         L1Token = new ERC20("Native L1 Token", "L1T");
 
-        LegacyL2Token = ILegacyMintableERC20Full(
-            DeployUtils.create1({
-                _name: "LegacyMintableERC20",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(
-                        ILegacyMintableERC20Full.__constructor__,
-                        (
-                            address(l2StandardBridge),
-                            address(L1Token),
-                            string.concat("LegacyL2-", L1Token.name()),
-                            string.concat("LegacyL2-", L1Token.symbol())
-                        )
-                    )
-                )
-            })
-        );
-        vm.label(address(LegacyL2Token), "LegacyMintableERC20");
-
         if (isForkTest()) {
-            console.log("CommonTest: fork test detected, skipping L2 setup");
             L2Token = IOptimismMintableERC20Full(makeAddr("L2Token"));
         } else {
-            // Deploy the L2 ERC20 now
             L2Token = IOptimismMintableERC20Full(
                 l2OptimismMintableERC20Factory.createStandardL2Token(
                     address(L1Token),
@@ -171,23 +99,18 @@ abstract contract CommonTest is Test, Setup, Events {
 
         NativeL2Token = new ERC20("Native L2 Token", "L2T");
 
+        string memory remoteL1TokenName = string(abi.encodePacked("L1-", NativeL2Token.name()));
+        string memory remoteL1TokenSymbol = string(abi.encodePacked("L1-", NativeL2Token.symbol()));
+
         RemoteL1Token = IOptimismMintableERC20Full(
             l1OptimismMintableERC20Factory.createStandardL2Token(
-                address(NativeL2Token),
-                string(abi.encodePacked("L1-", NativeL2Token.name())),
-                string(abi.encodePacked("L1-", NativeL2Token.symbol()))
+                address(NativeL2Token), remoteL1TokenName, remoteL1TokenSymbol
             )
         );
 
         BadL1Token = ERC20(
-            l1OptimismMintableERC20Factory.createStandardL2Token(
-                address(1),
-                string(abi.encodePacked("L1-", NativeL2Token.name())),
-                string(abi.encodePacked("L1-", NativeL2Token.symbol()))
-            )
+            l1OptimismMintableERC20Factory.createStandardL2Token(address(1), remoteL1TokenName, remoteL1TokenSymbol)
         );
-
-        console.log("CommonTest: SetUp complete!");
     }
 
     /// @dev Helper function that wraps `TransactionDeposited` event.
@@ -217,28 +140,10 @@ abstract contract CommonTest is Test, Setup, Events {
         console.log("CommonTest: enabling", _feature);
     }
 
-    /// @dev Enables alternative data availability mode for testing
-    function enableAltDA() public {
-        _checkNotDeployed("altda");
-        useAltDAOverride = true;
-    }
-
-    /// @dev Enables interoperability mode for testing
-    function enableInterop() public {
-        _checkNotDeployed("interop");
-        useInteropOverride = true;
-    }
-
-    /// @dev Enables revenue sharing mode for testing
-    function enableRevenueShare() public {
-        _checkNotDeployed("revenue share");
-        useRevenueShareOverride = true;
-    }
-
     /// @dev Disables upgrade mode for testing. By default the fork testing env will be upgraded to the latest
-    ///      implementation. This can be used to disable the upgrade which, is useful for tests targeting the upgrade
+    ///      implementation. This can be used to disable the upgrade, which is useful for tests targeting the upgrade
     ///      process itself.
-    function disableUpgradedFork() public {
+    function disableUpgradedFork() internal {
         _checkNotDeployed("non-upgraded fork");
 
         useUpgradedFork = false;

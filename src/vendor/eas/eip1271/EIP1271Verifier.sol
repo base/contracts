@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
-import { SignatureChecker } from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
-import { Address } from "@openzeppelin/contracts/utils/Address.sol";
+import { EIP712 } from "lib/openzeppelin-contracts/contracts/utils/cryptography/draft-EIP712.sol";
+import { SignatureChecker } from "lib/openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
+import { Address } from "lib/openzeppelin-contracts/contracts/utils/Address.sol";
 
 import {
     AttestationRequestData,

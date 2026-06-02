@@ -2,14 +2,24 @@
 #                        INSTALL                       #
 ########################################################
 
-# Installs dependencies.
-install:
-  forge install
+# Installs Foundry.
+install-foundry:
+  curl -L https://foundry.paradigm.xyz | bash
+  ~/.foundry/bin/foundryup
 
-# Shows the status of the git submodules.
-dep-status:
-  git submodule status
+# Installs pinned dependencies.
+deps: clean-lib
+  forge install --no-git \
+    github.com/foundry-rs/forge-std@6853b9ec7df5dc0c213b05ae67785ad4f4baa0ea \
+    github.com/OpenZeppelin/openzeppelin-contracts@ecd2ca2cd7cac116f7a37d0e474bbb3d7d5e1c4d \
+    github.com/OpenZeppelin/openzeppelin-contracts-upgradeable@0a2cb9a445c365870ed7a8ab461b12acf3e27d63 \
+    github.com/transmissions11/solmate@8f9b23f8838670afda0fd8983f2c41e8037ae6bc \
+    github.com/Vectorized/solady@502cc1ea718e6fa73b380635ee0868b0740595f0 \
+    github.com/risc0/risc0-ethereum@a78ac4a52fe9cfa14120c3b496430f0d42e1d8d3
 
+# Cleans dependency installs.
+clean-lib:
+  rm -rf lib
 
 ########################################################
 #                         BUILD                        #
@@ -32,7 +42,7 @@ forge-build *ARGS:
   @# - Providing a signature/args is not required for compilation; compilation happens before
   @#   argument validation and before execution. We still use `--skip-simulation` to guarantee
   @#   nothing runs in any case.
-  @forge script "scripts/deploy/Deploy.s.sol" \
+  @forge script "scripts/deploy/SystemDeploy.s.sol:SystemDeploy" \
     --skip "/**/test/**" \
     --sig "idonotexist()" \
     --skip-simulation \
@@ -111,7 +121,7 @@ prepare-upgrade-env *ARGS : build-go-ffi
   export FORK_BACKOFF=1000
   export FORK_TEST=true
   {{ARGS}} \
-  --match-path "test/{L1,dispute,cannon}/**"
+  --match-path "test/L1/**"
 
 # Runs upgrade path variant of contract tests.
 test-upgrade *ARGS:
@@ -134,7 +144,7 @@ test-upgrade-against-anvil *ARGS: build-go-ffi
   export FORK_RPC_URL=http://127.0.0.1:8545
   export FORK_TEST=true
   forge test {{ARGS}} \
-  --match-path "test/{L1,dispute,cannon}/**"
+  --match-path "test/L1/**"
 
 # Runs standard contract tests with rerun flag.
 test-rerun: build-go-ffi
@@ -143,13 +153,6 @@ test-rerun: build-go-ffi
 # Runs standard contract tests with rerun flag (developer mode).
 test-dev-rerun: build-go-ffi
   FOUNDRY_PROFILE=lite forge test --rerun -vvv
-
-# Run Kontrol tests and build all dependencies.
-test-kontrol: build-go-ffi build kontrol-summary-full test-kontrol-no-build
-
-# Run Kontrol tests without dependencies.
-test-kontrol-no-build:
-  ./test/kontrol/scripts/run-kontrol.sh script
 
 # Runs contract coverage.
 coverage: build-go-ffi
@@ -170,7 +173,7 @@ coverage-lcov-upgrade *ARGS: build-go-ffi
 # Runs coverage-lcov and coverage-lcov-upgrade and merges their output files info one file
 coverage-lcov-all *ARGS:
   just coverage-lcov {{ARGS}} && \
-  just coverage-lcov-upgrade --match-contract OPContractsManager_Upgrade_Test {{ARGS}} && \
+  just coverage-lcov-upgrade {{ARGS}} && \
   lcov -a lcov.info -a lcov-upgrade.info -o lcov-all.info
 
 ########################################################
@@ -189,17 +192,6 @@ deploy:
 ########################################################
 #                       SNAPSHOTS                      #
 ########################################################
-
-# Generates default Kontrol summary.
-kontrol-summary:
-  ./test/kontrol/scripts/make-summary-deployment.sh
-
-# Generates fault proofs Kontrol summary.
-kontrol-summary-fp:
-  KONTROL_FP_DEPLOYMENT=true ./test/kontrol/scripts/make-summary-deployment.sh
-
-# Generates all Kontrol summaries (default and FP).
-kontrol-summary-full: kontrol-summary kontrol-summary-fp
 
 # Generates ABI snapshots for contracts.
 snapshots-abi-storage-no-build:
@@ -241,16 +233,6 @@ snapshots-check: build snapshots-check-no-build
 interfaces-check-no-build:
   go run ./scripts/checks/interfaces
 
-# Checks that, if any L1 source contracts that have an upgrade method,
-# that upgrade method is called in the OPContractsManagerUpgrader.upgrade method.
-# Build the contracts first.
-opcm-upgrade-checks: clean build-dev opcm-upgrade-checks-no-build
-
-# Checks that, if any L1 source contracts that have an upgrade method,
-# that upgrade method is called in the OPContractsManagerUpgrader.upgrade method.
-opcm-upgrade-checks-no-build:
-  go run ./scripts/checks/opcm-upgrade-checks/
-
 # Checks that all interfaces are appropriately named and accurately reflect the corresponding
 # contract that they're meant to represent. We run "clean" before building because leftover
 # artifacts can cause the script to detect issues incorrectly.
@@ -267,14 +249,6 @@ reinitializer-check-no-build:
 # Checks that the size of the contracts is within the limit.
 size-check:
   forge build --sizes --skip "/**/test/**" --skip "/**/scripts/**"
-
-# Checks that any contracts with a modified semver lock also have a modified semver version.
-# Does not build contracts.
-semver-diff-check-no-build:
-  ./scripts/checks/check-semver-diff.sh
-
-# Checks that any contracts with a modified semver lock also have a modified semver version.
-semver-diff-check: build semver-diff-check-no-build
 
 # Checks that the semgrep tests are valid.
 semgrep-test-validity-check:
@@ -298,13 +272,6 @@ unused-imports-check-no-build:
 # Checks for unused imports in Solidity contracts.
 unused-imports-check: build unused-imports-check-no-build
 
-# Checks that the semver of contracts are valid. Does not build contracts.
-valid-semver-check-no-build:
-  go run ./scripts/checks/valid-semver-check/main.go
-
-# Checks that the semver of contracts are valid.
-valid-semver-check: build valid-semver-check-no-build
-
 # Checks that the deploy configs are valid.
 validate-deploy-configs:
   ./scripts/checks/check-deploy-configs.sh
@@ -315,12 +282,6 @@ validate-spacers-no-build:
 
 # Checks that spacer variables are correctly inserted.
 validate-spacers: build validate-spacers-no-build
-
-# Checks that the Kontrol summary dummy files have not been modified.
-# If you have changed the summary files deliberately, update the hashes in the script.
-# Use `openssl dgst -sha256` to generate the hash for a file.
-check-kontrol-summaries-unchanged:
-  ./scripts/checks/check-kontrol-summaries-unchanged.sh
 
 # Runs semgrep on the contracts.
 semgrep:
@@ -337,8 +298,6 @@ check:
   lint-check \
   snapshots-check-no-build \
   unused-imports-check-no-build \
-  valid-semver-check-no-build \
-  semver-diff-check-no-build \
   validate-deploy-configs \
   validate-spacers-no-build \
   reinitializer-check-no-build \

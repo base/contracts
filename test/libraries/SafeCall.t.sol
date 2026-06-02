@@ -5,12 +5,12 @@ pragma solidity 0.8.15;
 import { Config } from "scripts/libraries/Config.sol";
 
 // Forge
-import { Test } from "forge-std/Test.sol";
-import { VmSafe } from "forge-std/Vm.sol";
-import { StdCheatsSafe } from "forge-std/StdCheats.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
+import { VmSafe } from "lib/forge-std/src/Vm.sol";
+import { StdCheatsSafe } from "lib/forge-std/src/StdCheats.sol";
 
 // Libraries
-import { LibString } from "@solady/utils/LibString.sol";
+import { LibString } from "lib/solady/src/utils/LibString.sol";
 import { SafeCall } from "src/libraries/SafeCall.sol";
 
 contract SimpleSafeCaller {
@@ -32,16 +32,26 @@ contract SimpleSafeCaller {
 /// @title SafeCall_TestInit
 /// @notice Reusable test initialization for `SafeCall` tests.
 abstract contract SafeCall_TestInit is Test {
-    /// @notice Helper function to deduplicate code. Makes all assumptions required for these
-    ///         tests.
-    function assumeNot(address _addr) internal {
-        vm.deal(_addr, 0);
-        vm.assume(_addr != address(this));
-        assumeAddressIsNot(_addr, StdCheatsSafe.AddressType.ForgeAddress, StdCheatsSafe.AddressType.Precompile);
+    struct CallBalances {
+        uint256 from;
+        uint256 to;
     }
 
-    /// @notice Internal helper function for `send` tests
-    function sendTest(address _from, address _to, uint64 _gas, uint256 _value) internal {
+    /// @notice Makes all assumptions required for these tests.
+    function assumeNot(address _addr) internal {
+        vm.assume(_addr != address(this));
+        assumeAddressIsNot(_addr, StdCheatsSafe.AddressType.ForgeAddress, StdCheatsSafe.AddressType.Precompile);
+        vm.deal(_addr, 0);
+    }
+
+    function prepareCall(
+        address _from,
+        address _to,
+        uint256 _value
+    )
+        internal
+        returns (CallBalances memory balancesBefore)
+    {
         assumeNot(_from);
         assumeNot(_to);
 
@@ -49,7 +59,29 @@ abstract contract SafeCall_TestInit is Test {
         vm.deal(_from, _value);
         assertEq(_from.balance, _value, "from balance not dealt");
 
-        uint256[2] memory balancesBefore = [_from.balance, _to.balance];
+        balancesBefore = CallBalances({ from: _from.balance, to: _to.balance });
+    }
+
+    function assertCallBalances(
+        address _from,
+        address _to,
+        uint256 _value,
+        CallBalances memory _balancesBefore
+    )
+        internal
+        view
+    {
+        if (_from == _to) {
+            assertEq(_from.balance, _balancesBefore.from, "self-transfer did not preserve balance");
+        } else {
+            assertEq(_from.balance, _balancesBefore.from - _value, "from balance not drained");
+            assertEq(_to.balance, _balancesBefore.to + _value, "to balance received");
+        }
+    }
+
+    /// @notice Internal helper function for `send` tests
+    function sendTest(address _from, address _to, uint64 _gas, uint256 _value) internal {
+        CallBalances memory balancesBefore = prepareCall(_from, _to, _value);
 
         vm.expectCall(_to, _value, bytes(""));
         vm.prank(_from);
@@ -61,12 +93,7 @@ abstract contract SafeCall_TestInit is Test {
         }
 
         assertTrue(success, "send not successful");
-        if (_from == _to) {
-            assertEq(_from.balance, balancesBefore[0], "Self-send did not change balance");
-        } else {
-            assertEq(_from.balance, balancesBefore[0] - _value, "from balance not drained");
-            assertEq(_to.balance, balancesBefore[1] + _value, "to balance received");
-        }
+        assertCallBalances(_from, _to, _value, balancesBefore);
     }
 }
 
@@ -90,26 +117,14 @@ contract SafeCall_Send_Test is SafeCall_TestInit {
 contract SafeCall_Call_Test is SafeCall_TestInit {
     /// @notice Tests that `call` succeeds.
     function testFuzz_call_succeeds(address from, address to, uint256 gas, uint64 value, bytes memory data) external {
-        assumeNot(from);
-        assumeNot(to);
-
-        assertEq(from.balance, 0, "from balance is 0");
-        vm.deal(from, value);
-        assertEq(from.balance, value, "from balance not dealt");
-
-        uint256[2] memory balancesBefore = [from.balance, to.balance];
+        CallBalances memory balancesBefore = prepareCall(from, to, value);
 
         vm.expectCall(to, value, data);
         vm.prank(from);
         bool success = SafeCall.call(to, gas, value, data);
 
         assertTrue(success, "call not successful");
-        if (from == to) {
-            assertEq(from.balance, balancesBefore[0], "Self-send did not change balance");
-        } else {
-            assertEq(from.balance, balancesBefore[0] - value, "from balance not drained");
-            assertEq(to.balance, balancesBefore[1] + value, "to balance received");
-        }
+        assertCallBalances(from, to, value, balancesBefore);
     }
 }
 
@@ -126,110 +141,80 @@ contract SafeCall_CallWithMinGas_Test is SafeCall_TestInit {
     )
         external
     {
-        assumeNot(from);
-        assumeNot(to);
-
-        assertEq(from.balance, 0, "from balance is 0");
-        vm.deal(from, value);
-        assertEq(from.balance, value, "from balance not dealt");
+        CallBalances memory balancesBefore = prepareCall(from, to, value);
 
         // Bound minGas to [0, l1_block_gas_limit]
         minGas = uint64(bound(minGas, 0, 30_000_000));
-
-        uint256[2] memory balancesBefore = [from.balance, to.balance];
 
         vm.expectCallMinGas(to, value, minGas, data);
         vm.prank(from);
         bool success = SafeCall.callWithMinGas(to, minGas, value, data);
 
         assertTrue(success, "call not successful");
-        if (from == to) {
-            assertEq(from.balance, balancesBefore[0], "Self-send did not change balance");
-        } else {
-            assertEq(from.balance, balancesBefore[0] - value, "from balance not drained");
-            assertEq(to.balance, balancesBefore[1] + value, "to balance received");
-        }
+        assertCallBalances(from, to, value, balancesBefore);
     }
 
     /// @notice Tests that `callWithMinGas` succeeds for the lower gas bounds.
     function test_callWithMinGas_noLeakageLow_succeeds() external {
         SimpleSafeCaller caller = new SimpleSafeCaller();
 
-        for (uint64 i = 40_000; i < 100_000; i++) {
-            uint256 snapshot = vm.snapshot();
-
-            // The values below are best gotten by setting the value to a high number and running
-            // the test with a verbosity of `-vvv` then setting the value to the value (gas arg) of
-            // the failed assertion. A faster way to do this for forge coverage cases, is to
-            // comment out the optimizer and optimizer runs in the foundry.toml file and then run
-            // forge test. This is faster because forge test only compiles modified contracts
-            // unlike forge coverage.
-            uint256 expected;
-
-            // Because forge coverage always runs with the optimizer disabled, if forge coverage is
-            // run before testing this with forge test or forge snapshot, forge clean should be run
-            // first so that it recompiles the contracts using the foundry.toml optimizer settings.
-            if (vm.isContext(VmSafe.ForgeContext.Coverage) || LibString.eq(Config.foundryProfile(), "lite")) {
-                // 66_290 is the exact amount of gas required to make the safe call
-                // successfully with the optimizer disabled (ran via forge coverage)
-                expected = 66_290;
-            } else if (vm.isContext(VmSafe.ForgeContext.Test) || vm.isContext(VmSafe.ForgeContext.Snapshot)) {
-                // 65_922 is the exact amount of gas required to make the safe call
-                // successfully with the foundry.toml optimizer settings.
-                expected = 65_922;
-            } else {
-                revert("SafeCall_Test: unknown context");
-            }
-
-            if (i < expected) {
-                assertFalse(caller.makeSafeCall(i, 25_000));
-            } else {
-                vm.expectCallMinGas(address(caller), 0, 25_000, abi.encodeCall(caller.setA, (1)));
-                assertTrue(caller.makeSafeCall(i, 25_000));
-            }
-
-            assertTrue(vm.revertTo(snapshot));
-        }
+        checkNoGasLeakage({
+            _caller: caller,
+            _startGas: 40_000,
+            _endGas: 100_000,
+            _minGas: 25_000,
+            _expected: expectedSafeCallGas({ _coverageOrLiteGas: 66_290, _testGas: 65_922 }),
+            _setACall: abi.encodeCall(caller.setA, (1))
+        });
     }
 
     /// @notice Tests that `callWithMinGas` succeeds on the upper gas bounds.
     function test_callWithMinGas_noLeakageHigh_succeeds() external {
         SimpleSafeCaller caller = new SimpleSafeCaller();
 
-        for (uint64 i = 15_200_000; i < 15_300_000; i++) {
-            uint256 snapshot = vm.snapshot();
+        checkNoGasLeakage({
+            _caller: caller,
+            _startGas: 15_200_000,
+            _endGas: 15_300_000,
+            _minGas: 15_000_000,
+            _expected: expectedSafeCallGas({ _coverageOrLiteGas: 15_278_989, _testGas: 15_278_621 }),
+            _setACall: abi.encodeCall(caller.setA, (1))
+        });
+    }
 
-            // The values below are best gotten by setting the value to a high number and running
-            // the test with a verbosity of `-vvv` then setting the value to the value (gas arg) of
-            // the failed assertion. A faster way to do this for forge coverage cases, is to
-            // comment out the optimizer and optimizer runs in the foundry.toml file and then run
-            // forge test. This is faster because forge test only compiles modified contracts
-            // unlike forge coverage.
-            uint256 expected;
+    /// @notice Returns the gas threshold calibrated for the current forge context.
+    /// @dev Thresholds are calibrated from the failing gas arg when running these tests with `-vvv`.
+    function expectedSafeCallGas(uint256 _coverageOrLiteGas, uint256 _testGas) internal view returns (uint256) {
+        if (vm.isContext(VmSafe.ForgeContext.Coverage) || LibString.eq(Config.foundryProfile(), "lite")) {
+            return _coverageOrLiteGas;
+        } else if (vm.isContext(VmSafe.ForgeContext.Test) || vm.isContext(VmSafe.ForgeContext.Snapshot)) {
+            return _testGas;
+        } else {
+            revert("SafeCall_Test: unknown context");
+        }
+    }
 
-            // Because forge coverage always runs with the optimizer disabled, if forge coverage is
-            // run before testing this with forge test or forge snapshot, forge clean should be run
-            // first so that it recompiles the contracts using the foundry.toml optimizer settings.
-            if (vm.isContext(VmSafe.ForgeContext.Coverage) || LibString.eq(Config.foundryProfile(), "lite")) {
-                // 15_278_989 is the exact amount of gas required to make the safe call
-                // successfully with the optimizer disabled (ran via forge coverage)
-                expected = 15_278_989;
-            } else if (vm.isContext(VmSafe.ForgeContext.Test) || vm.isContext(VmSafe.ForgeContext.Snapshot)) {
-                // 15_278_621 is the exact amount of gas required to make the safe call
-                // successfully with the foundry.toml optimizer settings.
-                expected = 15_278_621;
+    function checkNoGasLeakage(
+        SimpleSafeCaller _caller,
+        uint64 _startGas,
+        uint64 _endGas,
+        uint64 _minGas,
+        uint256 _expected,
+        bytes memory _setACall
+    )
+        internal
+    {
+        for (uint64 i = _startGas; i < _endGas; i++) {
+            uint256 snapshot = vm.snapshotState();
+
+            if (i < _expected) {
+                assertFalse(_caller.makeSafeCall(i, _minGas));
             } else {
-                revert("SafeCall_Test: unknown context");
+                vm.expectCallMinGas(address(_caller), 0, _minGas, _setACall);
+                assertTrue(_caller.makeSafeCall(i, _minGas));
             }
 
-            if (i < expected) {
-                assertFalse(caller.makeSafeCall(i, 15_000_000));
-            } else {
-                vm.expectCallMinGas(address(caller), 0, 15_000_000, abi.encodeCall(caller.setA, (1)));
-                assertTrue(caller.makeSafeCall(i, 15_000_000));
-            }
-
-            assertTrue(vm.revertTo(snapshot));
+            assertTrue(vm.revertToState(snapshot));
         }
     }
 }

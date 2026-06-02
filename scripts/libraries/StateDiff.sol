@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { stdJson } from "forge-std/StdJson.sol";
-import { VmSafe } from "forge-std/Vm.sol";
+import { stdJson } from "lib/forge-std/src/StdJson.sol";
+import { VmSafe } from "lib/forge-std/src/Vm.sol";
 
 /// @title StateDiff
 /// @author refcell

@@ -3,15 +3,15 @@ pragma solidity 0.8.15;
 
 import { StandardBridge } from "src/universal/StandardBridge.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
-import { OptimismMintableERC20, ILegacyMintableERC20 } from "src/universal/OptimismMintableERC20.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { OptimismMintableERC20 } from "src/universal/OptimismMintableERC20.sol";
+import { ILegacyMintableERC20 } from "interfaces/legacy/ILegacyMintableERC20.sol";
+import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import { IERC165 } from "lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol";
 
 /// @title StandardBridgeTester
 /// @notice Simple wrapper around the StandardBridge contract that exposes
 ///         internal functions so they can be more easily tested directly.
 contract StandardBridgeTester is StandardBridge {
-    constructor() StandardBridge() { }
-
     function isOptimismMintableERC20(address _token) external view returns (bool) {
         return _isOptimismMintableERC20(_token);
     }
@@ -36,15 +36,9 @@ contract LegacyMintable is ERC20 {
 
     function burn(address _from, uint256 _amount) external pure { }
 
-    /// @notice Implements ERC165. This implementation should not be changed as
-    ///         it is how the actual legacy optimism mintable token does the
-    ///         check. Allows for testing against code that is has been deployed,
-    ///         assuming different compiler version is no problem.
+    /// @notice Matches the deployed legacy mintable token's ERC165 support.
     function supportsInterface(bytes4 _interfaceId) external pure returns (bool) {
-        bytes4 firstSupportedInterface = bytes4(keccak256("supportsInterface(bytes4)")); // ERC165
-        bytes4 secondSupportedInterface = ILegacyMintableERC20.l1Token.selector ^ ILegacyMintableERC20.mint.selector
-            ^ ILegacyMintableERC20.burn.selector;
-        return _interfaceId == firstSupportedInterface || _interfaceId == secondSupportedInterface;
+        return _interfaceId == type(IERC165).interfaceId || _interfaceId == type(ILegacyMintableERC20).interfaceId;
     }
 }
 
@@ -53,9 +47,10 @@ contract LegacyMintable is ERC20 {
 /// @dev This setup is primarily for tests focusing on internal stateless logic or default states
 ///      of the `StandardBridge` contract.
 abstract contract StandardBridge_TestInit is CommonTest {
+    address internal constant OTHER_TOKEN = address(0x20);
+
     StandardBridgeTester internal bridge;
     OptimismMintableERC20 internal mintable;
-    ERC20 internal erc20;
     LegacyMintable internal legacy;
 
     function setUp() public override {
@@ -67,7 +62,6 @@ abstract contract StandardBridge_TestInit is CommonTest {
             _bridge: address(0), _remoteToken: address(0), _name: "Stonks", _symbol: "STONK", _decimals: 18
         });
 
-        erc20 = new ERC20("Altcoin", "ALT");
         legacy = new LegacyMintable("Legacy", "LEG");
     }
 }
@@ -84,40 +78,28 @@ contract StandardBridge_Paused_Test is StandardBridge_TestInit {
 /// @title StandardBridge_IsOptimismMintableERC20_Test
 /// @notice Tests the `_isOptimismMintableERC20` internal function of `StandardBridge`.
 contract StandardBridge_IsOptimismMintableERC20_Test is StandardBridge_TestInit {
-    /// @notice Test coverage for identifying OptimismMintableERC20 tokens. This function should
-    ///         return true for both modern and legacy OptimismMintableERC20 tokens and false for
-    ///         any accounts that do not implement the interface.
     function test_isOptimismMintableERC20_succeeds() external view {
-        // Both the modern and legacy mintable tokens should return true
         assertTrue(bridge.isOptimismMintableERC20(address(mintable)));
         assertTrue(bridge.isOptimismMintableERC20(address(legacy)));
-        // A regular ERC20 should return false
-        assertFalse(bridge.isOptimismMintableERC20(address(erc20)));
-        // Non existent contracts should return false and not revert
-        assertEq(address(0x20).code.length, 0);
-        assertFalse(bridge.isOptimismMintableERC20(address(0x20)));
+        assertFalse(bridge.isOptimismMintableERC20(address(L1Token)));
+
+        assertEq(OTHER_TOKEN.code.length, 0);
+        assertFalse(bridge.isOptimismMintableERC20(OTHER_TOKEN));
     }
 }
 
 /// @title StandardBridge_IsCorrectTokenPair_Test
 /// @notice Tests the `_isCorrectTokenPair` internal function of `StandardBridge`.
 contract StandardBridge_IsCorrectTokenPair_Test is StandardBridge_TestInit {
-    /// @notice Test coverage of `isCorrectTokenPair` under different types of tokens.
     function test_isCorrectTokenPair_succeeds() external {
-        // Modern + known to be correct remote token
         assertTrue(bridge.isCorrectTokenPair(address(mintable), mintable.remoteToken()));
-        // Modern + known to be correct l1Token (legacy interface)
         assertTrue(bridge.isCorrectTokenPair(address(mintable), mintable.l1Token()));
-        // Modern + known to be incorrect remote token
-        assertTrue(mintable.remoteToken() != address(0x20));
-        assertFalse(bridge.isCorrectTokenPair(address(mintable), address(0x20)));
-        // Legacy + known to be correct l1Token
+        assertFalse(bridge.isCorrectTokenPair(address(mintable), OTHER_TOKEN));
+
         assertTrue(bridge.isCorrectTokenPair(address(legacy), legacy.l1Token()));
-        // Legacy + known to be incorrect l1Token
-        assertTrue(legacy.l1Token() != address(0x20));
-        assertFalse(bridge.isCorrectTokenPair(address(legacy), address(0x20)));
-        // A token that doesn't support either modern or legacy interface will revert
+        assertFalse(bridge.isCorrectTokenPair(address(legacy), OTHER_TOKEN));
+
         vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
-        bridge.isCorrectTokenPair(address(erc20), address(1));
+        bridge.isCorrectTokenPair(address(L1Token), address(1));
     }
 }

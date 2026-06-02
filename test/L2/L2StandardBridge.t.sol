@@ -2,12 +2,11 @@
 pragma solidity 0.8.15;
 
 // Testing
-import { stdStorage, StdStorage } from "forge-std/Test.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
 
 // Contracts
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import { OptimismMintableERC20 } from "src/universal/OptimismMintableERC20.sol";
 
 // Libraries
@@ -20,15 +19,13 @@ import { Features } from "src/libraries/Features.sol";
 import { ICrossDomainMessenger } from "interfaces/universal/ICrossDomainMessenger.sol";
 import { IStandardBridge } from "interfaces/universal/IStandardBridge.sol";
 import { IL2ToL1MessagePasser } from "interfaces/L2/IL2ToL1MessagePasser.sol";
-import { IL2ToL1MessagePasserCGT } from "interfaces/L2/IL2ToL1MessagePasserCGT.sol";
 import { IL2StandardBridge } from "interfaces/L2/IL2StandardBridge.sol";
 
 /// @title L2StandardBridge_TestInit
 /// @notice Reusable test initialization for `L2StandardBridge` tests.
 abstract contract L2StandardBridge_TestInit is CommonTest {
     /// @notice Sets up expected calls and emits for a successful ERC20 withdrawal.
-    function _preBridgeERC20(bool _isLegacy, address _l2Token) internal {
-        // Alice has 100 L2Token
+    function _preBridgeERC20(address _l2Token) internal {
         deal(_l2Token, alice, 100, true);
         assertEq(ERC20(_l2Token).balanceOf(alice), 100);
         uint256 nonce = l2CrossDomainMessenger.messageNonce();
@@ -50,17 +47,6 @@ abstract contract L2StandardBridge_TestInit is CommonTest {
             })
         );
 
-        if (_isLegacy) {
-            vm.expectCall(
-                address(l2StandardBridge), abi.encodeCall(l2StandardBridge.withdraw, (_l2Token, 100, 1000, hex""))
-            );
-        } else {
-            vm.expectCall(
-                address(l2StandardBridge),
-                abi.encodeCall(l2StandardBridge.bridgeERC20, (_l2Token, address(L1Token), 100, 1000, hex""))
-            );
-        }
-
         vm.expectCall(
             address(l2CrossDomainMessenger),
             abi.encodeCall(ICrossDomainMessenger.sendMessage, (address(l1StandardBridge), message, 1000))
@@ -73,7 +59,6 @@ abstract contract L2StandardBridge_TestInit is CommonTest {
             )
         );
 
-        // The l2StandardBridge should burn the tokens
         vm.expectCall(_l2Token, abi.encodeCall(OptimismMintableERC20.burn, (alice, 100)));
 
         vm.expectEmit(true, true, true, true);
@@ -108,9 +93,9 @@ abstract contract L2StandardBridge_TestInit is CommonTest {
     ///         recipient.
     /// @dev `withdrawTo` and `bridgeERC20To` should behave the same when transferring ERC20 tokens
     ///      so they should share the same setup and expectEmit calls
-    function _preBridgeERC20To(bool _isLegacy, address _l2Token) internal {
+    function _preBridgeERC20To(address _l2Token) internal {
         deal(_l2Token, alice, 100, true);
-        assertEq(L2Token.balanceOf(alice), 100);
+        assertEq(ERC20(_l2Token).balanceOf(alice), 100);
         uint256 nonce = l2CrossDomainMessenger.messageNonce();
         bytes memory message =
             abi.encodeCall(IStandardBridge.finalizeBridgeERC20, (address(L1Token), _l2Token, alice, bob, 100, hex""));
@@ -155,18 +140,6 @@ abstract contract L2StandardBridge_TestInit is CommonTest {
         vm.expectEmit(address(l2CrossDomainMessenger));
         emit SentMessageExtension1(address(l2StandardBridge), 0);
 
-        if (_isLegacy) {
-            vm.expectCall(
-                address(l2StandardBridge),
-                abi.encodeCall(l2StandardBridge.withdrawTo, (_l2Token, bob, 100, 1000, hex""))
-            );
-        } else {
-            vm.expectCall(
-                address(l2StandardBridge),
-                abi.encodeCall(l2StandardBridge.bridgeERC20To, (_l2Token, address(L1Token), bob, 100, 1000, hex""))
-            );
-        }
-
         vm.expectCall(
             address(l2CrossDomainMessenger),
             abi.encodeCall(ICrossDomainMessenger.sendMessage, (address(l1StandardBridge), message, 1000))
@@ -179,13 +152,28 @@ abstract contract L2StandardBridge_TestInit is CommonTest {
             )
         );
 
-        // The l2StandardBridge should burn the tokens
-        vm.expectCall(address(L2Token), abi.encodeCall(OptimismMintableERC20.burn, (alice, 100)));
+        vm.expectCall(_l2Token, abi.encodeCall(OptimismMintableERC20.burn, (alice, 100)));
 
         vm.prank(alice, alice);
     }
 
-    using stdStorage for StdStorage;
+    function _mockXDomainMessageSender(address _sender) internal {
+        vm.mockCall(
+            address(l2StandardBridge.messenger()),
+            abi.encodeCall(ICrossDomainMessenger.xDomainMessageSender, ()),
+            abi.encode(_sender)
+        );
+    }
+
+    function _mockOtherBridge() internal {
+        _mockXDomainMessageSender(address(l2StandardBridge.OTHER_BRIDGE()));
+    }
+
+    function _setupFinalizeBridgeETH() internal returns (address messenger) {
+        messenger = address(l2StandardBridge.messenger());
+        _mockOtherBridge();
+        vm.deal(messenger, 100);
+    }
 }
 
 /// @title L2StandardBridge_Version_Test
@@ -300,20 +288,6 @@ contract L2StandardBridge_Receive_Test is L2StandardBridge_TestInit {
         assertEq(success, true);
         assertEq(address(l2ToL1MessagePasser).balance, 100);
     }
-
-    /// @notice Tests that receive reverts when custom gas token is enabled and value is sent.
-    function testFuzz_receive_withCustomGasToken_reverts(uint256 _value) external {
-        skipIfSysFeatureDisabled(Features.CUSTOM_GAS_TOKEN);
-
-        _value = bound(_value, 1, type(uint128).max);
-        vm.deal(alice, _value);
-
-        vm.prank(alice, alice);
-        vm.expectRevert(IL2ToL1MessagePasserCGT.L2ToL1MessagePasserCGT_NotAllowedOnCGTMode.selector);
-
-        (bool revertsAsExpected,) = address(l2StandardBridge).call{ value: _value }(hex"");
-        assertTrue(revertsAsExpected, "expectRevert: call did not revert");
-    }
 }
 
 /// @title L2StandardBridge_Withdraw_Test
@@ -363,15 +337,8 @@ contract L2StandardBridge_Withdraw_Test is L2StandardBridge_TestInit {
     /// @notice Tests that `withdraw` burns the tokens, emits `WithdrawalInitiated`, and initiates
     ///         a withdrawal with `Withdrawer.initiateWithdrawal`.
     function test_withdraw_withdrawingERC20_succeeds() external {
-        _preBridgeERC20({ _isLegacy: true, _l2Token: address(L2Token) });
+        _preBridgeERC20(address(L2Token));
         l2StandardBridge.withdraw(address(L2Token), 100, 1000, hex"");
-
-        assertEq(L2Token.balanceOf(alice), 0);
-    }
-
-    function test_withdrawLegacyERC20_succeeds() external {
-        _preBridgeERC20({ _isLegacy: true, _l2Token: address(LegacyL2Token) });
-        l2StandardBridge.withdraw(address(LegacyL2Token), 100, 1000, hex"");
 
         assertEq(L2Token.balanceOf(alice), 0);
     }
@@ -382,18 +349,6 @@ contract L2StandardBridge_Withdraw_Test is L2StandardBridge_TestInit {
 
         vm.expectRevert("StandardBridge: function can only be called from an EOA");
         l2StandardBridge.withdraw(address(L2Token), 100, 1000, hex"");
-    }
-
-    /// @notice Tests that withdraw reverts when custom gas token is enabled and value is sent.
-    function testFuzz_withdraw_withCustomGasToken_reverts(uint256 _value, uint32 _minGasLimit) external {
-        skipIfSysFeatureDisabled(Features.CUSTOM_GAS_TOKEN);
-
-        _value = bound(_value, 1, type(uint128).max);
-        vm.deal(alice, _value);
-
-        vm.prank(alice, alice);
-        vm.expectRevert(IL2ToL1MessagePasserCGT.L2ToL1MessagePasserCGT_NotAllowedOnCGTMode.selector);
-        l2StandardBridge.withdraw{ value: _value }(Predeploys.LEGACY_ERC20_ETH, _value, _minGasLimit, hex"");
     }
 }
 
@@ -412,7 +367,7 @@ contract L2StandardBridge_WithdrawTo_Test is L2StandardBridge_TestInit {
     /// @notice Tests that `withdrawTo` burns the tokens, emits `WithdrawalInitiated`, and
     ///         initiates a withdrawal with `Withdrawer.initiateWithdrawal`.
     function test_withdrawTo_withdrawingERC20_succeeds() external {
-        _preBridgeERC20To({ _isLegacy: true, _l2Token: address(L2Token) });
+        _preBridgeERC20To(address(L2Token));
         l2StandardBridge.withdrawTo(address(L2Token), bob, 100, 1000, hex"");
 
         assertEq(L2Token.balanceOf(alice), 0);
@@ -432,7 +387,7 @@ contract L2StandardBridge_Uncategorized_Test is L2StandardBridge_TestInit {
     /// @notice Tests that `bridgeERC20` burns the tokens, emits `WithdrawalInitiated`, and
     ///         initiates a withdrawal with `Withdrawer.initiateWithdrawal`.
     function test_bridgeERC20_succeeds() external {
-        _preBridgeERC20({ _isLegacy: false, _l2Token: address(L2Token) });
+        _preBridgeERC20(address(L2Token));
         l2StandardBridge.bridgeERC20(address(L2Token), address(L1Token), 100, 1000, hex"");
 
         assertEq(L2Token.balanceOf(alice), 0);
@@ -444,45 +399,28 @@ contract L2StandardBridge_Uncategorized_Test is L2StandardBridge_TestInit {
         l2StandardBridge.bridgeERC20(address(L2Token), address(BadL1Token), 100, 1000, hex"");
     }
 
-    function test_bridgeLegacyERC20_succeeds() external {
-        _preBridgeERC20({ _isLegacy: false, _l2Token: address(LegacyL2Token) });
-        l2StandardBridge.bridgeERC20(address(LegacyL2Token), address(L1Token), 100, 1000, hex"");
-
-        assertEq(L2Token.balanceOf(alice), 0);
-    }
-
     /// @notice Tests that `bridgeERC20To` burns the tokens, emits `WithdrawalInitiated`, and
     ///         initiates a withdrawal with `Withdrawer.initiateWithdrawal`.
     function test_bridgeERC20To_succeeds() external {
-        _preBridgeERC20To({ _isLegacy: false, _l2Token: address(L2Token) });
+        _preBridgeERC20To(address(L2Token));
         l2StandardBridge.bridgeERC20To(address(L2Token), address(L1Token), bob, 100, 1000, hex"");
         assertEq(L2Token.balanceOf(alice), 0);
     }
 
     /// @notice Tests that `finalizeBridgeETH` reverts if the recipient is the other bridge.
     function test_finalizeBridgeETH_sendToSelf_reverts() external {
-        vm.mockCall(
-            address(l2StandardBridge.messenger()),
-            abi.encodeCall(ICrossDomainMessenger.xDomainMessageSender, ()),
-            abi.encode(address(l2StandardBridge.OTHER_BRIDGE()))
-        );
-        vm.deal(address(l2CrossDomainMessenger), 100);
-        vm.prank(address(l2CrossDomainMessenger));
+        address messenger = _setupFinalizeBridgeETH();
+        vm.prank(messenger);
         vm.expectRevert("StandardBridge: cannot send to self");
         l2StandardBridge.finalizeBridgeETH{ value: 100 }(alice, address(l2StandardBridge), 100, hex"");
     }
 
     /// @notice Tests that `finalizeBridgeETH` reverts if the recipient is the messenger.
     function test_finalizeBridgeETH_sendToMessenger_reverts() external {
-        vm.mockCall(
-            address(l2StandardBridge.messenger()),
-            abi.encodeCall(ICrossDomainMessenger.xDomainMessageSender, ()),
-            abi.encode(address(l2StandardBridge.OTHER_BRIDGE()))
-        );
-        vm.deal(address(l2CrossDomainMessenger), 100);
-        vm.prank(address(l2CrossDomainMessenger));
+        address messenger = _setupFinalizeBridgeETH();
+        vm.prank(messenger);
         vm.expectRevert("StandardBridge: cannot send to messenger");
-        l2StandardBridge.finalizeBridgeETH{ value: 100 }(alice, address(l2CrossDomainMessenger), 100, hex"");
+        l2StandardBridge.finalizeBridgeETH{ value: 100 }(alice, messenger, 100, hex"");
     }
 
     /// @notice Tests that bridging ETH succeeds.
@@ -491,10 +429,6 @@ contract L2StandardBridge_Uncategorized_Test is L2StandardBridge_TestInit {
         uint256 nonce = l2CrossDomainMessenger.messageNonce();
 
         bytes memory message = abi.encodeCall(IStandardBridge.finalizeBridgeETH, (alice, alice, _value, _extraData));
-
-        vm.expectCall(
-            address(l2StandardBridge), _value, abi.encodeCall(l2StandardBridge.bridgeETH, (_minGasLimit, _extraData))
-        );
 
         vm.expectCall(
             address(l2CrossDomainMessenger),
@@ -524,16 +458,8 @@ contract L2StandardBridge_Uncategorized_Test is L2StandardBridge_TestInit {
         skipIfSysFeatureEnabled(Features.CUSTOM_GAS_TOKEN);
         uint256 nonce = l2CrossDomainMessenger.messageNonce();
 
-        vm.expectCall(
-            address(l2StandardBridge),
-            _value,
-            abi.encodeCall(l1StandardBridge.bridgeETHTo, (bob, _minGasLimit, _extraData))
-        );
-
         bytes memory message = abi.encodeCall(IStandardBridge.finalizeBridgeETH, (alice, bob, _value, _extraData));
 
-        // the L2 bridge should call
-        // L2CrossDomainMessenger.sendMessage
         vm.expectCall(
             address(l2CrossDomainMessenger),
             abi.encodeCall(ICrossDomainMessenger.sendMessage, (address(l1StandardBridge), message, _minGasLimit))
@@ -550,7 +476,6 @@ contract L2StandardBridge_Uncategorized_Test is L2StandardBridge_TestInit {
         vm.expectEmit(address(l2CrossDomainMessenger));
         emit SentMessageExtension1(address(l2StandardBridge), _value);
 
-        // deposit eth to bob
         vm.deal(alice, _value);
         vm.prank(alice, alice);
 
@@ -559,13 +484,7 @@ contract L2StandardBridge_Uncategorized_Test is L2StandardBridge_TestInit {
 
     /// @notice Tests that `finalizeBridgeETH` succeeds.
     function test_finalizeBridgeETH_succeeds() external {
-        address messenger = address(l2StandardBridge.messenger());
-        vm.mockCall(
-            messenger,
-            abi.encodeCall(ICrossDomainMessenger.xDomainMessageSender, ()),
-            abi.encode(address(l2StandardBridge.OTHER_BRIDGE()))
-        );
-        vm.deal(messenger, 100);
+        address messenger = _setupFinalizeBridgeETH();
         vm.prank(messenger);
 
         vm.expectEmit(true, true, true, true);
@@ -582,11 +501,7 @@ contract L2StandardBridge_Uncategorized_Test is L2StandardBridge_TestInit {
         address messenger = address(l2StandardBridge.messenger());
         address localToken = address(L2Token);
         address remoteToken = address(L1Token);
-        vm.mockCall(
-            messenger,
-            abi.encodeCall(ICrossDomainMessenger.xDomainMessageSender, ()),
-            abi.encode(address(l2StandardBridge.OTHER_BRIDGE()))
-        );
+        _mockOtherBridge();
         deal(localToken, messenger, 100, true);
         vm.prank(messenger);
 
@@ -603,53 +518,11 @@ contract L2StandardBridge_Uncategorized_Test is L2StandardBridge_TestInit {
         address messenger = address(l2StandardBridge.messenger());
         address localToken = address(L2Token);
         address remoteToken = address(BadL1Token);
-        vm.mockCall(
-            messenger,
-            abi.encodeCall(ICrossDomainMessenger.xDomainMessageSender, ()),
-            abi.encode(address(l2StandardBridge.OTHER_BRIDGE()))
-        );
+        _mockOtherBridge();
         deal(localToken, messenger, 100, true);
         vm.prank(messenger);
 
         vm.expectRevert("StandardBridge: wrong remote token for Optimism Mintable ERC20 local token");
         l2StandardBridge.finalizeBridgeERC20(localToken, remoteToken, alice, alice, 100, hex"");
-    }
-
-    /// @notice Tests that bridgeETH reverts when custom gas token is enabled and value is sent.
-    function testFuzz_bridgeETH_withCustomGasToken_reverts(
-        uint256 _value,
-        uint32 _minGasLimit,
-        bytes calldata _extraData
-    )
-        external
-    {
-        skipIfSysFeatureDisabled(Features.CUSTOM_GAS_TOKEN);
-
-        _value = bound(_value, 1, type(uint128).max);
-        vm.deal(alice, _value);
-
-        vm.prank(alice, alice);
-        vm.expectRevert(IL2ToL1MessagePasserCGT.L2ToL1MessagePasserCGT_NotAllowedOnCGTMode.selector);
-        l2StandardBridge.bridgeETH{ value: _value }(_minGasLimit, _extraData);
-    }
-
-    /// @notice Tests that bridgeETHTo reverts when custom gas token is enabled and value is sent.
-    function testFuzz_bridgeETHTo_withCustomGasToken_reverts(
-        address _to,
-        uint256 _value,
-        uint32 _minGasLimit,
-        bytes calldata _extraData
-    )
-        external
-    {
-        skipIfSysFeatureDisabled(Features.CUSTOM_GAS_TOKEN);
-
-        vm.assume(_to != address(0));
-        _value = bound(_value, 1, type(uint128).max);
-        vm.deal(alice, _value);
-
-        vm.prank(alice, alice);
-        vm.expectRevert(IL2ToL1MessagePasserCGT.L2ToL1MessagePasserCGT_NotAllowedOnCGTMode.selector);
-        l2StandardBridge.bridgeETHTo{ value: _value }(_to, _minGasLimit, _extraData);
     }
 }

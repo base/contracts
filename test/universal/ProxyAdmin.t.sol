@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Testing
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 import { Proxy_SimpleStorage_Harness } from "test/universal/Proxy.t.sol";
 
 // Interfaces
@@ -17,7 +17,8 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 /// @title ProxyAdmin_TestInit
 /// @notice Reusable test initialization for `ProxyAdmin` tests.
 abstract contract ProxyAdmin_TestInit is Test {
-    address alice = address(64);
+    address internal constant PROXY_ADMIN_OWNER = address(64);
+    address internal constant NEW_PROXY_ADMIN = address(128);
 
     IProxy proxy;
     IL1ChugSplashProxy chugsplash;
@@ -30,15 +31,13 @@ abstract contract ProxyAdmin_TestInit is Test {
     Proxy_SimpleStorage_Harness implementation;
 
     function setUp() external {
-        // Deploy the proxy admin
         admin = IProxyAdmin(
             DeployUtils.create1({
                 _name: "ProxyAdmin",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxyAdmin.__constructor__, (alice)))
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxyAdmin.__constructor__, (PROXY_ADMIN_OWNER)))
             })
         );
 
-        // Deploy the standard proxy
         proxy = IProxy(
             DeployUtils.create1({
                 _name: "src/universal/Proxy.sol:Proxy",
@@ -46,7 +45,6 @@ abstract contract ProxyAdmin_TestInit is Test {
             })
         );
 
-        // Deploy the legacy L1ChugSplashProxy with the admin as the owner
         chugsplash = IL1ChugSplashProxy(
             DeployUtils.create1({
                 _name: "L1ChugSplashProxy",
@@ -56,15 +54,14 @@ abstract contract ProxyAdmin_TestInit is Test {
             })
         );
 
-        // Deploy the legacy AddressManager
         addressManager = IAddressManager(
             DeployUtils.create1({
                 _name: "AddressManager",
                 _args: DeployUtils.encodeConstructor(abi.encodeCall(IAddressManager.__constructor__, ()))
             })
         );
-        // The proxy admin must be the new owner of the address manager
         addressManager.transferOwnership(address(admin));
+
         // Deploy a legacy ResolvedDelegateProxy with the name `a`. Whatever `a` is set to in
         // AddressManager will be the address that is used for the implementation.
         resolved = IResolvedDelegateProxy(
@@ -75,15 +72,13 @@ abstract contract ProxyAdmin_TestInit is Test {
                 )
             })
         );
-        // Impersonate alice for setting up the admin.
-        vm.startPrank(alice);
-        // Set the address of the address manager in the admin so that it can resolve the
+
+        vm.startPrank(PROXY_ADMIN_OWNER);
+        // Set the address manager so the admin can resolve the
         // implementation address of legacy ResolvedDelegateProxy based proxies.
-        admin.setAddressManager(IAddressManager(address(addressManager)));
-        // Set the reverse lookup of the ResolvedDelegateProxy proxy
+        admin.setAddressManager(addressManager);
         admin.setImplementationName(address(resolved), "a");
 
-        // Set the proxy types
         admin.setProxyType(address(proxy), IProxyAdmin.ProxyType.ERC1967);
         admin.setProxyType(address(chugsplash), IProxyAdmin.ProxyType.CHUGSPLASH);
         admin.setProxyType(address(resolved), IProxyAdmin.ProxyType.RESOLVED);
@@ -106,7 +101,7 @@ contract ProxyAdmin_SetProxyType_Test is ProxyAdmin_TestInit {
 /// @notice Tests the `setImplementationName` function of the `ProxyAdmin` contract.
 contract ProxyAdmin_SetImplementationName_Test is ProxyAdmin_TestInit {
     function test_setImplementationName_succeeds() external {
-        vm.prank(alice);
+        vm.prank(PROXY_ADMIN_OWNER);
         admin.setImplementationName(address(1), "foo");
         assertEq(admin.implementationName(address(1)), "foo");
     }
@@ -122,7 +117,7 @@ contract ProxyAdmin_SetImplementationName_Test is ProxyAdmin_TestInit {
 contract ProxyAdmin_SetAddressManager_Test is ProxyAdmin_TestInit {
     function test_setAddressManager_notOwner_reverts() external {
         vm.expectRevert("Ownable: caller is not the owner");
-        admin.setAddressManager(IAddressManager((address(0))));
+        admin.setAddressManager(IAddressManager(address(0)));
     }
 }
 
@@ -130,74 +125,67 @@ contract ProxyAdmin_SetAddressManager_Test is ProxyAdmin_TestInit {
 /// @notice Tests the `isUpgrading` function of the `ProxyAdmin` contract.
 contract ProxyAdmin_IsUpgrading_Test is ProxyAdmin_TestInit {
     function test_isUpgrading_succeeds() external {
-        assertEq(false, admin.isUpgrading());
+        assertFalse(admin.isUpgrading());
 
-        vm.prank(alice);
+        vm.prank(PROXY_ADMIN_OWNER);
         admin.setUpgrading(true);
-        assertEq(true, admin.isUpgrading());
+        assertTrue(admin.isUpgrading());
     }
 }
 
 /// @title ProxyAdmin_GetProxyImplementation_Test
 /// @notice Tests the `getProxyImplementation` function of the `ProxyAdmin` contract.
 contract ProxyAdmin_GetProxyImplementation_Test is ProxyAdmin_TestInit {
-    function getProxyImplementation(address payable _proxy) internal {
-        {
-            address impl = admin.getProxyImplementation(_proxy);
-            assertEq(impl, address(0));
-        }
+    function _assertProxyImplementation(address payable _proxy) internal {
+        assertEq(admin.getProxyImplementation(_proxy), address(0));
 
-        vm.prank(alice);
+        vm.prank(PROXY_ADMIN_OWNER);
         admin.upgrade(_proxy, address(implementation));
 
-        {
-            address impl = admin.getProxyImplementation(_proxy);
-            assertEq(impl, address(implementation));
-        }
+        assertEq(admin.getProxyImplementation(_proxy), address(implementation));
     }
 
     function test_getProxyImplementation_erc1967_succeeds() external {
-        getProxyImplementation(payable(proxy));
+        _assertProxyImplementation(payable(proxy));
     }
 
     function test_getProxyImplementation_chugsplash_succeeds() external {
-        getProxyImplementation(payable(chugsplash));
+        _assertProxyImplementation(payable(chugsplash));
     }
 
     function test_getProxyImplementation_resolved_succeeds() external {
-        getProxyImplementation(payable(resolved));
+        _assertProxyImplementation(payable(resolved));
     }
 }
 
 /// @title ProxyAdmin_GetProxyAdmin_Test
 /// @notice Tests the `getProxyAdmin` function of the `ProxyAdmin` contract.
 contract ProxyAdmin_GetProxyAdmin_Test is ProxyAdmin_TestInit {
-    function getProxyAdmin(address payable _proxy) internal view {
-        address owner = admin.getProxyAdmin(_proxy);
-        assertEq(owner, address(admin));
+    function _assertProxyAdmin(address payable _proxy) internal view {
+        assertEq(admin.getProxyAdmin(_proxy), address(admin));
     }
 
     function test_getProxyAdmin_erc1967_succeeds() external view {
-        getProxyAdmin(payable(proxy));
+        _assertProxyAdmin(payable(proxy));
     }
 
     function test_getProxyAdmin_chugsplash_succeeds() external view {
-        getProxyAdmin(payable(chugsplash));
+        _assertProxyAdmin(payable(chugsplash));
     }
 
     function test_getProxyAdmin_resolved_succeeds() external view {
-        getProxyAdmin(payable(resolved));
+        _assertProxyAdmin(payable(resolved));
     }
 }
 
 /// @title ProxyAdmin_ChangeProxyAdmin_Test
 /// @notice Tests the `changeProxyAdmin` function of the `ProxyAdmin` contract.
 contract ProxyAdmin_ChangeProxyAdmin_Test is ProxyAdmin_TestInit {
-    function changeProxyAdmin(address payable _proxy) internal {
+    function _assertChangeProxyAdmin(address payable _proxy) internal {
         IProxyAdmin.ProxyType proxyType = admin.proxyType(address(_proxy));
 
-        vm.prank(alice);
-        admin.changeProxyAdmin(_proxy, address(128));
+        vm.prank(PROXY_ADMIN_OWNER);
+        admin.changeProxyAdmin(_proxy, NEW_PROXY_ADMIN);
 
         // The proxy is no longer the admin and can
         // no longer call the proxy interface except for
@@ -210,86 +198,79 @@ contract ProxyAdmin_ChangeProxyAdmin_Test is ProxyAdmin_TestInit {
             vm.expectRevert("L1ChugSplashProxy: implementation is not set yet");
             admin.getProxyAdmin(_proxy);
         } else if (proxyType == IProxyAdmin.ProxyType.RESOLVED) {
-            // Just an empty block to show that all cases are covered
-        } else {
-            vm.expectRevert("ProxyAdmin: unknown proxy type");
+            assertEq(admin.getProxyAdmin(_proxy), NEW_PROXY_ADMIN);
         }
 
         // Call the proxy contract directly to get the admin.
         // Different proxy types have different interfaces.
-        vm.prank(address(128));
+        vm.prank(NEW_PROXY_ADMIN);
         if (proxyType == IProxyAdmin.ProxyType.ERC1967) {
-            assertEq(IProxy(payable(_proxy)).admin(), address(128));
+            assertEq(IProxy(payable(_proxy)).admin(), NEW_PROXY_ADMIN);
         } else if (proxyType == IProxyAdmin.ProxyType.CHUGSPLASH) {
-            assertEq(IL1ChugSplashProxy(payable(_proxy)).getOwner(), address(128));
+            assertEq(IL1ChugSplashProxy(payable(_proxy)).getOwner(), NEW_PROXY_ADMIN);
         } else if (proxyType == IProxyAdmin.ProxyType.RESOLVED) {
-            assertEq(addressManager.owner(), address(128));
-        } else {
-            assert(false);
+            assertEq(addressManager.owner(), NEW_PROXY_ADMIN);
         }
     }
 
     function test_changeProxyAdmin_erc1967_succeeds() external {
-        changeProxyAdmin(payable(proxy));
+        _assertChangeProxyAdmin(payable(proxy));
     }
 
     function test_changeProxyAdmin_chugsplash_succeeds() external {
-        changeProxyAdmin(payable(chugsplash));
+        _assertChangeProxyAdmin(payable(chugsplash));
     }
 
     function test_changeProxyAdmin_resolved_succeeds() external {
-        changeProxyAdmin(payable(resolved));
+        _assertChangeProxyAdmin(payable(resolved));
     }
 }
 
 /// @title ProxyAdmin_Upgrade_Test
 /// @notice Tests the `upgrade` function of the `ProxyAdmin` contract.
 contract ProxyAdmin_Upgrade_Test is ProxyAdmin_TestInit {
-    function upgrade(address payable _proxy) internal {
-        vm.prank(alice);
+    function _assertUpgrade(address payable _proxy) internal {
+        vm.prank(PROXY_ADMIN_OWNER);
         admin.upgrade(_proxy, address(implementation));
 
-        address impl = admin.getProxyImplementation(_proxy);
-        assertEq(impl, address(implementation));
+        assertEq(admin.getProxyImplementation(_proxy), address(implementation));
     }
 
     function test_upgrade_erc1967_succeeds() external {
-        upgrade(payable(proxy));
+        _assertUpgrade(payable(proxy));
     }
 
     function test_upgrade_chugsplash_succeeds() external {
-        upgrade(payable(chugsplash));
+        _assertUpgrade(payable(chugsplash));
     }
 
     function test_upgrade_resolved_succeeds() external {
-        upgrade(payable(resolved));
+        _assertUpgrade(payable(resolved));
     }
 }
 
 /// @title ProxyAdmin_UpgradeAndCall_Test
 /// @notice Tests the `upgradeAndCall` function of the `ProxyAdmin` contract.
 contract ProxyAdmin_UpgradeAndCall_Test is ProxyAdmin_TestInit {
-    function upgradeAndCall(address payable _proxy) internal {
-        vm.prank(alice);
+    function _assertUpgradeAndCall(address payable _proxy) internal {
+        vm.prank(PROXY_ADMIN_OWNER);
         admin.upgradeAndCall(_proxy, address(implementation), abi.encodeCall(Proxy_SimpleStorage_Harness.set, (1, 1)));
 
-        address impl = admin.getProxyImplementation(_proxy);
-        assertEq(impl, address(implementation));
+        assertEq(admin.getProxyImplementation(_proxy), address(implementation));
 
-        uint256 got = Proxy_SimpleStorage_Harness(address(_proxy)).get(1);
-        assertEq(got, 1);
+        assertEq(Proxy_SimpleStorage_Harness(address(_proxy)).get(1), 1);
     }
 
-    function test_erc1967UpgradeAndCall_succeeds() external {
-        upgradeAndCall(payable(proxy));
+    function test_upgradeAndCall_erc1967_succeeds() external {
+        _assertUpgradeAndCall(payable(proxy));
     }
 
-    function test_chugsplashUpgradeAndCall_succeeds() external {
-        upgradeAndCall(payable(chugsplash));
+    function test_upgradeAndCall_chugsplash_succeeds() external {
+        _assertUpgradeAndCall(payable(chugsplash));
     }
 
-    function test_delegateResolvedUpgradeAndCall_succeeds() external {
-        upgradeAndCall(payable(resolved));
+    function test_upgradeAndCall_resolved_succeeds() external {
+        _assertUpgradeAndCall(payable(resolved));
     }
 }
 
@@ -298,7 +279,7 @@ contract ProxyAdmin_UpgradeAndCall_Test is ProxyAdmin_TestInit {
 ///         functions of the `ProxyAdmin` contract.
 contract ProxyAdmin_Uncategorized_Test is ProxyAdmin_TestInit {
     function test_owner_succeeds() external view {
-        assertEq(admin.owner(), alice);
+        assertEq(admin.owner(), PROXY_ADMIN_OWNER);
     }
 
     function test_proxyType_succeeds() external view {

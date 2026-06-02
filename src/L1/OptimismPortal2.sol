@@ -2,8 +2,8 @@
 pragma solidity 0.8.15;
 
 // Contracts
-import { ProxyAdminOwnedBase } from "src/L1/ProxyAdminOwnedBase.sol";
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
+import { Initializable } from "lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import { ResourceMetering } from "src/L1/ResourceMetering.sol";
 import { ReinitializableBase } from "src/universal/ReinitializableBase.sol";
 
@@ -15,16 +15,16 @@ import { Types } from "src/libraries/Types.sol";
 import { Hashing } from "src/libraries/Hashing.sol";
 import { SecureMerkleTrie } from "src/libraries/trie/SecureMerkleTrie.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
-import { GameStatus, GameType } from "src/dispute/lib/Types.sol";
+import { GameStatus, GameType } from "src/libraries/bridge/Types.sol";
 import { Features } from "src/libraries/Features.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
-import { IDisputeGameFactory } from "interfaces/dispute/IDisputeGameFactory.sol";
-import { IDisputeGame } from "interfaces/dispute/IDisputeGame.sol";
-import { IAnchorStateRegistry } from "interfaces/dispute/IAnchorStateRegistry.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
+import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 
@@ -106,11 +106,11 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
 
     /// @notice Mapping of withdrawal hashes to addresses that have submitted a proof for the
     ///         withdrawal. Original OptimismPortal contract only allowed one proof to be submitted
-    ///         for any given withdrawal hash. Fault Proofs version of this contract must allow
-    ///         multiple proofs for the same withdrawal hash to prevent a malicious user from
-    ///         blocking other withdrawals by proving them against invalid proposals. Submitters
-    ///         are tracked in an array to simplify the off-chain process of determining which
-    ///         proof submission should be used when finalizing a withdrawal.
+    ///         for any given withdrawal hash. This contract allows multiple proofs for the same
+    ///         withdrawal hash to prevent a malicious user from blocking other withdrawals by
+    ///         proving them against invalid proposals. Submitters are tracked in an array to
+    ///         simplify the off-chain process of determining which proof submission should be used
+    ///         when finalizing a withdrawal.
     mapping(bytes32 => address[]) public proofSubmitters;
 
     /// @custom:legacy

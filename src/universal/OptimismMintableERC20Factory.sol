@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Contracts
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { Initializable } from "lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import { OptimismMintableERC20 } from "src/universal/OptimismMintableERC20.sol";
 
 // Interfaces

@@ -21,20 +21,12 @@ additional_compiler_profiles = [
   { name = "dispute", optimizer_runs = 5000 },
 ]
 compilation_restrictions = [
-  { paths = "src/dispute/DisputeGameFactory.sol", optimizer_runs = 5000 },
-  { paths = "src/dispute/FaultDisputeGame.sol", optimizer_runs = 5000 },
-  { paths = "src/dispute/v2/FaultDisputeGameV2.sol", optimizer_runs = 5000 },
-  { paths = "src/dispute/PermissionedDisputeGame.sol", optimizer_runs = 5000 },
-  { paths = "src/dispute/v2/PermissionedDisputeGameV2.sol", optimizer_runs = 5000 },
-  { paths = "src/dispute/zk/OPSuccinctFaultDisputeGame.sol", optimizer_runs = 5000 },
-  { paths = "src/L1/OPContractsManager.sol", optimizer_runs = 5000 },
-  { paths = "src/L1/OPContractsManagerStandardValidator.sol", optimizer_runs = 5000 },
+  { paths = "src/L1/proofs/DisputeGameFactory.sol", optimizer_runs = 5000 },
   { paths = "src/L1/OptimismPortal2.sol", optimizer_runs = 5000 },
-  { paths = "src/L1/ProtocolVersions.sol", optimizer_runs = 5000 },
   { paths = "src/L1/SystemConfig.sol", optimizer_runs = 5000 },
   { paths = "src/universal/OptimismMintableERC20Factory.sol", optimizer_runs = 5000 },
-  { paths = "src/dispute/AnchorStateRegistry.sol", optimizer_runs = 5000 },
-  { paths = "src/dispute/DelayedWETH.sol", optimizer_runs = 5000 },
+  { paths = "src/L1/proofs/AnchorStateRegistry.sol", optimizer_runs = 5000 },
+  { paths = "src/L1/proofs/DelayedWETH.sol", optimizer_runs = 5000 },
   { paths = "src/universal/ProxyAdmin.sol", optimizer_runs = 5000 },
   { paths = "src/universal/Proxy.sol", optimizer_runs = 5000 },
   { paths = "src/L2/OptimismMintableERC721.sol", optimizer_runs = 5000 },
@@ -48,19 +40,7 @@ evm_version = 'cancun'
 
 remappings = [
   '@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts',
-  '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts',
-  '@openzeppelin/contracts-v5/=lib/openzeppelin-contracts-v5/contracts',
   'openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/',
-  '@rari-capital/solmate/=lib/solmate',
-  '@lib-keccak/=lib/lib-keccak/contracts/lib',
-  'solady/=lib/solady/src/',
-  '@solady/=lib/solady/src',
-  '@solady-v0.0.245/=lib/solady-v0.0.245/src',
-  'forge-std/=lib/forge-std/src',
-  'ds-test/=lib/forge-std/lib/ds-test/src',
-  'safe-contracts/=lib/safe-contracts/contracts',
-  'kontrol-cheatcodes/=lib/kontrol-cheatcodes/src',
-  'interfaces/=interfaces'
 ]
 
 fs_permissions = [
@@ -68,20 +48,13 @@ fs_permissions = [
   { access='read-write', path='./snapshots/' },
   { access='read-write', path='./deployments/' },
   { access='read', path='./deploy-config/' },
-  { access='read', path='./deploy-config-periphery/' },
-  { access='read', path='./broadcast/' },
   { access='read', path = './forge-artifacts/' },
-  { access='read-write', path='./.testdata/' },
-  { access='read', path='./kout-deployment' },
-  { access='read', path='./test/fixtures' },
-  { access='read', path='./lib/superchain-registry/superchain/configs/' },
-  { access='read', path='./lib/superchain-registry/validation/standard/' },
 ]
 
 # 5159 error code is selfdestruct error code
 # 2424 is deprecated natspec memory-safe-assembly comment (forge-std, solmate)
 # 8429 is deprecated virtual modifiers (solmate)
-ignored_error_codes = ["transient-storage", "code-size", "init-code-size", "too-many-warnings", 5159, 2424, 8429]
+ignored_error_codes = ["transient-storage", "code-size", "init-code-size", "too-many-warnings", 5159, 2424, 8429, 6335]
 deny = "warnings"
 ffi = true
 
@@ -164,32 +137,14 @@ additional_compiler_profiles = [
   { name = "dispute", optimizer_runs = 0 },
 ]
 compilation_restrictions = [
-  { paths = "src/dispute/DisputeGameFactory.sol", optimizer_runs = 0 },
-  { paths = "src/dispute/FaultDisputeGame.sol", optimizer_runs = 0 },
-  { paths = "src/dispute/v2/FaultDisputeGameV2.sol", optimizer_runs = 0 },
-  { paths = "src/dispute/PermissionedDisputeGame.sol", optimizer_runs = 0 },
-  { paths = "src/dispute/v2/PermissionedDisputeGameV2.sol", optimizer_runs = 0 },
-  { paths = "src/dispute/zk/OPSuccinctFaultDisputeGame.sol", optimizer_runs = 0 },
-  { paths = "src/L1/OPContractsManager.sol", optimizer_runs = 0 },
-  { paths = "src/L1/OPContractsManagerStandardValidator.sol", optimizer_runs = 0 },
+  { paths = "src/L1/proofs/DisputeGameFactory.sol", optimizer_runs = 0 },
   { paths = "src/L1/OptimismPortal2.sol", optimizer_runs = 0 },
-  { paths = "src/L1/ProtocolVersions.sol", optimizer_runs = 0 },
   { paths = "src/L1/SystemConfig.sol", optimizer_runs = 0 },
   { paths = "src/universal/OptimismMintableERC20Factory.sol", optimizer_runs = 0 },
-  { paths = "src/dispute/AnchorStateRegistry.sol", optimizer_runs = 0 },
-  { paths = "src/dispute/DelayedWETH.sol", optimizer_runs = 0 },
+  { paths = "src/L1/proofs/AnchorStateRegistry.sol", optimizer_runs = 0 },
+  { paths = "src/L1/proofs/DelayedWETH.sol", optimizer_runs = 0 },
   { paths = "src/universal/ProxyAdmin.sol", optimizer_runs = 0 },
   { paths = "src/universal/Proxy.sol", optimizer_runs = 0 },
   { paths = "src/L2/OptimismMintableERC721.sol", optimizer_runs = 0 },
   { paths = "src/L2/OptimismMintableERC721Factory.sol", optimizer_runs = 0 },
 ]
-
-################################################################
-#                         PROFILE: KONTROL                     #
-################################################################
-
-[profile.kprove]
-src = 'test/kontrol/proofs'
-out = 'kout-proofs'
-test = 'test/kontrol/proofs'
-script = 'test/kontrol/proofs'

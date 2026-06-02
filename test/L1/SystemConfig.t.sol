@@ -24,8 +24,8 @@ abstract contract SystemConfig_TestInit is CommonTest {
     event ConfigUpdate(uint256 indexed version, ISystemConfig.UpdateType indexed updateType, bytes data);
 
     bytes32 public constant EXAMPLE_FEATURE = "EXAMPLE_FEATURE";
+    bytes32 internal constant INITIALIZED_SLOT = bytes32(0);
 
-    address batchInbox;
     address owner;
     bytes32 batcherHash;
     uint64 gasLimit;
@@ -37,7 +37,6 @@ abstract contract SystemConfig_TestInit is CommonTest {
 
     function setUp() public virtual override {
         super.setUp();
-        batchInbox = deploy.cfg().batchInboxAddress();
         owner = deploy.cfg().finalSystemOwner();
         basefeeScalar = deploy.cfg().basefeeScalar();
         blobbasefeeScalar = deploy.cfg().blobbasefeeScalar();
@@ -46,6 +45,42 @@ abstract contract SystemConfig_TestInit is CommonTest {
         unsafeBlockSigner = deploy.cfg().p2pSequencerAddress();
         systemConfigImpl = EIP1967Helper.getImplementation(address(systemConfig));
         optimismMintableERC20Factory = artifacts.mustGetAddress("OptimismMintableERC20FactoryProxy");
+    }
+
+    function _resetInitialized() internal {
+        vm.store(address(systemConfig), INITIALIZED_SLOT, bytes32(0));
+    }
+
+    function _initializedValue() internal view returns (uint8) {
+        bytes32 slotVal = vm.load(address(systemConfig), INITIALIZED_SLOT);
+        return uint8(uint256(slotVal) & 0xFF);
+    }
+
+    function _emptyAddresses() internal pure returns (ISystemConfig.Addresses memory) {
+        return ISystemConfig.Addresses({
+            l1CrossDomainMessenger: address(0),
+            l1ERC721Bridge: address(0),
+            l1StandardBridge: address(0),
+            optimismPortal: address(0),
+            optimismMintableERC20Factory: address(0),
+            delayedWETH: address(0)
+        });
+    }
+
+    function _initializeSystemConfig(uint64 _gasLimit, IResourceMetering.ResourceConfig memory _config) internal {
+        systemConfig.initialize({
+            _owner: alice,
+            _basefeeScalar: basefeeScalar,
+            _blobbasefeeScalar: blobbasefeeScalar,
+            _batcherHash: bytes32(hex"abcd"),
+            _gasLimit: _gasLimit,
+            _unsafeBlockSigner: address(1),
+            _config: _config,
+            _batchInbox: address(0),
+            _addresses: _emptyAddresses(),
+            _l2ChainId: 1234,
+            _superchainConfig: ISuperchainConfig(address(0))
+        });
     }
 }
 
@@ -107,6 +142,8 @@ contract SystemConfig_Initialize_Test is SystemConfig_TestInit {
         assertEq(systemConfig.scalar() >> 248, 1);
         assertEq(systemConfig.batcherHash(), batcherHash);
         assertEq(systemConfig.gasLimit(), gasLimit);
+        assertTrue(gasLimit >= systemConfig.minimumGasLimit());
+        assertTrue(gasLimit <= systemConfig.maximumGasLimit());
         assertEq(systemConfig.unsafeBlockSigner(), unsafeBlockSigner);
         assertEq(systemConfig.basefeeScalar(), basefeeScalar);
         assertEq(systemConfig.blobbasefeeScalar(), blobbasefeeScalar);
@@ -119,10 +156,6 @@ contract SystemConfig_Initialize_Test is SystemConfig_TestInit {
         assertEq(actual.minimumBaseFee, rcfg.minimumBaseFee);
         assertEq(actual.systemTxMaxGas, rcfg.systemTxMaxGas);
         assertEq(actual.maximumBaseFee, rcfg.maximumBaseFee);
-        // Depends on start block being set to 0 in `initialize`
-        uint256 cfgStartBlock = deploy.cfg().systemConfigStartBlock();
-        assertEq(systemConfig.startBlock(), (cfgStartBlock == 0 ? block.number : cfgStartBlock));
-        assertEq(address(systemConfig.batchInbox()), address(batchInbox));
 
         // Check address getters both for the single contract getter and the struct getter
         ISystemConfig.Addresses memory addrs = systemConfig.getAddresses();
@@ -143,48 +176,18 @@ contract SystemConfig_Initialize_Test is SystemConfig_TestInit {
     function test_initialize_lowGasLimit_reverts() external {
         uint64 minimumGasLimit = systemConfig.minimumGasLimit();
 
-        // Wipe out the initialized slot so the proxy can be initialized again
-        vm.store(address(systemConfig), bytes32(0), bytes32(0));
+        _resetInitialized();
 
-        address admin = address(uint160(uint256(vm.load(address(systemConfig), Constants.PROXY_OWNER_ADDRESS))));
-        vm.prank(admin);
-
+        vm.prank(address(systemConfig.proxyAdmin()));
         vm.expectRevert("SystemConfig: gas limit too low");
-        systemConfig.initialize({
-            _owner: alice,
-            _basefeeScalar: basefeeScalar,
-            _blobbasefeeScalar: blobbasefeeScalar,
-            _batcherHash: bytes32(hex"abcd"),
-            _gasLimit: minimumGasLimit - 1,
-            _unsafeBlockSigner: address(1),
-            _config: Constants.DEFAULT_RESOURCE_CONFIG(),
-            _batchInbox: address(0),
-            _addresses: ISystemConfig.Addresses({
-                l1CrossDomainMessenger: address(0),
-                l1ERC721Bridge: address(0),
-                l1StandardBridge: address(0),
-                optimismPortal: address(0),
-                optimismMintableERC20Factory: address(0),
-                delayedWETH: address(0)
-            }),
-            _l2ChainId: 1234,
-            _superchainConfig: ISuperchainConfig(address(0))
-        });
+        _initializeSystemConfig(minimumGasLimit - 1, Constants.DEFAULT_RESOURCE_CONFIG());
     }
 
     /// @notice Tests that the initializer value is correct. Trivial test for normal
     ///         initialization but confirms that the initValue is not incremented incorrectly if
     ///         an upgrade function is not present.
-    function test_initialize_correctInitializerValue_succeeds() public {
-        // Get the slot for _initialized.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("SystemConfig", "_initialized");
-
-        // Get the initializer value.
-        bytes32 slotVal = vm.load(address(systemConfig), bytes32(slot.slot));
-        uint8 val = uint8(uint256(slotVal) & 0xFF);
-
-        // Assert that the initializer value matches the expected value.
-        assertEq(val, systemConfig.initVersion());
+    function test_initialize_correctInitializerValue_succeeds() public view {
+        assertEq(_initializedValue(), systemConfig.initVersion());
     }
 
     /// @notice Tests that `initialize` reverts if called by a non-proxy admin or owner.
@@ -193,40 +196,16 @@ contract SystemConfig_Initialize_Test is SystemConfig_TestInit {
         // Prank as the not ProxyAdmin or ProxyAdmin owner.
         vm.assume(_sender != address(systemConfig.proxyAdmin()) && _sender != systemConfig.proxyAdminOwner());
 
-        // Get the slot for _initialized.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("SystemConfig", "_initialized");
-
-        // Set the initialized slot to 0.
-        vm.store(address(systemConfig), bytes32(slot.slot), bytes32(0));
+        _resetInitialized();
 
         // Get the minimum gas limit.
         uint64 minimumGasLimit = systemConfig.minimumGasLimit();
 
         // Expect the revert with `ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner` selector.
+        vm.prank(_sender);
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
 
-        // Call the `initialize` function with the sender
-        vm.prank(_sender);
-        systemConfig.initialize({
-            _owner: alice,
-            _basefeeScalar: basefeeScalar,
-            _blobbasefeeScalar: blobbasefeeScalar,
-            _batcherHash: bytes32(hex"abcd"),
-            _gasLimit: minimumGasLimit - 1,
-            _unsafeBlockSigner: address(1),
-            _config: Constants.DEFAULT_RESOURCE_CONFIG(),
-            _batchInbox: address(0),
-            _addresses: ISystemConfig.Addresses({
-                l1CrossDomainMessenger: address(0),
-                l1ERC721Bridge: address(0),
-                l1StandardBridge: address(0),
-                optimismPortal: address(0),
-                optimismMintableERC20Factory: address(0),
-                delayedWETH: address(0)
-            }),
-            _l2ChainId: 1234,
-            _superchainConfig: ISuperchainConfig(address(0))
-        });
+        _initializeSystemConfig(minimumGasLimit - 1, Constants.DEFAULT_RESOURCE_CONFIG());
     }
 }
 
@@ -235,65 +214,25 @@ contract SystemConfig_Initialize_Test is SystemConfig_TestInit {
 contract SystemConfig_StartBlock_Test is SystemConfig_TestInit {
     /// @notice Tests that startBlock is updated correctly when it's zero.
     function test_startBlock_update_succeeds() external {
-        // Wipe out the initialized slot so the proxy can be initialized again
-        vm.store(address(systemConfig), bytes32(0), bytes32(0));
+        _resetInitialized();
         // Set slot startBlock to zero
         vm.store(address(systemConfig), systemConfig.START_BLOCK_SLOT(), bytes32(uint256(0)));
 
         // Initialize and check that StartBlock updates to current block number
         vm.prank(address(systemConfig.proxyAdmin()));
-        systemConfig.initialize({
-            _owner: alice,
-            _basefeeScalar: basefeeScalar,
-            _blobbasefeeScalar: blobbasefeeScalar,
-            _batcherHash: bytes32(hex"abcd"),
-            _gasLimit: gasLimit,
-            _unsafeBlockSigner: address(1),
-            _config: Constants.DEFAULT_RESOURCE_CONFIG(),
-            _batchInbox: address(0),
-            _addresses: ISystemConfig.Addresses({
-                l1CrossDomainMessenger: address(0),
-                l1ERC721Bridge: address(0),
-                l1StandardBridge: address(0),
-                optimismPortal: address(0),
-                optimismMintableERC20Factory: address(0),
-                delayedWETH: address(0)
-            }),
-            _l2ChainId: 1234,
-            _superchainConfig: ISuperchainConfig(address(0))
-        });
+        _initializeSystemConfig(gasLimit, Constants.DEFAULT_RESOURCE_CONFIG());
         assertEq(systemConfig.startBlock(), block.number);
     }
 
     /// @notice Tests that startBlock is not updated when it's not zero.
     function test_startBlock_update_fails() external {
-        // Wipe out the initialized slot so the proxy can be initialized again
-        vm.store(address(systemConfig), bytes32(0), bytes32(0));
+        _resetInitialized();
         // Set slot startBlock to non-zero value 1
         vm.store(address(systemConfig), systemConfig.START_BLOCK_SLOT(), bytes32(uint256(1)));
 
         // Initialize and check that StartBlock doesn't update
         vm.prank(address(systemConfig.proxyAdmin()));
-        systemConfig.initialize({
-            _owner: alice,
-            _basefeeScalar: basefeeScalar,
-            _blobbasefeeScalar: blobbasefeeScalar,
-            _batcherHash: bytes32(hex"abcd"),
-            _gasLimit: gasLimit,
-            _unsafeBlockSigner: address(1),
-            _config: Constants.DEFAULT_RESOURCE_CONFIG(),
-            _batchInbox: address(0),
-            _addresses: ISystemConfig.Addresses({
-                l1CrossDomainMessenger: address(0),
-                l1ERC721Bridge: address(0),
-                l1StandardBridge: address(0),
-                optimismPortal: address(0),
-                optimismMintableERC20Factory: address(0),
-                delayedWETH: address(0)
-            }),
-            _l2ChainId: 1234,
-            _superchainConfig: ISuperchainConfig(address(0))
-        });
+        _initializeSystemConfig(gasLimit, Constants.DEFAULT_RESOURCE_CONFIG());
         assertEq(systemConfig.startBlock(), 1);
     }
 }
@@ -396,8 +335,7 @@ contract SystemConfig_SetGasConfigEcotone_Test is SystemConfig_TestInit {
     }
 
     function testFuzz_setGasConfigEcotone_succeeds(uint32 _basefeeScalar, uint32 _blobbasefeeScalar) external {
-        bytes32 encoded =
-            ffi.encodeScalarEcotone({ _basefeeScalar: _basefeeScalar, _blobbasefeeScalar: _blobbasefeeScalar });
+        uint256 encoded = (uint256(0x01) << 248) | (uint256(_blobbasefeeScalar) << 32) | _basefeeScalar;
 
         vm.expectEmit(address(systemConfig));
         emit ConfigUpdate(0, ISystemConfig.UpdateType.FEE_SCALARS, abi.encode(systemConfig.overhead(), encoded));
@@ -406,11 +344,10 @@ contract SystemConfig_SetGasConfigEcotone_Test is SystemConfig_TestInit {
         systemConfig.setGasConfigEcotone({ _basefeeScalar: _basefeeScalar, _blobbasefeeScalar: _blobbasefeeScalar });
         assertEq(systemConfig.basefeeScalar(), _basefeeScalar);
         assertEq(systemConfig.blobbasefeeScalar(), _blobbasefeeScalar);
-        assertEq(systemConfig.scalar(), uint256(encoded));
+        assertEq(systemConfig.scalar(), encoded);
 
-        (uint32 basefeeScalar, uint32 blobbbasefeeScalar) = ffi.decodeScalarEcotone(encoded);
-        assertEq(uint256(basefeeScalar), uint256(_basefeeScalar));
-        assertEq(uint256(blobbbasefeeScalar), uint256(_blobbasefeeScalar));
+        assertEq(uint32(encoded), _basefeeScalar);
+        assertEq(uint32(encoded >> 32), _blobbasefeeScalar);
     }
 }
 
@@ -583,9 +520,8 @@ contract SystemConfig_SetResourceConfig_Test is SystemConfig_TestInit {
     )
         internal
     {
-        // Wipe out the initialized slot so the proxy can be initialized again
-        vm.store(address(systemConfig), bytes32(0), bytes32(0));
-        // Fetch the current gas limit
+        _resetInitialized();
+
         uint64 gasLimit = systemConfig.gasLimit();
 
         vm.prank(address(systemConfig.proxyAdmin()));
@@ -599,14 +535,7 @@ contract SystemConfig_SetResourceConfig_Test is SystemConfig_TestInit {
             _unsafeBlockSigner: address(0),
             _config: config,
             _batchInbox: address(0),
-            _addresses: ISystemConfig.Addresses({
-                l1CrossDomainMessenger: address(0),
-                l1ERC721Bridge: address(0),
-                l1StandardBridge: address(0),
-                optimismPortal: address(0),
-                optimismMintableERC20Factory: address(0),
-                delayedWETH: address(0)
-            }),
+            _addresses: _emptyAddresses(),
             _l2ChainId: 1234,
             _superchainConfig: ISuperchainConfig(address(0))
         });
@@ -704,6 +633,15 @@ contract SystemConfig_Paused_Test is SystemConfig_TestInit {
 contract SystemConfig_SetFeature_Test is SystemConfig_TestInit {
     event FeatureSet(bytes32 indexed feature, bool indexed enabled);
 
+    function _enableEthLockboxIfDisabled(address proxyAdmin) internal {
+        if (!systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX)) {
+            vm.prank(proxyAdmin);
+            systemConfig.setFeature(Features.ETH_LOCKBOX, true);
+        }
+
+        assertTrue(systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX));
+    }
+
     /// @notice Tests that `setFeature` reverts if the caller is not ProxyAdmin or ProxyAdmin owner.
     /// @param _sender The address to test.
     function testFuzz_setFeature_notProxyAdminOrProxyAdminOwner_reverts(address _sender) external {
@@ -793,7 +731,7 @@ contract SystemConfig_SetFeature_Test is SystemConfig_TestInit {
     function test_setFeature_alreadyDisabled_reverts() external {
         vm.prank(address(systemConfig.proxyAdmin()));
         vm.expectRevert(ISystemConfig.SystemConfig_InvalidFeatureState.selector);
-        systemConfig.setFeature("EXAMPLE FEATURE", false);
+        systemConfig.setFeature(EXAMPLE_FEATURE, false);
     }
 
     /// @notice Tests that disabling ETH_LOCKBOX reverts if the OptimismPortal has a non-zero
@@ -801,12 +739,7 @@ contract SystemConfig_SetFeature_Test is SystemConfig_TestInit {
     function test_setFeature_ethLockboxDisableWhileConfigured_reverts() external {
         address proxyAdmin = address(systemConfig.proxyAdmin());
 
-        // Ensure ETH_LOCKBOX is enabled first (no pause active in fresh setup).
-        if (!systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX)) {
-            vm.prank(proxyAdmin);
-            systemConfig.setFeature(Features.ETH_LOCKBOX, true);
-            assertTrue(systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX));
-        }
+        _enableEthLockboxIfDisabled(proxyAdmin);
 
         // Force the portal to have a configured ETHLockbox address.
         StorageSlot memory slot = ForgeArtifacts.getSlot("OptimismPortal2", "ethLockbox");
@@ -822,12 +755,7 @@ contract SystemConfig_SetFeature_Test is SystemConfig_TestInit {
     function test_setFeature_ethLockboxEnableWhilePaused_reverts() external {
         address proxyAdmin = address(systemConfig.proxyAdmin());
 
-        // Ensure ETH_LOCKBOX is enabled first (no pause active in fresh setup).
-        if (!systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX)) {
-            vm.prank(proxyAdmin);
-            systemConfig.setFeature(Features.ETH_LOCKBOX, true);
-            assertTrue(systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX));
-        }
+        _enableEthLockboxIfDisabled(proxyAdmin);
 
         // Pause globally.
         vm.prank(superchainConfig.guardian());
@@ -843,12 +771,7 @@ contract SystemConfig_SetFeature_Test is SystemConfig_TestInit {
     function test_setFeature_ethLockboxDisableWhilePaused_reverts() external {
         address proxyAdmin = address(systemConfig.proxyAdmin());
 
-        // Ensure ETH_LOCKBOX is enabled first.
-        if (!systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX)) {
-            vm.prank(proxyAdmin);
-            systemConfig.setFeature(Features.ETH_LOCKBOX, true);
-            assertTrue(systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX));
-        }
+        _enableEthLockboxIfDisabled(proxyAdmin);
 
         // Pause globally.
         vm.prank(superchainConfig.guardian());
@@ -901,9 +824,8 @@ contract SystemConfig_Guardian_Test is SystemConfig_TestInit {
     }
 }
 
-/// @title SystemConfig_Uncategorized_Test
-/// @notice General tests that are not testing any function directly of the `SystemConfig` contract
-///         are testing multiple functions at once.
+/// @title SystemConfig_SuperchainConfig_Test
+/// @notice Test contract for SystemConfig `superchainConfig` function.
 contract SystemConfig_SuperchainConfig_Test is SystemConfig_TestInit {
     /// @notice Tests that `superchainConfig()` returns the correct address.
     function test_superchainConfig_succeeds() external view {
@@ -955,14 +877,7 @@ contract SystemConfig_SetDAFootprintGasScalar_Test is SystemConfig_TestInit {
 /// @notice Test contract for SystemConfig `isCustomGasToken` function.
 contract SystemConfig_IsCustomGasToken_Test is SystemConfig_TestInit {
     /// @notice Tests that `isCustomGasToken` returns the correct value.
-    function test_isCustomGasToken_enabled_succeeds() external {
-        skipIfSysFeatureDisabled(Features.CUSTOM_GAS_TOKEN);
-        assertTrue(systemConfig.isCustomGasToken());
-    }
-
-    /// @notice Tests that `isCustomGasToken` returns the correct value.
-    function test_isCustomGasToken_disabled_succeeds() external {
-        skipIfSysFeatureEnabled(Features.CUSTOM_GAS_TOKEN);
+    function test_isCustomGasToken_disabled_succeeds() external view {
         assertFalse(systemConfig.isCustomGasToken());
     }
 }

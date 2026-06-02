@@ -2,10 +2,10 @@
 pragma solidity 0.8.15;
 
 // Contracts
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { Initializable } from "lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 
 // Libraries
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { Math } from "lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { Burn } from "src/libraries/Burn.sol";
 import { Arithmetic } from "src/libraries/Arithmetic.sol";
 

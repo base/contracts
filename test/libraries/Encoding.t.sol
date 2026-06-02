@@ -7,7 +7,6 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 // Libraries
 import { Encoding } from "src/libraries/Encoding.sol";
 import { Types } from "src/libraries/Types.sol";
-import { LegacyCrossDomainUtils } from "src/libraries/LegacyCrossDomainUtils.sol";
 
 contract Encoding_Harness {
     function encodeCrossDomainMessage(
@@ -31,13 +30,45 @@ contract Encoding_Harness {
 }
 
 /// @title Encoding_TestInit
-/// @notice Reusable test initialization for `Encoding` tests.
+/// @notice Reusable helpers for `Encoding` tests.
 abstract contract Encoding_TestInit is CommonTest {
-    Encoding_Harness encoding;
+    bytes1 internal constant SUPER_ROOT_VERSION = 0x01;
+    uint256 internal constant MAX_OUTPUT_ROOTS = 50;
 
-    function setUp() public override {
-        super.setUp();
-        encoding = new Encoding_Harness();
+    function _outputRoot(uint256 _chainId, bytes32 _root) internal pure returns (Types.OutputRootWithChainId memory) {
+        return Types.OutputRootWithChainId({ chainId: _chainId, root: _root });
+    }
+
+    function _superRootProof(
+        uint64 _timestamp,
+        uint256 _length,
+        uint256 _seed
+    )
+        internal
+        pure
+        returns (Types.SuperRootProof memory proof)
+    {
+        _length = bound(_length, 1, MAX_OUTPUT_ROOTS);
+
+        Types.OutputRootWithChainId[] memory outputRoots = new Types.OutputRootWithChainId[](_length);
+        for (uint256 i = 0; i < _length; i++) {
+            outputRoots[i] = _outputRoot(
+                uint256(keccak256(abi.encode(_seed, uint8(0), i))), keccak256(abi.encode(_seed, uint8(1), i))
+            );
+        }
+
+        proof = Types.SuperRootProof({ version: SUPER_ROOT_VERSION, timestamp: _timestamp, outputRoots: outputRoots });
+    }
+
+    function _expectedSuperRootProofEncoding(Types.SuperRootProof memory _proof)
+        internal
+        pure
+        returns (bytes memory expected)
+    {
+        expected = bytes.concat(_proof.version, bytes8(_proof.timestamp));
+        for (uint256 i = 0; i < _proof.outputRoots.length; i++) {
+            expected = bytes.concat(expected, bytes32(_proof.outputRoots[i].chainId), _proof.outputRoots[i].root);
+        }
     }
 }
 
@@ -57,14 +88,14 @@ contract Encoding_EncodeDepositTransaction_Test is Encoding_TestInit {
     )
         external
     {
-        Types.UserDepositTransaction memory t = Types.UserDepositTransaction(
+        Types.UserDepositTransaction memory depositTx = Types.UserDepositTransaction(
             _from, _to, isCreate, _value, _mint, _gas, _data, bytes32(uint256(0)), _logIndex
         );
 
-        bytes memory txn = Encoding.encodeDepositTransaction(t);
-        bytes memory _txn = ffi.encodeDepositTransaction(t);
+        bytes memory actual = Encoding.encodeDepositTransaction(depositTx);
+        bytes memory expected = ffi.encodeDepositTransaction(depositTx);
 
-        assertEq(txn, _txn);
+        assertEq(actual, expected);
     }
 }
 
@@ -83,48 +114,23 @@ contract Encoding_EncodeCrossDomainMessage_Test is Encoding_TestInit {
     )
         external
     {
-        uint8 version = _version % 2;
+        uint8 version = uint8(bound(uint256(_version), 0, 1));
         uint256 nonce = Encoding.encodeVersionedNonce(_nonce, version);
 
-        bytes memory encoding = Encoding.encodeCrossDomainMessage(nonce, _sender, _target, _value, _gasLimit, _data);
+        bytes memory actual = Encoding.encodeCrossDomainMessage(nonce, _sender, _target, _value, _gasLimit, _data);
+        bytes memory expected = ffi.encodeCrossDomainMessage(nonce, _sender, _target, _value, _gasLimit, _data);
 
-        bytes memory _encoding = ffi.encodeCrossDomainMessage(nonce, _sender, _target, _value, _gasLimit, _data);
-
-        assertEq(encoding, _encoding);
+        assertEq(actual, expected);
     }
 
     /// @notice Tests that encodeCrossDomainMessage reverts if version is greater than 1.
-    function testFuzz_encodeCrossDomainMessage_versionGreaterThanOne_reverts(uint256 nonce) external {
-        // nonce >> 240 must be greater than 1
-        uint256 minInvalidNonce = (uint256(type(uint240).max) + 1) * 2;
-        nonce = bound(nonce, minInvalidNonce, type(uint256).max);
+    function testFuzz_encodeCrossDomainMessage_versionGreaterThanOne_reverts(uint240 _nonce, uint16 _version) external {
+        uint16 invalidVersion = uint16(bound(uint256(_version), 2, type(uint16).max));
+        uint256 nonce = Encoding.encodeVersionedNonce(_nonce, invalidVersion);
+        Encoding_Harness harness = new Encoding_Harness();
 
         vm.expectRevert(bytes("Encoding: unknown cross domain message version"));
-        encoding.encodeCrossDomainMessage(nonce, address(this), address(this), 1, 100, hex"");
-    }
-}
-
-/// @title Encoding_EncodeCrossDomainMessageV0_Test
-/// @notice Tests the `encodeCrossDomainMessageV0` function of the `Encoding` contract.
-contract Encoding_EncodeCrossDomainMessageV0_Test is Encoding_TestInit {
-    /// @notice Tests legacy cross domain message encoding.
-    function testFuzz_encodeCrossDomainMessageV0_matchesLegacy_succeeds(
-        uint240 _nonce,
-        address _sender,
-        address _target,
-        bytes memory _data
-    )
-        external
-        pure
-    {
-        uint8 version = 0;
-        uint256 nonce = Encoding.encodeVersionedNonce(_nonce, version);
-
-        bytes memory legacyEncoding = LegacyCrossDomainUtils.encodeXDomainCalldata(_target, _sender, _data, nonce);
-
-        bytes memory bedrockEncoding = Encoding.encodeCrossDomainMessageV0(_target, _sender, _data, nonce);
-
-        assertEq(legacyEncoding, bedrockEncoding);
+        harness.encodeCrossDomainMessage(nonce, address(this), address(this), 1, 100, hex"");
     }
 }
 
@@ -136,99 +142,33 @@ contract Encoding_EncodeSuperRootProof_Test is Encoding_TestInit {
     /// @param _length The number of output roots in the super root proof
     /// @param _seed The seed used to generate the output roots
     function testFuzz_encodeSuperRootProof_succeeds(uint64 _timestamp, uint256 _length, uint256 _seed) external pure {
-        // Ensure at least 1 element and cap at a reasonable maximum to avoid gas issues
-        _length = uint256(bound(_length, 1, 50));
+        Types.SuperRootProof memory proof = _superRootProof(_timestamp, _length, _seed);
 
-        // Create output roots array
-        Types.OutputRootWithChainId[] memory outputRoots = new Types.OutputRootWithChainId[](_length);
-
-        // Generate deterministic chain IDs and roots based on the seed
-        for (uint256 i = 0; i < _length; i++) {
-            // Use different derivations of the seed for each value
-            uint256 chainId = uint256(keccak256(abi.encode(_seed, "chainId", i)));
-            bytes32 root = keccak256(abi.encode(_seed, "root", i));
-
-            outputRoots[i] = Types.OutputRootWithChainId({ chainId: chainId, root: root });
-        }
-
-        // Create the super root proof
-        Types.SuperRootProof memory proof =
-            Types.SuperRootProof({ version: 0x01, timestamp: _timestamp, outputRoots: outputRoots });
-
-        // Encode the proof
-        bytes memory encoded = Encoding.encodeSuperRootProof(proof);
-
-        // Verify encoding structure
-        assertEq(encoded[0], bytes1(0x01), "Version byte should be 0x01");
-
-        // Verify timestamp (bytes 1-8)
-        bytes8 encodedTimestamp;
-        for (uint256 i = 0; i < 8; i++) {
-            encodedTimestamp |= bytes8(encoded[i + 1]) >> (i * 8);
-        }
-        assertEq(uint64(encodedTimestamp), _timestamp, "Timestamp should match");
-
-        // Verify each chain ID and root is encoded correctly
-        uint256 offset = 9; // 1 byte version + 8 bytes timestamp
-        for (uint256 i = 0; i < _length; i++) {
-            // Extract chain ID (32 bytes)
-            uint256 encodedChainId;
-            assembly {
-                // Load 32 bytes from encoded at position offset
-                encodedChainId := mload(add(add(encoded, 32), offset))
-            }
-            assertEq(encodedChainId, outputRoots[i].chainId, "Chain ID should match");
-            offset += 32;
-
-            // Extract root (32 bytes)
-            bytes32 encodedRoot;
-            assembly {
-                // Load 32 bytes from encoded at position offset
-                encodedRoot := mload(add(add(encoded, 32), offset))
-            }
-            assertEq(encodedRoot, outputRoots[i].root, "Root should match");
-            offset += 32;
-        }
-
-        // Verify total length
-        assertEq(encoded.length, 9 + (_length * 64), "Encoded length should match expected");
+        assertEq(Encoding.encodeSuperRootProof(proof), _expectedSuperRootProofEncoding(proof));
     }
 
     /// @notice Tests encoding with a single output root
     function test_encodeSuperRootProof_singleOutputRoot_succeeds() external pure {
-        // Create a single output root
         Types.OutputRootWithChainId[] memory outputRoots = new Types.OutputRootWithChainId[](1);
-        outputRoots[0] = Types.OutputRootWithChainId({ chainId: 10, root: bytes32(uint256(0xdeadbeef)) });
+        outputRoots[0] = _outputRoot(10, bytes32(uint256(0xdeadbeef)));
 
-        // Create the super root proof
         Types.SuperRootProof memory proof =
-            Types.SuperRootProof({ version: 0x01, timestamp: 1234567890, outputRoots: outputRoots });
+            Types.SuperRootProof({ version: SUPER_ROOT_VERSION, timestamp: 1234567890, outputRoots: outputRoots });
 
-        // Encode the proof
-        bytes memory encoded = Encoding.encodeSuperRootProof(proof);
-
-        // Expected: 1 byte version + 8 bytes timestamp + (32 bytes chainId + 32 bytes root)
-        assertEq(encoded.length, 1 + 8 + 64, "Encoded length should be 73 bytes");
-        assertEq(encoded[0], bytes1(0x01), "First byte should be version 0x01");
+        assertEq(Encoding.encodeSuperRootProof(proof), _expectedSuperRootProofEncoding(proof));
     }
 
     /// @notice Tests encoding with multiple output roots
     function test_encodeSuperRootProof_multipleOutputRoots_succeeds() external pure {
-        // Create multiple output roots
         Types.OutputRootWithChainId[] memory outputRoots = new Types.OutputRootWithChainId[](3);
-        outputRoots[0] = Types.OutputRootWithChainId({ chainId: 10, root: bytes32(uint256(0xdeadbeef)) });
-        outputRoots[1] = Types.OutputRootWithChainId({ chainId: 20, root: bytes32(uint256(0xbeefcafe)) });
-        outputRoots[2] = Types.OutputRootWithChainId({ chainId: 30, root: bytes32(uint256(0xcafebabe)) });
+        outputRoots[0] = _outputRoot(10, bytes32(uint256(0xdeadbeef)));
+        outputRoots[1] = _outputRoot(20, bytes32(uint256(0xbeefcafe)));
+        outputRoots[2] = _outputRoot(30, bytes32(uint256(0xcafebabe)));
 
-        // Create the super root proof
         Types.SuperRootProof memory proof =
-            Types.SuperRootProof({ version: 0x01, timestamp: 1234567890, outputRoots: outputRoots });
+            Types.SuperRootProof({ version: SUPER_ROOT_VERSION, timestamp: 1234567890, outputRoots: outputRoots });
 
-        // Encode the proof
-        bytes memory encoded = Encoding.encodeSuperRootProof(proof);
-
-        // Expected: 1 byte version + 8 bytes timestamp + 3 * (32 bytes chainId + 32 bytes root)
-        assertEq(encoded.length, 1 + 8 + (3 * 64), "Encoded length should be 201 bytes");
+        assertEq(Encoding.encodeSuperRootProof(proof), _expectedSuperRootProofEncoding(proof));
     }
 
     /// @notice Tests that the Solidity impl of encodeSuperRootProof matches the FFI impl
@@ -236,70 +176,40 @@ contract Encoding_EncodeSuperRootProof_Test is Encoding_TestInit {
     /// @param _length The number of output roots in the super root proof
     /// @param _seed The seed used to generate the output roots
     function testDiff_encodeSuperRootProof_succeeds(uint64 _timestamp, uint256 _length, uint256 _seed) external {
-        // Ensure at least 1 element and cap at a reasonable maximum to avoid gas issues
-        _length = uint256(bound(_length, 1, 50));
+        Types.SuperRootProof memory proof = _superRootProof(_timestamp, _length, _seed);
 
-        // Create output roots array
-        Types.OutputRootWithChainId[] memory outputRoots = new Types.OutputRootWithChainId[](_length);
-
-        // Generate deterministic chain IDs and roots based on the seed
-        for (uint256 i = 0; i < _length; i++) {
-            // Use different derivations of the seed for each value
-            uint256 chainId = uint256(keccak256(abi.encode(_seed, "chainId", i)));
-            bytes32 root = keccak256(abi.encode(_seed, "root", i));
-
-            outputRoots[i] = Types.OutputRootWithChainId({ chainId: chainId, root: root });
-        }
-
-        // Create the super root proof
-        Types.SuperRootProof memory proof =
-            Types.SuperRootProof({ version: 0x01, timestamp: _timestamp, outputRoots: outputRoots });
-
-        // Encode using the Solidity implementation
-        bytes memory encoding1 = Encoding.encodeSuperRootProof(proof);
-
-        // Encode using the FFI implementation
-        bytes memory encoding2 = ffi.encodeSuperRootProof(proof);
-
-        // Compare the results
-        assertEq(encoding1, encoding2, "Solidity and FFI implementations should match");
+        assertEq(Encoding.encodeSuperRootProof(proof), ffi.encodeSuperRootProof(proof));
     }
 
     /// @notice Tests that encoding fails when version is not 0x01
     /// @param _version The version to use for the super root proof
     /// @param _timestamp The timestamp of the super root proof
     function testFuzz_encodeSuperRootProof_invalidVersion_reverts(bytes1 _version, uint64 _timestamp) external {
-        // Ensure version is not 0x01
-        if (_version == 0x01) {
+        if (_version == SUPER_ROOT_VERSION) {
             _version = 0x02;
         }
 
-        // Create a minimal valid output roots array
         Types.OutputRootWithChainId[] memory outputRoots = new Types.OutputRootWithChainId[](1);
-        outputRoots[0] = Types.OutputRootWithChainId({ chainId: 1, root: bytes32(uint256(1)) });
+        outputRoots[0] = _outputRoot(1, bytes32(uint256(1)));
 
-        // Create the super root proof with invalid version
         Types.SuperRootProof memory proof =
             Types.SuperRootProof({ version: _version, timestamp: _timestamp, outputRoots: outputRoots });
+        Encoding_Harness harness = new Encoding_Harness();
 
-        // Expect revert when encoding
         vm.expectRevert(Encoding.Encoding_InvalidSuperRootVersion.selector);
-        encoding.encodeSuperRootProof(proof);
+        harness.encodeSuperRootProof(proof);
     }
 
     /// @notice Tests that encoding fails when output roots array is empty
     /// @param _timestamp The timestamp of the super root proof
     function testFuzz_encodeSuperRootProof_emptyOutputRoots_reverts(uint64 _timestamp) external {
-        // Create an empty output roots array
         Types.OutputRootWithChainId[] memory outputRoots = new Types.OutputRootWithChainId[](0);
-
-        // Create the super root proof with empty output roots
         Types.SuperRootProof memory proof =
-            Types.SuperRootProof({ version: 0x01, timestamp: _timestamp, outputRoots: outputRoots });
+            Types.SuperRootProof({ version: SUPER_ROOT_VERSION, timestamp: _timestamp, outputRoots: outputRoots });
+        Encoding_Harness harness = new Encoding_Harness();
 
-        // Expect revert when encoding
         vm.expectRevert(Encoding.Encoding_EmptySuperRoot.selector);
-        encoding.encodeSuperRootProof(proof);
+        harness.encodeSuperRootProof(proof);
     }
 }
 
@@ -322,5 +232,12 @@ contract Encoding_Uncategorized_Test is Encoding_TestInit {
         assertEq(_version, uint16(decodedVersion));
 
         assertEq(_nonce, uint240(decodedNonce));
+    }
+
+    /// @notice Tests decoding and re-encoding a versioned nonce.
+    function testFuzz_encodedNonceRoundTrip_succeeds(uint256 _versionedNonce) external pure {
+        (uint240 nonce, uint16 version) = Encoding.decodeVersionedNonce(_versionedNonce);
+
+        assertEq(Encoding.encodeVersionedNonce(nonce, version), _versionedNonce);
     }
 }

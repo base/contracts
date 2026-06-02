@@ -2,11 +2,12 @@
 pragma solidity 0.8.15;
 
 // Testing utilities
-import { Test } from "forge-std/Test.sol";
+import { Test } from "lib/forge-std/src/Test.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
+import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
 
 // Libraries
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { Math } from "lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Hashing } from "src/libraries/Hashing.sol";
 import { Encoding } from "src/libraries/Encoding.sol";
@@ -17,9 +18,9 @@ import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.s
 /// @notice A mock external contract called via the SafeCall inside the CrossDomainMessenger's
 ///         `relayMessage` function.
 contract CrossDomainMessenger_ExternalRelay_Harness is Test {
-    address internal op;
+    address internal immutable op;
     address internal fuzzedSender;
-    IL1CrossDomainMessenger internal l1CrossDomainMessenger;
+    IL1CrossDomainMessenger internal immutable l1CrossDomainMessenger;
 
     event FailedRelayedMessage(bytes32 indexed msgHash);
 
@@ -28,19 +29,12 @@ contract CrossDomainMessenger_ExternalRelay_Harness is Test {
         op = _op;
     }
 
-    /// @notice Internal helper function to relay a message and perform assertions.
-    function _internalRelay(address _innerSender) internal {
+    function _internalRelay(address _innerSender, bytes memory _callMessage) internal {
         address initialSender = l1CrossDomainMessenger.xDomainMessageSender();
-
-        bytes memory callMessage = getCallData();
+        uint256 nonce = Encoding.encodeVersionedNonce({ _nonce: 0, _version: 1 });
 
         bytes32 hash = Hashing.hashCrossDomainMessage({
-            _nonce: Encoding.encodeVersionedNonce({ _nonce: 0, _version: 1 }),
-            _sender: _innerSender,
-            _target: address(this),
-            _value: 0,
-            _gasLimit: 0,
-            _data: callMessage
+            _nonce: nonce, _sender: _innerSender, _target: address(this), _value: 0, _gasLimit: 0, _data: _callMessage
         });
 
         vm.expectEmit(true, true, true, true);
@@ -48,12 +42,12 @@ contract CrossDomainMessenger_ExternalRelay_Harness is Test {
 
         vm.prank(address(op));
         l1CrossDomainMessenger.relayMessage({
-            _nonce: Encoding.encodeVersionedNonce({ _nonce: 0, _version: 1 }),
+            _nonce: nonce,
             _sender: _innerSender,
             _target: address(this),
             _value: 0,
             _minGasLimit: 0,
-            _message: callMessage
+            _message: _callMessage
         });
 
         assertTrue(l1CrossDomainMessenger.failedMessages(hash));
@@ -63,21 +57,21 @@ contract CrossDomainMessenger_ExternalRelay_Harness is Test {
 
     /// @notice externalCallWithMinGas is called by the CrossDomainMessenger.
     function externalCallWithMinGas() external payable {
+        bytes memory callMessage = getCallData();
+
         for (uint256 i = 0; i < 10; i++) {
             address _innerSender;
             unchecked {
                 _innerSender = address(uint160(uint256(uint160(fuzzedSender)) + i));
             }
-            _internalRelay(_innerSender);
+            _internalRelay(_innerSender, callMessage);
         }
     }
 
-    /// @notice Helper function to get the callData for an `externalCallWithMinGas
     function getCallData() public pure returns (bytes memory) {
         return abi.encodeCall(CrossDomainMessenger_ExternalRelay_Harness.externalCallWithMinGas, ());
     }
 
-    /// @notice Helper function to set the fuzzed sender
     function setFuzzedSender(address _fuzzedSender) public {
         fuzzedSender = _fuzzedSender;
     }
@@ -86,14 +80,25 @@ contract CrossDomainMessenger_ExternalRelay_Harness is Test {
 /// @title CrossDomainMessenger_TestInit
 /// @notice Reusable test initialization for `CrossDomainMessenger` tests.
 abstract contract CrossDomainMessenger_TestInit is CommonTest {
-    // Storage slot of the l2Sender
-    uint256 constant senderSlotIndex = 50;
-
     CrossDomainMessenger_ExternalRelay_Harness public er;
 
     function setUp() public override {
         super.setUp();
         er = new CrossDomainMessenger_ExternalRelay_Harness(l1CrossDomainMessenger, address(optimismPortal2));
+    }
+
+    function _versionedNonce(uint16 _version) internal pure returns (uint256) {
+        return Encoding.encodeVersionedNonce({ _nonce: 0, _version: _version });
+    }
+
+    function _setPortalL2Sender(address _sender) internal {
+        StorageSlot memory senderSlot = ForgeArtifacts.getSlot("OptimismPortal2", "l2Sender");
+        vm.store(address(optimismPortal2), bytes32(senderSlot.slot), bytes32(abi.encode(_sender)));
+    }
+
+    function _assertMessageStatus(bytes32 _hash, bool _successful, bool _failed) internal view {
+        assertEq(l1CrossDomainMessenger.successfulMessages(_hash), _successful);
+        assertEq(l1CrossDomainMessenger.failedMessages(_hash), _failed);
     }
 }
 
@@ -118,32 +123,20 @@ contract CrossDomainMessenger_RelayMessage_Test is CrossDomainMessenger_TestInit
         vm.expectCall(target, callMessage);
 
         uint64 gasLimit = uint64(bound(_gasLimit, 0, 30_000_000));
+        uint256 nonce = _versionedNonce(1);
 
         bytes32 hash = Hashing.hashCrossDomainMessage({
-            _nonce: Encoding.encodeVersionedNonce({ _nonce: 0, _version: 1 }),
-            _sender: sender,
-            _target: target,
-            _value: 0,
-            _gasLimit: gasLimit,
-            _data: callMessage
+            _nonce: nonce, _sender: sender, _target: target, _value: 0, _gasLimit: gasLimit, _data: callMessage
         });
 
-        // Set the value of `op.l2Sender()` to be the L2 Cross Domain Messenger.
-        vm.store(address(optimismPortal2), bytes32(senderSlotIndex), bytes32(abi.encode(sender)));
+        _setPortalL2Sender(sender);
         vm.prank(address(optimismPortal2));
         l1CrossDomainMessenger.relayMessage({
-            _nonce: Encoding.encodeVersionedNonce({ _nonce: 0, _version: 1 }),
-            _sender: sender,
-            _target: target,
-            _value: 0,
-            _minGasLimit: gasLimit,
-            _message: callMessage
+            _nonce: nonce, _sender: sender, _target: target, _value: 0, _minGasLimit: gasLimit, _message: callMessage
         });
 
-        assertTrue(l1CrossDomainMessenger.successfulMessages(hash));
-        assertEq(l1CrossDomainMessenger.failedMessages(hash), false);
+        _assertMessageStatus(hash, true, false);
 
-        // Ensures that the `xDomainMsgSender` is set back to `Predeploys.L2_CROSS_DOMAIN_MESSENGER`
         vm.expectRevert("CrossDomainMessenger: xDomainMessageSender is not set");
         l1CrossDomainMessenger.xDomainMessageSender();
     }
@@ -153,6 +146,40 @@ contract CrossDomainMessenger_RelayMessage_Test is CrossDomainMessenger_TestInit
 ///      L2 CrossDomainMessenger contracts. For simplicity, we use the L1 Messenger as the test
 ///      contract.
 contract CrossDomainMessenger_BaseGas_Test is CommonTest {
+    function _totalMessageSize(uint256 _messageLength) internal view returns (uint64) {
+        return uint64(_messageLength + l1CrossDomainMessenger.ENCODING_OVERHEAD());
+    }
+
+    function _executionGas(uint32 _minGasLimit) internal view returns (uint64) {
+        return uint64(
+            l1CrossDomainMessenger.RELAY_CONSTANT_OVERHEAD() + l1CrossDomainMessenger.RELAY_CALL_OVERHEAD()
+                + l1CrossDomainMessenger.RELAY_RESERVED_GAS() + l1CrossDomainMessenger.RELAY_GAS_CHECK_BUFFER()
+                + ((_minGasLimit * l1CrossDomainMessenger.MIN_GAS_DYNAMIC_OVERHEAD_NUMERATOR())
+                    / l1CrossDomainMessenger.MIN_GAS_DYNAMIC_OVERHEAD_DENOMINATOR())
+        );
+    }
+
+    function _floorGas(uint256 _messageLength) internal view returns (uint64) {
+        return l1CrossDomainMessenger.TX_BASE_GAS()
+            + (_totalMessageSize(_messageLength) * l1CrossDomainMessenger.FLOOR_CALLDATA_OVERHEAD());
+    }
+
+    function _executionGasWithOverhead(uint256 _messageLength, uint32 _minGasLimit) internal view returns (uint64) {
+        return l1CrossDomainMessenger.TX_BASE_GAS() + _executionGas(_minGasLimit)
+            + (_totalMessageSize(_messageLength) * l1CrossDomainMessenger.MIN_GAS_CALLDATA_OVERHEAD());
+    }
+
+    function _baseGasMinimum(uint256 _messageLength, uint32 _minGasLimit) internal view returns (uint64) {
+        uint64 totalMessageSize = _totalMessageSize(_messageLength);
+        return l1CrossDomainMessenger.TX_BASE_GAS()
+            + uint64(
+            Math.max(
+            _executionGas(_minGasLimit) + (totalMessageSize * l1CrossDomainMessenger.MIN_GAS_CALLDATA_OVERHEAD()),
+            totalMessageSize * l1CrossDomainMessenger.FLOOR_CALLDATA_OVERHEAD()
+        )
+        );
+    }
+
     /// @notice Ensure that `baseGas` passes for the max value of `_minGasLimit`, this is about
     ///         4 Billion.
     function test_baseGas_succeeds() external view {
@@ -179,50 +206,26 @@ contract CrossDomainMessenger_BaseGas_Test is CommonTest {
 
     /// @notice Test that `baseGas` returns at least the floor cost for calldata
     function test_baseGas_floor_succeeds() external view {
-        // Create a message large enough that the floor cost would be higher than the execution gas
         bytes memory largeMessage = new bytes(100_000);
 
         uint64 baseGasResult = l1CrossDomainMessenger.baseGas(largeMessage, 0);
 
-        // Calculate the expected floor cost
-        uint64 expectedFloorCost = l1CrossDomainMessenger.TX_BASE_GAS()
-            + (uint64(largeMessage.length + l1CrossDomainMessenger.ENCODING_OVERHEAD())
-                * l1CrossDomainMessenger.FLOOR_CALLDATA_OVERHEAD());
-
-        // Verify that the result is at least the floor cost
-        assertTrue(baseGasResult >= expectedFloorCost, "baseGas should return at least the floor cost");
+        assertGe(baseGasResult, _floorGas(largeMessage.length), "baseGas should return at least the floor cost");
     }
 
     /// @notice Test that `baseGas` returns the execution gas when it's higher than the floor cost
     function test_baseGas_executionGas_succeeds() external view {
-        // Create a small message where execution gas would be higher than floor cost
         bytes memory smallMessage = new bytes(10);
         uint32 highGasLimit = 1_000_000;
 
         uint64 baseGasResult = l1CrossDomainMessenger.baseGas(smallMessage, highGasLimit);
+        uint64 expectedExecutionGasWithOverhead = _executionGasWithOverhead(smallMessage.length, highGasLimit);
 
-        // Calculate the expected floor cost
-        uint64 floorCost = l1CrossDomainMessenger.TX_BASE_GAS()
-            + (uint64(smallMessage.length + l1CrossDomainMessenger.ENCODING_OVERHEAD())
-                * l1CrossDomainMessenger.FLOOR_CALLDATA_OVERHEAD());
-
-        // Calculate the expected execution gas (simplified version of what's in the contract)
-        uint64 executionGas = l1CrossDomainMessenger.RELAY_CONSTANT_OVERHEAD()
-            + l1CrossDomainMessenger.RELAY_CALL_OVERHEAD() + l1CrossDomainMessenger.RELAY_RESERVED_GAS()
-            + l1CrossDomainMessenger.RELAY_GAS_CHECK_BUFFER()
-            + ((highGasLimit * l1CrossDomainMessenger.MIN_GAS_DYNAMIC_OVERHEAD_NUMERATOR())
-                / l1CrossDomainMessenger.MIN_GAS_DYNAMIC_OVERHEAD_DENOMINATOR());
-
-        uint64 expectedExecutionGasWithOverhead = l1CrossDomainMessenger.TX_BASE_GAS() + executionGas
-            + (uint64(smallMessage.length + l1CrossDomainMessenger.ENCODING_OVERHEAD())
-                * l1CrossDomainMessenger.MIN_GAS_CALLDATA_OVERHEAD());
-
-        // Verify that the result is the execution gas (which should be higher than floor cost)
-        assertTrue(
-            baseGasResult >= expectedExecutionGasWithOverhead, "baseGas should return at least the execution gas"
-        );
-        assertTrue(
-            expectedExecutionGasWithOverhead > floorCost, "Execution gas should be higher than floor cost for this test"
+        assertGe(baseGasResult, expectedExecutionGasWithOverhead, "baseGas should return at least the execution gas");
+        assertGt(
+            expectedExecutionGasWithOverhead,
+            _floorGas(smallMessage.length),
+            "Execution gas should be higher than floor cost for this test"
         );
     }
 
@@ -232,31 +235,8 @@ contract CrossDomainMessenger_BaseGas_Test is CommonTest {
     /// @param _minGasLimit The minimum gas limit to test
     function testFuzz_baseGas_maxLogic_succeeds(bytes calldata _message, uint32 _minGasLimit) external view {
         uint64 baseGasResult = l1CrossDomainMessenger.baseGas(_message, _minGasLimit);
+        uint64 expectedMinimum = _baseGasMinimum(_message.length, _minGasLimit);
 
-        // Calculate the expected execution gas
-        uint64 executionGas = l1CrossDomainMessenger.RELAY_CONSTANT_OVERHEAD()
-            + l1CrossDomainMessenger.RELAY_CALL_OVERHEAD() + l1CrossDomainMessenger.RELAY_RESERVED_GAS()
-            + l1CrossDomainMessenger.RELAY_GAS_CHECK_BUFFER()
-            + ((_minGasLimit * l1CrossDomainMessenger.MIN_GAS_DYNAMIC_OVERHEAD_NUMERATOR())
-                / l1CrossDomainMessenger.MIN_GAS_DYNAMIC_OVERHEAD_DENOMINATOR());
-
-        uint64 executionGasWithOverhead = executionGas
-            + (uint64(_message.length + l1CrossDomainMessenger.ENCODING_OVERHEAD())
-                * l1CrossDomainMessenger.MIN_GAS_CALLDATA_OVERHEAD());
-
-        // The result should be at least the maximum of the two calculations
-        uint64 expectedMinimum = uint64(
-            Math.max(
-                executionGasWithOverhead,
-                uint64(_message.length + l1CrossDomainMessenger.ENCODING_OVERHEAD())
-                    * l1CrossDomainMessenger.FLOOR_CALLDATA_OVERHEAD()
-            )
-        );
-        expectedMinimum += l1CrossDomainMessenger.TX_BASE_GAS();
-
-        assertTrue(
-            baseGasResult >= expectedMinimum,
-            "baseGas should return at least the maximum of execution gas and floor cost"
-        );
+        assertGe(baseGasResult, expectedMinimum, "baseGas should return at least the max gas path");
     }
 }

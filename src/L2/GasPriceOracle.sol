@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Libraries
-import { LibZip } from "@solady/utils/LibZip.sol";
+import { LibZip } from "lib/solady/src/utils/LibZip.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { Arithmetic } from "src/libraries/Arithmetic.sol";

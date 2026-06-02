@@ -11,8 +11,7 @@ import { IL2ToL1MessagePasser } from "interfaces/L2/IL2ToL1MessagePasser.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 
 // External
-// import from openzeppelin-contracts-v5
-import { Initializable } from "@openzeppelin/contracts-v5/proxy/utils/Initializable.sol";
+import { Initializable } from "src/vendor/Initializable.sol";
 
 /// @title FeeVault
 /// @notice The FeeVault contract contains the basic logic for the various different vault contracts
@@ -101,8 +100,6 @@ abstract contract FeeVault is Initializable {
     /// @notice Updates the minimum amount of funds the FeeVault contract must hold before they can be
     /// withdrawn.
     /// @param _newMinWithdrawalAmount The new minimum withdrawal amount.
-    /// @dev If integrating the FeeSplitter contract, the minimum withdrawal amount must be set to 0 to
-    /// avoid blocking withdrawals and disbursements for all vaults if one vault doesn't reach the threshold.
     function setMinWithdrawalAmount(uint256 _newMinWithdrawalAmount) external {
         if (msg.sender != IProxyAdmin(Predeploys.PROXY_ADMIN).owner()) {
             revert FeeVault_OnlyProxyAdminOwner();

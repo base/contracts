@@ -20,6 +20,9 @@ abstract contract OptimismMintableERC20Factory_TestInit is CommonTest {
     event StandardL2TokenCreated(address indexed remoteToken, address indexed localToken);
     event OptimismMintableERC20Created(address indexed localToken, address indexed remoteToken, address deployer);
 
+    string internal constant REMOTE_TOKEN_ZERO_REVERT =
+        "OptimismMintableERC20Factory: must provide remote token address";
+
     /// @notice Precalculates the address of the token contract.
     function _calculateTokenAddress(
         address _remote,
@@ -75,11 +78,8 @@ contract OptimismMintableERC20Factory_CreateStandardL2Token_Test is OptimismMint
     )
         external
     {
-        // Assume
         vm.assume(_remoteToken != address(0));
 
-        // Arrange
-        // Defaults to 18 decimals
         address local = _calculateTokenAddress(_remoteToken, _name, _symbol, 18);
 
         vm.expectEmit(address(l2OptimismMintableERC20Factory));
@@ -88,19 +88,17 @@ contract OptimismMintableERC20Factory_CreateStandardL2Token_Test is OptimismMint
         vm.expectEmit(address(l2OptimismMintableERC20Factory));
         emit OptimismMintableERC20Created(local, _remoteToken, _caller);
 
-        // Act
         vm.prank(_caller);
         address addr = l2OptimismMintableERC20Factory.createStandardL2Token(_remoteToken, _name, _symbol);
 
-        // Assert
-        assertTrue(addr == local);
-        assertTrue(OptimismMintableERC20(local).decimals() == 18);
+        assertEq(addr, local);
+        assertEq(OptimismMintableERC20(local).decimals(), 18);
         assertEq(l2OptimismMintableERC20Factory.deployments(local), _remoteToken);
     }
 
     /// @notice Test that calling `createOptimismMintableERC20WithDecimals` with valid parameters
     ///         succeeds.
-    function test_createStandardL2TokenWithDecimals_succeeds(
+    function test_createOptimismMintableERC20WithDecimals_succeeds(
         address _caller,
         address _remoteToken,
         string memory _name,
@@ -109,10 +107,8 @@ contract OptimismMintableERC20Factory_CreateStandardL2Token_Test is OptimismMint
     )
         external
     {
-        // Assume
         vm.assume(_remoteToken != address(0));
 
-        // Arrange
         address local = _calculateTokenAddress(_remoteToken, _name, _symbol, _decimals);
 
         vm.expectEmit(address(l2OptimismMintableERC20Factory));
@@ -121,15 +117,13 @@ contract OptimismMintableERC20Factory_CreateStandardL2Token_Test is OptimismMint
         vm.expectEmit(address(l2OptimismMintableERC20Factory));
         emit OptimismMintableERC20Created(local, _remoteToken, _caller);
 
-        // Act
         vm.prank(_caller);
         address addr = l2OptimismMintableERC20Factory.createOptimismMintableERC20WithDecimals(
             _remoteToken, _name, _symbol, _decimals
         );
 
-        // Assert
-        assertTrue(addr == local);
-        assertTrue(OptimismMintableERC20(local).decimals() == _decimals);
+        assertEq(addr, local);
+        assertEq(OptimismMintableERC20(local).decimals(), _decimals);
         assertEq(l2OptimismMintableERC20Factory.deployments(local), _remoteToken);
     }
 
@@ -142,23 +136,20 @@ contract OptimismMintableERC20Factory_CreateStandardL2Token_Test is OptimismMint
     )
         external
     {
-        // Assume
         vm.assume(_remoteToken != address(0));
 
         vm.prank(_caller);
         l2OptimismMintableERC20Factory.createStandardL2Token(_remoteToken, _name, _symbol);
 
-        // Arrange
-        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
+        vm.expectRevert(bytes(""));
 
-        // Act
         vm.prank(_caller);
         l2OptimismMintableERC20Factory.createStandardL2Token(_remoteToken, _name, _symbol);
     }
 
-    /// @notice Test that calling `createStandardL2TokenWithDecimals` with the same parameters
+    /// @notice Test that calling `createOptimismMintableERC20WithDecimals` with the same parameters
     ///         twice reverts.
-    function test_createStandardL2TokenWithDecimals_sameTwice_reverts(
+    function test_createOptimismMintableERC20WithDecimals_sameTwice_reverts(
         address _caller,
         address _remoteToken,
         string memory _name,
@@ -167,16 +158,13 @@ contract OptimismMintableERC20Factory_CreateStandardL2Token_Test is OptimismMint
     )
         external
     {
-        // Assume
         vm.assume(_remoteToken != address(0));
 
         vm.prank(_caller);
         l2OptimismMintableERC20Factory.createOptimismMintableERC20WithDecimals(_remoteToken, _name, _symbol, _decimals);
 
-        // Arrange
-        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
+        vm.expectRevert(bytes(""));
 
-        // Act
         vm.prank(_caller);
         l2OptimismMintableERC20Factory.createOptimismMintableERC20WithDecimals(_remoteToken, _name, _symbol, _decimals);
     }
@@ -189,18 +177,15 @@ contract OptimismMintableERC20Factory_CreateStandardL2Token_Test is OptimismMint
     )
         external
     {
-        // Arrange
-        address remote = address(0);
-        vm.expectRevert("OptimismMintableERC20Factory: must provide remote token address");
+        vm.expectRevert(bytes(REMOTE_TOKEN_ZERO_REVERT));
 
-        // Act
         vm.prank(_caller);
-        l2OptimismMintableERC20Factory.createStandardL2Token(remote, _name, _symbol);
+        l2OptimismMintableERC20Factory.createStandardL2Token(address(0), _name, _symbol);
     }
 
-    /// @notice Test that calling `createStandardL2TokenWithDecimals` with a zero remote token
+    /// @notice Test that calling `createOptimismMintableERC20WithDecimals` with a zero remote token
     ///         address reverts.
-    function test_createStandardL2TokenWithDecimals_remoteIsZero_reverts(
+    function test_createOptimismMintableERC20WithDecimals_remoteIsZero_reverts(
         address _caller,
         string memory _name,
         string memory _symbol,
@@ -208,13 +193,10 @@ contract OptimismMintableERC20Factory_CreateStandardL2Token_Test is OptimismMint
     )
         external
     {
-        // Arrange
-        address remote = address(0);
-        vm.expectRevert("OptimismMintableERC20Factory: must provide remote token address");
+        vm.expectRevert(bytes(REMOTE_TOKEN_ZERO_REVERT));
 
-        // Act
         vm.prank(_caller);
-        l2OptimismMintableERC20Factory.createOptimismMintableERC20WithDecimals(remote, _name, _symbol, _decimals);
+        l2OptimismMintableERC20Factory.createOptimismMintableERC20WithDecimals(address(0), _name, _symbol, _decimals);
     }
 }
 
@@ -236,7 +218,7 @@ contract OptimismMintableERC20Factory_Uncategorized_Test is OptimismMintableERC2
         proxy.upgradeToAndCall(address(nextImpl), abi.encodeCall(NextImpl.initialize, (2)));
         assertEq(proxy.implementation(), address(nextImpl));
 
-        // Verify that the NextImpl contract initialized its values according as expected
+        // Verify that the NextImpl contract initialized its values as expected.
         bytes32 slot21After = vm.load(address(l1OptimismMintableERC20Factory), bytes32(uint256(21)));
         bytes32 slot21Expected = NextImpl(address(l1OptimismMintableERC20Factory)).slot21Init();
         assertEq(slot21Expected, slot21After);

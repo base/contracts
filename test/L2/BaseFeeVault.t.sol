@@ -18,7 +18,6 @@ contract BaseFeeVault_Uncategorized_Test is FeeVault_Uncategorized_Test {
     function setUp() public virtual override {
         super.setUp();
         recipient = deploy.cfg().baseFeeVaultRecipient();
-        feeVaultName = "BaseFeeVault";
         minWithdrawalAmount = deploy.cfg().baseFeeVaultMinimumWithdrawalAmount();
         feeVault = IFeeVault(payable(Predeploys.BASE_FEE_VAULT));
         withdrawalNetwork = Types.WithdrawalNetwork(uint8(deploy.cfg().baseFeeVaultWithdrawalNetwork()));
