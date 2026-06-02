@@ -3,9 +3,6 @@ pragma solidity ^0.8.0;
 
 import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
-import { StdAssertions } from "lib/forge-std/src/StdAssertions.sol";
-
-import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 
 // Scripts
 import { Artifacts } from "scripts/Artifacts.s.sol";
@@ -15,21 +12,16 @@ import { Config } from "scripts/libraries/Config.sol";
 
 // Libraries
 import { GameTypes } from "src/libraries/bridge/Types.sol";
-import { Claim } from "src/libraries/bridge/LibUDT.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
 // Interfaces
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
-import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
-import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 
@@ -43,12 +35,15 @@ import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 ///         `forkSystemAddresses`.
 ///         This contract must not have constructor logic because it is set into state using `etch`.
 
-contract ForkLive is Script, StdAssertions, FeatureFlags {
+contract ForkLive is Script {
     DeployConfig internal constant cfg =
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
 
     Artifacts internal constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
+
+    SystemDeploy internal constant deploy =
+        SystemDeploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
 
     bool public useOpsRepo;
 
@@ -98,22 +93,15 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         useOpsRepo = bytes(superchainOpsAllocsPath).length > 0;
         if (useOpsRepo) {
             console.log("ForkLive: loading state from %s", superchainOpsAllocsPath);
-            // Set the resultant state from the superchain ops repo upgrades.
-            // The allocs are generated when simulating an upgrade task that runs vm.dumpState.
-            // These allocs represent the state of the EVM after the upgrade has been simulated.
+            // Load the simulated post-upgrade state before deriving implementation addresses.
             vm.loadAllocs(superchainOpsAllocsPath);
-            // Next, fetch the addresses from the configured fork entrypoints. This function uses a local EVM
-            // to retrieve implementation addresses by reading from the live proxy addresses.
-            // Setting the allocs first ensures the correct implementation addresses are retrieved.
-            _readForkAddresses();
-        } else {
-            // Read the live system and save the addresses to the Artifacts contract.
-            _readForkAddresses();
-            // Now deploy the updated implementations of the contracts.
+        }
+
+        _readForkAddresses();
+        if (!useOpsRepo) {
             _deployNewImplementations();
         }
 
-        // Now upgrade the contracts (if the config is set to do so)
         if (useOpsRepo) {
             console.log("ForkLive: using ops repo to upgrade");
         } else if (cfg.useUpgradedFork()) {
@@ -189,17 +177,15 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
     /// @notice Calls to the SystemDeploy.s.sol contract etched by Setup.sol to a deterministic address, sets up the
     /// environment, and deploys new implementations.
     function _deployNewImplementations() internal {
-        SystemDeploy deploy = SystemDeploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
         deploy.deployImplementations();
     }
 
     /// @notice Performs a script-level upgrade without a manager delegatecall.
     /// @param _upgrader The address of the OP Chain ProxyAdmin owner to use for the chain upgrade.
-    function _doUpgrade(address _upgrader) internal {
+    /// @param _systemConfigProxy The OP Chain SystemConfig proxy to upgrade.
+    function _doUpgrade(address _upgrader, ISystemConfig _systemConfigProxy) internal {
         SystemDeploy systemDeploy = new SystemDeploy();
         Types.Implementations memory implementations = _latestImplementations();
-
-        ISystemConfig systemConfigProxy = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
 
         ISuperchainConfig superchainConfig = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
         IProxyAdmin superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
@@ -224,7 +210,7 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
                 saveArtifacts: false,
                 superchainConfigProxy: ISuperchainConfig(address(0)),
                 implementations: implementations,
-                systemConfigProxy: systemConfigProxy
+                systemConfigProxy: _systemConfigProxy
             })
         );
     }
@@ -237,43 +223,33 @@ contract ForkLive is Script, StdAssertions, FeatureFlags {
         address upgrader = proxyAdmin.owner();
         vm.label(upgrader, "ProxyAdmin Owner");
 
-        // Run past upgrades depending on network.
-        if (block.chainid == 1) {
-            // Mainnet
-            // This is empty because the block number in the justfile is after the most recent upgrade so there are no
-            // past upgrades to run.
-        } else {
+        if (block.chainid != 1) {
             revert UnsupportedChainId();
         }
 
-        // Current upgrade.
-        _doUpgrade(upgrader);
+        _doUpgrade(upgrader, systemConfig);
 
         console.log("ForkLive: Saving newly deployed contracts");
 
         // A new ASR and new dispute games were deployed, so we need to update them
         IDisputeGameFactory disputeGameFactory =
             IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
-        IDisputeGame av = disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER);
-        artifacts.save("AggregateVerifier", address(av));
+        IAggregateVerifier aggregateVerifier =
+            IAggregateVerifier(address(disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER)));
+        artifacts.save("AggregateVerifier", address(aggregateVerifier));
 
-        IAnchorStateRegistry newAnchorStateRegistry = av.anchorStateRegistry();
-        artifacts.save("AnchorStateRegistryProxy", address(newAnchorStateRegistry));
-
-        // Get the lockbox address from the portal, and save it
         IOptimismPortal2 portal = IOptimismPortal2(artifacts.mustGetAddress("OptimismPortalProxy"));
         address lockboxAddress = address(portal.ethLockbox());
         artifacts.save("ETHLockboxProxy", lockboxAddress);
 
-        // Get the new DelayedWETH address and save it (might be a new proxy).
-        IDelayedWETH newDelayedWeth = IAggregateVerifier(address(av)).DELAYED_WETH();
-        artifacts.save("DelayedWETHProxy", address(newDelayedWeth));
-        artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(address(newDelayedWeth)));
+        GameAddresses memory gameAddresses = _aggregateVerifierAddresses(aggregateVerifier);
+        artifacts.save("AnchorStateRegistryProxy", gameAddresses.anchorStateRegistry);
+        artifacts.save("DelayedWETHProxy", gameAddresses.weth);
+        artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(gameAddresses.weth));
     }
 
     /// @notice Returns the latest implementation set saved by deployImplementations.
     function _latestImplementations() internal view returns (Types.Implementations memory) {
-        SystemDeploy deploy = SystemDeploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
         return deploy.getImplementations();
     }
 

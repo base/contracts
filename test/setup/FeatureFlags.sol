@@ -6,39 +6,16 @@ import { Vm } from "lib/forge-std/src/Vm.sol";
 // Interfaces
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 
-/// @notice FeatureFlags manages the feature bitmap by either direct user input or via environment
-///         variables.
+/// @notice Provides helpers for checking SystemConfig-gated test behavior.
 abstract contract FeatureFlags {
-    /// @notice The address of the foundry Vm contract.
     Vm private constant vm = Vm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
 
-    /// @notice The development feature bitmap.
-    bytes32 internal devFeatureBitmap;
+    ISystemConfig private sysCfg;
 
-    /// @notice The address of the SystemConfig contract.
-    ISystemConfig internal sysCfg;
-
-    /// @notice Sets the address of the SystemConfig contract.
-    /// @param _sysCfg The address of the SystemConfig contract.
-    function setSystemConfig(ISystemConfig _sysCfg) public {
+    function setSystemConfig(ISystemConfig _sysCfg) internal {
         sysCfg = _sysCfg;
     }
 
-    /// @notice Enables a feature.
-    /// @param _feature The feature to set.
-    function setDevFeatureEnabled(bytes32 _feature) public {
-        devFeatureBitmap |= _feature;
-    }
-
-    /// @notice Disables a feature.
-    /// @param _feature The feature to set.
-    function setDevFeatureDisabled(bytes32 _feature) public {
-        devFeatureBitmap &= ~_feature;
-    }
-
-    /// @notice Checks if a system feature is enabled.
-    /// @param _feature The feature to check.
-    /// @return True if the feature is enabled, false otherwise.
     function isSysFeatureEnabled(bytes32 _feature) public view returns (bool) {
         return sysCfg.isFeatureEnabled(_feature);
     }
