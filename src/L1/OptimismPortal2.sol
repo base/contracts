@@ -654,14 +654,7 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     /// @param _withdrawalHash   Hash of the withdrawal transaction (Hashing.hashWithdrawal).
     /// @param _disputeGameIndex Index of the dispute game to check.
     /// @return Whether the preconditions for proveAndFinalizeWithdrawalTransaction are met.
-    function canProveAndFinalize(
-        bytes32 _withdrawalHash,
-        uint256 _disputeGameIndex
-    )
-        external
-        view
-        returns (bool)
-    {
+    function canProveAndFinalize(bytes32 _withdrawalHash, uint256 _disputeGameIndex) external view returns (bool) {
         if (finalizedWithdrawals[_withdrawalHash]) return false;
         if (paused()) return false;
 

@@ -1946,9 +1946,7 @@ contract OptimismPortal2_ProveAndFinalizeWithdrawalTransaction_Test is OptimismP
         game.resolve();
 
         vm.expectCallMinGas(withdrawalTx.target, withdrawalTx.value, uint64(withdrawalTx.gasLimit), withdrawalTx.data);
-        optimismPortal2.proveAndFinalizeWithdrawalTransaction(
-            withdrawalTx, _proposedGameIndex, proof, withdrawalProof
-        );
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction(withdrawalTx, _proposedGameIndex, proof, withdrawalProof);
         assertTrue(optimismPortal2.finalizedWithdrawals(withdrawalHash));
     }
 
