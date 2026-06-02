@@ -104,25 +104,21 @@ func validateTestStructure(artifact *solc.ForgeArtifact) []error {
 		return []error{err}
 	}
 
-	if isExcluded(filePath) {
-		return nil
-	}
-
 	var errs []error
-	if !checkSrcPath(artifact) {
+	if !isPathExcluded(filePath, excludedSrcValidationPaths) && !checkSrcPath(artifact) {
 		errs = append(errs, fmt.Errorf("test file path does not match src path"))
 	}
-	if !checkContractNameFilePath(artifact) {
+	if !isPathExcluded(filePath, excludedContractNameValidationPaths) && !checkContractNameFilePath(artifact) {
 		errs = append(errs, fmt.Errorf("contract name does not match file path"))
 	}
-	errs = append(errs, checkTestStructure(artifact)...)
+	errs = append(errs, checkTestStructure(artifact, isPathExcluded(filePath, excludedFunctionNameValidationPaths))...)
 	return errs
 }
 
 // Allowed function-name placeholders for the <Contract>_<FunctionName>_Test pattern.
 var allowedFunctionNames = []string{"Uncategorized", "Integration"}
 
-func checkTestStructure(artifact *solc.ForgeArtifact) []error {
+func checkTestStructure(artifact *solc.ForgeArtifact, skipFunctionNameValidation bool) []error {
 	var errs []error
 
 	for _, contractName := range artifact.Metadata.Settings.CompilationTarget {
@@ -139,7 +135,9 @@ func checkTestStructure(artifact *solc.ForgeArtifact) []error {
 		case len(parts) == 3 && parts[2] == "Harness":
 			// <ContractName>_<Descriptor>_Harness (e.g. OPContractsManager_Upgrade_Harness)
 		case (len(parts) == 3 || len(parts) == 4) && parts[len(parts)-1] == "Test":
-			errs = append(errs, checkTestMethodName(artifact, contractName, parts[1])...)
+			if !skipFunctionNameValidation {
+				errs = append(errs, checkTestMethodName(artifact, contractName, parts[1])...)
+			}
 		default:
 			errs = append(errs, fmt.Errorf("contract '%s': invalid naming pattern. Expected patterns: <ContractName>_TestInit, <ContractName>_<FunctionName>_Test, or <ContractName>_Uncategorized_Test", contractName))
 		}
@@ -278,8 +276,10 @@ func checkFunctionExists(artifact *solc.ForgeArtifact, functionName string) bool
 // Exclusion configuration
 
 var (
-	excludedPaths []string
-	excludedTests []string
+	excludedSrcValidationPaths          []string
+	excludedContractNameValidationPaths []string
+	excludedFunctionNameValidationPaths []string
+	excludedTests                       []string
 )
 
 type ExclusionsConfig struct {
@@ -299,16 +299,14 @@ func loadExclusions(configPath string) error {
 		return fmt.Errorf("failed to decode TOML file: %w", err)
 	}
 
-	excludedPaths = slices.Concat(
-		config.ExcludedPaths.SrcValidation,
-		config.ExcludedPaths.ContractNameValidation,
-		config.ExcludedPaths.FunctionNameValidation,
-	)
+	excludedSrcValidationPaths = config.ExcludedPaths.SrcValidation
+	excludedContractNameValidationPaths = config.ExcludedPaths.ContractNameValidation
+	excludedFunctionNameValidationPaths = config.ExcludedPaths.FunctionNameValidation
 	excludedTests = config.ExcludedTests.Contracts
 	return nil
 }
 
-func isExcluded(filePath string) bool {
+func isPathExcluded(filePath string, excludedPaths []string) bool {
 	for _, excluded := range excludedPaths {
 		if strings.HasPrefix(filePath, excluded) {
 			return true

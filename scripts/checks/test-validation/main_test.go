@@ -30,11 +30,22 @@ func artifactWithMethods(names ...string) *solc.ForgeArtifact {
 	}
 }
 
-func setExclusions(t *testing.T, paths, tests []string) {
+func setExclusions(t *testing.T, srcPaths, contractNamePaths, functionNamePaths, tests []string) {
 	t.Helper()
-	prevPaths, prevTests := excludedPaths, excludedTests
-	excludedPaths, excludedTests = paths, tests
-	t.Cleanup(func() { excludedPaths, excludedTests = prevPaths, prevTests })
+	prevSrcPaths := excludedSrcValidationPaths
+	prevContractNamePaths := excludedContractNameValidationPaths
+	prevFunctionNamePaths := excludedFunctionNameValidationPaths
+	prevTests := excludedTests
+	excludedSrcValidationPaths = srcPaths
+	excludedContractNameValidationPaths = contractNamePaths
+	excludedFunctionNameValidationPaths = functionNamePaths
+	excludedTests = tests
+	t.Cleanup(func() {
+		excludedSrcValidationPaths = prevSrcPaths
+		excludedContractNameValidationPaths = prevContractNamePaths
+		excludedFunctionNameValidationPaths = prevFunctionNamePaths
+		excludedTests = prevTests
+	})
 }
 
 func TestProcessFile(t *testing.T) {
@@ -110,14 +121,50 @@ func TestCheckTestName(t *testing.T) {
 }
 
 func TestValidateTestStructure(t *testing.T) {
-	setExclusions(t, []string{"test/excluded/"}, nil)
-	artifact := artifactWithTarget("test/excluded/Contract.t.sol", "Contract_Test")
+	setExclusions(t, []string{"test/excluded/"}, nil, nil, nil)
+	artifact := artifactWithTarget("test/excluded/Contract.t.sol", "Contract_TestInit")
+	require.Empty(t, validateTestStructure(artifact))
+}
+
+func TestValidateTestStructureFunctionNameExclusionDoesNotSkipSrcPath(t *testing.T) {
+	setExclusions(t, nil, nil, []string{"test/function-name/"}, nil)
+	t.Chdir(t.TempDir())
+
+	artifact := artifactWithTarget("test/function-name/Missing.t.sol", "Missing_TestInit")
+	errs := validateTestStructure(artifact)
+
+	require.Len(t, errs, 1)
+	require.Contains(t, errs[0].Error(), "test file path does not match src path")
+}
+
+func TestValidateTestStructureFunctionNameExclusionDoesNotSkipContractName(t *testing.T) {
+	setExclusions(t, nil, nil, []string{"test/function-name/"}, nil)
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "src", "function-name"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "src", "function-name", "Contract.sol"), []byte(""), 0644))
+	t.Chdir(tmpDir)
+
+	artifact := artifactWithTarget("test/function-name/Contract.t.sol", "Other_TestInit")
+	errs := validateTestStructure(artifact)
+
+	require.Len(t, errs, 1)
+	require.Contains(t, errs[0].Error(), "contract name does not match file path")
+}
+
+func TestValidateTestStructureFunctionNameExclusionSkipsOnlyFunctionName(t *testing.T) {
+	setExclusions(t, nil, nil, []string{"test/function-name/"}, nil)
+	tmpDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "src", "function-name"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "src", "function-name", "Contract.sol"), []byte(""), 0644))
+	t.Chdir(tmpDir)
+
+	artifact := artifactWithTarget("test/function-name/Contract.t.sol", "Contract_Missing_Test")
 	require.Empty(t, validateTestStructure(artifact))
 }
 
 func TestCheckTestStructure(t *testing.T) {
-	require.Empty(t, checkTestStructure(artifactWithTarget("test.sol", "Contract_TestInit")))
-	require.NotEmpty(t, checkTestStructure(artifactWithTarget("test.sol", "Invalid_Pattern")))
+	require.Empty(t, checkTestStructure(artifactWithTarget("test.sol", "Contract_TestInit"), false))
+	require.NotEmpty(t, checkTestStructure(artifactWithTarget("test.sol", "Invalid_Pattern"), false))
 }
 
 func TestGetCompilationTarget(t *testing.T) {
@@ -217,18 +264,21 @@ func TestLoadExclusions(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "test.toml")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(`[excluded_paths]
 src_validation = ["path1"]
+contract_name_validation = ["path2"]
+function_name_validation = ["path3"]
 [excluded_tests]
 contracts = ["Test1"]`), 0644))
 
-	setExclusions(t, nil, nil)
+	setExclusions(t, nil, nil, nil, nil)
 	require.NoError(t, loadExclusions(tmpFile))
-	require.Len(t, excludedPaths, 1)
-	require.Len(t, excludedTests, 1)
+	require.Equal(t, []string{"path1"}, excludedSrcValidationPaths)
+	require.Equal(t, []string{"path2"}, excludedContractNameValidationPaths)
+	require.Equal(t, []string{"path3"}, excludedFunctionNameValidationPaths)
+	require.Equal(t, []string{"Test1"}, excludedTests)
 }
 
-func TestIsExcluded(t *testing.T) {
-	setExclusions(t, []string{"test/excluded/", "other/path/"}, nil)
-
+func TestIsPathExcluded(t *testing.T) {
+	excludedPaths := []string{"test/excluded/", "other/path/"}
 	tests := []struct {
 		filePath string
 		want     bool
@@ -240,13 +290,13 @@ func TestIsExcluded(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.filePath, func(t *testing.T) {
-			require.Equal(t, tt.want, isExcluded(tt.filePath))
+			require.Equal(t, tt.want, isPathExcluded(tt.filePath, excludedPaths))
 		})
 	}
 }
 
 func TestIsExcludedTest(t *testing.T) {
-	setExclusions(t, nil, []string{"ExcludedContract", "AnotherExcluded"})
+	setExclusions(t, nil, nil, nil, []string{"ExcludedContract", "AnotherExcluded"})
 
 	tests := []struct {
 		contractName string
