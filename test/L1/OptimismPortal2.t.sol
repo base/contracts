@@ -27,6 +27,7 @@ import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 // Interfaces
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
+import { OptimismPortal2 } from "src/L1/OptimismPortal2.sol";
 import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
@@ -1802,6 +1803,399 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
         } else {
             assertEq(address(optimismPortal2).balance, balanceBefore + _mint);
         }
+    }
+}
+
+/// @title OptimismPortal2_ProveAndFinalizeWithdrawalTransaction_Test
+/// @notice Tests for the combined proveAndFinalizeWithdrawalTransaction function and
+///         canProveAndFinalize view function.
+contract OptimismPortal2_ProveAndFinalizeWithdrawalTransaction_Test is OptimismPortal2_TestInit {
+    /// @dev Upgrades the portal implementation to one with proofMaturityDelaySeconds = 0,
+    ///      enabling the proveAndFinalizeWithdrawalTransaction codepath.
+    function setUp() public override {
+        super.setUp();
+        OptimismPortal2 newImpl = new OptimismPortal2(0);
+        vm.prank(EIP1967Helper.getAdmin(address(optimismPortal2)));
+        IProxy(payable(address(optimismPortal2))).upgradeTo(address(newImpl));
+    }
+
+    /// @notice Resolves the game and calls proveAndFinalizeWithdrawalTransaction with default tx.
+    function _proveAndFinalizeDefaultWithdrawal() internal {
+        game.resolve();
+        vm.expectEmit(true, true, true, true, address(optimismPortal2));
+        emit WithdrawalProven(_withdrawalHash, alice, bob);
+        vm.expectEmit(true, true, true, true, address(optimismPortal2));
+        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
+        vm.expectEmit(true, true, true, true, address(optimismPortal2));
+        emit WithdrawalFinalized(_withdrawalHash, true);
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+    }
+
+    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` reverts when
+    ///         PROOF_MATURITY_DELAY_SECONDS is non-zero (immediate finality not enabled).
+    function test_proveAndFinalizeWithdrawalTransaction_immediateFinalityNotEnabled_reverts() external {
+        // Deploy a portal with non-zero delay to verify the guard.
+        OptimismPortal2 standardImpl = new OptimismPortal2(604800);
+        vm.prank(EIP1967Helper.getAdmin(address(optimismPortal2)));
+        IProxy(payable(address(optimismPortal2))).upgradeTo(address(standardImpl));
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_ImmediateFinalityNotEnabled.selector);
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+    }
+
+    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` succeeds end-to-end.
+    function test_proveAndFinalizeWithdrawalTransaction_succeeds() external {
+        uint256 bobBalanceBefore = address(bob).balance;
+
+        _proveAndFinalizeDefaultWithdrawal();
+
+        assertTrue(optimismPortal2.finalizedWithdrawals(_withdrawalHash));
+        (IDisputeGame provenGame, uint64 provenTimestamp) =
+            optimismPortal2.provenWithdrawals(_withdrawalHash, address(this));
+        assertEq(address(provenGame), address(game));
+        assertEq(provenTimestamp, uint64(block.timestamp));
+        assertEq(optimismPortal2.numProofSubmitters(_withdrawalHash), 1);
+        assertEq(address(bob).balance, bobBalanceBefore + _defaultTx.value);
+    }
+
+    /// @notice Tests the critical same-block flow: create game, resolve, proveAndFinalize all
+    ///         within a single block timestamp.
+    function test_proveAndFinalizeWithdrawalTransaction_sameBlockAsGameCreation_succeeds() external {
+        uint256 bobBalanceBefore = address(bob).balance;
+
+        IAggregateVerifier newGame = _createDisputeGame(Claim.wrap(_outputRoot), 42);
+        uint256 newGameIndex = disputeGameFactory.gameCount() - 1;
+        newGame.resolve();
+
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: newGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+
+        assertTrue(optimismPortal2.finalizedWithdrawals(_withdrawalHash));
+        assertEq(address(bob).balance, bobBalanceBefore + _defaultTx.value);
+    }
+
+    /// @notice Fuzz test for `proveAndFinalizeWithdrawalTransaction` with arbitrary withdrawal
+    ///         transactions (uses FFI for proof generation).
+    function testDiff_proveAndFinalizeWithdrawalTransaction_succeeds(
+        address _sender,
+        address _target,
+        uint256 _value,
+        uint256 _gasLimit,
+        bytes memory _data
+    )
+        external
+    {
+        skipIfForkTest("Skipping on forked tests because of the L2ToL1MessageParser call below");
+
+        vm.assume(
+            _target != address(optimismPortal2) // Cannot call the optimism portal
+                && _target.code.length == 0 // No accounts with code
+                && _target != CONSOLE // The console has no code but behaves like a contract
+                && uint160(_target) > 9 // No precompiles (or zero address)
+        );
+        if (isUsingLockbox()) {
+            vm.assume(_target != address(ethLockbox));
+        }
+
+        uint256 value = bound(_value, 0, 200_000_000 ether);
+        vm.deal(address(optimismPortal2), value);
+        if (isUsingLockbox()) {
+            vm.deal(address(ethLockbox), value);
+        }
+
+        uint256 gasLimit = bound(_gasLimit, 0, 50_000_000);
+        Types.WithdrawalTransaction memory withdrawalTx = Types.WithdrawalTransaction({
+            nonce: l2ToL1MessagePasser.messageNonce(),
+            sender: _sender,
+            target: _target,
+            value: value,
+            gasLimit: gasLimit,
+            data: _data
+        });
+
+        (
+            bytes32 stateRoot,
+            bytes32 storageRoot,
+            bytes32 outputRoot,
+            bytes32 withdrawalHash,
+            bytes[] memory withdrawalProof
+        ) = ffi.getProveWithdrawalTransactionInputs(withdrawalTx);
+
+        Types.OutputRootProof memory proof = Types.OutputRootProof({
+            version: bytes32(uint256(0)),
+            stateRoot: stateRoot,
+            messagePasserStorageRoot: storageRoot,
+            latestBlockhash: bytes32(uint256(0))
+        });
+
+        vm.mockCall(address(game), abi.encodeCall(game.rootClaim, ()), abi.encode(outputRoot));
+        game.resolve();
+
+        vm.expectCallMinGas(withdrawalTx.target, withdrawalTx.value, uint64(withdrawalTx.gasLimit), withdrawalTx.data);
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction(
+            withdrawalTx, _proposedGameIndex, proof, withdrawalProof
+        );
+        assertTrue(optimismPortal2.finalizedWithdrawals(withdrawalHash));
+    }
+
+    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` reverts when paused.
+    function test_proveAndFinalizeWithdrawalTransaction_paused_reverts() external {
+        game.resolve();
+
+        vm.startPrank(optimismPortal2.guardian());
+        systemConfig.superchainConfig().pause(address(0));
+        vm.stopPrank();
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_CallPaused.selector);
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+    }
+
+    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` reverts when the game is
+    ///         still IN_PROGRESS (not resolved).
+    function test_proveAndFinalizeWithdrawalTransaction_gameNotResolved_reverts() external {
+        vm.expectRevert(IOptimismPortal.OptimismPortal_InvalidDisputeGame.selector);
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+    }
+
+    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` reverts when the game
+    ///         resolved as CHALLENGER_WINS.
+    function test_proveAndFinalizeWithdrawalTransaction_challengerWins_reverts() external {
+        game.resolve();
+        vm.mockCall(address(game), abi.encodeCall(game.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_InvalidDisputeGame.selector);
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+    }
+
+    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` reverts on replay.
+    function test_proveAndFinalizeWithdrawalTransaction_onReplay_reverts() external {
+        game.resolve();
+
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_AlreadyFinalized.selector);
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+    }
+
+    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` reverts with an invalid
+    ///         output root proof.
+    function test_proveAndFinalizeWithdrawalTransaction_invalidOutputRootProof_reverts() external {
+        game.resolve();
+
+        Types.OutputRootProof memory badProof = Types.OutputRootProof({
+            version: bytes32(uint256(0)),
+            stateRoot: bytes32(uint256(0xbad)),
+            messagePasserStorageRoot: _storageRoot,
+            latestBlockhash: bytes32(uint256(0))
+        });
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_InvalidOutputRootProof.selector);
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: badProof,
+            _withdrawalProof: _withdrawalProof
+        });
+    }
+
+    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` reverts with an invalid
+    ///         merkle inclusion proof.
+    function test_proveAndFinalizeWithdrawalTransaction_invalidMerkleProof_reverts() external {
+        game.resolve();
+
+        bytes[] memory badMerkleProof = new bytes[](1);
+        badMerkleProof[0] = hex"deadbeef";
+
+        vm.expectRevert(IOptimismPortal.ContentLengthMismatch.selector);
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: badMerkleProof
+        });
+    }
+
+    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` reverts when the target is
+    ///         the portal itself or the ETH lockbox.
+    function test_proveAndFinalizeWithdrawalTransaction_unsafeTarget_reverts() external {
+        game.resolve();
+
+        Types.WithdrawalTransaction memory badTx = _defaultTx;
+        badTx.target = address(optimismPortal2);
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_BadTarget.selector);
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: badTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+
+        if (isUsingLockbox()) {
+            badTx.target = address(ethLockbox);
+            vm.expectRevert(IOptimismPortal.OptimismPortal_BadTarget.selector);
+            optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+                _tx: badTx,
+                _disputeGameIndex: _proposedGameIndex,
+                _outputRootProof: _outputRootProof,
+                _withdrawalProof: _withdrawalProof
+            });
+        }
+    }
+
+    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` correctly handles reentrancy.
+    ///         The reentrant call to finalizeWithdrawalTransaction reverts, but the outer
+    ///         proveAndFinalize call still succeeds.
+    function test_proveAndFinalizeWithdrawalTransaction_onReentrancy_succeeds() external {
+        Types.WithdrawalTransaction memory _testTx = _defaultTx;
+        _testTx.target = address(this);
+        _testTx.data = abi.encodeCall(this.callPortalAndExpectRevert, ());
+
+        (
+            bytes32 stateRoot,
+            bytes32 storageRoot,
+            bytes32 outputRoot,
+            bytes32 withdrawalHash,
+            bytes[] memory withdrawalProof
+        ) = ffi.getProveWithdrawalTransactionInputs(_testTx);
+        Types.OutputRootProof memory outputRootProof = Types.OutputRootProof({
+            version: bytes32(0),
+            stateRoot: stateRoot,
+            messagePasserStorageRoot: storageRoot,
+            latestBlockhash: bytes32(0)
+        });
+
+        vm.mockCall(address(game), abi.encodeCall(game.rootClaim, ()), abi.encode(outputRoot));
+        game.resolve();
+
+        vm.expectCall(address(this), _testTx.data);
+        vm.expectEmit(true, true, true, true, address(optimismPortal2));
+        emit WithdrawalFinalized(withdrawalHash, true);
+
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _testTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: outputRootProof,
+            _withdrawalProof: withdrawalProof
+        });
+
+        assertTrue(optimismPortal2.finalizedWithdrawals(withdrawalHash));
+    }
+
+    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` calls unlockETH on the
+    ///         ETHLockbox when the lockbox feature is enabled.
+    function test_proveAndFinalizeWithdrawalTransaction_withETHLockbox_succeeds() external {
+        address dummyLockbox = address(0xdeadbeef);
+        forceEnableLockbox(dummyLockbox);
+        vm.deal(address(dummyLockbox), 0xFFFFFFFF);
+        vm.deal(address(optimismPortal2), _defaultTx.value);
+
+        uint256 bobBalanceBefore = address(bob).balance;
+        game.resolve();
+
+        vm.expectCall(address(dummyLockbox), abi.encodeCall(ethLockbox.unlockETH, (_defaultTx.value)));
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+
+        assertEq(address(bob).balance, bobBalanceBefore + _defaultTx.value);
+        assertTrue(optimismPortal2.finalizedWithdrawals(_withdrawalHash));
+    }
+
+    /// @notice Tests that when the target call fails, ETH is re-locked in the lockbox.
+    function test_proveAndFinalizeWithdrawalTransaction_targetFailsAndRelocks_fails() external {
+        address dummyLockbox = address(0xdeadbeef);
+        forceEnableLockbox(dummyLockbox);
+        vm.deal(address(dummyLockbox), 0xFFFFFFFF);
+        vm.deal(address(optimismPortal2), _defaultTx.value);
+
+        uint256 bobBalanceBefore = address(bob).balance;
+        vm.etch(bob, hex"fe");
+
+        game.resolve();
+
+        vm.expectEmit(true, true, true, true, address(optimismPortal2));
+        emit WithdrawalFinalized(_withdrawalHash, false);
+
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+
+        assertEq(address(bob).balance, bobBalanceBefore);
+        assertTrue(optimismPortal2.finalizedWithdrawals(_withdrawalHash));
+    }
+
+    /// @notice Tests that `canProveAndFinalize` returns true when preconditions are met.
+    function test_canProveAndFinalize_succeeds() external {
+        game.resolve();
+        assertTrue(optimismPortal2.canProveAndFinalize(_withdrawalHash, _proposedGameIndex));
+    }
+
+    /// @notice Tests that `canProveAndFinalize` returns false when withdrawal is finalized.
+    function test_canProveAndFinalize_alreadyFinalized_returnsFalse() external {
+        _proveAndFinalizeDefaultWithdrawal();
+        assertFalse(optimismPortal2.canProveAndFinalize(_withdrawalHash, _proposedGameIndex));
+    }
+
+    /// @notice Tests that `canProveAndFinalize` returns false when system is paused.
+    function test_canProveAndFinalize_paused_returnsFalse() external {
+        game.resolve();
+
+        vm.startPrank(optimismPortal2.guardian());
+        systemConfig.superchainConfig().pause(address(0));
+        vm.stopPrank();
+
+        assertFalse(optimismPortal2.canProveAndFinalize(_withdrawalHash, _proposedGameIndex));
+    }
+
+    /// @notice Tests that `canProveAndFinalize` returns false when game is not resolved.
+    function test_canProveAndFinalize_gameNotResolved_returnsFalse() external view {
+        assertFalse(optimismPortal2.canProveAndFinalize(_withdrawalHash, _proposedGameIndex));
     }
 }
 

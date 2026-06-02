@@ -91,14 +91,13 @@ contract ChallengeTest is BaseTest {
         _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
-    function testChallengeFailsAfterZKNullification() public {
+    function testCannotProvideProofAfterGameOver() public {
         AggregateVerifier game =
             _createGame(ZK_PROVER, "tee", "tee-proof", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry));
 
+        assertTrue(game.gameOver());
+        vm.expectRevert(AggregateVerifier.GameOver.selector);
         _provideProof(game, ZK_PROVER, _proofOfType(AggregateVerifier.ProofType.ZK));
-        _nullify(game, AggregateVerifier.ProofType.ZK, "zk2");
-        vm.expectRevert(Verifier.Nullified.selector);
-        _challenge(game, AggregateVerifier.ProofType.ZK, _claim("zk3").raw());
     }
 
     function testChallengeRemovedWhenZkVerifierNullifiedByOtherGame() public {

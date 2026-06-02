@@ -1057,8 +1057,12 @@ contract SystemDeploy is Script {
 
     function _assertValidImplementationInput(ImplementationInput memory _input) internal pure {
         require(_input.withdrawalDelaySeconds != 0, "SystemDeploy: withdrawalDelaySeconds not set");
-        require(_input.proofMaturityDelaySeconds != 0, "SystemDeploy: proofMaturityDelaySeconds not set");
-        require(_input.disputeGameFinalityDelaySeconds != 0, "SystemDeploy: finality delay not set");
+        if (_input.proofMaturityDelaySeconds == 0) {
+            console.log("WARNING: proofMaturityDelaySeconds is 0 - immediate finality mode enabled");
+        }
+        if (_input.disputeGameFinalityDelaySeconds == 0) {
+            console.log("WARNING: disputeGameFinalityDelaySeconds is 0 - immediate finality mode enabled");
+        }
     }
 
     function _multiproofEnabled(ImplementationInput memory _input) internal pure returns (bool) {

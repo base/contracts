@@ -89,19 +89,17 @@ contract AggregateVerifierTest is BaseTest {
         _assertAnchorRoot(rootClaim);
     }
 
-    function testUpdatingAnchorStateRegistryWithBothProofs() public {
+    function testUpdatingAnchorStateRegistryWithSingleTeeProof() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
         bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
-        bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
 
         AggregateVerifier game = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), teeProof
         );
 
-        _provideProof(game, ZK_PROVER, zkProof);
-        assertEq(game.proofCount(), 2);
+        assertEq(game.proofCount(), 1);
+        assertTrue(game.gameOver());
 
-        vm.warp(block.timestamp + aggregateVerifierImpl.FAST_FINALIZATION_DELAY());
         game.resolve();
         _assertStatus(game, GameStatus.DEFENDER_WINS);
 
@@ -112,27 +110,22 @@ contract AggregateVerifierTest is BaseTest {
         _claimCreditAfterDelay(game);
     }
 
-    function testProofCannotIncreaseExpectedResolution() public {
+    function testGameOverImmediatelyAfterTeeProof() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
         bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
         bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
-        uint256 slowDelay = aggregateVerifierImpl.SLOW_FINALIZATION_DELAY();
 
         AggregateVerifier game = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), teeProof
         );
 
-        Timestamp originalExpectedResolution = game.expectedResolution();
-        assertEq(originalExpectedResolution.raw(), block.timestamp + slowDelay);
+        Timestamp expectedRes = game.expectedResolution();
+        assertEq(expectedRes.raw(), block.timestamp);
+        assertTrue(game.gameOver());
 
-        vm.warp(block.timestamp + slowDelay - 1);
-        vm.expectRevert(AggregateVerifier.GameNotOver.selector);
-        game.resolve();
-
+        vm.expectRevert(AggregateVerifier.GameOver.selector);
         _provideProof(game, ZK_PROVER, zkProof);
-        assertEq(game.expectedResolution().raw(), originalExpectedResolution.raw());
 
-        vm.warp(block.timestamp + 1);
         game.resolve();
         _assertStatus(game, GameStatus.DEFENDER_WINS);
     }

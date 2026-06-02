@@ -48,10 +48,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     //                         Constants                          //
     ////////////////////////////////////////////////////////////////
     /// @notice The slow finalization delay.
-    uint64 public constant SLOW_FINALIZATION_DELAY = 5 days;
+    uint64 public constant SLOW_FINALIZATION_DELAY = 0;
 
     /// @notice The fast finalization delay.
-    uint64 public constant FAST_FINALIZATION_DELAY = 1 days;
+    uint64 public constant FAST_FINALIZATION_DELAY = 0;
 
     /// @notice The EIP-2935 blockhash history contract address (deployed post-Pectra).
     /// @dev This contract stores blockhashes for the last ~8192 blocks, extending the
