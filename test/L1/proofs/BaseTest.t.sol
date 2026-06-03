@@ -117,7 +117,8 @@ contract BaseTest is Test {
             CONFIG_HASH,
             L2_CHAIN_ID,
             BLOCK_INTERVAL,
-            INTERMEDIATE_BLOCK_INTERVAL
+            INTERMEDIATE_BLOCK_INTERVAL,
+            AggregateVerifier.FinalizationDelays({ slow: 5 days, fast: 1 days })
         );
 
         factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(aggregateVerifierImpl)));

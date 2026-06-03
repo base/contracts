@@ -34,6 +34,8 @@
   "sequencerFeeVaultMinimumWithdrawalAmount": "0x8ac7230489e80000",
   "sequencerFeeVaultRecipient": "0xfabb0ac9d68b0b445fb7357272ff202c5651694a",
   "sequencerFeeVaultWithdrawalNetwork": 0,
+  "slowFinalizationDelay": 432000,
+  "fastFinalizationDelay": 86400,
   "sp1Verifier": "0x0000000000000000000000000000000000000000",
   "superchainConfigGuardian": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
   "superchainConfigIncidentResponder": "0x0000000000000000000000000000000000000000",

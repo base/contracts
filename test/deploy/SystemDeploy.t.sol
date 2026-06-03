@@ -196,7 +196,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             teeProposer: proposer,
             teeChallenger: challenger,
             guardian: guardian,
-            incidentResponder: incidentResponder
+            incidentResponder: incidentResponder,
+            slowFinalizationDelay: 5 days,
+            fastFinalizationDelay: 1 days
         });
         input_.opChainInput = Types.DeployInput({
             roles: Types.Roles({

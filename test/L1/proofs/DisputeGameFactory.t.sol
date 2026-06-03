@@ -230,7 +230,8 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
             bytes32(uint256(4)),
             L2_CHAIN_ID,
             AGGREGATE_BLOCK_INTERVAL,
-            AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL
+            AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL,
+            AggregateVerifier.FinalizationDelays({ slow: 5 days, fast: 1 days })
         );
         _setGame(address(gameImpl), GameTypes.AGGREGATE_VERIFIER);
 

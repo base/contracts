@@ -44,15 +44,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 aggregateHash;
     }
 
+    /// @notice Finalization delay configuration for the dispute game.
+    struct FinalizationDelays {
+        uint64 slow;
+        uint64 fast;
+    }
+
     ////////////////////////////////////////////////////////////////
     //                         Constants                          //
     ////////////////////////////////////////////////////////////////
-    /// @notice The slow finalization delay.
-    uint64 public constant SLOW_FINALIZATION_DELAY = 0;
-
-    /// @notice The fast finalization delay.
-    uint64 public constant FAST_FINALIZATION_DELAY = 0;
-
     /// @notice The EIP-2935 blockhash history contract address (deployed post-Pectra).
     /// @dev This contract stores blockhashes for the last ~8192 blocks, extending the
     ///      256-block window of the native blockhash() opcode.
@@ -112,6 +112,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The game type ID.
     GameType internal immutable GAME_TYPE;
+
+    /// @notice The slow finalization delay (time after first proof before game can resolve).
+    uint64 public immutable SLOW_FINALIZATION_DELAY;
+
+    /// @notice The fast finalization delay (time after both proofs before game can resolve).
+    uint64 public immutable FAST_FINALIZATION_DELAY;
 
     ////////////////////////////////////////////////////////////////
     //                         State Vars                         //
@@ -259,6 +265,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param l2ChainId The chain ID of the L2 network.
     /// @param blockInterval The block interval.
     /// @param intermediateBlockInterval The intermediate block interval.
+    /// @param delays Finalization delay configuration (slow = after single proof, fast = after both proofs).
     constructor(
         GameType gameType_,
         IAnchorStateRegistry anchorStateRegistry_,
@@ -270,7 +277,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 configHash,
         uint256 l2ChainId,
         uint256 blockInterval,
-        uint256 intermediateBlockInterval
+        uint256 intermediateBlockInterval,
+        FinalizationDelays memory delays
     ) {
         // Block interval and intermediate block interval must be positive and divisible.
         if (blockInterval == 0 || intermediateBlockInterval == 0 || blockInterval % intermediateBlockInterval != 0) {
@@ -291,6 +299,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         L2_CHAIN_ID = l2ChainId;
         BLOCK_INTERVAL = blockInterval;
         INTERMEDIATE_BLOCK_INTERVAL = intermediateBlockInterval;
+        SLOW_FINALIZATION_DELAY = delays.slow;
+        FAST_FINALIZATION_DELAY = delays.fast;
 
         INITIALIZE_CALLDATA_SIZE = 0x8E + 0x20 * intermediateOutputRootsCount();
     }

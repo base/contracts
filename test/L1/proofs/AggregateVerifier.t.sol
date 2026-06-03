@@ -89,17 +89,19 @@ contract AggregateVerifierTest is BaseTest {
         _assertAnchorRoot(rootClaim);
     }
 
-    function testUpdatingAnchorStateRegistryWithSingleTeeProof() public {
+    function testUpdatingAnchorStateRegistryWithBothProofs() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
         bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
+        bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
 
         AggregateVerifier game = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), teeProof
         );
 
-        assertEq(game.proofCount(), 1);
-        assertTrue(game.gameOver());
+        _provideProof(game, ZK_PROVER, zkProof);
+        assertEq(game.proofCount(), 2);
 
+        vm.warp(block.timestamp + aggregateVerifierImpl.FAST_FINALIZATION_DELAY());
         game.resolve();
         _assertStatus(game, GameStatus.DEFENDER_WINS);
 
@@ -110,22 +112,27 @@ contract AggregateVerifierTest is BaseTest {
         _claimCreditAfterDelay(game);
     }
 
-    function testGameOverImmediatelyAfterTeeProof() public {
+    function testProofCannotIncreaseExpectedResolution() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
         bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
         bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
+        uint256 slowDelay = aggregateVerifierImpl.SLOW_FINALIZATION_DELAY();
 
         AggregateVerifier game = _createAggregateVerifierGame(
             TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), teeProof
         );
 
-        Timestamp expectedRes = game.expectedResolution();
-        assertEq(expectedRes.raw(), block.timestamp);
-        assertTrue(game.gameOver());
+        Timestamp originalExpectedResolution = game.expectedResolution();
+        assertEq(originalExpectedResolution.raw(), block.timestamp + slowDelay);
 
-        vm.expectRevert(AggregateVerifier.GameOver.selector);
+        vm.warp(block.timestamp + slowDelay - 1);
+        vm.expectRevert(AggregateVerifier.GameNotOver.selector);
+        game.resolve();
+
         _provideProof(game, ZK_PROVER, zkProof);
+        assertEq(game.expectedResolution().raw(), originalExpectedResolution.raw());
 
+        vm.warp(block.timestamp + 1);
         game.resolve();
         _assertStatus(game, GameStatus.DEFENDER_WINS);
     }
@@ -410,7 +417,8 @@ contract AggregateVerifierTest is BaseTest {
             CONFIG_HASH,
             L2_CHAIN_ID,
             blockInterval,
-            intermediateBlockInterval
+            intermediateBlockInterval,
+            AggregateVerifier.FinalizationDelays({ slow: 5 days, fast: 1 days })
         );
     }
 }

@@ -36,16 +36,21 @@ contract NullifyTest is BaseTest {
         _claimCreditAfterDelay(game);
     }
 
-    function testCannotProvideSecondProofWhenGameOver() public {
+    function testNullifyWithTEEProofWhenTEEAndZKProofsAreProvided() public {
         AggregateVerifier game = _createGame(
             TEE_PROVER, "tee1", "tee-proof-1", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
         );
 
-        assertTrue(game.gameOver());
-        assertEq(game.expectedResolution().raw(), block.timestamp);
-
-        vm.expectRevert(AggregateVerifier.GameOver.selector);
         _provideProof(game, ZK_PROVER, _generateProof("zk-proof-2", AggregateVerifier.ProofType.ZK));
+
+        assertEq(game.expectedResolution().raw(), block.timestamp + game.FAST_FINALIZATION_DELAY());
+
+        _nullify(game, "tee-proof-2", AggregateVerifier.ProofType.TEE, "tee2");
+
+        _assertStatus(game, GameStatus.IN_PROGRESS);
+        assertEq(game.bondRecipient(), TEE_PROVER);
+        assertEq(game.proofCount(), 1);
+        assertEq(game.expectedResolution().raw(), block.timestamp + game.SLOW_FINALIZATION_DELAY());
     }
 
     function testZKNullifyFailsIfNoZKProof() public {
@@ -99,15 +104,30 @@ contract NullifyTest is BaseTest {
     /// @notice With TEE + ZK, the fast window is 1 day. Another game nullifies the shared ZK verifier; the first
     ///         `resolve` persists the ZK refutation and returns `IN_PROGRESS`. After `SLOW_FINALIZATION_DELAY`
     ///         from that moment, a second `resolve` finalizes with only the TEE proof.
-    function testSingleTeeProofResolvesImmediately() public {
+    function testTwoProofsResolveDelayedAfterExternalVerifierNullify() public {
         AggregateVerifier gameA = _createGame(
             TEE_PROVER, "dual-a", "tee-dual-a", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
         );
 
-        assertEq(gameA.proofCount(), 1);
-        assertTrue(gameA.gameOver());
-        assertEq(gameA.expectedResolution().raw(), block.timestamp);
+        _provideProof(gameA, ZK_PROVER, _generateProof("zk-dual-a", AggregateVerifier.ProofType.ZK));
 
+        assertEq(gameA.proofCount(), 2);
+        assertEq(gameA.expectedResolution().raw(), block.timestamp + gameA.FAST_FINALIZATION_DELAY());
+
+        vm.warp(block.timestamp + gameA.FAST_FINALIZATION_DELAY());
+        assertTrue(gameA.gameOver());
+
+        AggregateVerifier gameB =
+            _createGame(ZK_PROVER, "dual-b", "zk-dual-b", AggregateVerifier.ProofType.ZK, address(gameA));
+
+        _nullify(gameB, "zk-nullify-dual", AggregateVerifier.ProofType.ZK, "dual-nullify-b");
+        assertTrue(zkVerifier.nullified());
+
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
+        assertEq(gameA.proofCount(), 1);
+        assertEq(gameA.expectedResolution().raw(), block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
+
+        vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.DEFENDER_WINS));
         _assertStatus(gameA, GameStatus.DEFENDER_WINS);
     }
