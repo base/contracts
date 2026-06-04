@@ -16,8 +16,8 @@
     "sourceCodeHash": "0xd9f576a79e97bc541b3d7a2ee928f34223edaaecb074eeb9e6e2ecee857ce6a0"
   },
   "src/L1/OptimismPortal2.sol:OptimismPortal2": {
-    "initCodeHash": "0x2c01bc6c0a55a1a27263224e05c1b28703ff85c61075bae7ab384b3043820ed2",
-    "sourceCodeHash": "0xa1281f5da03fa0431eabad33da23f51a8d835b0dd04554603fd59e11efe9fa51"
+    "initCodeHash": "0x4207708445df9fa2ee05f16d3009fdb7d4bc414b038829b78099a21e03c12882",
+    "sourceCodeHash": "0x6c4e368bd8bed86e38e5d5bce7fc1469b45724bdee24030f28932672aecb8ed6"
   },
   "src/L1/SuperchainConfig.sol:SuperchainConfig": {
     "initCodeHash": "0x9b1f3555b499709485d51d5d9665002c0eb1e5eb893be1fb978a30749e894858",
@@ -28,8 +28,8 @@
     "sourceCodeHash": "0xf122a50487efe9bd5a620262ba20ef4adbca14eeec2af7fd32e6e16739001596"
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0x90629c679e821a70553d899a68e818bcddb672a004a0d2e09078d17028a2f082",
-    "sourceCodeHash": "0x4835d3de998b2951898f0e427c61b0c330ac3feb5f7a8dc9fd0deb78912a9b7a"
+    "initCodeHash": "0x431d51aacc2c107476e9ff8502078acc138289d6544a6f92ecb78609549d0a09",
+    "sourceCodeHash": "0xbb9919fac076799e886762939c25518ca5b3978b974735685fb8b3026a1abfa6"
   },
   "src/L1/proofs/AnchorStateRegistry.sol:AnchorStateRegistry": {
     "initCodeHash": "0x6f3afd2d0ef97a82ca3111976322b99343a270e54cd4a405028f2f29c75f7fb1",
