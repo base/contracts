@@ -97,9 +97,6 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Thrown when a caller other than the authorized proof submitter calls verify or batchVerify
     error CallerNotProofSubmitter();
 
-    /// @dev Thrown when a certificate hash is not found in the trusted intermediate certificates set
-    error CertificateNotFound(bytes32 certHash);
-
     /// @dev Thrown when a program ID argument is bytes32(0)
     error ZeroProgramId();
 
@@ -356,15 +353,17 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     }
 
     /**
-     * @dev Revokes a trusted intermediate certificate.
+     * @dev Revokes an intermediate certificate, whether or not it has been cached as trusted.
      * @param certHash Hash of the certificate to revoke
      *
      * Requirements:
      * - Only callable by contract owner or revoker
-     * - Certificate must exist in the trusted intermediate certificates set
      *
-     * This function allows the owner or revoker to revoke compromised intermediate certificates
-     * without affecting the root certificate or other trusted certificates.
+     * Certificates that have never been seen on-chain can be revoked preemptively; the
+     * persistent `revokedCerts` sentinel blocks them from being trusted on first
+     * verification. This function allows the owner or revoker to revoke compromised
+     * intermediate certificates without affecting the root certificate or other trusted
+     * certificates.
      *
      * Durability: in addition to clearing `trustedIntermediateCerts[certHash]`, this
      * function flips the persistent `revokedCerts[certHash]` sentinel. The sentinel
@@ -375,9 +374,6 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
      * explicit `unrevokeCert` call by the owner.
      */
     function revokeCert(bytes32 certHash) external onlyOwnerOrRevoker {
-        if (trustedIntermediateCerts[certHash] == 0) {
-            revert CertificateNotFound(certHash);
-        }
         delete trustedIntermediateCerts[certHash];
         revokedCerts[certHash] = true;
         emit CertRevoked(certHash);

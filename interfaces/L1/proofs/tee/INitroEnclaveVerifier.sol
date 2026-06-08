@@ -281,18 +281,17 @@ interface INitroEnclaveVerifier {
         external;
 
     /**
-     * @dev Revokes a trusted intermediate certificate.
+     * @dev Revokes an intermediate certificate, whether or not it has been cached as trusted.
      * @param _certHash Hash of the certificate to revoke
      *
      * Requirements:
      * - Only callable by contract owner or revoker
-     * - Certificate must exist in the trusted set
      *
-     * In addition to clearing the cached entry, this flips a persistent
-     * revocation sentinel that survives later cache writes. Subsequent
-     * verifications whose chain traverses the revoked hash are rejected
-     * regardless of the journal-supplied `trustedCertsPrefixLen`. Re-trust
-     * requires an explicit `unrevokeCert` call.
+     * In addition to clearing any cached entry, this flips a persistent revocation
+     * sentinel that survives later cache writes. Certificates never seen on-chain can
+     * be revoked preemptively. Subsequent verifications whose chain traverses the
+     * revoked hash are rejected regardless of the journal-supplied
+     * `trustedCertsPrefixLen`. Re-trust requires an explicit `unrevokeCert` call.
      */
     function revokeCert(bytes32 _certHash) external;
 

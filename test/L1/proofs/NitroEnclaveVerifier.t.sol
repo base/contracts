@@ -205,12 +205,6 @@ contract NitroEnclaveVerifierTest is Test {
         assertEq(verifier.trustedIntermediateCerts(INTERMEDIATE_CERT_1), 0);
     }
 
-    function testRevokeCertRevertsIfNotTrusted() public {
-        bytes32 unknown = keccak256("unknown-cert");
-        vm.expectRevert(abi.encodeWithSelector(NitroEnclaveVerifier.CertificateNotFound.selector, unknown));
-        verifier.revokeCert(unknown);
-    }
-
     function testRevokeCertRevertsIfNotOwnerOrRevoker() public {
         vm.prank(submitter);
         vm.expectRevert(NitroEnclaveVerifier.CallerNotOwnerOrRevoker.selector);
@@ -221,6 +215,64 @@ contract NitroEnclaveVerifierTest is Test {
         assertFalse(verifier.revokedCerts(INTERMEDIATE_CERT_1));
         verifier.revokeCert(INTERMEDIATE_CERT_1);
         assertTrue(verifier.revokedCerts(INTERMEDIATE_CERT_1));
+    }
+
+    function testRevokeCertPreemptiveUnknownCert() public {
+        bytes32 unknown = keccak256("unknown-cert");
+        assertEq(verifier.trustedIntermediateCerts(unknown), 0);
+        assertFalse(verifier.revokedCerts(unknown));
+
+        vm.expectEmit(false, false, false, true);
+        emit NitroEnclaveVerifier.CertRevoked(unknown);
+        verifier.revokeCert(unknown);
+
+        assertTrue(verifier.revokedCerts(unknown));
+        assertEq(verifier.trustedIntermediateCerts(unknown), 0);
+    }
+
+    function testVerifyRejectsPreemptivelyRevokedCertInSuffix() public {
+        _setUpRiscZeroConfig();
+        bytes32 unknown = keccak256("unknown-compromised-intermediate");
+        verifier.revokeCert(unknown);
+
+        VerifierJournal memory journal = _createSuccessJournal();
+        bytes32[] memory certs = new bytes32[](3);
+        certs[0] = ROOT_CERT;
+        certs[1] = unknown; // preemptively revoked, lives in the suffix
+        certs[2] = keccak256("attacker-leaf");
+        journal.certs = certs;
+
+        uint64[] memory expiries = new uint64[](3);
+        expiries[0] = ROOT_CERT_EXPIRY;
+        expiries[1] = NEW_LEAF_CERT_EXPIRY;
+        expiries[2] = NEW_LEAF_CERT_EXPIRY;
+        journal.certExpiries = expiries;
+        journal.trustedCertsPrefixLen = 1;
+
+        bytes memory output = abi.encode(journal);
+        bytes memory proofBytes = abi.encodePacked(bytes4(0), bytes32(0));
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+
+        vm.prank(submitter);
+        VerifierJournal memory result = verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+
+        assertEq(uint8(result.result), uint8(VerificationResult.IntermediateCertsNotTrusted));
+        assertEq(verifier.trustedIntermediateCerts(unknown), 0);
+        assertTrue(verifier.revokedCerts(unknown));
+    }
+
+    function testCheckTrustedIntermediateCertsBreaksAtPreemptivelyRevokedEntry() public {
+        bytes32 unknown = keccak256("unknown-compromised-intermediate");
+        verifier.revokeCert(unknown);
+
+        bytes32[][] memory reportCerts = new bytes32[][](1);
+        reportCerts[0] = new bytes32[](3);
+        reportCerts[0][0] = ROOT_CERT;
+        reportCerts[0][1] = unknown;
+        reportCerts[0][2] = keccak256("leaf");
+
+        uint8[] memory prefixLens = verifier.checkTrustedIntermediateCerts(reportCerts);
+        assertEq(prefixLens[0], 1);
     }
 
     // ============ unrevokeCert Tests ============
