@@ -45,7 +45,7 @@
   },
   "src/L1/proofs/tee/NitroEnclaveVerifier.sol:NitroEnclaveVerifier": {
     "initCodeHash": "0xf79cd59d23f6a5ad78960b664e20779592d73bfcf52527c3e03adda04edd9645",
-    "sourceCodeHash": "0x87c59e16167407772ce33d735d7174ce947adb77809c234841bb5f5b9af249ba"
+    "sourceCodeHash": "0x03c164216b27f82ee13064ace6079d5e24e187d888f41bd01c8daffa60c575d6"
   },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
     "initCodeHash": "0xfd1942e1c2f59b0aa72b33d698a948a53b6e4cf1040106f173fb5d89f63f57b0",
