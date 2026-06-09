@@ -287,7 +287,7 @@ contract SystemDeploy is Script {
             startingAnchorRoot: Proposal({
                 root: Hash.wrap(cfg.multiproofGenesisOutputRoot()), l2SequenceNumber: cfg.multiproofGenesisBlockNumber()
             }),
-            saltMixer: "salt mixer",
+            saltMixer: cfg.saltMixer(),
             gasLimit: uint64(cfg.l2GenesisBlockGasLimit())
         });
     }
