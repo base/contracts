@@ -37,6 +37,8 @@ contract DeployConfig is Script {
     uint32 public basefeeScalar;
     uint32 public blobbasefeeScalar;
 
+    string public saltMixer;
+
     uint256 public baseFeeVaultMinimumWithdrawalAmount;
     uint256 public baseFeeVaultWithdrawalNetwork;
     uint256 public disputeGameFinalityDelaySeconds;
@@ -92,6 +94,7 @@ contract DeployConfig is Script {
         baseFeeVaultMinimumWithdrawalAmount = _json.readUint("$.baseFeeVaultMinimumWithdrawalAmount");
         baseFeeVaultWithdrawalNetwork = _json.readUint("$.baseFeeVaultWithdrawalNetwork");
         disputeGameFinalityDelaySeconds = _json.readUint("$.disputeGameFinalityDelaySeconds");
+        saltMixer = _json.readStringOr("$.saltMixer", vm.envOr("DEPLOY_SALT_MIXER", string("salt mixer")));
         delayedWETHWithdrawalDelay = _json.readUint("$.delayedWETHWithdrawalDelay");
         l1ChainId = _json.readUint("$.l1ChainId");
         l1FeeVaultMinimumWithdrawalAmount = _json.readUint("$.l1FeeVaultMinimumWithdrawalAmount");
