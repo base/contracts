@@ -1811,13 +1811,19 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
 /// @notice Tests for the combined proveAndFinalizeWithdrawalTransaction function and
 ///         canProveAndFinalize view function.
 contract OptimismPortal2_ProveAndFinalizeWithdrawalTransaction_Test is OptimismPortal2_TestInit {
-    /// @dev Upgrades the portal implementation to one with proofMaturityDelaySeconds = 0,
-    ///      enabling the proveAndFinalizeWithdrawalTransaction codepath.
+    /// @dev Upgrades the portal implementation to one with proofMaturityDelaySeconds = 0 and
+    ///      mocks disputeGameFinalityDelaySeconds to 0, enabling the
+    ///      proveAndFinalizeWithdrawalTransaction codepath (immediate finality mode).
     function setUp() public override {
         super.setUp();
         OptimismPortal2 newImpl = new OptimismPortal2(0);
         vm.prank(EIP1967Helper.getAdmin(address(optimismPortal2)));
         IProxy(payable(address(optimismPortal2))).upgradeTo(address(newImpl));
+        vm.mockCall(
+            address(anchorStateRegistry),
+            abi.encodeCall(anchorStateRegistry.disputeGameFinalityDelaySeconds, ()),
+            abi.encode(uint256(0))
+        );
     }
 
     /// @notice Resolves the game and calls proveAndFinalizeWithdrawalTransaction with default tx.
@@ -1839,11 +1845,26 @@ contract OptimismPortal2_ProveAndFinalizeWithdrawalTransaction_Test is OptimismP
 
     /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` reverts when
     ///         PROOF_MATURITY_DELAY_SECONDS is non-zero (immediate finality not enabled).
-    function test_proveAndFinalizeWithdrawalTransaction_immediateFinalityNotEnabled_reverts() external {
+    function test_proveAndFinalizeWithdrawalTransaction_immediateFinalityNotEnabled_proofMaturity_reverts() external {
         // Deploy a portal with non-zero delay to verify the guard.
         OptimismPortal2 standardImpl = new OptimismPortal2(604800);
         vm.prank(EIP1967Helper.getAdmin(address(optimismPortal2)));
         IProxy(payable(address(optimismPortal2))).upgradeTo(address(standardImpl));
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_ImmediateFinalityNotEnabled.selector);
+        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+    }
+
+    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` reverts when
+    ///         disputeGameFinalityDelaySeconds is non-zero (immediate finality not enabled).
+    function test_proveAndFinalizeWithdrawalTransaction_immediateFinalityNotEnabled_finalityDelay_reverts() external {
+        // Clear the disputeGameFinalityDelaySeconds mock to expose the real non-zero value.
+        vm.clearMockedCalls();
 
         vm.expectRevert(IOptimismPortal.OptimismPortal_ImmediateFinalityNotEnabled.selector);
         optimismPortal2.proveAndFinalizeWithdrawalTransaction({

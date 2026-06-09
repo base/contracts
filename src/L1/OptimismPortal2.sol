@@ -543,9 +543,13 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         // Cannot prove/finalize withdrawal transactions while the system is paused.
         _assertNotPaused();
 
-        // This function bypasses the proof maturity delay check enforced by checkWithdrawal.
-        // It is only safe to use on chains configured for immediate TEE-backed finality.
+        // This function bypasses the proof maturity delay and dispute game finality delay checks
+        // enforced by checkWithdrawal. It is only safe to use on chains configured for immediate
+        // TEE-backed finality where all timing gates are disabled.
         if (PROOF_MATURITY_DELAY_SECONDS != 0) {
+            revert OptimismPortal_ImmediateFinalityNotEnabled();
+        }
+        if (anchorStateRegistry.disputeGameFinalityDelaySeconds() != 0) {
             revert OptimismPortal_ImmediateFinalityNotEnabled();
         }
 
@@ -655,6 +659,8 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     /// @param _disputeGameIndex Index of the dispute game to check.
     /// @return Whether the preconditions for proveAndFinalizeWithdrawalTransaction are met.
     function canProveAndFinalize(bytes32 _withdrawalHash, uint256 _disputeGameIndex) external view returns (bool) {
+        if (PROOF_MATURITY_DELAY_SECONDS != 0) return false;
+        if (anchorStateRegistry.disputeGameFinalityDelaySeconds() != 0) return false;
         if (finalizedWithdrawals[_withdrawalHash]) return false;
         if (paused()) return false;
 
