@@ -204,6 +204,10 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     /// @notice Thrown when a withdrawal has not been proven.
     error OptimismPortal_Unproven();
 
+    /// @notice Thrown when proveAndFinalizeWithdrawalTransaction is called on a chain that has
+    ///         not been configured for immediate finality (PROOF_MATURITY_DELAY_SECONDS != 0).
+    error OptimismPortal_ImmediateFinalityNotEnabled();
+
     /// @notice Thrown when ETHLockbox is set/unset incorrectly depending on the feature flag.
     error OptimismPortal_InvalidLockboxState();
 
@@ -381,38 +385,7 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
             revert OptimismPortal_InvalidProofTimestamp();
         }
 
-        // Verify that the output root can be generated with the elements in the proof.
-        if (disputeGameProxy.rootClaim().raw() != Hashing.hashOutputRootProof(_outputRootProof)) {
-            revert OptimismPortal_InvalidOutputRootProof();
-        }
-
-        // Load the ProvenWithdrawal into memory, using the withdrawal hash as a unique identifier.
-        bytes32 withdrawalHash = Hashing.hashWithdrawal(_tx);
-
-        // Compute the storage slot of the withdrawal hash in the L2ToL1MessagePasser contract.
-        // Refer to the Solidity documentation for more information on how storage layouts are
-        // computed for mappings.
-        bytes32 storageKey = keccak256(
-            abi.encode(
-                withdrawalHash,
-                uint256(0) // The withdrawals mapping is at the first slot in the layout.
-            )
-        );
-
-        // Verify that the hash of this withdrawal was stored in the L2toL1MessagePasser contract
-        // on L2. If this is true, under the assumption that the SecureMerkleTrie does not have
-        // bugs, then we know that this withdrawal was actually triggered on L2 and can therefore
-        // be relayed on L1.
-        if (
-            SecureMerkleTrie.verifyInclusionProof({
-                    _key: abi.encode(storageKey),
-                    _value: hex"01",
-                    _proof: _withdrawalProof,
-                    _root: _outputRootProof.messagePasserStorageRoot
-                }) == false
-        ) {
-            revert OptimismPortal_InvalidMerkleProof();
-        }
+        bytes32 withdrawalHash = _verifyWithdrawalProof(_tx, disputeGameProxy, _outputRootProof, _withdrawalProof);
 
         // Designate the withdrawalHash as proven by storing the disputeGameProxy and timestamp in
         // the provenWithdrawals mapping. A given user may re-prove a withdrawalHash multiple
@@ -551,6 +524,155 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         }
     }
 
+    /// @notice Proves and finalizes a withdrawal transaction in a single call.
+    ///         Designed for chains with immediate TEE-backed finality where dispute game
+    ///         delays are set to zero. The dispute game must already be resolved as
+    ///         DEFENDER_WINS before this function is called.
+    /// @param _tx               Withdrawal transaction to finalize.
+    /// @param _disputeGameIndex Index of the dispute game to prove the withdrawal against.
+    /// @param _outputRootProof  Inclusion proof of the L2ToL1MessagePasser storage root.
+    /// @param _withdrawalProof  Inclusion proof of the withdrawal in L2ToL1MessagePasser.
+    function proveAndFinalizeWithdrawalTransaction(
+        Types.WithdrawalTransaction memory _tx,
+        uint256 _disputeGameIndex,
+        Types.OutputRootProof calldata _outputRootProof,
+        bytes[] calldata _withdrawalProof
+    )
+        external
+    {
+        // Cannot prove/finalize withdrawal transactions while the system is paused.
+        _assertNotPaused();
+
+        // This function bypasses the proof maturity delay and dispute game finality delay checks
+        // enforced by checkWithdrawal. It is only safe to use on chains configured for immediate
+        // TEE-backed finality where all timing gates are disabled.
+        if (PROOF_MATURITY_DELAY_SECONDS != 0) {
+            revert OptimismPortal_ImmediateFinalityNotEnabled();
+        }
+        if (anchorStateRegistry.disputeGameFinalityDelaySeconds() != 0) {
+            revert OptimismPortal_ImmediateFinalityNotEnabled();
+        }
+
+        // Make sure that the target address is safe.
+        if (_isUnsafeTarget(_tx.target)) {
+            revert OptimismPortal_BadTarget();
+        }
+
+        // Cannot prove/finalize withdrawal with value when custom gas token mode is enabled.
+        if (_isUsingCustomGasToken()) {
+            if (_tx.value > 0) revert OptimismPortal_NotAllowedOnCGTMode();
+        }
+
+        // Make sure that the l2Sender has not yet been set. The l2Sender is set to a value other
+        // than the default value when a withdrawal transaction is being finalized. This check is
+        // a defacto reentrancy guard.
+        if (l2Sender != Constants.DEFAULT_L2_SENDER) {
+            revert OptimismPortal_NoReentrancy();
+        }
+
+        // Fetch the dispute game proxy from the `DisputeGameFactory` contract.
+        (,, IDisputeGame disputeGameProxy) = disputeGameFactory().gameAtIndex(_disputeGameIndex);
+
+        // Game must be a Proper Game.
+        if (!anchorStateRegistry.isGameProper(disputeGameProxy)) {
+            revert OptimismPortal_ImproperDisputeGame();
+        }
+
+        // Game must have been respected game type when created.
+        if (!anchorStateRegistry.isGameRespected(disputeGameProxy)) {
+            revert OptimismPortal_InvalidDisputeGame();
+        }
+
+        // Game must have resolved in favor of the Defender (valid root claim). This is stricter
+        // than proveWithdrawalTransaction (which only rejects CHALLENGER_WINS) because we finalize
+        // atomically and cannot wait for resolution.
+        if (disputeGameProxy.status() != GameStatus.DEFENDER_WINS) {
+            revert OptimismPortal_InvalidDisputeGame();
+        }
+
+        // Verify the output root proof and withdrawal merkle inclusion proof.
+        bytes32 withdrawalHash = _verifyWithdrawalProof(_tx, disputeGameProxy, _outputRootProof, _withdrawalProof);
+
+        // Designate the withdrawalHash as proven by storing the disputeGameProxy and timestamp in
+        // the provenWithdrawals mapping. Persisted for off-chain tooling and on-chain forensics.
+        provenWithdrawals[withdrawalHash][msg.sender] =
+            ProvenWithdrawal({ disputeGameProxy: disputeGameProxy, timestamp: uint64(block.timestamp) });
+
+        // Add the proof submitter to the list of proof submitters for this withdrawal hash.
+        proofSubmitters[withdrawalHash].push(msg.sender);
+
+        // Check that this withdrawal has not already been finalized, this is replay protection.
+        if (finalizedWithdrawals[withdrawalHash]) {
+            revert OptimismPortal_AlreadyFinalized();
+        }
+
+        // Mark the withdrawal as finalized so it can't be replayed.
+        finalizedWithdrawals[withdrawalHash] = true;
+
+        // If using ETHLockbox, unlock the ETH from the ETHLockbox.
+        if (_isUsingLockbox()) {
+            if (_tx.value > 0) ethLockbox.unlockETH(_tx.value);
+        }
+
+        // Set the l2Sender so contracts know who triggered this withdrawal on L2.
+        l2Sender = _tx.sender;
+
+        // Trigger the call to the target contract. We use a custom low level method
+        // SafeCall.callWithMinGas to ensure two key properties
+        //   1. Target contracts cannot force this call to run out of gas by returning a very large
+        //      amount of data (and this is OK because we don't care about the returndata here).
+        //   2. The amount of gas provided to the execution context of the target is at least the
+        //      gas limit specified by the user. If there is not enough gas in the current context
+        //      to accomplish this, `callWithMinGas` will revert.
+        bool success = SafeCall.callWithMinGas(_tx.target, _tx.gasLimit, _tx.value, _tx.data);
+
+        // Reset the l2Sender back to the default value.
+        l2Sender = Constants.DEFAULT_L2_SENDER;
+
+        // All withdrawals are immediately finalized. Replayability can
+        // be achieved through contracts built on top of this contract
+        emit WithdrawalProven(withdrawalHash, _tx.sender, _tx.target);
+        emit WithdrawalProvenExtension1(withdrawalHash, msg.sender);
+        emit WithdrawalFinalized(withdrawalHash, success);
+
+        // If using ETHLockbox, send ETH back to the Lockbox in the case of a failed transaction or
+        // it'll get stuck here and would need to be moved back via admin action.
+        if (_isUsingLockbox()) {
+            if (!success && _tx.value > 0) {
+                ethLockbox.lockETH{ value: _tx.value }();
+            }
+        }
+
+        // Reverting here is useful for determining the exact gas cost to successfully execute the
+        // sub call to the target contract if the minimum gas limit specified by the user would not
+        // be sufficient to execute the sub call.
+        if (!success && tx.origin == Constants.ESTIMATION_ADDRESS) {
+            revert OptimismPortal_GasEstimation();
+        }
+    }
+
+    /// @notice Checks whether a withdrawal can be proven and finalized via the combined
+    ///         proveAndFinalizeWithdrawalTransaction function. Does not verify the output root
+    ///         proof or merkle proof (those require full proof data and are expensive to
+    ///         evaluate as a view call).
+    /// @param _withdrawalHash   Hash of the withdrawal transaction (Hashing.hashWithdrawal).
+    /// @param _disputeGameIndex Index of the dispute game to check.
+    /// @return Whether the preconditions for proveAndFinalizeWithdrawalTransaction are met.
+    function canProveAndFinalize(bytes32 _withdrawalHash, uint256 _disputeGameIndex) external view returns (bool) {
+        if (PROOF_MATURITY_DELAY_SECONDS != 0) return false;
+        if (anchorStateRegistry.disputeGameFinalityDelaySeconds() != 0) return false;
+        if (finalizedWithdrawals[_withdrawalHash]) return false;
+        if (paused()) return false;
+
+        (,, IDisputeGame disputeGameProxy) = disputeGameFactory().gameAtIndex(_disputeGameIndex);
+
+        if (!anchorStateRegistry.isGameProper(disputeGameProxy)) return false;
+        if (!anchorStateRegistry.isGameRespected(disputeGameProxy)) return false;
+        if (disputeGameProxy.status() != GameStatus.DEFENDER_WINS) return false;
+
+        return true;
+    }
+
     /// @notice Accepts deposits of ETH and data, and emits a TransactionDeposited event for use in
     ///         deriving deposit transactions. Note that if a deposit is made by a contract, its
     ///         address will be aliased when retrieved using `tx.origin` or `msg.sender`. Consider
@@ -653,6 +775,57 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
                 || !systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX) && address(ethLockbox) != address(0)
         ) {
             revert OptimismPortal_InvalidLockboxState();
+        }
+    }
+
+    /// @notice Verifies a withdrawal's output root proof and merkle inclusion proof against
+    ///         a dispute game's root claim.
+    /// @param _tx               Withdrawal transaction.
+    /// @param _disputeGameProxy Dispute game to verify against.
+    /// @param _outputRootProof  Inclusion proof of the L2ToL1MessagePasser storage root.
+    /// @param _withdrawalProof  Inclusion proof of the withdrawal in L2ToL1MessagePasser.
+    /// @return withdrawalHash_  Hash of the withdrawal transaction.
+    function _verifyWithdrawalProof(
+        Types.WithdrawalTransaction memory _tx,
+        IDisputeGame _disputeGameProxy,
+        Types.OutputRootProof calldata _outputRootProof,
+        bytes[] calldata _withdrawalProof
+    )
+        internal
+        pure
+        returns (bytes32 withdrawalHash_)
+    {
+        // Verify that the output root can be generated with the elements in the proof.
+        if (_disputeGameProxy.rootClaim().raw() != Hashing.hashOutputRootProof(_outputRootProof)) {
+            revert OptimismPortal_InvalidOutputRootProof();
+        }
+
+        // Load the ProvenWithdrawal into memory, using the withdrawal hash as a unique identifier.
+        withdrawalHash_ = Hashing.hashWithdrawal(_tx);
+
+        // Compute the storage slot of the withdrawal hash in the L2ToL1MessagePasser contract.
+        // Refer to the Solidity documentation for more information on how storage layouts are
+        // computed for mappings.
+        bytes32 storageKey = keccak256(
+            abi.encode(
+                withdrawalHash_,
+                uint256(0) // The withdrawals mapping is at the first slot in the layout.
+            )
+        );
+
+        // Verify that the hash of this withdrawal was stored in the L2toL1MessagePasser contract
+        // on L2. If this is true, under the assumption that the SecureMerkleTrie does not have
+        // bugs, then we know that this withdrawal was actually triggered on L2 and can therefore
+        // be relayed on L1.
+        if (
+            SecureMerkleTrie.verifyInclusionProof({
+                    _key: abi.encode(storageKey),
+                    _value: hex"01",
+                    _proof: _withdrawalProof,
+                    _root: _outputRootProof.messagePasserStorageRoot
+                }) == false
+        ) {
+            revert OptimismPortal_InvalidMerkleProof();
         }
     }
 

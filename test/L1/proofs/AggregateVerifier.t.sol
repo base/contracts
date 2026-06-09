@@ -417,7 +417,8 @@ contract AggregateVerifierTest is BaseTest {
             CONFIG_HASH,
             L2_CHAIN_ID,
             blockInterval,
-            intermediateBlockInterval
+            intermediateBlockInterval,
+            AggregateVerifier.FinalizationDelays({ slow: 5 days, fast: 1 days })
         );
     }
 }

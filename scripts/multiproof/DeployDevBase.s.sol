@@ -116,7 +116,8 @@ abstract contract DeployDevBase is Script {
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainId(),
                 _blockInterval(),
-                _intermediateBlockInterval()
+                _intermediateBlockInterval(),
+                AggregateVerifier.FinalizationDelays(cfg.slowFinalizationDelay(), cfg.fastFinalizationDelay())
             )
         );
 

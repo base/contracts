@@ -33,6 +33,7 @@ interface IOptimismPortal2 is IProxyAdminOwnedBase {
     error OptimismPortal_NoReentrancy();
     error OptimismPortal_ProofNotOldEnough();
     error OptimismPortal_Unproven();
+    error OptimismPortal_ImmediateFinalityNotEnabled();
     error OptimismPortal_InvalidLockboxState();
     error OutOfGas();
     error UnexpectedList();
@@ -87,6 +88,20 @@ interface IOptimismPortal2 is IProxyAdminOwnedBase {
         bytes[] memory _withdrawalProof
     )
         external;
+    function proveAndFinalizeWithdrawalTransaction(
+        Types.WithdrawalTransaction memory _tx,
+        uint256 _disputeGameIndex,
+        Types.OutputRootProof calldata _outputRootProof,
+        bytes[] calldata _withdrawalProof
+    )
+        external;
+    function canProveAndFinalize(
+        bytes32 _withdrawalHash,
+        uint256 _disputeGameIndex
+    )
+        external
+        view
+        returns (bool);
     function provenWithdrawals(
         bytes32,
         address

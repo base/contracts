@@ -85,6 +85,8 @@ contract SystemDeploy is Script {
         address teeChallenger;
         address guardian;
         address incidentResponder;
+        uint64 slowFinalizationDelay;
+        uint64 fastFinalizationDelay;
     }
 
     struct DeployInput {
@@ -127,6 +129,8 @@ contract SystemDeploy is Script {
         uint256 l2ChainId;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+        uint64 slowFinalizationDelay;
+        uint64 fastFinalizationDelay;
     }
 
     struct MultiproofOutput {
@@ -269,7 +273,9 @@ contract SystemDeploy is Script {
             teeProposer: cfg.teeProposer(),
             teeChallenger: cfg.teeChallenger(),
             guardian: cfg.superchainConfigGuardian(),
-            incidentResponder: cfg.superchainConfigIncidentResponder()
+            incidentResponder: cfg.superchainConfigIncidentResponder(),
+            slowFinalizationDelay: cfg.slowFinalizationDelay(),
+            fastFinalizationDelay: cfg.fastFinalizationDelay()
         });
     }
 
@@ -1009,7 +1015,9 @@ contract SystemDeploy is Script {
                 multiproofConfigHash: _input.multiproofConfigHash,
                 l2ChainId: _opChainInput.l2ChainId,
                 multiproofBlockInterval: _input.multiproofBlockInterval,
-                multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval
+                multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval,
+                slowFinalizationDelay: _input.slowFinalizationDelay,
+                fastFinalizationDelay: _input.fastFinalizationDelay
             })
         );
 
@@ -1038,7 +1046,8 @@ contract SystemDeploy is Script {
                     _input.multiproofConfigHash,
                     _input.l2ChainId,
                     _input.multiproofBlockInterval,
-                    _input.multiproofIntermediateBlockInterval
+                    _input.multiproofIntermediateBlockInterval,
+                    AggregateVerifier.FinalizationDelays(_input.slowFinalizationDelay, _input.fastFinalizationDelay)
                 )
             )
         );
@@ -1057,8 +1066,19 @@ contract SystemDeploy is Script {
 
     function _assertValidImplementationInput(ImplementationInput memory _input) internal pure {
         require(_input.withdrawalDelaySeconds != 0, "SystemDeploy: withdrawalDelaySeconds not set");
-        require(_input.proofMaturityDelaySeconds != 0, "SystemDeploy: proofMaturityDelaySeconds not set");
-        require(_input.disputeGameFinalityDelaySeconds != 0, "SystemDeploy: finality delay not set");
+        if (_input.proofMaturityDelaySeconds == 0) {
+            require(
+                _input.disputeGameFinalityDelaySeconds == 0 && _input.slowFinalizationDelay == 0
+                    && _input.fastFinalizationDelay == 0,
+                "SystemDeploy: all finality delays must be zero for immediate finality"
+            );
+        } else {
+            require(
+                _input.disputeGameFinalityDelaySeconds != 0 && _input.slowFinalizationDelay != 0
+                    && _input.fastFinalizationDelay != 0,
+                "SystemDeploy: finality delays must all be nonzero for standard mode"
+            );
+        }
     }
 
     function _multiproofEnabled(ImplementationInput memory _input) internal pure returns (bool) {
