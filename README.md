@@ -2,9 +2,18 @@
 
 # contracts
 
-This repo contains contracts and scripts for Base.
-Note that Base primarily utilizes Optimism's bedrock contracts located in Optimism's repo [here](https://github.com/ethereum-optimism/optimism/tree/develop/packages/contracts-bedrock).
+This repo contains the contracts and scripts for Base.
+Base no longer relies on the OP Stack contracts published in Optimism's repo; all of the contracts that power Base are now maintained directly in this repository.
 For contract deployment artifacts, see [base-org/contract-deployments](https://github.com/base-org/contract-deployments).
+
+The contracts are organized under `src/`:
+
+- `src/L1` — L1 contracts, including the portal, bridges, messengers, `SystemConfig`, `SuperchainConfig`, and the fault `proofs/` system (dispute games, anchor state registry, and TEE/ZK verifiers).
+- `src/L2` — L2 predeploys, including bridges, messengers, fee vaults, the fee disburser, `L1Block`, and the gas price oracle.
+- `src/universal` — Shared contracts used across L1 and L2, such as the standard bridge, cross-domain messenger, mintable ERC20/ERC721 factories, and proxy contracts.
+- `src/legacy` — Legacy contracts retained for compatibility (e.g. `AddressManager`, proxy variants).
+- `src/libraries` — Shared Solidity libraries (encoding, hashing, predeploys, tries, etc.).
+- `src/vendor` — Third-party contracts vendored into the repo.
 
 <!-- Badge row 1 - status -->
 
