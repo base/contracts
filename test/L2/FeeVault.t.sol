@@ -4,10 +4,18 @@ pragma solidity 0.8.15;
 // Testing
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { Reverter } from "test/mocks/Callers.sol";
+import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
+
+// Scripts
+import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
+
+// Contracts
+import { Proxy } from "src/universal/Proxy.sol";
 
 // Interfaces
 import { IFeeVault } from "interfaces/L2/IFeeVault.sol";
 import { IL2ToL1MessagePasser } from "interfaces/L2/IL2ToL1MessagePasser.sol";
+import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
 // Libraries
 import { Hashing } from "src/libraries/Hashing.sol";
@@ -41,8 +49,19 @@ abstract contract FeeVault_Uncategorized_Test is CommonTest {
         emit Withdrawal(_amount, _recipient, address(this), _network);
     }
 
+    /// @notice Deploys an uninitialized fee vault proxy for initialize access-control tests.
+    function _deployFeeVaultProxy() internal returns (IFeeVault vault_) {
+        string memory cname = Predeploys.getName(address(feeVault));
+        bytes memory constructorArgs = DeployUtils.encodeConstructor(abi.encodeCall(IFeeVault.__constructor__, ()));
+        address impl = DeployUtils.create1({ _name: cname, _args: constructorArgs });
+        address vault = address(new Proxy(Predeploys.PROXY_ADMIN));
+        EIP1967Helper.setImplementation(vault, impl);
+        vault_ = IFeeVault(payable(vault));
+    }
+
     /// @notice Tests that the initialize function succeeds.
     function test_initialize_succeeds() external view {
+        assertEq(IProxyAdminOwnedBase(address(feeVault)).proxyAdminOwner(), proxyAdminOwner);
         assertEq(feeVault.recipient(), recipient);
         assertEq(feeVault.minWithdrawalAmount(), minWithdrawalAmount);
         assertEq(uint8(feeVault.withdrawalNetwork()), uint8(withdrawalNetwork));
@@ -52,8 +71,34 @@ abstract contract FeeVault_Uncategorized_Test is CommonTest {
     function test_initialize_reinitialization_reverts() external {
         _setupL2Withdrawal();
 
+        vm.prank(proxyAdminOwner);
         vm.expectRevert(IFeeVault.InvalidInitialization.selector);
         feeVault.initialize(recipient, minWithdrawalAmount, Types.WithdrawalNetwork.L1);
+    }
+
+    /// @notice Tests that the ProxyAdmin can initialize an uninitialized fee vault proxy.
+    function test_initialize_proxyAdmin_succeeds() external {
+        IFeeVault vault = _deployFeeVaultProxy();
+
+        vm.prank(Predeploys.PROXY_ADMIN);
+        vault.initialize(recipient, minWithdrawalAmount, withdrawalNetwork);
+
+        assertEq(IProxyAdminOwnedBase(address(vault)).proxyAdminOwner(), proxyAdminOwner);
+        assertEq(vault.recipient(), recipient);
+        assertEq(vault.minWithdrawalAmount(), minWithdrawalAmount);
+        assertEq(uint8(vault.withdrawalNetwork()), uint8(withdrawalNetwork));
+    }
+
+    /// @notice Tests that initialization reverts if called by a non-proxy admin or proxy admin owner.
+    /// @param _sender The address of the sender to test.
+    function testFuzz_initialize_notProxyAdminOrProxyAdminOwner_reverts(address _sender) external {
+        IFeeVault vault = _deployFeeVaultProxy();
+
+        vm.assume(_sender != proxyAdminOwner && _sender != Predeploys.PROXY_ADMIN);
+
+        vm.prank(_sender);
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
+        vault.initialize(recipient, minWithdrawalAmount, withdrawalNetwork);
     }
 
     /// @notice Tests that the immutable values match the storage getters.
@@ -182,7 +227,7 @@ abstract contract FeeVault_Uncategorized_Test is CommonTest {
         uint256 initialAmount = feeVault.minWithdrawalAmount();
 
         vm.prank(_caller);
-        vm.expectRevert(IFeeVault.FeeVault_OnlyProxyAdminOwner.selector);
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
         feeVault.setMinWithdrawalAmount(_newAmount);
 
         assertEq(feeVault.minWithdrawalAmount(), initialAmount);
@@ -203,7 +248,7 @@ abstract contract FeeVault_Uncategorized_Test is CommonTest {
         address initialRecipient = feeVault.recipient();
 
         vm.prank(_caller);
-        vm.expectRevert(IFeeVault.FeeVault_OnlyProxyAdminOwner.selector);
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
         feeVault.setRecipient(_newRecipient);
 
         assertEq(feeVault.recipient(), initialRecipient);
@@ -230,7 +275,7 @@ abstract contract FeeVault_Uncategorized_Test is CommonTest {
         Types.WithdrawalNetwork initialNetwork = feeVault.withdrawalNetwork();
 
         vm.prank(_caller);
-        vm.expectRevert(IFeeVault.FeeVault_OnlyProxyAdminOwner.selector);
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
         feeVault.setWithdrawalNetwork(newNetwork);
 
         assertEq(uint8(feeVault.withdrawalNetwork()), uint8(initialNetwork));

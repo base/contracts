@@ -168,13 +168,15 @@ contract L2Genesis is Script {
         // 8,9,A,B,C,D,E: legacy, not used in OP-Stack.
         setGasPriceOracle(); // f
         setL2StandardBridge(_input.l1StandardBridgeProxy); // 10
+        // ProxyAdmin must be configured before fee vault initialization, which requires
+        // the ProxyAdmin owner via ProxyAdminOwnedBase.
+        setProxyAdmin(_input); // 18
         setSequencerFeeVault(_input); // 11
         setOptimismMintableERC20Factory(); // 12
         setL2ERC721Bridge(_input.l1ERC721BridgeProxy); // 14
         setL1Block(); // 15
         setL2ToL1MessagePasser(); // 16
         setOptimismMintableERC721Factory(_input); // 17
-        setProxyAdmin(_input); // 18
         setBaseFeeVault(_input); // 19
         setL1FeeVault(_input); // 1A
         setOperatorFeeVault(_input); // 1B
@@ -232,7 +234,8 @@ contract L2Genesis is Script {
             _vaultAddr: Predeploys.SEQUENCER_FEE_WALLET,
             _recipient: _input.sequencerFeeVaultRecipient,
             _minWithdrawalAmount: _input.sequencerFeeVaultMinimumWithdrawalAmount,
-            _withdrawalNetwork: Types.WithdrawalNetwork(_input.sequencerFeeVaultWithdrawalNetwork)
+            _withdrawalNetwork: Types.WithdrawalNetwork(_input.sequencerFeeVaultWithdrawalNetwork),
+            _proxyAdminOwner: _input.opChainProxyAdminOwner
         });
     }
 
@@ -283,7 +286,8 @@ contract L2Genesis is Script {
             _vaultAddr: Predeploys.BASE_FEE_VAULT,
             _recipient: _input.baseFeeVaultRecipient,
             _minWithdrawalAmount: _input.baseFeeVaultMinimumWithdrawalAmount,
-            _withdrawalNetwork: Types.WithdrawalNetwork(_input.baseFeeVaultWithdrawalNetwork)
+            _withdrawalNetwork: Types.WithdrawalNetwork(_input.baseFeeVaultWithdrawalNetwork),
+            _proxyAdminOwner: _input.opChainProxyAdminOwner
         });
     }
 
@@ -293,7 +297,8 @@ contract L2Genesis is Script {
             _vaultAddr: Predeploys.L1_FEE_VAULT,
             _recipient: _input.l1FeeVaultRecipient,
             _minWithdrawalAmount: _input.l1FeeVaultMinimumWithdrawalAmount,
-            _withdrawalNetwork: Types.WithdrawalNetwork(_input.l1FeeVaultWithdrawalNetwork)
+            _withdrawalNetwork: Types.WithdrawalNetwork(_input.l1FeeVaultWithdrawalNetwork),
+            _proxyAdminOwner: _input.opChainProxyAdminOwner
         });
     }
 
@@ -303,7 +308,8 @@ contract L2Genesis is Script {
             _vaultAddr: Predeploys.OPERATOR_FEE_VAULT,
             _recipient: _input.operatorFeeVaultRecipient,
             _minWithdrawalAmount: _input.operatorFeeVaultMinimumWithdrawalAmount,
-            _withdrawalNetwork: Types.WithdrawalNetwork(_input.operatorFeeVaultWithdrawalNetwork)
+            _withdrawalNetwork: Types.WithdrawalNetwork(_input.operatorFeeVaultWithdrawalNetwork),
+            _proxyAdminOwner: _input.opChainProxyAdminOwner
         });
     }
 
@@ -371,12 +377,17 @@ contract L2Genesis is Script {
         address _vaultAddr,
         address _recipient,
         uint256 _minWithdrawalAmount,
-        Types.WithdrawalNetwork _withdrawalNetwork
+        Types.WithdrawalNetwork _withdrawalNetwork,
+        address _proxyAdminOwner
     )
         internal
     {
         address impl = _setImplementationCode(_vaultAddr);
 
+        // Allow ProxyAdminOwnedBase access checks during implementation initialization.
+        EIP1967Helper.setAdmin(impl, Predeploys.PROXY_ADMIN);
+
+        vm.startPrank(_proxyAdminOwner);
         /// Initialize the implementation using max value for min withdrawal amount to make it unusable
         IFeeVault(payable(impl)).initialize(address(0), type(uint256).max, Types.WithdrawalNetwork.L1);
         // Initialize the predeploy
@@ -386,6 +397,7 @@ contract L2Genesis is Script {
                 _minWithdrawalAmount: _minWithdrawalAmount,
                 _withdrawalNetwork: _withdrawalNetwork
             });
+        vm.stopPrank();
     }
 
     /// @notice Funds the default dev accounts with ether
