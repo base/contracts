@@ -186,7 +186,7 @@ genesis:
 
 # Deploys the contracts.
 deploy:
-  ./scripts/deploy/deploy.sh
+  forge script scripts/deploy/SystemDeploy.s.sol:SystemDeploy
 
 
 ########################################################
