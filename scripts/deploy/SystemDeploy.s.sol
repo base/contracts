@@ -85,6 +85,7 @@ contract SystemDeploy is Script {
         ISP1Verifier sp1Verifier;
         address teeProposer;
         address teeChallenger;
+        address devTeeSigner;
         address guardian;
         address incidentResponder;
         uint64 slowFinalizationDelay;
@@ -274,6 +275,7 @@ contract SystemDeploy is Script {
             sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
             teeProposer: cfg.teeProposer(),
             teeChallenger: cfg.teeChallenger(),
+            devTeeSigner: cfg.devTeeSigner(),
             guardian: cfg.superchainConfigGuardian(),
             incidentResponder: cfg.superchainConfigIncidentResponder(),
             slowFinalizationDelay: cfg.slowFinalizationDelay(),
@@ -996,6 +998,12 @@ contract SystemDeploy is Script {
                 )
             )
         );
+
+        if (_isDevMultiproof(_input) && _input.devTeeSigner != address(0)) {
+            vm.broadcast(msg.sender);
+            DevTEEProverRegistry(address(output_.teeProverRegistryProxy))
+                .addDevSigner(_input.devTeeSigner, _input.teeImageHash);
+        }
 
         if (!_isDevMultiproof(_input)) {
             INitroEnclaveVerifier nitroVerifier = INitroEnclaveVerifier(_input.nitroEnclaveVerifier);

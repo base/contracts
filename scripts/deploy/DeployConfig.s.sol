@@ -22,6 +22,7 @@ contract DeployConfig is Script {
     address public sp1Verifier;
     address public superchainConfigGuardian;
     address public superchainConfigIncidentResponder;
+    address public devTeeSigner;
     address public teeChallenger;
     address public teeProposer;
 
@@ -79,6 +80,7 @@ contract DeployConfig is Script {
         sp1Verifier = _json.readAddress("$.sp1Verifier");
         superchainConfigGuardian = _json.readAddress("$.superchainConfigGuardian");
         superchainConfigIncidentResponder = _json.readAddress("$.superchainConfigIncidentResponder");
+        devTeeSigner = _json.readAddressOr("$.devTeeSigner", address(0));
         teeChallenger = _json.readAddress("$.teeChallenger");
         teeProposer = _json.readAddress("$.teeProposer");
 

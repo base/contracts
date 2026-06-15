@@ -181,11 +181,13 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     }
 
     function test_deploy_devMultiproof_succeeds() public {
+        address devSigner = 0x6cebCF805c5191BCf26602E43DECa89AEe092b5d;
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.implementationsInput.nitroEnclaveVerifier = address(0);
         input.implementationsInput.sp1Verifier = ISP1Verifier(address(0));
         input.implementationsInput.zkRangeHash = bytes32(0);
         input.implementationsInput.zkAggregationHash = bytes32(0);
+        input.implementationsInput.devTeeSigner = devSigner;
         input.implementationsInput.proofMaturityDelaySeconds = 0;
         input.implementationsInput.withdrawalDelaySeconds = 0;
         input.implementationsInput.disputeGameFinalityDelaySeconds = 0;
@@ -196,11 +198,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
 
         _assertMultiproofDeployed(output, input);
 
-        address teeProverRegistryProxyAddr = address(output.opChain.teeProverRegistryProxy);
-        DevTEEProverRegistry devRegistry = DevTEEProverRegistry(teeProverRegistryProxyAddr);
-        vm.prank(owner);
-        devRegistry.addDevSigner(makeAddr("devSigner"), bytes32(uint256(1)));
-        assertTrue(devRegistry.isRegisteredSigner(makeAddr("devSigner")), "dev signer registered");
+        DevTEEProverRegistry devRegistry = DevTEEProverRegistry(address(output.opChain.teeProverRegistryProxy));
+        assertTrue(devRegistry.isRegisteredSigner(devSigner), "dev signer registered at deploy time");
 
         IAggregateVerifier aggVerifier = IAggregateVerifier(address(output.opChain.aggregateVerifier));
         assertEq(
@@ -237,6 +236,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             sp1Verifier: ISP1Verifier(address(sp1Verifier)),
             teeProposer: proposer,
             teeChallenger: challenger,
+            devTeeSigner: address(0),
             guardian: guardian,
             incidentResponder: incidentResponder,
             slowFinalizationDelay: 5 days,
