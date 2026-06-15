@@ -968,7 +968,7 @@ contract SystemDeploy is Script {
         GameType gameType = GameType.wrap(uint32(_input.multiproofGameType));
 
         vm.broadcast(msg.sender);
-        if (_input.nitroEnclaveVerifier == address(0)) {
+        if (_isDevMultiproof(_input)) {
             output_.teeProverRegistryImpl =
                 new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), _output.disputeGameFactoryProxy);
         } else {
@@ -997,7 +997,7 @@ contract SystemDeploy is Script {
             )
         );
 
-        if (_input.nitroEnclaveVerifier != address(0)) {
+        if (!_isDevMultiproof(_input)) {
             INitroEnclaveVerifier nitroVerifier = INitroEnclaveVerifier(_input.nitroEnclaveVerifier);
             if (nitroVerifier.proofSubmitter() != address(output_.teeProverRegistryProxy)) {
                 vm.broadcast(msg.sender);
@@ -1009,7 +1009,7 @@ contract SystemDeploy is Script {
         output_.teeVerifier =
             IVerifier(address(new TEEVerifier(output_.teeProverRegistryProxy, _output.anchorStateRegistryProxy)));
         vm.broadcast(msg.sender);
-        if (address(_input.sp1Verifier) == address(0)) {
+        if (_isDevMultiproof(_input)) {
             output_.zkVerifier = IVerifier(address(new MockVerifier(_output.anchorStateRegistryProxy)));
         } else {
             output_.zkVerifier =
@@ -1117,7 +1117,7 @@ contract SystemDeploy is Script {
         require(_input.teeProposer != address(0), "SystemDeploy: teeProposer not set");
         require(_input.teeChallenger != address(0), "SystemDeploy: teeChallenger not set");
 
-        if (_input.nitroEnclaveVerifier != address(0)) {
+        if (!_isDevMultiproof(_input)) {
             require(_input.zkRangeHash != bytes32(0), "SystemDeploy: zkRangeHash not set");
             require(_input.zkAggregationHash != bytes32(0), "SystemDeploy: zkAggregationHash not set");
             require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
