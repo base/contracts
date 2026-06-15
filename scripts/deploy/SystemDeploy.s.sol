@@ -40,7 +40,6 @@ import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVer
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
-import { MockVerifier } from "test/mocks/MockVerifier.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { SemverComp } from "src/libraries/SemverComp.sol";
 import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
@@ -1016,10 +1015,10 @@ contract SystemDeploy is Script {
         vm.broadcast(msg.sender);
         output_.teeVerifier =
             IVerifier(address(new TEEVerifier(output_.teeProverRegistryProxy, _output.anchorStateRegistryProxy)));
-        vm.broadcast(msg.sender);
         if (_isDevMultiproof(_input)) {
-            output_.zkVerifier = IVerifier(address(new MockVerifier(_output.anchorStateRegistryProxy)));
+            output_.zkVerifier = IVerifier(address(0xdead));
         } else {
+            vm.broadcast(msg.sender);
             output_.zkVerifier =
                 IVerifier(address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryProxy)));
         }
