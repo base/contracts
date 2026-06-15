@@ -18,7 +18,7 @@
   "l2OutputOracleStartingBlockNumber": 1,
   "l2OutputOracleStartingTimestamp": 1,
   "multiproofBlockInterval": 100,
-  "multiproofConfigHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "multiproofConfigHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
   "multiproofGameType": 621,
   "multiproofGenesisBlockNumber": 0,
   "multiproofIntermediateBlockInterval": 10,

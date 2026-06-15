@@ -8,7 +8,12 @@ import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Types } from "scripts/libraries/Types.sol";
 import { SystemDeployAssertions } from "test/deploy/SystemDeployAssertions.sol";
 
+import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
+import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
+import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
+import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
@@ -175,6 +180,43 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         _assertMultiproofDeployed(reuseOutput, input);
     }
 
+    function test_deploy_devMultiproof_succeeds() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.implementationsInput.nitroEnclaveVerifier = address(0);
+        input.implementationsInput.sp1Verifier = ISP1Verifier(address(0));
+        input.implementationsInput.zkRangeHash = bytes32(0);
+        input.implementationsInput.zkAggregationHash = bytes32(0);
+        input.implementationsInput.proofMaturityDelaySeconds = 0;
+        input.implementationsInput.withdrawalDelaySeconds = 0;
+        input.implementationsInput.disputeGameFinalityDelaySeconds = 0;
+        input.implementationsInput.slowFinalizationDelay = 0;
+        input.implementationsInput.fastFinalizationDelay = 0;
+
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+
+        _assertMultiproofDeployed(output, input);
+
+        address teeProverRegistryProxyAddr = address(output.opChain.teeProverRegistryProxy);
+        DevTEEProverRegistry devRegistry = DevTEEProverRegistry(teeProverRegistryProxyAddr);
+        vm.prank(owner);
+        devRegistry.addDevSigner(makeAddr("devSigner"), bytes32(uint256(1)));
+        assertTrue(devRegistry.isRegisteredSigner(makeAddr("devSigner")), "dev signer registered");
+
+        IAggregateVerifier aggVerifier = IAggregateVerifier(address(output.opChain.aggregateVerifier));
+        assertEq(
+            address(aggVerifier.DELAYED_WETH()),
+            address(output.opChain.delayedWETHProxy),
+            "aggregate verifier uses real DelayedWETH"
+        );
+
+        assertEq(address(output.opChain.nitroEnclaveVerifier), address(0), "no nitro verifier in dev mode");
+        assertEq(address(output.opChain.sp1Verifier), address(0), "no sp1 verifier in dev mode");
+
+        IDisputeGameFactory factory = IDisputeGameFactory(address(output.opChain.disputeGameFactoryProxy));
+        GameType gameType = GameType.wrap(uint32(input.implementationsInput.multiproofGameType));
+        assertNotEq(address(factory.gameImpls(gameType)), address(0), "game type registered on factory");
+    }
+
     function _defaultDeployInput() internal view returns (SystemDeploy.DeployInput memory input_) {
         input_.saveArtifacts = false;
         input_.superchainInput = SystemDeploy.SuperchainInput({
@@ -250,11 +292,13 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertEq(teeProverRegistry.manager(), _input.opChainInput.roles.opChainProxyAdminOwner, "tee registry manager");
         assertTrue(teeProverRegistry.isValidProposer(_input.implementationsInput.teeProposer), "tee proposer");
         assertTrue(teeProverRegistry.isValidProposer(_input.implementationsInput.teeChallenger), "tee challenger");
-        assertEq(
-            MockNitroEnclaveVerifier(_input.implementationsInput.nitroEnclaveVerifier).proofSubmitter(),
-            teeProverRegistryProxyAddr,
-            "nitro proof submitter"
-        );
+        if (_input.implementationsInput.nitroEnclaveVerifier != address(0)) {
+            assertEq(
+                MockNitroEnclaveVerifier(_input.implementationsInput.nitroEnclaveVerifier).proofSubmitter(),
+                teeProverRegistryProxyAddr,
+                "nitro proof submitter"
+            );
+        }
         assertEq(
             address(teeProverRegistry.DISPUTE_GAME_FACTORY()),
             address(_output.opChain.disputeGameFactoryProxy),
@@ -266,11 +310,13 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             teeProverRegistryProxyAddr,
             "tee verifier registry"
         );
-        assertEq(
-            address(ZKVerifier(zkVerifierAddr).SP1_VERIFIER()),
-            address(_input.implementationsInput.sp1Verifier),
-            "zk verifier sp1"
-        );
+        if (address(_input.implementationsInput.sp1Verifier) != address(0)) {
+            assertEq(
+                address(ZKVerifier(zkVerifierAddr).SP1_VERIFIER()),
+                address(_input.implementationsInput.sp1Verifier),
+                "zk verifier sp1"
+            );
+        }
     }
 
     function _expected(

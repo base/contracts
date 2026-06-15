@@ -39,6 +39,8 @@ import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
+import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
+import { MockVerifier } from "test/mocks/MockVerifier.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { SemverComp } from "src/libraries/SemverComp.sol";
 import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
@@ -966,9 +968,14 @@ contract SystemDeploy is Script {
         GameType gameType = GameType.wrap(uint32(_input.multiproofGameType));
 
         vm.broadcast(msg.sender);
-        output_.teeProverRegistryImpl = new TEEProverRegistry(
-            INitroEnclaveVerifier(_input.nitroEnclaveVerifier), _output.disputeGameFactoryProxy
-        );
+        if (_input.nitroEnclaveVerifier == address(0)) {
+            output_.teeProverRegistryImpl =
+                new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), _output.disputeGameFactoryProxy);
+        } else {
+            output_.teeProverRegistryImpl = new TEEProverRegistry(
+                INitroEnclaveVerifier(_input.nitroEnclaveVerifier), _output.disputeGameFactoryProxy
+            );
+        }
 
         output_.teeProverRegistryProxy =
             TEEProverRegistry(_deployProxy(_opChainInput, _output.opChainProxyAdmin, "TEEProverRegistry"));
@@ -990,17 +997,24 @@ contract SystemDeploy is Script {
             )
         );
 
-        INitroEnclaveVerifier nitroVerifier = INitroEnclaveVerifier(_input.nitroEnclaveVerifier);
-        if (nitroVerifier.proofSubmitter() != address(output_.teeProverRegistryProxy)) {
-            vm.broadcast(msg.sender);
-            nitroVerifier.setProofSubmitter(address(output_.teeProverRegistryProxy));
+        if (_input.nitroEnclaveVerifier != address(0)) {
+            INitroEnclaveVerifier nitroVerifier = INitroEnclaveVerifier(_input.nitroEnclaveVerifier);
+            if (nitroVerifier.proofSubmitter() != address(output_.teeProverRegistryProxy)) {
+                vm.broadcast(msg.sender);
+                nitroVerifier.setProofSubmitter(address(output_.teeProverRegistryProxy));
+            }
         }
 
         vm.broadcast(msg.sender);
         output_.teeVerifier =
             IVerifier(address(new TEEVerifier(output_.teeProverRegistryProxy, _output.anchorStateRegistryProxy)));
         vm.broadcast(msg.sender);
-        output_.zkVerifier = IVerifier(address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryProxy)));
+        if (address(_input.sp1Verifier) == address(0)) {
+            output_.zkVerifier = IVerifier(address(new MockVerifier(_output.anchorStateRegistryProxy)));
+        } else {
+            output_.zkVerifier =
+                IVerifier(address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryProxy)));
+        }
 
         output_.aggregateVerifier = _newAggregateVerifier(
             AggregateVerifierInput({
@@ -1084,16 +1098,14 @@ contract SystemDeploy is Script {
         return _input.multiproofConfigHash != bytes32(0);
     }
 
+    function _isDevMultiproof(ImplementationInput memory _input) internal pure returns (bool) {
+        return _multiproofEnabled(_input) && _input.nitroEnclaveVerifier == address(0);
+    }
+
     function _assertValidMultiproofInput(ImplementationInput memory _input) internal view {
         require(_input.teeImageHash != bytes32(0), "SystemDeploy: teeImageHash not set");
-        require(_input.zkRangeHash != bytes32(0), "SystemDeploy: zkRangeHash not set");
-        require(_input.zkAggregationHash != bytes32(0), "SystemDeploy: zkAggregationHash not set");
         require(_input.multiproofConfigHash != bytes32(0), "SystemDeploy: multiproofConfigHash not set");
         require(_input.multiproofGameType != 0, "SystemDeploy: multiproofGameType not set");
-        require(_input.nitroEnclaveVerifier != address(0), "SystemDeploy: nitroEnclaveVerifier not set");
-        require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
-        DeployUtils.assertValidContractAddress(_input.nitroEnclaveVerifier);
-        DeployUtils.assertValidContractAddress(address(_input.sp1Verifier));
         require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
         require(
             _input.multiproofIntermediateBlockInterval != 0, "SystemDeploy: multiproof intermediate interval not set"
@@ -1104,6 +1116,14 @@ contract SystemDeploy is Script {
         );
         require(_input.teeProposer != address(0), "SystemDeploy: teeProposer not set");
         require(_input.teeChallenger != address(0), "SystemDeploy: teeChallenger not set");
+
+        if (_input.nitroEnclaveVerifier != address(0)) {
+            require(_input.zkRangeHash != bytes32(0), "SystemDeploy: zkRangeHash not set");
+            require(_input.zkAggregationHash != bytes32(0), "SystemDeploy: zkAggregationHash not set");
+            require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
+            DeployUtils.assertValidContractAddress(_input.nitroEnclaveVerifier);
+            DeployUtils.assertValidContractAddress(address(_input.sp1Verifier));
+        }
     }
 
     function _assertValidImplementations(Types.Implementations memory _impls) internal view {
