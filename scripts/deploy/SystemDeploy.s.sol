@@ -1124,7 +1124,12 @@ contract SystemDeploy is Script {
         require(_input.teeProposer != address(0), "SystemDeploy: teeProposer not set");
         require(_input.teeChallenger != address(0), "SystemDeploy: teeChallenger not set");
 
-        if (!_isDevMultiproof(_input)) {
+        if (_isDevMultiproof(_input)) {
+            require(
+                block.chainid != 1 && block.chainid != 8453 && block.chainid != 84532,
+                "SystemDeploy: dev multiproof cannot be deployed on production chains"
+            );
+        } else {
             require(_input.zkRangeHash != bytes32(0), "SystemDeploy: zkRangeHash not set");
             require(_input.zkAggregationHash != bytes32(0), "SystemDeploy: zkAggregationHash not set");
             require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
