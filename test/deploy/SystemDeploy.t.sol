@@ -17,7 +17,9 @@ import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
-import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
+import { GameStatus, GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { Claim } from "src/libraries/bridge/LibUDT.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 
 contract MockNitroEnclaveVerifier {
@@ -208,6 +210,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             "aggregate verifier uses real DelayedWETH"
         );
 
+        assertEq(address(output.opChain.zkVerifier), address(0xdead), "zk verifier is bricked (0xdead)");
         assertEq(address(output.opChain.nitroEnclaveVerifier), address(0), "no nitro verifier in dev mode");
         assertEq(address(output.opChain.sp1Verifier), address(0), "no sp1 verifier in dev mode");
 
@@ -274,7 +277,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertNotEq(impls.teeProverRegistryImpl, address(0), "tee prover registry impl");
         assertEq(impls.aggregateVerifierImpl, address(_output.opChain.aggregateVerifier), "aggregate verifier impl");
         assertEq(impls.teeVerifierImpl, teeVerifierAddr, "tee verifier impl");
-        assertEq(impls.zkVerifierImpl, zkVerifierAddr, "zk verifier impl");
+        if (address(_input.implementationsInput.sp1Verifier) != address(0)) {
+            assertEq(impls.zkVerifierImpl, zkVerifierAddr, "zk verifier impl");
+        }
         assertEq(
             address(_output.opChain.nitroEnclaveVerifier),
             _input.implementationsInput.nitroEnclaveVerifier,
@@ -344,6 +349,239 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             multiproofBlockInterval: _input.implementationsInput.multiproofBlockInterval,
             multiproofIntermediateBlockInterval: _input.implementationsInput.multiproofIntermediateBlockInterval,
             withdrawalDelaySeconds: _input.implementationsInput.withdrawalDelaySeconds
+        });
+    }
+}
+
+/// @title ZKBricking_Test
+/// @notice Invariant tests proving the ZK proof path is permanently bricked when deploying
+///         in dev multiproof mode (sp1Verifier == address(0) → ZK_VERIFIER = 0xdead).
+contract ZKBricking_Test is Test {
+    Artifacts internal constant artifacts =
+        Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
+    SystemDeploy internal systemDeploy;
+
+    uint256 internal constant TEE_SIGNER_PK = 0xA11CE;
+    address internal teeSigner;
+
+    address internal owner = address(this);
+    address internal guardian = makeAddr("guardian");
+    address internal incidentResponder = makeAddr("incidentResponder");
+    address internal proposer = makeAddr("proposer");
+    address internal challenger = makeAddr("challenger");
+
+    uint256 internal l2ChainId = 901;
+    uint256 internal constant BLOCK_INTERVAL = 100;
+    uint256 internal constant INTERMEDIATE_BLOCK_INTERVAL = 10;
+    uint256 internal constant INTERMEDIATE_ROOTS_COUNT = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;
+
+    SystemDeploy.DeployOutput internal output;
+    SystemDeploy.DeployInput internal input;
+    IDisputeGameFactory internal factory;
+    GameType internal gameType;
+    DevTEEProverRegistry internal devRegistry;
+
+    function setUp() public {
+        teeSigner = vm.addr(TEE_SIGNER_PK);
+
+        systemDeploy = new SystemDeploy();
+        input = _devMultiproofInput();
+        output = systemDeploy.deploy(input);
+
+        factory = IDisputeGameFactory(address(output.opChain.disputeGameFactoryProxy));
+        gameType = GameType.wrap(uint32(input.implementationsInput.multiproofGameType));
+
+        devRegistry = DevTEEProverRegistry(address(output.opChain.teeProverRegistryProxy));
+        vm.prank(owner);
+        devRegistry.addDevSigner(teeSigner, input.implementationsInput.teeImageHash);
+    }
+
+    /// @notice Attempting to initialize a dispute game with a ZK proof hard-reverts because
+    ///         ZK_VERIFIER (0xdead) is codeless and the ABI decoder fails on empty returndata.
+    function test_zkProofSubmission_reverts() public {
+        Claim rootClaim = _nextRootClaim();
+        bytes memory extraData =
+            _buildExtraData(rootClaim, BLOCK_INTERVAL, address(output.opChain.anchorStateRegistryProxy));
+        bytes memory zkProof = _buildProof(AggregateVerifier.ProofType.ZK, "zk-payload");
+
+        uint256 initBond = factory.initBonds(gameType);
+        vm.deal(proposer, initBond);
+        vm.prank(proposer);
+        vm.expectRevert();
+        factory.createWithInitData{ value: initBond }(gameType, rootClaim, extraData, zkProof);
+    }
+
+    /// @notice After a valid TEE proof, challenge() with a ZK proof hard-reverts.
+    function test_zkChallenge_reverts() public {
+        (AggregateVerifier game,) = _createGameWithTEEProof();
+
+        bytes32 intermediateRoot = game.intermediateOutputRoot(0);
+        bytes32 differentRoot = keccak256(abi.encodePacked(intermediateRoot, "different"));
+        bytes memory zkChallengeProof =
+            abi.encodePacked(uint8(AggregateVerifier.ProofType.ZK), bytes32(0), uint256(0), "fake-zk-proof");
+
+        vm.expectRevert();
+        game.challenge(zkChallengeProof, 0, differentRoot);
+    }
+
+    /// @notice A TEE-only game resolves successfully as DEFENDER_WINS (finalization delay = 0).
+    function test_resolve_succeedsWithTEEOnly() public {
+        (AggregateVerifier game,) = _createGameWithTEEProof();
+
+        vm.warp(block.timestamp + 1);
+        GameStatus status = game.resolve();
+        assertEq(uint8(status), uint8(GameStatus.DEFENDER_WINS), "TEE-only game resolves DEFENDER_WINS");
+    }
+
+    /// @notice After TEE initialization, verifyProposalProof() with ZK hard-reverts.
+    function test_zkProofViaVerifyProposalProof_reverts() public {
+        (AggregateVerifier game,) = _createGameWithTEEProof();
+
+        bytes memory zkProof = abi.encodePacked(uint8(AggregateVerifier.ProofType.ZK), "fake-zk-proof");
+        vm.expectRevert();
+        game.verifyProposalProof(zkProof);
+    }
+
+    // ─── Helpers
+    // ───────────────────────────────────────────────────────────────
+
+    function _createGameWithTEEProof() internal returns (AggregateVerifier game, Claim rootClaim) {
+        rootClaim = _nextRootClaim();
+        bytes memory extraData =
+            _buildExtraData(rootClaim, BLOCK_INTERVAL, address(output.opChain.anchorStateRegistryProxy));
+        bytes memory teeProof = _buildSignedTEEProof(rootClaim, extraData);
+
+        uint256 initBond = factory.initBonds(gameType);
+        vm.deal(proposer, initBond);
+        vm.prank(proposer);
+        game = AggregateVerifier(
+            address(factory.createWithInitData{ value: initBond }(gameType, rootClaim, extraData, teeProof))
+        );
+    }
+
+    function _buildSignedTEEProof(Claim rootClaim, bytes memory extraData) internal view returns (bytes memory) {
+        uint256 l1OriginNumber = block.number - 1;
+        bytes32 l1OriginHash = blockhash(l1OriginNumber);
+
+        Proposal memory startingAnchorRoot = output.opChain.anchorStateRegistryProxy.getStartingAnchorRoot();
+        bytes32 startingRoot = startingAnchorRoot.root.raw();
+        uint64 startingL2SeqNum = uint64(startingAnchorRoot.l2SequenceNumber);
+        uint64 endingL2SeqNum = startingL2SeqNum + uint64(BLOCK_INTERVAL);
+
+        bytes memory intermediateRoots = _extractIntermediateRoots(extraData);
+
+        bytes32 journal = keccak256(
+            abi.encodePacked(
+                proposer,
+                l1OriginHash,
+                startingRoot,
+                startingL2SeqNum,
+                rootClaim.raw(),
+                endingL2SeqNum,
+                intermediateRoots,
+                input.implementationsInput.multiproofConfigHash,
+                input.implementationsInput.teeImageHash
+            )
+        );
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(TEE_SIGNER_PK, journal);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        return abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, signature);
+    }
+
+    function _extractIntermediateRoots(bytes memory extraData) internal pure returns (bytes memory) {
+        uint256 headerLen = 32 + 20;
+        uint256 rootsLen = extraData.length - headerLen;
+        bytes memory roots = new bytes(rootsLen);
+        for (uint256 i = 0; i < rootsLen; i++) {
+            roots[i] = extraData[headerLen + i];
+        }
+        return roots;
+    }
+
+    function _nextRootClaim() internal view returns (Claim) {
+        Proposal memory anchor = output.opChain.anchorStateRegistryProxy.getStartingAnchorRoot();
+        uint256 nextL2Block = anchor.l2SequenceNumber + BLOCK_INTERVAL;
+        return Claim.wrap(keccak256(abi.encode(nextL2Block)));
+    }
+
+    function _buildExtraData(
+        Claim rootClaim,
+        uint256 blockInterval,
+        address parentAddr
+    )
+        internal
+        pure
+        returns (bytes memory)
+    {
+        uint256 l2BlockNumber = blockInterval;
+        bytes memory intermediateRoots = _generateIntermediateRoots(l2BlockNumber, rootClaim);
+        return abi.encodePacked(l2BlockNumber, parentAddr, intermediateRoots);
+    }
+
+    function _generateIntermediateRoots(uint256 l2BlockNumber, Claim rootClaim) private pure returns (bytes memory) {
+        bytes32[] memory roots = new bytes32[](INTERMEDIATE_ROOTS_COUNT);
+        uint256 startingL2Block = l2BlockNumber - BLOCK_INTERVAL;
+        for (uint256 i = 1; i < INTERMEDIATE_ROOTS_COUNT; i++) {
+            roots[i - 1] = keccak256(abi.encode(startingL2Block + INTERMEDIATE_BLOCK_INTERVAL * i));
+        }
+        roots[INTERMEDIATE_ROOTS_COUNT - 1] = rootClaim.raw();
+        return abi.encodePacked(roots);
+    }
+
+    function _buildProof(
+        AggregateVerifier.ProofType proofType,
+        bytes memory payload
+    )
+        internal
+        view
+        returns (bytes memory)
+    {
+        uint256 l1OriginNumber = block.number - 1;
+        bytes32 l1OriginHash = blockhash(l1OriginNumber);
+        return abi.encodePacked(uint8(proofType), l1OriginHash, l1OriginNumber, payload);
+    }
+
+    function _devMultiproofInput() internal returns (SystemDeploy.DeployInput memory input_) {
+        input_.saveArtifacts = false;
+        input_.superchainInput = SystemDeploy.SuperchainInput({
+            guardian: guardian, incidentResponder: incidentResponder, superchainProxyAdminOwner: owner
+        });
+        input_.implementationsInput = SystemDeploy.ImplementationInput({
+            withdrawalDelaySeconds: 0,
+            proofMaturityDelaySeconds: 0,
+            disputeGameFinalityDelaySeconds: 0,
+            teeImageHash: bytes32(uint256(1)),
+            zkRangeHash: bytes32(0),
+            zkAggregationHash: bytes32(0),
+            multiproofConfigHash: bytes32(uint256(4)),
+            multiproofGameType: 621,
+            nitroEnclaveVerifier: address(0),
+            multiproofBlockInterval: BLOCK_INTERVAL,
+            multiproofIntermediateBlockInterval: INTERMEDIATE_BLOCK_INTERVAL,
+            sp1Verifier: ISP1Verifier(address(0)),
+            teeProposer: proposer,
+            teeChallenger: challenger,
+            devTeeSigner: vm.addr(TEE_SIGNER_PK),
+            guardian: guardian,
+            incidentResponder: incidentResponder,
+            slowFinalizationDelay: 0,
+            fastFinalizationDelay: 0
+        });
+        input_.opChainInput = Types.DeployInput({
+            roles: Types.Roles({
+                opChainProxyAdminOwner: owner,
+                systemConfigOwner: owner,
+                batcher: makeAddr("batcher"),
+                unsafeBlockSigner: makeAddr("unsafeBlockSigner")
+            }),
+            basefeeScalar: 100,
+            blobBasefeeScalar: 200,
+            l2ChainId: l2ChainId,
+            startingAnchorRoot: Proposal({ root: Hash.wrap(bytes32(uint256(1))), l2SequenceNumber: 0 }),
+            saltMixer: "zk-bricking-test",
+            gasLimit: 60_000_000
         });
     }
 }
