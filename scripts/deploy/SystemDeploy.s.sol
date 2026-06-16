@@ -1110,7 +1110,6 @@ contract SystemDeploy is Script {
     }
 
     function _assertValidMultiproofInput(ImplementationInput memory _input) internal view {
-        require(_input.teeImageHash != bytes32(0), "SystemDeploy: teeImageHash not set");
         require(_input.multiproofConfigHash != bytes32(0), "SystemDeploy: multiproofConfigHash not set");
         require(_input.multiproofGameType != 0, "SystemDeploy: multiproofGameType not set");
         require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
@@ -1130,6 +1129,7 @@ contract SystemDeploy is Script {
                 "SystemDeploy: dev multiproof cannot be deployed on production chains"
             );
         } else {
+            require(_input.teeImageHash != bytes32(0), "SystemDeploy: teeImageHash not set");
             require(_input.zkRangeHash != bytes32(0), "SystemDeploy: zkRangeHash not set");
             require(_input.zkAggregationHash != bytes32(0), "SystemDeploy: zkAggregationHash not set");
             require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
