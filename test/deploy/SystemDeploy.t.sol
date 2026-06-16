@@ -219,6 +219,30 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertNotEq(address(factory.gameImpls(gameType)), address(0), "game type registered on factory");
     }
 
+    function test_deploy_devMultiproof_onProductionChain_reverts() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.implementationsInput.nitroEnclaveVerifier = address(0);
+        input.implementationsInput.sp1Verifier = ISP1Verifier(address(0));
+        input.implementationsInput.zkRangeHash = bytes32(0);
+        input.implementationsInput.zkAggregationHash = bytes32(0);
+        input.implementationsInput.devTeeSigner = makeAddr("devSigner");
+
+        // Ethereum mainnet
+        vm.chainId(1);
+        vm.expectRevert("SystemDeploy: dev multiproof cannot be deployed on production chains");
+        systemDeploy.deploy(input);
+
+        // Base mainnet
+        vm.chainId(8453);
+        vm.expectRevert("SystemDeploy: dev multiproof cannot be deployed on production chains");
+        systemDeploy.deploy(input);
+
+        // Base Sepolia
+        vm.chainId(84532);
+        vm.expectRevert("SystemDeploy: dev multiproof cannot be deployed on production chains");
+        systemDeploy.deploy(input);
+    }
+
     function _defaultDeployInput() internal view returns (SystemDeploy.DeployInput memory input_) {
         input_.saveArtifacts = false;
         input_.superchainInput = SystemDeploy.SuperchainInput({
