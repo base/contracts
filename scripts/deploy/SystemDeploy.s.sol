@@ -1094,9 +1094,8 @@ contract SystemDeploy is Script {
             );
 
             vm.broadcast(msg.sender);
-            _output.disputeGameFactoryProxy.setImplementation(
-                gameType, IDisputeGame(address(output_.aggregateVerifier))
-            );
+            _output.disputeGameFactoryProxy
+                .setImplementation(gameType, IDisputeGame(address(output_.aggregateVerifier)));
             vm.label(address(output_.aggregateVerifier), "AggregateVerifier");
         }
 
