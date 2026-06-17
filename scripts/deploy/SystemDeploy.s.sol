@@ -243,6 +243,14 @@ contract SystemDeploy is Script {
     function registerAggregateVerifier(bytes32 _multiproofConfigHash) public {
         require(_multiproofConfigHash != bytes32(0), "SystemDeploy: multiproofConfigHash not set");
 
+        // This entrypoint hardcodes the dev ZK sentinel (0xdead) and exists only for dev multiproof
+        // (devnet) deployments, where config_hash is unknown until after genesis. Reject any config
+        // that wires a real nitroEnclaveVerifier (production). _assertValidMultiproofInput also
+        // blocks production chain IDs and validates the multiproof parameters.
+        ImplementationInput memory implInput = _configuredImplementationsInput();
+        require(_isDevMultiproof(implInput), "SystemDeploy: registerAggregateVerifier is dev-multiproof only");
+        _assertValidMultiproofInput(implInput);
+
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
 
         // zkVerifier is the dev sentinel (0xdead); this entrypoint is dev-multiproof only.
