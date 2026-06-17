@@ -50,6 +50,24 @@ contract Artifacts {
         _predeploys[keccak256("EAS")] = payable(Predeploys.EAS);
     }
 
+    /// @notice Loads previously-saved deployments from the outfile back into memory.
+    /// @dev `setUp()` only seeds predeploys; named deployments are otherwise only populated by
+    ///      `save()` within the same process. A re-entrant script run (e.g.
+    ///      `registerAggregateVerifier` after L2 genesis) is a fresh process, so it must call
+    ///      this to read addresses from an earlier deploy. Re-seeding forge's stateful JSON
+    ///      object also ensures a later `save()` appends to — rather than clobbers — the file.
+    function load() public {
+        if (!vm.exists(deploymentOutfile)) return;
+        string memory json = vm.readFile(deploymentOutfile);
+        if (bytes(json).length == 0) return;
+        string[] memory keys = vm.parseJsonKeys(json, "$");
+        for (uint256 i = 0; i < keys.length; i++) {
+            address payable addr = payable(vm.parseJsonAddress(json, string.concat(".", keys[i])));
+            _namedDeployments[keys[i]] = addr;
+            stdJson.serialize("", keys[i], addr);
+        }
+    }
+
     /// @notice Returns the address of a deployment. Also handles the predeploys.
     /// @param _name The name of the deployment.
     /// @return The address of the deployment. May be `address(0)` if the deployment does not

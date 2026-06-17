@@ -231,6 +231,62 @@ contract SystemDeploy is Script {
         });
     }
 
+    /// @notice Deploys and registers the AggregateVerifier for a dev multiproof devnet after L2
+    ///         genesis, once the real config_hash is finally known.
+    /// @dev Pairs with MULTIPROOF_DEFER_REGISTRATION: the main deploy skips the AggregateVerifier,
+    ///      then this entrypoint deploys it with `_multiproofConfigHash` and points the
+    ///      DisputeGameFactory's game-type implementation at it. All other inputs are reloaded from
+    ///      the deploy config (`cfg`) and the saved deployment artifacts, so the verifier is built
+    ///      identically to the inline path. Must be broadcast by the DisputeGameFactory owner
+    ///      (finalSystemOwner). Run with:
+    ///        forge script ... --sig "registerAggregateVerifier(bytes32)" <hash> --broadcast
+    function registerAggregateVerifier(bytes32 _multiproofConfigHash) public {
+        require(_multiproofConfigHash != bytes32(0), "SystemDeploy: multiproofConfigHash not set");
+
+        // Re-entrant run in a fresh process: reload addresses from the prior deploy's outfile so
+        // mustGetAddress resolves them and the subsequent save() appends instead of clobbering.
+        artifacts.load();
+
+        // This entrypoint hardcodes the dev ZK sentinel (0xdead) and exists only for dev multiproof
+        // (devnet) deployments, where config_hash is unknown until after genesis. Reject any config
+        // that wires a real nitroEnclaveVerifier (production). _assertValidMultiproofInput also
+        // blocks production chain IDs and validates the multiproof parameters.
+        ImplementationInput memory implInput = _configuredImplementationsInput();
+        require(_isDevMultiproof(implInput), "SystemDeploy: registerAggregateVerifier is dev-multiproof only");
+        _assertValidMultiproofInput(implInput);
+
+        GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
+
+        // zkVerifier is the dev sentinel (0xdead); this entrypoint is dev-multiproof only.
+        IVerifier aggregateVerifier = _newAggregateVerifier(
+            AggregateVerifierInput({
+                multiproofGameType: gameType,
+                anchorStateRegistry: IAnchorStateRegistry(artifacts.mustGetAddress("AnchorStateRegistryProxy")),
+                delayedWETH: IDelayedWETH(artifacts.mustGetAddress("DelayedWETHProxy")),
+                teeVerifier: IVerifier(artifacts.mustGetAddress("TEEVerifier")),
+                zkVerifier: IVerifier(address(0xdead)),
+                teeImageHash: cfg.teeImageHash(),
+                zkRangeHash: cfg.zkRangeHash(),
+                zkAggregationHash: cfg.zkAggregationHash(),
+                multiproofConfigHash: _multiproofConfigHash,
+                l2ChainId: cfg.l2ChainId(),
+                multiproofBlockInterval: cfg.multiproofBlockInterval(),
+                multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
+                slowFinalizationDelay: cfg.slowFinalizationDelay(),
+                fastFinalizationDelay: cfg.fastFinalizationDelay()
+            })
+        );
+
+        IDisputeGameFactory disputeGameFactory =
+            IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
+        vm.broadcast(msg.sender);
+        disputeGameFactory.setImplementation(gameType, IDisputeGame(address(aggregateVerifier)));
+
+        artifacts.save("AggregateVerifier", address(aggregateVerifier));
+        vm.label(address(aggregateVerifier), "AggregateVerifier");
+        console.log("Registered AggregateVerifier at:", address(aggregateVerifier));
+    }
+
     function _runConfigured() internal returns (DeployOutput memory output_) {
         output_ = deploy(_deployInput());
 
@@ -1023,33 +1079,42 @@ contract SystemDeploy is Script {
                 IVerifier(address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryProxy)));
         }
 
-        output_.aggregateVerifier = _newAggregateVerifier(
-            AggregateVerifierInput({
-                multiproofGameType: gameType,
-                anchorStateRegistry: _output.anchorStateRegistryProxy,
-                delayedWETH: _output.delayedWETHProxy,
-                teeVerifier: output_.teeVerifier,
-                zkVerifier: output_.zkVerifier,
-                teeImageHash: _input.teeImageHash,
-                zkRangeHash: _input.zkRangeHash,
-                zkAggregationHash: _input.zkAggregationHash,
-                multiproofConfigHash: _input.multiproofConfigHash,
-                l2ChainId: _opChainInput.l2ChainId,
-                multiproofBlockInterval: _input.multiproofBlockInterval,
-                multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval,
-                slowFinalizationDelay: _input.slowFinalizationDelay,
-                fastFinalizationDelay: _input.fastFinalizationDelay
-            })
-        );
+        if (_deferAggregateVerifierRegistration(_input)) {
+            // The multiproof config_hash commits to the L2 genesis block hash, which is only known
+            // after the L2 execution client initializes from the generated genesis. Defer
+            // AggregateVerifier deployment + registration to `registerAggregateVerifier(bytes32)`,
+            // invoked post-genesis with the real hash. output_.aggregateVerifier stays unset here.
+            console.log("Deferring AggregateVerifier: run registerAggregateVerifier(bytes32) after L2 genesis");
+        } else {
+            output_.aggregateVerifier = _newAggregateVerifier(
+                AggregateVerifierInput({
+                    multiproofGameType: gameType,
+                    anchorStateRegistry: _output.anchorStateRegistryProxy,
+                    delayedWETH: _output.delayedWETHProxy,
+                    teeVerifier: output_.teeVerifier,
+                    zkVerifier: output_.zkVerifier,
+                    teeImageHash: _input.teeImageHash,
+                    zkRangeHash: _input.zkRangeHash,
+                    zkAggregationHash: _input.zkAggregationHash,
+                    multiproofConfigHash: _input.multiproofConfigHash,
+                    l2ChainId: _opChainInput.l2ChainId,
+                    multiproofBlockInterval: _input.multiproofBlockInterval,
+                    multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval,
+                    slowFinalizationDelay: _input.slowFinalizationDelay,
+                    fastFinalizationDelay: _input.fastFinalizationDelay
+                })
+            );
 
-        vm.broadcast(msg.sender);
-        _output.disputeGameFactoryProxy.setImplementation(gameType, IDisputeGame(address(output_.aggregateVerifier)));
+            vm.broadcast(msg.sender);
+            _output.disputeGameFactoryProxy
+                .setImplementation(gameType, IDisputeGame(address(output_.aggregateVerifier)));
+            vm.label(address(output_.aggregateVerifier), "AggregateVerifier");
+        }
 
         vm.label(address(output_.teeProverRegistryImpl), "TEEProverRegistryImpl");
         vm.label(address(output_.teeProverRegistryProxy), "TEEProverRegistryProxy");
         vm.label(address(output_.teeVerifier), "TEEVerifier");
         vm.label(address(output_.zkVerifier), "ZKVerifier");
-        vm.label(address(output_.aggregateVerifier), "AggregateVerifier");
     }
 
     function _newAggregateVerifier(AggregateVerifierInput memory _input) internal returns (IVerifier) {
@@ -1107,6 +1172,16 @@ contract SystemDeploy is Script {
 
     function _isDevMultiproof(ImplementationInput memory _input) internal pure returns (bool) {
         return _multiproofEnabled(_input) && _input.nitroEnclaveVerifier == address(0);
+    }
+
+    /// @notice Whether AggregateVerifier deployment + registration should be deferred to a
+    ///         post-genesis step instead of happening inline during the main deploy.
+    /// @dev Only meaningful for dev multiproof (devnet), where the config_hash commits to the L2
+    ///      genesis hash and is therefore unknown at L1 deploy time. Opt-in via the
+    ///      MULTIPROOF_DEFER_REGISTRATION env var so other dev flows that precompute the hash keep
+    ///      deploying the verifier inline.
+    function _deferAggregateVerifierRegistration(ImplementationInput memory _input) internal view returns (bool) {
+        return _isDevMultiproof(_input) && vm.envOr("MULTIPROOF_DEFER_REGISTRATION", false);
     }
 
     function _assertValidMultiproofInput(ImplementationInput memory _input) internal view {
