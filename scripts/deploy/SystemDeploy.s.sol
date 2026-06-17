@@ -243,6 +243,10 @@ contract SystemDeploy is Script {
     function registerAggregateVerifier(bytes32 _multiproofConfigHash) public {
         require(_multiproofConfigHash != bytes32(0), "SystemDeploy: multiproofConfigHash not set");
 
+        // Re-entrant run in a fresh process: reload addresses from the prior deploy's outfile so
+        // mustGetAddress resolves them and the subsequent save() appends instead of clobbering.
+        artifacts.load();
+
         // This entrypoint hardcodes the dev ZK sentinel (0xdead) and exists only for dev multiproof
         // (devnet) deployments, where config_hash is unknown until after genesis. Reject any config
         // that wires a real nitroEnclaveVerifier (production). _assertValidMultiproofInput also
