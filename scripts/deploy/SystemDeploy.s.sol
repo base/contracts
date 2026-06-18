@@ -1199,8 +1199,11 @@ contract SystemDeploy is Script {
         require(_input.teeChallenger != address(0), "SystemDeploy: teeChallenger not set");
 
         if (_isDevMultiproof(_input)) {
+            // Block only real value-bearing chains (Ethereum mainnet, Base mainnet). Public
+            // testnets such as Base Sepolia (84532) are valid dev-multiproof settlement targets,
+            // e.g. an L3 devnet that settles to Base Sepolia.
             require(
-                block.chainid != 1 && block.chainid != 8453 && block.chainid != 84532,
+                block.chainid != 1 && block.chainid != 8453,
                 "SystemDeploy: dev multiproof cannot be deployed on production chains"
             );
         } else {
