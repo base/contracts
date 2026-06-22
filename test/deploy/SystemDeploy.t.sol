@@ -34,6 +34,20 @@ contract MockSP1Verifier {
     function verifyProof(bytes32, bytes calldata, bytes calldata) external pure { }
 }
 
+/// @notice Test harness that forces dev-multiproof registration deferral on, mirroring
+///         MULTIPROOF_DEFER_REGISTRATION=true without mutating the process-global env (which would
+///         race other parallel test contracts).
+contract SystemDeployDeferredHarness is SystemDeploy {
+    function _deferAggregateVerifierRegistration(ImplementationInput memory _input)
+        internal
+        pure
+        override
+        returns (bool)
+    {
+        return _isDevMultiproof(_input);
+    }
+}
+
 contract SystemDeploy_Test is Test, SystemDeployAssertions {
     Artifacts internal constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
@@ -219,6 +233,62 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertNotEq(address(factory.gameImpls(gameType)), address(0), "game type registered on factory");
     }
 
+    /// @notice Dev-multiproof with deferred registration: the main deploy must leave the
+    ///         AnchorStateRegistry uninitialized (zero starting anchor) and the game type
+    ///         unregistered, because the real anchor (L2 genesis output root) is only known after
+    ///         L2 genesis. The post-genesis one-shot then initializes the registry with the real
+    ///         anchor — exactly once — which is what registerAggregateVerifier does against
+    ///         cfg + artifacts.
+    function test_deploy_devMultiproof_deferred_anchorInitializedPostGenesis() public {
+        address devSigner = 0x6cebCF805c5191BCf26602E43DECa89AEe092b5d;
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.implementationsInput.nitroEnclaveVerifier = address(0);
+        input.implementationsInput.sp1Verifier = ISP1Verifier(address(0));
+        input.implementationsInput.zkRangeHash = bytes32(0);
+        input.implementationsInput.zkAggregationHash = bytes32(0);
+        input.implementationsInput.devTeeSigner = devSigner;
+        input.implementationsInput.proofMaturityDelaySeconds = 0;
+        input.implementationsInput.withdrawalDelaySeconds = 0;
+        input.implementationsInput.disputeGameFinalityDelaySeconds = 0;
+        input.implementationsInput.slowFinalizationDelay = 0;
+        input.implementationsInput.fastFinalizationDelay = 0;
+
+        // Use a harness that forces deferral on (mirroring MULTIPROOF_DEFER_REGISTRATION=true)
+        // without mutating the process-global env, which would race other parallel test contracts.
+        SystemDeploy.DeployOutput memory output = new SystemDeployDeferredHarness().deploy(input);
+
+        IDisputeGameFactory factory = IDisputeGameFactory(address(output.opChain.disputeGameFactoryProxy));
+        GameType gameType = GameType.wrap(uint32(input.implementationsInput.multiproofGameType));
+
+        // Deferred: the AggregateVerifier is not registered and the registry is uninitialized.
+        assertEq(address(factory.gameImpls(gameType)), address(0), "game type not registered yet (deferred)");
+        assertEq(
+            Hash.unwrap(output.opChain.anchorStateRegistryProxy.getStartingAnchorRoot().root),
+            bytes32(0),
+            "anchor uninitialized after deferred deploy"
+        );
+
+        // Simulate the post-genesis one-shot: the ProxyAdmin owner (this test contract) initializes
+        // the registry with the real genesis output root.
+        bytes32 genesisOutputRoot = bytes32(uint256(0xC0FFEE));
+        output.opChain.anchorStateRegistryProxy
+            .initialize(
+                output.opChain.systemConfigProxy,
+                output.opChain.disputeGameFactoryProxy,
+                Proposal({ root: Hash.wrap(genesisOutputRoot), l2SequenceNumber: 0 }),
+                gameType
+            );
+
+        (Hash anchorRoot, uint256 anchorBlock) = output.opChain.anchorStateRegistryProxy.getAnchorRoot();
+        assertEq(Hash.unwrap(anchorRoot), genesisOutputRoot, "anchor root set to real genesis output root");
+        assertEq(anchorBlock, 0, "anchor block is genesis");
+        assertEq(
+            GameType.unwrap(output.opChain.anchorStateRegistryProxy.respectedGameType()),
+            GameType.unwrap(gameType),
+            "respected game type set on init"
+        );
+    }
+
     function test_deploy_devMultiproof_onProductionChain_reverts() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.implementationsInput.nitroEnclaveVerifier = address(0);
@@ -237,9 +307,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         vm.expectRevert("SystemDeploy: dev multiproof cannot be deployed on production chains");
         systemDeploy.deploy(input);
 
-        // Base Sepolia
+        // Base Sepolia (84532) is a valid dev-multiproof settlement target (see PRIV-2004), so it
+        // must NOT revert.
         vm.chainId(84532);
-        vm.expectRevert("SystemDeploy: dev multiproof cannot be deployed on production chains");
         systemDeploy.deploy(input);
     }
 
