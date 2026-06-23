@@ -255,6 +255,30 @@ contract SystemDeploy is Script {
         require(_isDevMultiproof(implInput), "SystemDeploy: registerAggregateVerifier is dev-multiproof only");
         _assertValidMultiproofInput(implInput);
 
+        // Initialize the AnchorStateRegistry now that the real L2 genesis output root is known. The
+        // main deploy deferred ASR initialization (see _initializeOPChain) because the starting
+        // anchor (the L2 genesis output root) cannot be computed until after L2 genesis. This must
+        // run before deploying the AggregateVerifier, whose constructor reads
+        // ANCHOR_STATE_REGISTRY.disputeGameFactory(). Idempotent: skip if a prior run (e.g. a retry)
+        // already initialized the registry, detected via a non-zero starting anchor root.
+        IAnchorStateRegistry anchorStateRegistry =
+            IAnchorStateRegistry(artifacts.mustGetAddress("AnchorStateRegistryProxy"));
+        if (Hash.unwrap(anchorStateRegistry.getStartingAnchorRoot().root) == bytes32(0)) {
+            bytes32 genesisOutputRoot = cfg.multiproofGenesisOutputRoot();
+            require(
+                genesisOutputRoot != bytes32(0) && genesisOutputRoot != bytes32(uint256(1)),
+                "SystemDeploy: real multiproofGenesisOutputRoot required for deferred anchor"
+            );
+            vm.broadcast(msg.sender);
+            anchorStateRegistry.initialize(
+                ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy")),
+                IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy")),
+                Proposal({ root: Hash.wrap(genesisOutputRoot), l2SequenceNumber: cfg.multiproofGenesisBlockNumber() }),
+                GameTypes.AGGREGATE_VERIFIER
+            );
+            console.log("Initialized AnchorStateRegistry with deferred genesis output root");
+        }
+
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
 
         // zkVerifier is the dev sentinel (0xdead); this entrypoint is dev-multiproof only.
@@ -290,10 +314,16 @@ contract SystemDeploy is Script {
     function _runConfigured() internal returns (DeployOutput memory output_) {
         output_ = deploy(_deployInput());
 
-        vm.startPrank(ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy")).guardian());
-        IAnchorStateRegistry(artifacts.mustGetAddress("AnchorStateRegistryProxy"))
-            .setRespectedGameType(GameType.wrap(uint32(cfg.respectedGameType())));
-        vm.stopPrank();
+        // When dev-multiproof registration is deferred, the main deploy leaves the
+        // AnchorStateRegistry uninitialized (see _initializeOPChain); its initialize() — which also
+        // sets the respected game type — runs in the post-genesis registerAggregateVerifier(bytes32)
+        // one-shot. Skip the guardian call here to avoid reverting on the uninitialized registry.
+        if (!_deferAggregateVerifierRegistration(_configuredImplementationsInput())) {
+            vm.startPrank(ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy")).guardian());
+            IAnchorStateRegistry(artifacts.mustGetAddress("AnchorStateRegistryProxy"))
+                .setRespectedGameType(GameType.wrap(uint32(cfg.respectedGameType())));
+            vm.stopPrank();
+        }
 
         console.log("set up op chain!");
     }
@@ -583,7 +613,7 @@ contract SystemDeploy is Script {
         vm.broadcast(msg.sender);
         output_.opChainProxyAdmin.setImplementationName(address(output_.l1CrossDomainMessengerProxy), messengerName);
 
-        _initializeOPChain(_input, _superchainConfig, impls_, output_);
+        _initializeOPChain(_input, _superchainConfig, impls_, output_, _implementationsInput);
 
         _upgradeToAndCall(
             output_.opChainProxyAdmin,
@@ -614,7 +644,8 @@ contract SystemDeploy is Script {
         Types.DeployInput memory _input,
         ISuperchainConfig _superchainConfig,
         Types.Implementations memory _impls,
-        Types.DeployOutput memory _output
+        Types.DeployOutput memory _output,
+        ImplementationInput memory _implementationsInput
     )
         internal
     {
@@ -678,12 +709,23 @@ contract SystemDeploy is Script {
             abi.encodeCall(IDisputeGameFactory.initialize, (msg.sender))
         );
 
-        _upgradeToAndCall(
-            _output.opChainProxyAdmin,
-            address(_output.anchorStateRegistryProxy),
-            _impls.anchorStateRegistryImpl,
-            _encodeAnchorStateRegistryInitializer(_input, _output)
-        );
+        if (_deferAggregateVerifierRegistration(_implementationsInput)) {
+            // Dev-multiproof: the AnchorStateRegistry's starting anchor is the L2 genesis output
+            // root, which is only known after L2 genesis. Set the implementation now (so the proxy
+            // is upgrade-complete) but defer initialize() to the post-genesis
+            // registerAggregateVerifier(bytes32) one-shot, which calls it exactly once with the real
+            // anchor. Nothing else in the deploy reads the registry's state.
+            _upgradeTo(
+                _output.opChainProxyAdmin, address(_output.anchorStateRegistryProxy), _impls.anchorStateRegistryImpl
+            );
+        } else {
+            _upgradeToAndCall(
+                _output.opChainProxyAdmin,
+                address(_output.anchorStateRegistryProxy),
+                _impls.anchorStateRegistryImpl,
+                _encodeAnchorStateRegistryInitializer(_input, _output)
+            );
+        }
     }
 
     function _upgradeSuperchainConfigIfNeeded(
@@ -1180,7 +1222,12 @@ contract SystemDeploy is Script {
     ///      genesis hash and is therefore unknown at L1 deploy time. Opt-in via the
     ///      MULTIPROOF_DEFER_REGISTRATION env var so other dev flows that precompute the hash keep
     ///      deploying the verifier inline.
-    function _deferAggregateVerifierRegistration(ImplementationInput memory _input) internal view returns (bool) {
+    function _deferAggregateVerifierRegistration(ImplementationInput memory _input)
+        internal
+        view
+        virtual
+        returns (bool)
+    {
         return _isDevMultiproof(_input) && vm.envOr("MULTIPROOF_DEFER_REGISTRATION", false);
     }
 
