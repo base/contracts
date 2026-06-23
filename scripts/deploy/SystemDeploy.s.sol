@@ -269,12 +269,16 @@ contract SystemDeploy is Script {
                 genesisOutputRoot != bytes32(0) && genesisOutputRoot != bytes32(uint256(1)),
                 "SystemDeploy: real multiproofGenesisOutputRoot required for deferred anchor"
             );
+            // Resolve all cheatcode-backed inputs before vm.broadcast: cheatcode staticcalls
+            // (mustGetAddress, cfg.*) are disallowed once a broadcast is armed for the next call.
+            ISystemConfig anchorSystemConfig = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
+            IDisputeGameFactory anchorDisputeGameFactory =
+                IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
+            Proposal memory startingAnchor =
+                Proposal({ root: Hash.wrap(genesisOutputRoot), l2SequenceNumber: cfg.multiproofGenesisBlockNumber() });
             vm.broadcast(msg.sender);
             anchorStateRegistry.initialize(
-                ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy")),
-                IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy")),
-                Proposal({ root: Hash.wrap(genesisOutputRoot), l2SequenceNumber: cfg.multiproofGenesisBlockNumber() }),
-                GameTypes.AGGREGATE_VERIFIER
+                anchorSystemConfig, anchorDisputeGameFactory, startingAnchor, GameTypes.AGGREGATE_VERIFIER
             );
             console.log("Initialized AnchorStateRegistry with deferred genesis output root");
         }
