@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# Production wrapper for SystemDeploy.s.sol — deploys (or upgrades) a full OP Stack L1 system
-# from the selected deploy-config. Reconstructed for the SystemDeploy toolchain (the previous
-# deploy.sh targeted the legacy Deploy.s.sol and was removed in #266).
-#
+# Production wrapper for SystemDeploy.s.sol — deploys (or upgrades)
 # Required env:
 #   DEPLOY_ETH_RPC_URL   L1 RPC endpoint (e.g. Hoodi)
 #   DEPLOY_CONFIG_PATH   path to deploy-config/<network>.json (read by Config.deployConfigPath())
@@ -10,15 +7,10 @@
 #   DEPLOY_PRIVATE_KEY                 raw private key, OR
 #   DEPLOY_LEDGER=1 + DEPLOY_HD_PATH   sign with a Ledger
 # Optional:
-#   SALT_MIXER           CREATE2 salt-mixer override (default "salt mixer"). Set a fresh value
-#                        (e.g. zeronet-regenesis-2026-06) to deploy a NEW contract set for an
-#                        existing l2ChainId without colliding with the immortal old addresses.
+#   SALT_MIXER           CREATE2 salt-mixer override (default "salt mixer").
 #   DEPLOY_VERIFY=1      run contract verification
 #   VERIFIER_URL / ETHERSCAN_API_KEY   verification params
 #
-# NOTE: the default `run()` entrypoint deploys a fresh SuperchainConfig too. Zeronet reuses the
-# shared Hoodi superchain — to reuse it, call SystemDeploy.deploy() with the existing
-# superchainConfigProxy instead of run() (see plan R5 / confirm with @brianb).
 
 set -euo pipefail
 
@@ -40,7 +32,7 @@ else
 fi
 
 verify_args=()
-if [ -n "${DEPLOY_VERIFY:-}" ]; then
+if [ "${DEPLOY_VERIFY:-}" = "1" ]; then
   verify_args=(--verify)
   [ -n "${VERIFIER_URL:-}" ] && verify_args+=(--verifier custom --verifier-url "$VERIFIER_URL")
   [ -n "${ETHERSCAN_API_KEY:-}" ] && verify_args+=(--verifier-api-key "$ETHERSCAN_API_KEY")
