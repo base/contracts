@@ -1,78 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-/**
- * @title DeployDevWithNitro
- * @notice Development deployment WITH AWS Nitro attestation validation.
- *
- * ══════════════════════════════════════════════════════════════════════════════════
- *                            DEPLOYMENT TYPE: DEV (WITH NITRO)
- * ══════════════════════════════════════════════════════════════════════════════════
- *
- * This script deploys infrastructure using the REAL TEEProverRegistry, which
- * REQUIRES a ZK proof of a valid AWS Nitro attestation for signer registration.
- * You cannot use addDevSigner() - you must go through the full registerSigner() flow.
- *
- * PREREQUISITES:
- *   1. Deploy the RISC Zero verifier route AND NitroEnclaveVerifier using
- *      DeployNitroVerifier.s.sol (required because NitroEnclaveVerifier and its
- *      dependencies need Solidity ^0.8.20, while this script is pinned to =0.8.15).
- *   2. Set `nitroEnclaveVerifier` in the deploy config to the deployed address.
- *
- * ─────────────────────────────────────────────────────────────────────────────────
- * SIGNER REGISTRATION FLOW
- * ─────────────────────────────────────────────────────────────────────────────────
- *
- * After deployment, register a signer by generating a RISC Zero ZK proof of a
- * valid AWS Nitro attestation document and calling:
- *
- *   cast send $TEE_PROVER_REGISTRY \
- *     "registerSigner(bytes,bytes)" $ZK_OUTPUT $ZK_PROOF_BYTES \
- *     --private-key $OWNER_OR_MANAGER_KEY --rpc-url $RPC_URL
- *
- * IMPORTANT: The attestation is only valid for 60 minutes! Generate the proof
- * and submit the transaction within that window.
- *
- * ══════════════════════════════════════════════════════════════════════════════════
- */
+import { console2 as console } from "lib/forge-std/src/console2.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
-import { Proxy } from "src/universal/Proxy.sol";
-import { Script } from "lib/forge-std/src/Script.sol";
-import { console2 as console } from "lib/forge-std/src/console2.sol";
-import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
-import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { DisputeGameFactory } from "src/L1/proofs/DisputeGameFactory.sol";
-import { GameType, Hash } from "src/libraries/bridge/Types.sol";
-
-import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
-import { Config } from "scripts/libraries/Config.sol";
-import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
-
-import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
-import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
-import { MockVerifier } from "test/mocks/MockVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
-import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 
-import { MinimalProxyAdmin } from "./mocks/MinimalProxyAdmin.sol";
-import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";
-import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
+import { DeployDevBase } from "./DeployDevBase.s.sol";
 
 /// @title DeployDevWithNitro
-/// @notice Development deployment WITH AWS Nitro attestation validation.
-/// @dev Uses real TEEProverRegistry which requires registerSigner() with valid attestation.
-///      NitroEnclaveVerifier must be pre-deployed via DeployNitroVerifier.s.sol.
-contract DeployDevWithNitro is Script {
+/// @notice Development deployment WITH AWS Nitro attestation validation. Uses the real
+///         TEEProverRegistry, so signer registration requires a ZK proof of a valid AWS
+///         Nitro attestation (no addDevSigner bypass).
+/// @dev Prerequisite: deploy the RISC Zero verifier stack and NitroEnclaveVerifier via
+///      DeployRiscZeroStack.s.sol first (those contracts need Solidity ^0.8.20, while this
+///      script is pinned to =0.8.15), then set `nitroEnclaveVerifier` in the deploy config.
+///      Note: AWS Nitro attestations are only valid for 60 minutes — generate the ZK proof
+///      and submit registerSigner() within that window.
+contract DeployDevWithNitro is DeployDevBase {
     uint256 public constant BLOCK_INTERVAL = 600;
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
     uint256 public constant INIT_BOND = 0.00001 ether;
-
-    DeployConfig public constant cfg =
-        DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
 
     address public nitroEnclaveVerifierAddr;
     address public tdxVerifierAddr;
@@ -83,15 +32,23 @@ contract DeployDevWithNitro is Script {
     address public mockDelayedWETH;
     address public aggregateVerifier;
 
-    function setUp() public {
-        DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
-        cfg.read(Config.deployConfigPath());
+    function _blockInterval() internal pure override returns (uint256) {
+        return BLOCK_INTERVAL;
     }
 
-    function run() public {
-        GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
+    function _intermediateBlockInterval() internal pure override returns (uint256) {
+        return INTERMEDIATE_BLOCK_INTERVAL;
+    }
 
-        // NitroEnclaveVerifier must be pre-deployed (via DeployNitroVerifier.s.sol)
+    function _initBond() internal pure override returns (uint256) {
+        return INIT_BOND;
+    }
+
+    function _outputSuffix() internal pure override returns (string memory) {
+        return "-dev-with-nitro.json";
+    }
+
+    function _preflight() internal override {
         nitroEnclaveVerifierAddr = cfg.nitroEnclaveVerifier();
         tdxVerifierAddr = cfg.tdxVerifier();
         require(
@@ -99,7 +56,21 @@ contract DeployDevWithNitro is Script {
             "nitroEnclaveVerifier must be set in config (deploy via DeployNitroVerifier.s.sol first)"
         );
         require(tdxVerifierAddr != address(0), "tdxVerifier must be set in config");
+    }
 
+    function _deployTEERegistryImpl() internal override returns (address) {
+        return address(
+            new TEEProverRegistry(
+                INitroEnclaveVerifier(nitroEnclaveVerifierAddr), IDisputeGameFactory(disputeGameFactory)
+            )
+        );
+    }
+
+    function _serializeExtra(string memory key) internal override {
+        vm.serializeAddress(key, "NitroEnclaveVerifier", nitroEnclaveVerifierAddr);
+    }
+
+    function _logHeader() internal view override {
         console.log("=== Deploying Dev Infrastructure (WITH NITRO) ===");
         console.log("Chain ID:", block.chainid);
         console.log("Owner:", cfg.finalSystemOwner());
@@ -110,17 +81,6 @@ contract DeployDevWithNitro is Script {
         console.log("TDXVerifier:", tdxVerifierAddr);
         console.log("");
         console.log("NOTE: Using REAL TEEProverRegistry - ZK attestation proof REQUIRED.");
-
-        vm.startBroadcast();
-
-        _deployInfrastructure(gameType);
-        _deployTEEContracts(gameType);
-        _deployAggregateVerifier(gameType);
-
-        vm.stopBroadcast();
-
-        _printSummary();
-        _writeOutput();
     }
 
     function _deployTEEContracts(GameType gameType) internal {

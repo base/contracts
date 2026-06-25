@@ -3,10 +3,7 @@ pragma solidity 0.8.15;
 
 import { Test } from "lib/forge-std/src/Test.sol";
 
-import {
-    TransparentUpgradeableProxy
-} from "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
+import { Proxy } from "src/universal/Proxy.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
@@ -31,24 +28,21 @@ contract MockAggregateVerifierForVerifier {
     }
 }
 
-/// @notice Mock DisputeGameFactory that returns a fixed game implementation.
 contract MockDisputeGameFactoryForVerifier {
-    mapping(uint32 => address) internal _impls;
+    IDisputeGame internal immutable _impl;
 
-    function setImpl(uint32 gameType_, address impl) external {
-        _impls[gameType_] = impl;
+    constructor(address impl) {
+        _impl = IDisputeGame(impl);
     }
 
-    function gameImpls(GameType gameType_) external view returns (IDisputeGame) {
-        return IDisputeGame(_impls[GameType.unwrap(gameType_)]);
+    function gameImpls(GameType) external view returns (IDisputeGame) {
+        return _impl;
     }
 }
 
 contract TEEVerifierTest is Test {
     TEEVerifier public verifier;
     DevTEEProverRegistry public teeProverRegistry;
-    ProxyAdmin public proxyAdmin;
-    MockAnchorStateRegistry public anchorStateRegistry;
 
     uint256 internal constant NITRO_SIGNER_PRIVATE_KEY =
         0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
@@ -61,8 +55,6 @@ contract TEEVerifierTest is Test {
     bytes32 internal constant TDX_IMAGE_ID = keccak256("test-tdx-image-id");
     uint32 internal constant TEST_GAME_TYPE = 621;
     address internal immutable PROPOSER = makeAddr("proposer");
-
-    address internal owner;
 
     function setUp() public {
         owner = address(this);
@@ -81,15 +73,13 @@ contract TEEVerifierTest is Test {
             INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(address(mockFactory))
         );
 
-        // Deploy proxy admin
-        proxyAdmin = new ProxyAdmin(address(this));
-
-        // Deploy proxy
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+        address proxyAdmin = makeAddr("proxy-admin");
+        Proxy proxy = new Proxy(proxyAdmin);
+        vm.prank(proxyAdmin);
+        proxy.upgradeToAndCall(
             address(impl),
-            address(proxyAdmin),
             abi.encodeCall(
-                TEEProverRegistry.initialize, (owner, owner, new address[](0), GameType.wrap(TEST_GAME_TYPE))
+                TEEProverRegistry.initialize, (address(this), address(this), new address[](0), TEST_GAME_TYPE)
             )
         );
 
@@ -102,8 +92,7 @@ contract TEEVerifierTest is Test {
         // Set the proposer as valid
         teeProverRegistry.setProposer(PROPOSER, true);
 
-        // Deploy TEEVerifier
-        anchorStateRegistry = new MockAnchorStateRegistry();
+        MockAnchorStateRegistry anchorStateRegistry = new MockAnchorStateRegistry();
         verifier = new TEEVerifier(
             TEEProverRegistry(address(teeProverRegistry)), IAnchorStateRegistry(address(anchorStateRegistry))
         );
@@ -143,7 +132,6 @@ contract TEEVerifierTest is Test {
     }
 
     function testVerifyFailsWithUnregisteredSigner() public {
-        // Use a different private key that's not registered
         uint256 unregisteredKey = 0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef;
         address unregisteredSigner = vm.addr(unregisteredKey);
 

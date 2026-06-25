@@ -3,7 +3,7 @@ pragma solidity 0.8.25;
 
 contract Counter {
     address internal immutable OWNER;
-    uint256 public count = 0;
+    uint256 public count;
 
     constructor(address owner) {
         OWNER = owner;
@@ -16,7 +16,7 @@ contract Counter {
     }
 
     function incrementPayable() external payable {
-        require(msg.value != 0, "value must be greater than 0");
+        require(msg.value > 0, "value must be greater than 0");
         count += 1;
     }
 }

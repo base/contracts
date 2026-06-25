@@ -14,34 +14,32 @@ import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVer
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 
-/**
- * @title NitroEnclaveVerifier
- * @dev Implementation contract for AWS Nitro Enclave attestation verification using zero-knowledge proofs
- * @dev Custom version of Automata's NitroEnclaveVerifier contract at
- * https://github.com/automata-network/aws-nitro-enclave-attestation/tree/26c90565cb009e6539643a0956f9502a12ade672
- *
- * Differences from the upstream Automata contract:
- * - Verification of ZK proofs is restricted to an authorized proof submitter address
- * - All privileged actions emit events for monitoring
- * - Removes verification-with-explicit-program-ID and Pico logic
- *
- * This contract provides on-chain verification of AWS Nitro Enclave attestation reports by validating
- * zero-knowledge proofs generated off-chain. It supports both single and batch verification modes
- * and can work with multiple ZK proof systems (RISC Zero and Succinct SP1).
- *
- * Key features:
- * - Certificate chain management with automatic caching of newly discovered certificates
- * - Timestamp validation with configurable time tolerance
- * - Certificate revocation capabilities for compromised intermediate certificates
- * - Gas-efficient batch verification for multiple attestations
- * - Support for both RISC Zero and SP1 proving systems
- *
- * Security considerations:
- * - Only the contract owner can manage certificates and configurations
- * - Root certificate is immutable once set (requires owner to change)
- * - Intermediate certificates are automatically cached but can be revoked
- * - Timestamp validation prevents replay attacks within the configured time window
- */
+/// @title NitroEnclaveVerifier
+/// @dev Implementation contract for AWS Nitro Enclave attestation verification using zero-knowledge proofs
+/// @dev Custom version of Automata's NitroEnclaveVerifier contract at
+/// https://github.com/automata-network/aws-nitro-enclave-attestation/tree/26c90565cb009e6539643a0956f9502a12ade672
+///
+/// Differences from the upstream Automata contract:
+/// - Verification of ZK proofs is restricted to an authorized proof submitter address
+/// - All privileged actions emit events for monitoring
+/// - Removes verification-with-explicit-program-ID and Pico logic
+///
+/// This contract provides onchain verification of AWS Nitro Enclave attestation reports by validating
+/// zero-knowledge proofs generated offchain. It supports both single and batch verification modes
+/// and can work with multiple ZK proof systems (RISC Zero and Succinct SP1).
+///
+/// Key features:
+/// - Certificate chain management with automatic caching of newly discovered certificates
+/// - Timestamp validation with configurable time tolerance
+/// - Certificate revocation capabilities for compromised intermediate certificates
+/// - Gas-efficient batch verification for multiple attestations
+/// - Support for both RISC Zero and SP1 proving systems
+///
+/// Security considerations:
+/// - Only the contract owner can manage certificates and configurations
+/// - Root certificate is immutable once set (requires owner to change)
+/// - Intermediate certificates are automatically cached but can be revoked
+/// - Timestamp validation prevents replay attacks within the configured time window
 contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Sentinel address to indicate a route has been permanently frozen
     address private constant FROZEN = address(0xdead);
@@ -70,6 +68,19 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Mapping from ZkCoProcessorType to its corresponding verifierProofId representation
     mapping(ZkCoProcessorType => bytes32) private _verifierProofIds;
 
+    /// @dev Persistent revocation sentinel for intermediate certificates.
+    ///
+    /// `revokeCert` zeroes `trustedIntermediateCerts[certHash]`, but the suffix-cache
+    /// path in `_cacheNewCert` would otherwise restore that entry on the next
+    /// successful verification whose chain traverses the revoked hash. This
+    /// mapping survives `_cacheNewCert` overwrites and is consulted in
+    /// `_verifyJournal`, `_cacheNewCert`, and `checkTrustedIntermediateCerts`,
+    /// making `revokeCert` durable independently of the journal's `trustedCertsPrefixLen`.
+    ///
+    /// Re-trust requires an explicit `unrevokeCert` admin call; it is never
+    /// granted as a side effect of verification.
+    mapping(bytes32 => bool) public revokedCerts;
+
     // ============ Custom Errors ============
 
     /// @dev Error thrown when an unsupported or unknown ZK coprocessor type is used
@@ -83,9 +94,6 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
 
     /// @dev Thrown when a caller other than the authorized proof submitter calls verify or batchVerify
     error CallerNotProofSubmitter();
-
-    /// @dev Thrown when a certificate hash is not found in the trusted intermediate certificates set
-    error CertificateNotFound(bytes32 certHash);
 
     /// @dev Thrown when a program ID argument is bytes32(0)
     error ZeroProgramId();
@@ -113,6 +121,9 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
 
     /// @dev Thrown when caller is neither the owner nor the revoker
     error CallerNotOwnerOrRevoker();
+
+    /// @dev Thrown when `unrevokeCert` is called for a hash that is not currently revoked
+    error CertificateNotRevoked(bytes32 certHash);
 
     // ============ Events ============
 
@@ -146,6 +157,9 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     /// @dev Event emitted when a certificate is revoked
     event CertRevoked(bytes32 certHash);
 
+    /// @dev Event emitted when a previously revoked certificate is explicitly re-trusted
+    event CertUnrevoked(bytes32 certHash);
+
     /// @dev Event emitted when the maximum time difference is updated
     event MaxTimeDiffUpdated(uint64 newMaxTimeDiff);
 
@@ -161,19 +175,17 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         _;
     }
 
-    /**
-     * @dev Initializes the contract with owner, time tolerance and initial trusted certificates
-     * @param owner Address to be set as the contract owner
-     * @param initialMaxTimeDiff Maximum time difference in seconds for timestamp validation
-     * @param initializeTrustedCerts Array of initial trusted intermediate certificate hashes
-     * @param initializeTrustedCertExpiries Array of notAfter timestamps (seconds) for each initial cert
-     * @param initialRootCert Hash of the AWS Nitro Enclave root certificate
-     * @param initialProofSubmitter Address that is authorized to submit proofs
-     * @param initialRevoker Address authorized to revoke intermediate certificates (can be address(0) to disable)
-     * @param zkCoProcessor Type of ZK coprocessor to configure (RiscZero or Succinct)
-     * @param config Configuration parameters for the ZK coprocessor
-     * @param verifierProofId The verifierProofId corresponding to the verifierId in config
-     */
+    /// @dev Initializes the contract with owner, time tolerance and initial trusted certificates
+    /// @param owner Address to be set as the contract owner
+    /// @param initialMaxTimeDiff Maximum time difference in seconds for timestamp validation
+    /// @param initializeTrustedCerts Array of initial trusted intermediate certificate hashes
+    /// @param initializeTrustedCertExpiries Array of notAfter timestamps (seconds) for each initial cert
+    /// @param initialRootCert Hash of the AWS Nitro Enclave root certificate
+    /// @param initialProofSubmitter Address that is authorized to submit proofs
+    /// @param initialRevoker Address authorized to revoke intermediate certificates (can be address(0) to disable)
+    /// @param zkCoProcessor Type of ZK coprocessor to configure (RiscZero or Succinct)
+    /// @param config Configuration parameters for the ZK coprocessor
+    /// @param verifierProofId The verifierProofId corresponding to the verifierId in config
     constructor(
         address owner,
         uint64 initialMaxTimeDiff,
@@ -203,21 +215,17 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
 
     // ============ Query Functions ============
 
-    /**
-     * @dev Retrieves the configuration for a specific coprocessor
-     * @param zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
-     * @return ZkCoProcessorConfig Configuration parameters including program IDs and verifier address
-     */
+    /// @dev Retrieves the configuration for a specific coprocessor
+    /// @param zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
+    /// @return ZkCoProcessorConfig Configuration parameters including program IDs and verifier address
     function getZkConfig(ZkCoProcessorType zkCoProcessor) external view returns (ZkCoProcessorConfig memory) {
         return zkConfig[zkCoProcessor];
     }
 
-    /**
-     * @dev Gets the verifier address for a specific route
-     * @param zkCoProcessor Type of ZK coprocessor
-     * @param selector Proof selector
-     * @return Verifier address (route-specific or default fallback)
-     */
+    /// @dev Gets the verifier address for a specific route
+    /// @param zkCoProcessor Type of ZK coprocessor
+    /// @param selector Proof selector
+    /// @return Verifier address (route-specific or default fallback)
     function getZkVerifier(ZkCoProcessorType zkCoProcessor, bytes4 selector) external view returns (address) {
         address verifier = _zkVerifierRoutes[zkCoProcessor][selector];
 
@@ -232,29 +240,25 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         return verifier;
     }
 
-    /**
-     * @dev Returns the verifierProofId for a given ZkCoProcessorType
-     * @param zkCoProcessor Type of ZK coprocessor
-     * @return The corresponding verifierProofId
-     */
+    /// @dev Returns the verifierProofId for a given ZkCoProcessorType
+    /// @param zkCoProcessor Type of ZK coprocessor
+    /// @return The corresponding verifierProofId
     function getVerifierProofId(ZkCoProcessorType zkCoProcessor) external view returns (bytes32) {
         return _verifierProofIds[zkCoProcessor];
     }
 
-    /**
-     * @dev Checks the prefix length of trusted certificates in each provided certificate chain for reports
-     * @param reportCerts Array of certificate chains, each containing certificate hashes
-     * @return Array indicating the prefix length of trusted certificates in each chain
-     *
-     * For each certificate chain:
-     * 1. Validates that the first certificate matches the stored root certificate
-     * 2. Counts consecutive trusted certificates starting from the root
-     * 3. Stops counting when an untrusted certificate is encountered
-     *
-     * This function is used to pre-validate certificate chains before generating proofs,
-     * helping to optimize the proving process by determining trusted certificate lengths.
-     * Usually called from off-chain
-     */
+    /// @dev Checks the prefix length of trusted certificates in each provided certificate chain for reports
+    /// @param reportCerts Array of certificate chains, each containing certificate hashes
+    /// @return Array indicating the prefix length of trusted certificates in each chain
+    ///
+    /// For each certificate chain:
+    /// 1. Validates that the first certificate matches the stored root certificate
+    /// 2. Counts consecutive trusted certificates starting from the root
+    /// 3. Stops counting when an untrusted certificate is encountered
+    ///
+    /// This function is used to pre-validate certificate chains before generating proofs,
+    /// helping to optimize the proving process by determining trusted certificate lengths.
+    /// Usually called from offchain
     function checkTrustedIntermediateCerts(bytes32[][] calldata reportCerts) public view returns (uint8[] memory) {
         uint8[] memory results = new uint8[](reportCerts.length);
         bytes32 rootCertHash = rootCert;
@@ -265,6 +269,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
                 revert RootCertMismatch(rootCertHash, certs[0]);
             }
             for (uint256 j = 1; j < certs.length; j++) {
+                // Stop counting at any revoked entry so offchain callers cannot derive a
+                // prefix-len that walks past a revoked cert and then claim it as the trusted boundary.
+                if (revokedCerts[certs[j]]) {
+                    break;
+                }
                 uint64 expiry = trustedIntermediateCerts[certs[j]];
                 if (block.timestamp > expiry) {
                     break;
@@ -278,48 +287,42 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
 
     // ============ Admin Functions ============
 
-    /**
-     * @dev Sets the trusted root certificate hash
-     * @param newRootCert Hash of the AWS Nitro Enclave root certificate
-     *
-     * Requirements:
-     * - Only callable by contract owner
-     *
-     * The root certificate serves as the trust anchor for all certificate chain validations.
-     * This should be set to the hash of AWS's root certificate for Nitro Enclaves.
-     */
+    /// @dev Sets the trusted root certificate hash
+    /// @param newRootCert Hash of the AWS Nitro Enclave root certificate
+    ///
+    /// Requirements:
+    /// - Only callable by contract owner
+    ///
+    /// The root certificate serves as the trust anchor for all certificate chain validations.
+    /// This should be set to the hash of AWS's root certificate for Nitro Enclaves.
     function setRootCert(bytes32 newRootCert) external onlyOwner {
         _setRootCert(newRootCert);
     }
 
-    /**
-     * @dev Updates the maximum allowed time difference for attestation timestamp validation
-     * @param newMaxTimeDiff New maximum time difference in seconds
-     *
-     * Requirements:
-     * - Only callable by contract owner
-     * - Must be greater than zero
-     */
+    /// @dev Updates the maximum allowed time difference for attestation timestamp validation
+    /// @param newMaxTimeDiff New maximum time difference in seconds
+    ///
+    /// Requirements:
+    /// - Only callable by contract owner
+    /// - Must be greater than zero
     function setMaxTimeDiff(uint64 newMaxTimeDiff) external onlyOwner {
         if (newMaxTimeDiff == 0) revert ZeroMaxTimeDiff();
         maxTimeDiff = newMaxTimeDiff;
         emit MaxTimeDiffUpdated(newMaxTimeDiff);
     }
 
-    /**
-     * @dev Configures zero-knowledge verification parameters for a specific coprocessor
-     * @param zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
-     * @param config Configuration parameters including program IDs and verifier address
-     * @param verifierProofId The verifierProofId corresponding to the verifierId in config
-     *
-     * Requirements:
-     * - Only callable by contract owner
-     *
-     * This function sets up the necessary parameters for ZK proof verification:
-     * - verifierId: Program ID for single attestation verification
-     * - aggregatorId: Program ID for batch/aggregated verification
-     * - zkVerifier: Address of the deployed ZK verifier contract
-     */
+    /// @dev Configures zero-knowledge verification parameters for a specific coprocessor
+    /// @param zkCoProcessor Type of ZK coprocessor (RiscZero or Succinct)
+    /// @param config Configuration parameters including program IDs and verifier address
+    /// @param verifierProofId The verifierProofId corresponding to the verifierId in config
+    ///
+    /// Requirements:
+    /// - Only callable by contract owner
+    ///
+    /// This function sets up the necessary parameters for ZK proof verification:
+    /// - verifierId: Program ID for single attestation verification
+    /// - aggregatorId: Program ID for batch/aggregated verification
+    /// - zkVerifier: Address of the deployed ZK verifier contract
     function setZkConfiguration(
         ZkCoProcessorType zkCoProcessor,
         ZkCoProcessorConfig memory config,
@@ -331,33 +334,56 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         _setZkConfiguration(zkCoProcessor, config, verifierProofId);
     }
 
-    /**
-     * @dev Revokes a trusted intermediate certificate
-     * @param certHash Hash of the certificate to revoke
-     *
-     * Requirements:
-     * - Only callable by contract owner or revoker
-     * - Certificate must exist in the trusted intermediate certificates set
-     *
-     * This function allows the owner or revoker to revoke compromised intermediate certificates
-     * without affecting the root certificate or other trusted certificates.
-     *
-     * Note: A revoked cert can be trusted again by reproving it.
-     */
+    /// @dev Revokes an intermediate certificate, whether or not it has been cached as trusted.
+    /// @param certHash Hash of the certificate to revoke
+    ///
+    /// Requirements:
+    /// - Only callable by contract owner or revoker
+    ///
+    /// Certificates that have never been seen onchain can be revoked preemptively; the
+    /// persistent `revokedCerts` sentinel blocks them from being trusted on first
+    /// verification. This function allows the owner or revoker to revoke compromised
+    /// intermediate certificates without affecting the root certificate or other trusted
+    /// certificates.
+    ///
+    /// Durability: in addition to clearing `trustedIntermediateCerts[certHash]`, this
+    /// function flips the persistent `revokedCerts[certHash]` sentinel. The sentinel
+    /// survives subsequent `_cacheNewCert` overwrites and causes both `_verifyJournal`
+    /// and `checkTrustedIntermediateCerts` to reject any chain whose suffix traverses
+    /// the revoked hash, regardless of the journal's `trustedCertsPrefixLen`. Reproving
+    /// the same chain therefore cannot silently restore trust; re-trust requires an
+    /// explicit `unrevokeCert` call by the owner.
     function revokeCert(bytes32 certHash) external onlyOwnerOrRevoker {
-        if (trustedIntermediateCerts[certHash] == 0) {
-            revert CertificateNotFound(certHash);
-        }
         delete trustedIntermediateCerts[certHash];
+        revokedCerts[certHash] = true;
         emit CertRevoked(certHash);
     }
 
-    /**
-     * @dev Updates the verifier program ID, adding the new version to the supported set
-     * @param zkCoProcessor Type of ZK coprocessor
-     * @param newVerifierId New verifier program ID to set as latest
-     * @param newVerifierProofId New verifier proof ID (stored in mapping, used in batch verification)
-     */
+    /// @dev Explicitly re-trusts a previously revoked intermediate certificate.
+    /// @param certHash Hash of the certificate to un-revoke
+    ///
+    /// Requirements:
+    /// - Only callable by contract owner
+    /// - Certificate must currently be marked as revoked
+    ///
+    /// Clearing the revocation sentinel does not by itself restore the cached
+    /// expiry; the next successful verification whose chain traverses `certHash`
+    /// will re-cache it via `_cacheNewCert`. This two-step design (admin clears
+    /// the sentinel, verification re-caches the expiry) keeps re-trust an
+    /// explicit, owner-only action while still letting the normal cache path
+    /// supply the up-to-date `notAfter` timestamp.
+    function unrevokeCert(bytes32 certHash) external onlyOwner {
+        if (!revokedCerts[certHash]) {
+            revert CertificateNotRevoked(certHash);
+        }
+        delete revokedCerts[certHash];
+        emit CertUnrevoked(certHash);
+    }
+
+    /// @dev Updates the verifier program ID, adding the new version to the supported set
+    /// @param zkCoProcessor Type of ZK coprocessor
+    /// @param newVerifierId New verifier program ID to set as latest
+    /// @param newVerifierProofId New verifier proof ID (stored in mapping, used in batch verification)
     function updateVerifierId(
         ZkCoProcessorType zkCoProcessor,
         bytes32 newVerifierId,
@@ -377,11 +403,9 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         emit VerifierIdUpdated(zkCoProcessor, newVerifierId, newVerifierProofId);
     }
 
-    /**
-     * @dev Updates the aggregator program ID, adding the new version to the supported set
-     * @param zkCoProcessor Type of ZK coprocessor
-     * @param newAggregatorId New aggregator program ID to set as latest
-     */
+    /// @dev Updates the aggregator program ID, adding the new version to the supported set
+    /// @param zkCoProcessor Type of ZK coprocessor
+    /// @param newAggregatorId New aggregator program ID to set as latest
     function updateAggregatorId(ZkCoProcessorType zkCoProcessor, bytes32 newAggregatorId) external onlyOwner {
         if (newAggregatorId == bytes32(0)) revert ZeroProgramId();
         if (zkConfig[zkCoProcessor].aggregatorId == newAggregatorId) {
@@ -393,12 +417,10 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         emit AggregatorIdUpdated(zkCoProcessor, newAggregatorId);
     }
 
-    /**
-     * @dev Adds a route-specific verifier override
-     * @param zkCoProcessor Type of ZK coprocessor
-     * @param selector Proof selector (first 4 bytes of proof data)
-     * @param verifier Address of the verifier contract for this route
-     */
+    /// @dev Adds a route-specific verifier override
+    /// @param zkCoProcessor Type of ZK coprocessor
+    /// @param selector Proof selector (first 4 bytes of proof data)
+    /// @param verifier Address of the verifier contract for this route
     function addVerifyRoute(ZkCoProcessorType zkCoProcessor, bytes4 selector, address verifier) external onlyOwner {
         if (verifier == address(0)) revert ZeroVerifierAddress();
         if (verifier == FROZEN) revert InvalidVerifierAddress();
@@ -411,13 +433,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         emit ZkRouteAdded(zkCoProcessor, selector, verifier);
     }
 
-    /**
-     * @dev Permanently freezes a verification route
-     * @param zkCoProcessor Type of ZK coprocessor
-     * @param selector Proof selector to freeze
-     *
-     * WARNING: This action is IRREVERSIBLE
-     */
+    /// @dev Permanently freezes a verification route
+    /// @param zkCoProcessor Type of ZK coprocessor
+    /// @param selector Proof selector to freeze
+    ///
+    /// WARNING: This action is IRREVERSIBLE
     function freezeVerifyRoute(ZkCoProcessorType zkCoProcessor, bytes4 selector) external onlyOwner {
         address currentVerifier = _zkVerifierRoutes[zkCoProcessor][selector];
 
@@ -429,25 +449,21 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         emit ZkRouteWasFrozen(zkCoProcessor, selector);
     }
 
-    /**
-     * @dev Sets the proof submitter address
-     * @param submitter The address of the proof submitter
-     *
-     * Requirements:
-     * - Only callable by contract owner
-     * - Address must not be zero
-     */
+    /// @dev Sets the proof submitter address
+    /// @param submitter The address of the proof submitter
+    ///
+    /// Requirements:
+    /// - Only callable by contract owner
+    /// - Address must not be zero
     function setProofSubmitter(address submitter) external onlyOwner {
         _setProofSubmitter(submitter);
     }
 
-    /**
-     * @dev Updates the revoker address
-     * @param newRevoker New revoker address (can be address(0) to disable the revoker role)
-     *
-     * Requirements:
-     * - Only callable by contract owner
-     */
+    /// @dev Updates the revoker address
+    /// @param newRevoker New revoker address (can be address(0) to disable the revoker role)
+    ///
+    /// Requirements:
+    /// - Only callable by contract owner
     function setRevoker(address newRevoker) external onlyOwner {
         revoker = newRevoker;
         emit RevokerUpdated(newRevoker);
@@ -455,27 +471,25 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
 
     // ============ Verification Functions ============
 
-    /**
-     * @dev Verifies a single attestation report using zero-knowledge proof
-     * @param output Encoded VerifierJournal containing the verification result
-     * @param zkCoprocessor Type of ZK coprocessor used to generate the proof
-     * @param proofBytes Zero-knowledge proof data for the attestation
-     * @return journal VerifierJournal containing the verification result and extracted data
-     *
-     * This function performs end-to-end verification of a single attestation:
-     * 1. Retrieves the single verification program ID from configuration
-     * 2. Verifies the zero-knowledge proof using the specified coprocessor
-     * 3. Decodes the verification journal from the output
-     * 4. Validates the journal through comprehensive checks
-     * 5. Returns the final verification result
-     *
-     * The returned journal contains all extracted attestation data including:
-     * - Verification status and any error conditions
-     * - Certificate chain information and trust levels
-     * - User data, nonce, and public key from the attestation
-     * - Platform Configuration Registers (PCRs) for integrity measurement
-     * - Module ID and timestamp information
-     */
+    /// @dev Verifies a single attestation report using zero-knowledge proof
+    /// @param output Encoded VerifierJournal containing the verification result
+    /// @param zkCoprocessor Type of ZK coprocessor used to generate the proof
+    /// @param proofBytes Zero-knowledge proof data for the attestation
+    /// @return journal VerifierJournal containing the verification result and extracted data
+    ///
+    /// This function performs end-to-end verification of a single attestation:
+    /// 1. Retrieves the single verification program ID from configuration
+    /// 2. Verifies the zero-knowledge proof using the specified coprocessor
+    /// 3. Decodes the verification journal from the output
+    /// 4. Validates the journal through comprehensive checks
+    /// 5. Returns the final verification result
+    ///
+    /// The returned journal contains all extracted attestation data including:
+    /// - Verification status and any error conditions
+    /// - Certificate chain information and trust levels
+    /// - User data, nonce, and public key from the attestation
+    /// - Platform Configuration Registers (PCRs) for integrity measurement
+    /// - Module ID and timestamp information
     function verify(
         bytes calldata output,
         ZkCoProcessorType zkCoprocessor,
@@ -492,22 +506,20 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         emit AttestationSubmitted(journal.result, zkCoprocessor, abi.encode(journal));
     }
 
-    /**
-     * @dev Verifies multiple attestation reports in a single batch operation
-     * @param output Encoded BatchVerifierJournal containing aggregated verification results
-     * @param zkCoprocessor Type of ZK coprocessor used to generate the proof
-     * @param proofBytes Zero-knowledge proof data for batch verification
-     * @return results Array of VerifierJournal results, one for each attestation in the batch
-     *
-     * This function provides gas-efficient batch verification by:
-     * 1. Using the aggregator program ID for ZK proof verification
-     * 2. Validating the batch verifier key matches the expected value
-     * 3. Processing each individual attestation through standard validation
-     * 4. Returning comprehensive results for all attestations
-     *
-     * Batch verification is recommended when processing multiple attestations
-     * as it significantly reduces gas costs compared to individual verifications.
-     */
+    /// @dev Verifies multiple attestation reports in a single batch operation
+    /// @param output Encoded BatchVerifierJournal containing aggregated verification results
+    /// @param zkCoprocessor Type of ZK coprocessor used to generate the proof
+    /// @param proofBytes Zero-knowledge proof data for batch verification
+    /// @return results Array of VerifierJournal results, one for each attestation in the batch
+    ///
+    /// This function provides gas-efficient batch verification by:
+    /// 1. Using the aggregator program ID for ZK proof verification
+    /// 2. Validating the batch verifier key matches the expected value
+    /// 3. Processing each individual attestation through standard validation
+    /// 4. Returning comprehensive results for all attestations
+    ///
+    /// Batch verification is recommended when processing multiple attestations
+    /// as it significantly reduces gas costs compared to individual verifications.
     function batchVerify(
         bytes calldata output,
         ZkCoProcessorType zkCoprocessor,
@@ -563,40 +575,61 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         emit ZKConfigurationUpdated(zkCoProcessor, config, verifierProofId);
     }
 
-    /**
-     * @dev Internal function to cache newly discovered trusted certificates
-     * @param journal Verification journal containing certificate chain information
-     *
-     * This function automatically adds any certificates beyond the trusted length
-     * to the trusted intermediate certificates set. This optimizes future verifications
-     * by expanding the known trusted certificate set based on successful verifications.
-     */
+    /// @dev Internal function to cache newly discovered trusted certificates
+    /// @param journal Verification journal containing certificate chain information
+    ///
+    /// This function automatically adds any certificates beyond the trusted length
+    /// to the trusted intermediate certificates set. This optimizes future verifications
+    /// by expanding the known trusted certificate set based on successful verifications.
+    ///
+    /// Revoked entries terminate caching: once `revokedCerts[certHash]` is set by
+    /// `revokeCert`, no successful verification will silently restore the cache,
+    /// regardless of the journal's `trustedCertsPrefixLen`. Because `certs[i+1]` is
+    /// signed by `certs[i]`, every descendant of a revoked cert inherits its trust
+    /// from a revoked parent and must not be cached either — so we `break` rather
+    /// than `continue` on the first revoked entry, matching `checkTrustedIntermediateCerts`.
+    ///
+    /// Note: in current control flow this guard is unreachable because `_verifyJournal`
+    /// Pass 2 already rejects any journal whose suffix contains a revoked digest before
+    /// `_cacheNewCert` is invoked. The check is retained as defense-in-depth against
+    /// future refactors. Re-trust requires an explicit `unrevokeCert`.
     function _cacheNewCert(VerifierJournal memory journal) internal {
         for (uint256 i = journal.trustedCertsPrefixLen; i < journal.certs.length; i++) {
             bytes32 certHash = journal.certs[i];
+            if (revokedCerts[certHash]) {
+                break;
+            }
             trustedIntermediateCerts[certHash] = journal.certExpiries[i];
         }
     }
 
-    /**
-     * @dev Internal function to verify and validate a journal entry
-     * @param journal Verification journal to validate
-     * @return Updated journal with final verification result
-     *
-     * This function performs comprehensive validation:
-     * 1. Checks if the initial ZK verification was successful
-     * 2. Validates the root certificate matches the trusted root
-     * 3. Ensures all trusted certificates are still valid (not revoked)
-     * 4. Validates the attestation timestamp is within acceptable range
-     * 5. Caches newly discovered certificates for future use
-     *
-     * The timestamp validation converts milliseconds to seconds and checks:
-     * - Attestation is not too old (timestamp + maxTimeDiff > block.timestamp)
-     * - Attestation is not from the future (timestamp < block.timestamp)
-     * Note that due to truncating timestamp from milliseconds, to seconds,
-     * some valid attestations may be rejected. However, this ensures all invalid
-     * timestamps are rejected.
-     */
+    /// @dev Internal function to verify and validate a journal entry
+    /// @param journal Verification journal to validate
+    /// @return Updated journal with final verification result
+    ///
+    /// This function performs comprehensive validation:
+    /// 1. Checks if the initial ZK verification was successful
+    /// 2. Validates the root certificate matches the trusted root
+    /// 3. Ensures all trusted certificates in the prefix are still valid (not revoked, not expired)
+    /// 4. Ensures no certificate in the suffix has been revoked, regardless of `trustedCertsPrefixLen`
+    /// 5. Validates the attestation timestamp is within acceptable range
+    /// 6. Caches newly discovered certificates for future use
+    ///
+    /// The suffix-side revocation check (step 4) is the load-bearing fix for the
+    /// `revokeCert` durability gap exposed under the production
+    /// `trustedCertsPrefixLen = 1` configuration. Without it, Pass 1 only walks
+    /// the root and a journal whose chain traverses a revoked intermediate in
+    /// the suffix would succeed and then re-cache the revoked entry via
+    /// `_cacheNewCert`. Rejecting any suffix entry present in `revokedCerts`
+    /// makes revocation durable independently of the journal-supplied prefix
+    /// length.
+    ///
+    /// The timestamp validation converts milliseconds to seconds and checks:
+    /// - Attestation is not too old (timestamp + maxTimeDiff > block.timestamp)
+    /// - Attestation is not from the future (timestamp < block.timestamp)
+    /// Note that due to truncating timestamp from milliseconds, to seconds,
+    /// some valid attestations may be rejected. However, this ensures all invalid
+    /// timestamps are rejected.
     function _verifyJournal(VerifierJournal memory journal) internal returns (VerifierJournal memory) {
         if (journal.result != VerificationResult.Success) {
             return journal;
@@ -605,7 +638,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
             journal.result = VerificationResult.RootCertNotTrusted;
             return journal;
         }
-        // Check every trusted certificate to ensure none have been revoked
+        // Pass 1: trusted prefix — root must match the onchain root, and every
+        // intermediate must still hold a non-expired cached entry.
         for (uint256 i = 0; i < journal.trustedCertsPrefixLen; i++) {
             bytes32 certHash = journal.certs[i];
             if (i == 0) {
@@ -615,14 +649,31 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
                 }
                 continue;
             }
+            // `revokeCert` zeroes `trustedIntermediateCerts[certHash]`, so the
+            // expiry check below already catches a revoked cert reached through
+            // the prefix path. The explicit `revokedCerts` guard is retained as
+            // defense-in-depth against future code paths that might re-cache
+            // before this loop runs.
+            if (revokedCerts[certHash]) {
+                journal.result = VerificationResult.IntermediateCertsNotTrusted;
+                return journal;
+            }
             uint64 expiry = trustedIntermediateCerts[certHash];
             if (block.timestamp > expiry) {
                 journal.result = VerificationResult.IntermediateCertsNotTrusted;
                 return journal;
             }
         }
-        // Check any remaining certificates in the chain that are not yet trusted
+        // Pass 2: suffix — journal-supplied expiries plus a hard reject on any
+        // cert that the operator has explicitly revoked. This is the path that
+        // closes the production `trustedCertsPrefixLen = 1` bypass: a revoked
+        // intermediate in the suffix can no longer pass verification and then
+        // be silently re-cached.
         for (uint256 i = journal.trustedCertsPrefixLen; i < journal.certs.length; i++) {
+            if (revokedCerts[journal.certs[i]]) {
+                journal.result = VerificationResult.IntermediateCertsNotTrusted;
+                return journal;
+            }
             uint64 expiry = journal.certExpiries[i];
             if (block.timestamp > expiry) {
                 journal.result = VerificationResult.InvalidTimestamp;
@@ -638,13 +689,11 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         return journal;
     }
 
-    /**
-     * @dev Internal function to verify zero-knowledge proofs using the appropriate coprocessor
-     * @param zkCoprocessor Type of ZK coprocessor (RiscZero or Succinct)
-     * @param programId Program identifier for the verification program
-     * @param output Encoded output data to verify
-     * @param proofBytes Zero-knowledge proof data
-     */
+    /// @dev Internal function to verify zero-knowledge proofs using the appropriate coprocessor
+    /// @param zkCoprocessor Type of ZK coprocessor (RiscZero or Succinct)
+    /// @param programId Program identifier for the verification program
+    /// @param output Encoded output data to verify
+    /// @param proofBytes Zero-knowledge proof data
     function _verifyZk(
         ZkCoProcessorType zkCoprocessor,
         bytes32 programId,
@@ -666,12 +715,10 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
         }
     }
 
-    /**
-     * @dev Internal function to resolve the ZK verifier address based on route configuration
-     * @param zkCoprocessor Type of ZK coprocessor
-     * @param proofBytes Proof data (selector extracted from first 4 bytes)
-     * @return Resolved verifier address
-     */
+    /// @dev Internal function to resolve the ZK verifier address based on route configuration
+    /// @param zkCoprocessor Type of ZK coprocessor
+    /// @param proofBytes Proof data (selector extracted from first 4 bytes)
+    /// @return Resolved verifier address
     function _resolveZkVerifier(
         ZkCoProcessorType zkCoprocessor,
         bytes calldata proofBytes
@@ -702,8 +749,8 @@ contract NitroEnclaveVerifier is Ownable, INitroEnclaveVerifier, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.3.0
+    /// @custom:semver 0.4.0
     function version() public pure virtual returns (string memory) {
-        return "0.3.0";
+        return "0.4.0";
     }
 }

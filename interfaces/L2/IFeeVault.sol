@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { Types } from "src/libraries/Types.sol";
 
-interface IFeeVault {
-    error FeeVault_OnlyProxyAdminOwner();
+interface IFeeVault is IProxyAdminOwnedBase {
     error InvalidInitialization();
     error NotInitializing();
 

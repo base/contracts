@@ -25,12 +25,12 @@ contract SetPreinstalls is Script {
         _setPreinstallCode(Preinstalls.DeterministicDeploymentProxy);
         _setPreinstallCode(Preinstalls.MultiSend_v130);
         _setPreinstallCode(Preinstalls.Permit2);
-        _setPreinstallCode(Preinstalls.SenderCreator_v060); // ERC 4337 v0.6.0
-        _setPreinstallCode(Preinstalls.EntryPoint_v060); // ERC 4337 v0.6.0
-        _setPreinstallCode(Preinstalls.SenderCreator_v070); // ERC 4337 v0.7.0
-        _setPreinstallCode(Preinstalls.EntryPoint_v070); // ERC 4337 v0.7.0
+        _setPreinstallCode(Preinstalls.SenderCreator_v060);
+        _setPreinstallCode(Preinstalls.EntryPoint_v060);
+        _setPreinstallCode(Preinstalls.SenderCreator_v070);
+        _setPreinstallCode(Preinstalls.EntryPoint_v070);
         _setPreinstallCode(Preinstalls.BeaconBlockRoots);
-        _setPreinstallCode(Preinstalls.HistoryStorage); // EIP-2935
+        _setPreinstallCode(Preinstalls.HistoryStorage);
         _setPreinstallCode(Preinstalls.CreateX);
         // 4788 sender nonce must be incremented, since it's part of later upgrade-transactions.
         // For the upgrade-tx to not create a contract that conflicts with an already-existing copy,

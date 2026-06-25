@@ -1,92 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-/**
- * @title DeployDevNoNitro
- * @notice Development deployment WITHOUT AWS Nitro attestation validation.
- *
- * ══════════════════════════════════════════════════════════════════════════════════
- *                              DEPLOYMENT TYPE: DEV (NO NITRO)
- * ══════════════════════════════════════════════════════════════════════════════════
- *
- * This script deploys infrastructure using DevTEEProverRegistry, which BYPASSES
- * AWS Nitro attestation validation. Signers can be registered with a simple call
- * to addDevSigner() without needing a real Nitro enclave or attestation document.
- *
- * USE THIS SCRIPT WHEN:
- * - Running local development or testing
- * - You don't have access to an AWS Nitro enclave
- * - You want to quickly test the prover without attestation overhead
- *
- * DO NOT USE THIS SCRIPT FOR:
- * - Production deployments
- * - Security testing of the attestation flow
- *
- * ─────────────────────────────────────────────────────────────────────────────────
- * SIGNER REGISTRATION (SIMPLIFIED)
- * ─────────────────────────────────────────────────────────────────────────────────
- *
- * After deployment, register one dev Nitro signer and one dev TDX signer:
- *
- *   cast send $TEE_PROVER_REGISTRY \
- *     "addDevSigner(address,bytes32)" $NITRO_SIGNER_ADDRESS $TEE_NITRO_IMAGE_HASH \
- *     --private-key $OWNER_KEY --rpc-url $RPC_URL
- *
- *   cast send $TEE_PROVER_REGISTRY \
- *     "addDevTDXSigner(address,bytes32)" $TDX_SIGNER_ADDRESS $TEE_TDX_IMAGE_HASH \
- *     --private-key $OWNER_KEY --rpc-url $RPC_URL
- *
- * No attestation, PCR0 registration, or certificate validation required.
- *
- * ─────────────────────────────────────────────────────────────────────────────────
- * COMPARISON WITH DeployDevWithNitro
- * ─────────────────────────────────────────────────────────────────────────────────
- *
- * | Feature                    | DeployDevNoNitro       | DeployDevWithNitro     |
- * |----------------------------|------------------------|------------------------|
- * | TEEProverRegistry          | DevTEEProverRegistry   | TEEProverRegistry      |
- * | Signer registration        | addDevSigner()         | registerSigner()       |
- * | Requires Nitro enclave     | No                     | Yes                    |
- * | Validates attestation (ZK) | No                     | Yes                    |
- * | PCR0 pre-registration      | No                     | Yes                    |
- * | Attestation freshness      | N/A                    | < 60 minutes           |
- *
- * Both scripts use mocks for AnchorStateRegistry, DelayedWETH, and ZK Verifier.
- *
- * ══════════════════════════════════════════════════════════════════════════════════
- */
+import { console2 as console } from "lib/forge-std/src/console2.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-import { Proxy } from "src/universal/Proxy.sol";
-import { Script } from "lib/forge-std/src/Script.sol";
-import { console2 as console } from "lib/forge-std/src/console2.sol";
-import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
-import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { DisputeGameFactory } from "src/L1/proofs/DisputeGameFactory.sol";
-import { GameType, Hash } from "src/libraries/bridge/Types.sol";
-
-import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
-import { Config } from "scripts/libraries/Config.sol";
-import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
-
-import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
-import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
-import { MockVerifier } from "test/mocks/MockVerifier.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 
-import { MinimalProxyAdmin } from "./mocks/MinimalProxyAdmin.sol";
-import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";
-import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
+import { DeployDevBase } from "./DeployDevBase.s.sol";
 
 /// @title DeployDevNoNitro
-/// @notice Development deployment WITHOUT AWS Nitro attestation validation.
-/// @dev Uses DevTEEProverRegistry which allows addDevSigner() to bypass attestation.
-contract DeployDevNoNitro is Script {
+/// @notice Development deployment using DevTEEProverRegistry, which bypasses AWS Nitro attestation
+///         validation. See scripts/multiproof/README.md for usage. Not for production.
+contract DeployDevNoNitro is DeployDevBase {
     uint256 public constant BLOCK_INTERVAL = 100;
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 10;
     uint256 public constant INIT_BOND = 0.001 ether;
@@ -108,9 +37,26 @@ contract DeployDevNoNitro is Script {
         tdxVerifierAddr = cfg.tdxVerifier();
     }
 
-    function run() public {
-        GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
+    function _intermediateBlockInterval() internal pure override returns (uint256) {
+        return INTERMEDIATE_BLOCK_INTERVAL;
+    }
 
+    function _initBond() internal pure override returns (uint256) {
+        return INIT_BOND;
+    }
+
+    function _outputSuffix() internal pure override returns (string memory) {
+        return "-dev-no-nitro.json";
+    }
+
+    function _deployTEERegistryImpl() internal override returns (address) {
+        return
+            address(
+                new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(disputeGameFactory))
+            );
+    }
+
+    function _logHeader() internal view override {
         console.log("=== Deploying Dev Infrastructure (NO NITRO) ===");
         console.log("Chain ID:", block.chainid);
         console.log("Owner:", cfg.finalSystemOwner());

@@ -16,7 +16,8 @@ import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { Claim, GameStatus, GameType, Hash, Proposal, Timestamp } from "src/libraries/bridge/Types.sol";
+import { GameStatus, GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
+import { Timestamp, Claim } from "src/libraries/bridge/LibUDT.sol";
 
 // Solady
 import { Clone } from "lib/solady/src/utils/Clone.sol";
@@ -64,7 +65,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     //                         Constants                          //
     ////////////////////////////////////////////////////////////////
     /// @notice The slow finalization delay.
-    uint64 public constant SLOW_FINALIZATION_DELAY = 7 days;
+    uint64 public constant SLOW_FINALIZATION_DELAY = 5 days;
 
     /// @notice The fast finalization delay.
     uint64 public constant FAST_FINALIZATION_DELAY = 1 days;
@@ -271,9 +272,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice Thrown when there are not enough proofs to resolve the game.
     error NotEnoughProofs();
-
-    /// @notice Thrown when the proof threshold is not positive.
-    error InvalidProofThreshold();
 
     /// @param gameType_ The game type.
     /// @param anchorStateRegistry_ The anchor state registry.

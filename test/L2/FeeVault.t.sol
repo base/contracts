@@ -4,11 +4,18 @@ pragma solidity 0.8.15;
 // Testing
 import { CommonTest } from "test/setup/CommonTest.sol";
 import { Reverter } from "test/mocks/Callers.sol";
+import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
+
+// Scripts
+import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
+
+// Contracts
+import { Proxy } from "src/universal/Proxy.sol";
 
 // Interfaces
-import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IFeeVault } from "interfaces/L2/IFeeVault.sol";
 import { IL2ToL1MessagePasser } from "interfaces/L2/IL2ToL1MessagePasser.sol";
+import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
 // Libraries
 import { Hashing } from "src/libraries/Hashing.sol";
@@ -17,9 +24,11 @@ import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Features } from "src/libraries/Features.sol";
 
 /// @title FeeVault_Uncategorized_Test
-/// @notice Abstract test contract for fee feeVault testing.
+/// @notice Abstract test contract for fee vault testing.
 ///         Subclasses can override the feeVault-specific variables.
 abstract contract FeeVault_Uncategorized_Test is CommonTest {
+    uint32 internal constant WITHDRAWAL_MIN_GAS = 400_000;
+
     // Variables that can be overridden by concrete test contracts
     address recipient;
     IFeeVault feeVault;
@@ -29,13 +38,30 @@ abstract contract FeeVault_Uncategorized_Test is CommonTest {
 
     /// @notice Helper function to set up L2 withdrawal configuration.
     function _setupL2Withdrawal() internal {
-        // Set the withdrawal network to L2
-        vm.prank(IProxyAdmin(Predeploys.PROXY_ADMIN).owner());
+        vm.prank(proxyAdminOwner);
         feeVault.setWithdrawalNetwork(Types.WithdrawalNetwork.L2);
+    }
+
+    function _expectWithdrawalEvents(uint256 _amount, address _recipient, Types.WithdrawalNetwork _network) internal {
+        vm.expectEmit(address(feeVault));
+        emit Withdrawal(_amount, _recipient, address(this));
+        vm.expectEmit(address(feeVault));
+        emit Withdrawal(_amount, _recipient, address(this), _network);
+    }
+
+    /// @notice Deploys an uninitialized fee vault proxy for initialize access-control tests.
+    function _deployFeeVaultProxy() internal returns (IFeeVault vault_) {
+        string memory cname = Predeploys.getName(address(feeVault));
+        bytes memory constructorArgs = DeployUtils.encodeConstructor(abi.encodeCall(IFeeVault.__constructor__, ()));
+        address impl = DeployUtils.create1({ _name: cname, _args: constructorArgs });
+        address vault = address(new Proxy(Predeploys.PROXY_ADMIN));
+        EIP1967Helper.setImplementation(vault, impl);
+        vault_ = IFeeVault(payable(vault));
     }
 
     /// @notice Tests that the initialize function succeeds.
     function test_initialize_succeeds() external view {
+        assertEq(IProxyAdminOwnedBase(address(feeVault)).proxyAdminOwner(), proxyAdminOwner);
         assertEq(feeVault.recipient(), recipient);
         assertEq(feeVault.minWithdrawalAmount(), minWithdrawalAmount);
         assertEq(uint8(feeVault.withdrawalNetwork()), uint8(withdrawalNetwork));
@@ -45,8 +71,34 @@ abstract contract FeeVault_Uncategorized_Test is CommonTest {
     function test_initialize_reinitialization_reverts() external {
         _setupL2Withdrawal();
 
+        vm.prank(proxyAdminOwner);
         vm.expectRevert(IFeeVault.InvalidInitialization.selector);
         feeVault.initialize(recipient, minWithdrawalAmount, Types.WithdrawalNetwork.L1);
+    }
+
+    /// @notice Tests that the ProxyAdmin can initialize an uninitialized fee vault proxy.
+    function test_initialize_proxyAdmin_succeeds() external {
+        IFeeVault vault = _deployFeeVaultProxy();
+
+        vm.prank(Predeploys.PROXY_ADMIN);
+        vault.initialize(recipient, minWithdrawalAmount, withdrawalNetwork);
+
+        assertEq(IProxyAdminOwnedBase(address(vault)).proxyAdminOwner(), proxyAdminOwner);
+        assertEq(vault.recipient(), recipient);
+        assertEq(vault.minWithdrawalAmount(), minWithdrawalAmount);
+        assertEq(uint8(vault.withdrawalNetwork()), uint8(withdrawalNetwork));
+    }
+
+    /// @notice Tests that initialization reverts if called by a non-proxy admin or proxy admin owner.
+    /// @param _sender The address of the sender to test.
+    function testFuzz_initialize_notProxyAdminOrProxyAdminOwner_reverts(address _sender) external {
+        IFeeVault vault = _deployFeeVaultProxy();
+
+        vm.assume(_sender != proxyAdminOwner && _sender != Predeploys.PROXY_ADMIN);
+
+        vm.prank(_sender);
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
+        vault.initialize(recipient, minWithdrawalAmount, withdrawalNetwork);
     }
 
     /// @notice Tests that the immutable values match the storage getters.
@@ -63,19 +115,17 @@ abstract contract FeeVault_Uncategorized_Test is CommonTest {
         vm.prank(alice);
         (bool success,) = address(feeVault).call{ value: 100 }(hex"");
 
-        assertEq(success, true);
+        assertTrue(success);
         assertEq(address(feeVault).balance, balance + 100);
     }
 
     /// @notice Tests that `withdraw` reverts if the balance is less than the minimum withdrawal
     ///         amount.
     function testFuzz_withdraw_notEnough_reverts(uint256 _minWithdrawalAmount) external {
-        // Set the minimum withdrawal amount
         _minWithdrawalAmount = bound(_minWithdrawalAmount, 1, type(uint256).max);
-        vm.prank(IProxyAdmin(Predeploys.PROXY_ADMIN).owner());
+        vm.prank(proxyAdminOwner);
         feeVault.setMinWithdrawalAmount(_minWithdrawalAmount);
 
-        // Set the balance to be less than the minimum withdrawal amount
         vm.deal(address(feeVault), _minWithdrawalAmount - 1);
 
         vm.expectRevert("FeeVault: withdrawal amount must be greater than minimum withdrawal amount");
@@ -86,61 +136,38 @@ abstract contract FeeVault_Uncategorized_Test is CommonTest {
     function test_withdraw_toL1_succeeds() external {
         skipIfSysFeatureEnabled(Features.CUSTOM_GAS_TOKEN);
 
-        // Setup L1 withdrawal
-        vm.prank(IProxyAdmin(Predeploys.PROXY_ADMIN).owner());
+        vm.prank(proxyAdminOwner);
         feeVault.setWithdrawalNetwork(Types.WithdrawalNetwork.L1);
 
-        // Set recipient
-        vm.prank(IProxyAdmin(Predeploys.PROXY_ADMIN).owner());
-        feeVault.setRecipient(recipient);
-
-        // Set minimum withdrawal amount
-        vm.prank(IProxyAdmin(Predeploys.PROXY_ADMIN).owner());
-        feeVault.setMinWithdrawalAmount(minWithdrawalAmount);
-
-        // Set the balance to be greater than the minimum withdrawal amount
-        uint256 amount = feeVault.minWithdrawalAmount() + 1;
+        uint256 amount = minWithdrawalAmount + 1;
         vm.deal(address(feeVault), amount);
 
-        // No ether has been withdrawn yet
         assertEq(feeVault.totalProcessed(), 0);
+        _expectWithdrawalEvents(amount, recipient, Types.WithdrawalNetwork.L1);
 
-        vm.expectEmit(address(address(feeVault)));
-        emit Withdrawal(address(feeVault).balance, recipient, address(this));
-        vm.expectEmit(address(address(feeVault)));
-        emit Withdrawal(address(feeVault).balance, recipient, address(this), Types.WithdrawalNetwork.L1);
-
-        // The entire feeVault's balance is withdrawn
         vm.expectCall(
             Predeploys.L2_TO_L1_MESSAGE_PASSER,
-            address(feeVault).balance,
-            abi.encodeCall(IL2ToL1MessagePasser.initiateWithdrawal, (recipient, 400_000, hex""))
+            amount,
+            abi.encodeCall(IL2ToL1MessagePasser.initiateWithdrawal, (recipient, WITHDRAWAL_MIN_GAS, hex""))
         );
 
-        // The message is passed to the correct recipient
-        vm.expectEmit(Predeploys.L2_TO_L1_MESSAGE_PASSER);
-        emit MessagePassed(
-            l2ToL1MessagePasser.messageNonce(),
-            address(feeVault),
-            recipient,
-            amount,
-            400_000,
-            hex"",
-            Hashing.hashWithdrawal(
-                Types.WithdrawalTransaction({
-                    nonce: l2ToL1MessagePasser.messageNonce(),
-                    sender: address(feeVault),
-                    target: recipient,
-                    value: amount,
-                    gasLimit: 400_000,
-                    data: hex""
-                })
-            )
+        uint256 nonce = l2ToL1MessagePasser.messageNonce();
+        bytes32 withdrawalHash = Hashing.hashWithdrawal(
+            Types.WithdrawalTransaction({
+                nonce: nonce,
+                sender: address(feeVault),
+                target: recipient,
+                value: amount,
+                gasLimit: WITHDRAWAL_MIN_GAS,
+                data: hex""
+            })
         );
+
+        vm.expectEmit(Predeploys.L2_TO_L1_MESSAGE_PASSER);
+        emit MessagePassed(nonce, address(feeVault), recipient, amount, WITHDRAWAL_MIN_GAS, hex"", withdrawalHash);
 
         feeVault.withdraw();
 
-        // The withdrawal was successful
         assertEq(feeVault.totalProcessed(), amount);
         assertEq(address(feeVault).balance, 0);
         assertEq(Predeploys.L2_TO_L1_MESSAGE_PASSER.balance, amount);
@@ -150,23 +177,16 @@ abstract contract FeeVault_Uncategorized_Test is CommonTest {
     function test_withdraw_toL2_succeeds() public {
         _setupL2Withdrawal();
 
-        uint256 amount = feeVault.minWithdrawalAmount() + 1;
+        uint256 amount = minWithdrawalAmount + 1;
         vm.deal(address(feeVault), amount);
 
-        // No ether has been withdrawn yet
         assertEq(feeVault.totalProcessed(), 0);
+        _expectWithdrawalEvents(amount, recipient, Types.WithdrawalNetwork.L2);
 
-        vm.expectEmit(address(address(feeVault)));
-        emit Withdrawal(address(feeVault).balance, feeVault.RECIPIENT(), address(this));
-        vm.expectEmit(address(address(feeVault)));
-        emit Withdrawal(address(feeVault).balance, feeVault.RECIPIENT(), address(this), Types.WithdrawalNetwork.L2);
-
-        // The entire feeVault's balance is withdrawn
-        vm.expectCall(recipient, address(feeVault).balance, bytes(""));
+        vm.expectCall(recipient, amount, bytes(""));
 
         uint256 withdrawnAmount = feeVault.withdraw();
 
-        // The withdrawal was successful
         assertEq(withdrawnAmount, amount);
         assertEq(feeVault.totalProcessed(), amount);
         assertEq(address(feeVault).balance, 0);
@@ -178,17 +198,15 @@ abstract contract FeeVault_Uncategorized_Test is CommonTest {
     function test_withdraw_toL2recipientReverts_fails() external {
         _setupL2Withdrawal();
 
-        uint256 amount = feeVault.minWithdrawalAmount();
+        uint256 amount = minWithdrawalAmount;
 
         vm.deal(address(feeVault), amount);
-        // No ether has been withdrawn yet
         assertEq(feeVault.totalProcessed(), 0);
 
         // Ensure the RECIPIENT reverts
-        vm.etch(feeVault.RECIPIENT(), type(Reverter).runtimeCode);
+        vm.etch(recipient, type(Reverter).runtimeCode);
 
-        // The entire feeVault's balance is withdrawn
-        vm.expectCall(recipient, address(feeVault).balance, bytes(""));
+        vm.expectCall(recipient, amount, bytes(""));
         vm.expectRevert("FeeVault: failed to send ETH to L2 fee recipient");
         feeVault.withdraw();
         assertEq(feeVault.totalProcessed(), 0);
@@ -196,87 +214,70 @@ abstract contract FeeVault_Uncategorized_Test is CommonTest {
 
     /// @notice Tests that the owner can successfully set minimum withdrawal amount with fuzz testing.
     function testFuzz_setMinWithdrawalAmount_succeeds(uint256 _newMinWithdrawalAmount) external {
-        address owner = IProxyAdmin(Predeploys.PROXY_ADMIN).owner();
+        vm.prank(proxyAdminOwner);
+        feeVault.setMinWithdrawalAmount(_newMinWithdrawalAmount);
 
-        vm.prank(owner);
-        IFeeVault(payable(address(feeVault))).setMinWithdrawalAmount(_newMinWithdrawalAmount);
-
-        // Verify the value was updated
         assertEq(feeVault.minWithdrawalAmount(), _newMinWithdrawalAmount);
     }
 
     /// @notice Tests that non-owner cannot set minimum withdrawal amount with fuzz testing.
     function testFuzz_setMinWithdrawalAmount_onlyOwner_reverts(address _caller, uint256 _newAmount) external {
-        address owner = IProxyAdmin(Predeploys.PROXY_ADMIN).owner();
-        vm.assume(_caller != owner);
+        vm.assume(_caller != proxyAdminOwner);
 
         uint256 initialAmount = feeVault.minWithdrawalAmount();
 
         vm.prank(_caller);
-        vm.expectRevert(IFeeVault.FeeVault_OnlyProxyAdminOwner.selector);
-        IFeeVault(payable(address(feeVault))).setMinWithdrawalAmount(_newAmount);
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
+        feeVault.setMinWithdrawalAmount(_newAmount);
 
-        // Verify the value and boolean flag were NOT changed
         assertEq(feeVault.minWithdrawalAmount(), initialAmount);
     }
 
     /// @notice Tests that the owner can successfully set recipient with fuzz testing.
     function testFuzz_setRecipient_succeeds(address _newRecipient) external {
-        address owner = IProxyAdmin(Predeploys.PROXY_ADMIN).owner();
+        vm.prank(proxyAdminOwner);
+        feeVault.setRecipient(_newRecipient);
 
-        vm.prank(owner);
-        IFeeVault(payable(address(feeVault))).setRecipient(_newRecipient);
-
-        // Verify the value was updated
         assertEq(feeVault.recipient(), _newRecipient);
     }
 
     /// @notice Tests that non-owner cannot set recipient with fuzz testing.
     function testFuzz_setRecipient_onlyOwner_reverts(address _caller, address _newRecipient) external {
-        address owner = IProxyAdmin(Predeploys.PROXY_ADMIN).owner();
-        vm.assume(_caller != owner);
+        vm.assume(_caller != proxyAdminOwner);
 
         address initialRecipient = feeVault.recipient();
 
         vm.prank(_caller);
-        vm.expectRevert(IFeeVault.FeeVault_OnlyProxyAdminOwner.selector);
-        IFeeVault(payable(address(feeVault))).setRecipient(_newRecipient);
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
+        feeVault.setRecipient(_newRecipient);
 
-        // Verify the value and boolean flag were NOT changed
         assertEq(feeVault.recipient(), initialRecipient);
     }
 
     /// @notice Tests that the owner can successfully set withdrawal network with fuzz testing.
     function testFuzz_setWithdrawalNetwork_succeeds(uint8 _networkValue) external {
-        // Bound to valid enum values (0 = L1, 1 = L2)
         _networkValue = uint8(bound(_networkValue, 0, 1));
         Types.WithdrawalNetwork newNetwork = Types.WithdrawalNetwork(_networkValue);
 
-        address owner = IProxyAdmin(Predeploys.PROXY_ADMIN).owner();
+        vm.prank(proxyAdminOwner);
+        feeVault.setWithdrawalNetwork(newNetwork);
 
-        vm.prank(owner);
-        IFeeVault(payable(address(feeVault))).setWithdrawalNetwork(newNetwork);
-
-        // Verify the value was updated
         assertEq(uint8(feeVault.withdrawalNetwork()), uint8(newNetwork));
     }
 
     /// @notice Tests that non-owner cannot set withdrawal network with fuzz testing.
     function testFuzz_setWithdrawalNetwork_onlyOwner_reverts(address _caller, uint8 _networkValue) external {
-        address owner = IProxyAdmin(Predeploys.PROXY_ADMIN).owner();
-        vm.assume(_caller != owner);
+        vm.assume(_caller != proxyAdminOwner);
 
-        // Bound to valid enum values
         _networkValue = uint8(bound(_networkValue, 0, 1));
         Types.WithdrawalNetwork newNetwork = Types.WithdrawalNetwork(_networkValue);
 
         Types.WithdrawalNetwork initialNetwork = feeVault.withdrawalNetwork();
 
         vm.prank(_caller);
-        vm.expectRevert(IFeeVault.FeeVault_OnlyProxyAdminOwner.selector);
-        IFeeVault(payable(address(feeVault))).setWithdrawalNetwork(newNetwork);
+        vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
+        feeVault.setWithdrawalNetwork(newNetwork);
 
-        // Verify the value and boolean flag were NOT changed
         assertEq(uint8(feeVault.withdrawalNetwork()), uint8(initialNetwork));
     }
 }

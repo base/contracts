@@ -8,9 +8,10 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 
 // Scripts
-import { Deploy } from "scripts/deploy/Deploy.s.sol";
+import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
+import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { ForkLive } from "test/setup/ForkLive.s.sol";
-import { Fork, LATEST_FORK } from "scripts/libraries/Config.sol";
+import { LATEST_FORK } from "scripts/libraries/Config.sol";
 import { L2Genesis } from "scripts/L2Genesis.s.sol";
 import { Fork, ForkUtils } from "scripts/libraries/Config.sol";
 import { Artifacts } from "scripts/Artifacts.s.sol";
@@ -21,10 +22,8 @@ import { Config } from "scripts/libraries/Config.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { Preinstalls } from "src/libraries/Preinstalls.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
-import { Chains } from "scripts/libraries/Chains.sol";
 
 // Interfaces
-import { IOPContractsManager } from "interfaces/L1/IOPContractsManager.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
@@ -36,7 +35,6 @@ import { IOptimismMintableERC721Factory } from "interfaces/L2/IOptimismMintableE
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { IBigStepper } from "interfaces/L1/proofs/IBigStepper.sol";
 import { IL2CrossDomainMessenger } from "interfaces/L2/IL2CrossDomainMessenger.sol";
 import { IL2StandardBridge } from "interfaces/L2/IL2StandardBridge.sol";
 import { IL2ToL1MessagePasser } from "interfaces/L2/IL2ToL1MessagePasser.sol";
@@ -51,13 +49,10 @@ import { IGasPriceOracle } from "interfaces/L2/IGasPriceOracle.sol";
 import { IL1Block } from "interfaces/L2/IL1Block.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IWETH98 } from "interfaces/universal/IWETH98.sol";
-import { IPermissionedDisputeGameV2 } from "interfaces/L1/proofs/v2/IPermissionedDisputeGameV2.sol";
-import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
-import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
 /// @title Setup
-/// @dev This contact is responsible for setting up the contracts in state. It currently
+/// @dev This contract is responsible for setting up the contracts in state. It currently
 ///      sets the L2 contracts directly at the predeploy addresses instead of setting them
 ///      up behind proxies. In the future we will migrate to importing the genesis JSON
 ///      file that is created to set up the L2 contracts instead of setting them up manually.
@@ -67,16 +62,20 @@ abstract contract Setup is FeatureFlags {
     /// @notice The address of the foundry Vm contract.
     Vm private constant vm = Vm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
 
-    /// @notice The address of the Deploy contract. Set into state with `etch` to avoid
+    uint256 internal constant ETH_MAINNET_CHAIN_ID = 1;
+    uint256 internal constant ETH_SEPOLIA_CHAIN_ID = 11155111;
+
+    /// @notice The address of the SystemDeploy contract. Set into state with `etch` to avoid
     ///         mutating any nonces. MUST not have constructor logic.
-    Deploy internal constant deploy = Deploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
+    SystemDeploy internal constant deploy =
+        SystemDeploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
 
     /// @notice The address of the ForkLive contract. Set into state with `etch` to avoid
     ///         mutating any nonces. MUST not have constructor logic.
     ForkLive internal constant forkLive =
         ForkLive(address(uint160(uint256(keccak256(abi.encode("optimism.forklive"))))));
 
-    /// @notice The address of the Artifacts contract. Set into state by Deployer.setUp() with `etch` to avoid
+    /// @notice The address of the Artifacts contract. Set into state by SystemDeploy.setUp() with `etch` to avoid
     ///         mutating any nonces. MUST not have constructor logic.
     Artifacts public constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
@@ -90,10 +89,7 @@ abstract contract Setup is FeatureFlags {
     // L1 contracts - dispute
     IDisputeGameFactory disputeGameFactory;
     IAnchorStateRegistry anchorStateRegistry;
-    IFaultDisputeGameV2 faultDisputeGame;
     IDelayedWETH delayedWeth;
-    IPermissionedDisputeGameV2 permissionedDisputeGame;
-    IDelayedWETH delayedWETHPermissionedGameProxy;
 
     // L1 contracts - core
     address proxyAdminOwner;
@@ -109,8 +105,6 @@ abstract contract Setup is FeatureFlags {
     IL1ERC721Bridge l1ERC721Bridge;
     IOptimismMintableERC20Factory l1OptimismMintableERC20Factory;
     ISuperchainConfig superchainConfig;
-    IOPContractsManager opcm;
-    IBigStepper mips;
 
     // L2 contracts
     IL2CrossDomainMessenger l2CrossDomainMessenger =
@@ -129,7 +123,6 @@ abstract contract Setup is FeatureFlags {
     IGasPriceOracle gasPriceOracle = IGasPriceOracle(Predeploys.GAS_PRICE_ORACLE);
     IL1Block l1Block = IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES);
     IWETH98 weth = IWETH98(payable(Predeploys.WETH));
-    IVerifier aggregateVerifier;
     TEEProverRegistry teeProverRegistry;
 
     /// @notice Indicates whether a test is running against a forked production network.
@@ -137,51 +130,41 @@ abstract contract Setup is FeatureFlags {
         return Config.forkTest();
     }
 
-    /// @notice Indicates whether a test is running against a forked network that is OP.
-    function isOpFork() public view returns (bool) {
-        string memory opChain = Config.forkOpChain();
-        return keccak256(bytes(opChain)) == keccak256(bytes("op"));
-    }
-
-    /// @dev Deploys either the Deploy.s.sol or Fork.s.sol contract, by fetching the bytecode dynamically using
+    /// @dev Deploys the SystemDeploy and ForkLive setup contracts by fetching the bytecode dynamically using
     ///      `vm.getDeployedCode()` and etching it into the state.
     ///      This enables us to avoid including the bytecode of those contracts in the bytecode of this contract.
     ///      If the bytecode of those contracts was included in this contract, then it will double
     ///      the compile time and bloat all of the test contract artifacts since they
-    ///      will also need to include the bytecode for the Deploy contract.
+    ///      will also need to include the bytecode for the SystemDeploy contract.
     ///      This is a hack as we are pushing solidity to the edge.
     function setUp() public virtual {
         console.log("Setup: L1 setup start!");
 
-        if (isForkTest()) {
+        bool forkTest = isForkTest();
+        if (forkTest) {
             vm.createSelectFork(Config.forkRpcUrl(), Config.forkBlockNumber());
             console.log("Setup: fork selected!");
             require(
-                block.chainid == Chains.Sepolia || block.chainid == Chains.Mainnet,
+                block.chainid == ETH_SEPOLIA_CHAIN_ID || block.chainid == ETH_MAINNET_CHAIN_ID,
                 "Setup: ETH_RPC_URL must be set to a production (Sepolia or Mainnet) RPC URL"
             );
         }
 
         // Etch the contracts used to setup the test environment
-        DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(deploy), _cname: "Deploy" });
+        DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(deploy), _cname: "SystemDeploy" });
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(forkLive), _cname: "ForkLive" });
 
         deploy.setUp();
-        forkLive.setUp();
-
-        deploy.cfg().setDevFeatureBitmap(devFeatureBitmap);
 
         console.log("Setup: L1 setup done!");
 
-        if (isForkTest()) {
-            // Return early if this is a fork test as we don't need to setup L2
+        if (forkTest) {
             console.log("Setup: fork test detected, skipping L2 genesis generation");
             return;
         }
 
         console.log("Setup: L2 setup start!");
-        vm.etch(address(l2Genesis), vm.getDeployedCode("L2Genesis.s.sol:L2Genesis"));
-        vm.allowCheatcodes(address(l2Genesis));
+        DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(l2Genesis), _cname: "L2Genesis" });
         console.log("Setup: L2 setup done!");
     }
 
@@ -222,13 +205,10 @@ abstract contract Setup is FeatureFlags {
     /// @dev Sets up the L1 contracts.
     function L1() public {
         console.log("Setup: creating L1 deployments");
-        // Set the deterministic deployer in state to ensure that it is there
-        vm.etch(
-            0x4e59b44847b379578588920cA78FbF26c0B4956C,
-            hex"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3"
-        );
+        vm.etch(Preinstalls.DeterministicDeploymentProxy, Preinstalls.DeterministicDeploymentProxyCode);
 
-        if (isForkTest()) {
+        bool forkTest = isForkTest();
+        if (forkTest) {
             forkLive.run();
         } else {
             deploy.run();
@@ -240,7 +220,7 @@ abstract contract Setup is FeatureFlags {
 
         // Only skip ETHLockbox assignment if we're in a fork test with non-upgraded fork
         // TODO(#14691): Remove this check once Upgrade 15 is deployed on Mainnet.
-        if (!isForkTest() || deploy.cfg().useUpgradedFork()) {
+        if (!forkTest || deploy.cfg().useUpgradedFork()) {
             // Here we use getAddress instead of mustGetAddress because some chains might not have
             // the ETHLockbox proxy. Chains that don't have the ETHLockbox proxy will just return
             // address(0) and cause a revert if we use mustGetAddress.
@@ -261,14 +241,11 @@ abstract contract Setup is FeatureFlags {
         anchorStateRegistry = IAnchorStateRegistry(artifacts.mustGetAddress("AnchorStateRegistryProxy"));
         disputeGameFactory = IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
         delayedWeth = IDelayedWETH(artifacts.mustGetAddress("DelayedWETHProxy"));
-        opcm = IOPContractsManager(artifacts.mustGetAddress("OPContractsManager"));
         proxyAdmin = IProxyAdmin(artifacts.mustGetAddress("ProxyAdmin"));
         proxyAdminOwner = proxyAdmin.owner();
         superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
         superchainProxyAdminOwner = superchainProxyAdmin.owner();
-        mips = IBigStepper(artifacts.mustGetAddress("MipsSingleton"));
-        aggregateVerifier = IVerifier(artifacts.mustGetAddress("AggregateVerifier"));
-        teeProverRegistry = TEEProverRegistry(artifacts.mustGetAddress("TEEProverRegistry"));
+        teeProverRegistry = TEEProverRegistry(artifacts.getAddress("TEEProverRegistry"));
 
         console.log("Setup: registered L1 deployments");
 
@@ -285,32 +262,29 @@ abstract contract Setup is FeatureFlags {
         }
 
         console.log("Setup: creating L2 genesis with fork %s", l2Fork.toString());
+        DeployConfig cfg = deploy.cfg();
         l2Genesis.run(
             L2Genesis.Input({
-                l1ChainID: deploy.cfg().l1ChainID(),
-                l2ChainID: deploy.cfg().l2ChainID(),
+                l1ChainID: cfg.l1ChainId(),
+                l2ChainID: cfg.l2ChainId(),
                 l1CrossDomainMessengerProxy: payable(address(l1CrossDomainMessenger)),
                 l1StandardBridgeProxy: payable(address(l1StandardBridge)),
                 l1ERC721BridgeProxy: payable(address(l1ERC721Bridge)),
-                opChainProxyAdminOwner: deploy.cfg().proxyAdminOwner(),
-                sequencerFeeVaultRecipient: deploy.cfg().sequencerFeeVaultRecipient(),
-                sequencerFeeVaultMinimumWithdrawalAmount: deploy.cfg().sequencerFeeVaultMinimumWithdrawalAmount(),
-                sequencerFeeVaultWithdrawalNetwork: deploy.cfg().sequencerFeeVaultWithdrawalNetwork(),
-                baseFeeVaultRecipient: deploy.cfg().baseFeeVaultRecipient(),
-                baseFeeVaultMinimumWithdrawalAmount: deploy.cfg().baseFeeVaultMinimumWithdrawalAmount(),
-                baseFeeVaultWithdrawalNetwork: deploy.cfg().baseFeeVaultWithdrawalNetwork(),
-                l1FeeVaultRecipient: deploy.cfg().l1FeeVaultRecipient(),
-                l1FeeVaultMinimumWithdrawalAmount: deploy.cfg().l1FeeVaultMinimumWithdrawalAmount(),
-                l1FeeVaultWithdrawalNetwork: deploy.cfg().l1FeeVaultWithdrawalNetwork(),
-                operatorFeeVaultRecipient: deploy.cfg().operatorFeeVaultRecipient(),
-                operatorFeeVaultMinimumWithdrawalAmount: deploy.cfg().operatorFeeVaultMinimumWithdrawalAmount(),
-                operatorFeeVaultWithdrawalNetwork: deploy.cfg().operatorFeeVaultWithdrawalNetwork(),
-                governanceTokenOwner: deploy.cfg().governanceTokenOwner(),
+                opChainProxyAdminOwner: cfg.proxyAdminOwner(),
+                sequencerFeeVaultRecipient: cfg.sequencerFeeVaultRecipient(),
+                sequencerFeeVaultMinimumWithdrawalAmount: cfg.sequencerFeeVaultMinimumWithdrawalAmount(),
+                sequencerFeeVaultWithdrawalNetwork: cfg.sequencerFeeVaultWithdrawalNetwork(),
+                baseFeeVaultRecipient: cfg.baseFeeVaultRecipient(),
+                baseFeeVaultMinimumWithdrawalAmount: cfg.baseFeeVaultMinimumWithdrawalAmount(),
+                baseFeeVaultWithdrawalNetwork: cfg.baseFeeVaultWithdrawalNetwork(),
+                l1FeeVaultRecipient: cfg.l1FeeVaultRecipient(),
+                l1FeeVaultMinimumWithdrawalAmount: cfg.l1FeeVaultMinimumWithdrawalAmount(),
+                l1FeeVaultWithdrawalNetwork: cfg.l1FeeVaultWithdrawalNetwork(),
+                operatorFeeVaultRecipient: cfg.operatorFeeVaultRecipient(),
+                operatorFeeVaultMinimumWithdrawalAmount: cfg.operatorFeeVaultMinimumWithdrawalAmount(),
+                operatorFeeVaultWithdrawalNetwork: cfg.operatorFeeVaultWithdrawalNetwork(),
                 fork: uint256(l2Fork),
-                enableGovernance: deploy.cfg().enableGovernance(),
-                fundDevAccounts: deploy.cfg().fundDevAccounts(),
-                chainFeesRecipient: deploy.cfg().chainFeesRecipient(),
-                l1FeesDepositor: deploy.cfg().l1FeesDepositor()
+                fundDevAccounts: cfg.fundDevAccounts()
             })
         );
 

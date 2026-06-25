@@ -9,6 +9,7 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 import { NextImpl } from "test/mocks/NextImpl.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { DisputeGameFactory_TestInit } from "test/L1/proofs/DisputeGameFactory.t.sol";
+import { MockVerifier } from "test/mocks/MockVerifier.sol";
 
 // Scripts
 import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
@@ -18,25 +19,25 @@ import { Types } from "src/libraries/Types.sol";
 import { Hashing } from "src/libraries/Hashing.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
-import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { Features } from "src/libraries/Features.sol";
+import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import "src/libraries/bridge/Types.sol";
+import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 
 // Interfaces
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
+import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
-import { IFaultDisputeGameV2 } from "interfaces/L1/proofs/v2/IFaultDisputeGameV2.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
-import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
+import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 
 abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
     address depositor;
 
     Types.WithdrawalTransaction _defaultTx;
-    IFaultDisputeGameV2 game;
+    IAggregateVerifier game;
     uint256 _proposedGameIndex;
     uint256 _proposedBlockNumber;
     bytes32 _stateRoot;
@@ -75,49 +76,155 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
 
     /// @dev Setup the system for a ready-to-use state.
     function setUp() public virtual override {
-        if (isForkTest()) {
-            // Set the proposed block number to be the next block number on the forked network
-            (, _proposedBlockNumber) = anchorStateRegistry.getAnchorRoot();
-            _proposedBlockNumber += 1;
+        respectedGameType = optimismPortal2.respectedGameType();
+        MockVerifier teeVerifier = new MockVerifier(anchorStateRegistry);
+        MockVerifier zkVerifier = new MockVerifier(anchorStateRegistry);
+        AggregateVerifier gameImpl = new AggregateVerifier(
+            respectedGameType,
+            anchorStateRegistry,
+            delayedWeth,
+            IVerifier(address(teeVerifier)),
+            IVerifier(address(zkVerifier)),
+            bytes32(uint256(1)),
+            AggregateVerifier.ZkHashes(bytes32(uint256(2)), bytes32(uint256(3))),
+            bytes32(uint256(4)),
+            deploy.cfg().l2ChainId(),
+            100,
+            10
+        );
+        disputeGameFactory.setImplementation(respectedGameType, IDisputeGame(address(gameImpl)));
+        disputeGameFactory.setInitBond(respectedGameType, 0);
 
-            // Set the init bond of anchor game type 0 to be 0.
-            // It is a mapping so the storage slot is calculated as keccak256(abi.encode(key, slot)).
-            // The storage slot for the initBond mapping is 102, see `snapshots/storageLayout/DisputeGameFactory.json`.
-            vm.store(
-                address(disputeGameFactory), keccak256(abi.encode(GameType.wrap(0), uint256(102))), bytes32(uint256(0))
-            );
-        } else {
-            // Set up the dummy game.
-            _proposedBlockNumber = 0xFF;
-        }
+        Proposal memory startingRoot = anchorStateRegistry.getStartingAnchorRoot();
+        _proposedBlockNumber = startingRoot.l2SequenceNumber + gameImpl.BLOCK_INTERVAL();
 
         depositor = makeAddr("depositor");
-
-        setupFaultDisputeGame(Claim.wrap(_outputRoot));
 
         // Warp forward in time to ensure that the game is created after the retirement timestamp.
         vm.warp(anchorStateRegistry.retirementTimestamp() + 1);
 
-        respectedGameType = optimismPortal2.respectedGameType();
-        game = IFaultDisputeGameV2(
-            payable(address(
-                    disputeGameFactory.create{ value: disputeGameFactory.initBonds(respectedGameType) }(
-                        respectedGameType, Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber)
-                    )
-                ))
-        );
+        game = _createDisputeGame(Claim.wrap(_outputRoot), 0);
 
         // Grab the index of the game we just created.
         _proposedGameIndex = disputeGameFactory.gameCount() - 1;
 
-        // Warp beyond the chess clocks and finalize the game.
-        vm.warp(block.timestamp + game.maxClockDuration().raw() + 1 seconds);
+        // Warp beyond the resolution delay.
+        vm.warp(game.expectedResolution().raw() + 1 seconds);
 
         // Fund the portal so that we can withdraw ETH.
         vm.deal(address(optimismPortal2), 0xFFFFFFFF);
         if (isUsingLockbox()) {
             vm.deal(address(ethLockbox), 0xFFFFFFFF);
         }
+    }
+
+    function _createDisputeGame(Claim _rootClaim, uint256 _salt) internal returns (IAggregateVerifier game_) {
+        AggregateVerifier gameImpl = AggregateVerifier(address(disputeGameFactory.gameImpls(respectedGameType)));
+        bytes memory intermediateRoots =
+            _generateIntermediateRoots(_rootClaim, _salt, gameImpl.intermediateOutputRootsCount());
+        bytes memory extraData = abi.encodePacked(_proposedBlockNumber, address(anchorStateRegistry), intermediateRoots);
+        bytes memory proof = abi.encodePacked(
+            uint8(AggregateVerifier.ProofType.TEE), blockhash(block.number - 1), block.number - 1, bytes32(0)
+        );
+
+        game_ = IAggregateVerifier(
+            payable(address(
+                    disputeGameFactory.createWithInitData{ value: disputeGameFactory.initBonds(respectedGameType) }(
+                        respectedGameType, _rootClaim, extraData, proof
+                    )
+                ))
+        );
+    }
+
+    function _generateIntermediateRoots(
+        Claim _rootClaim,
+        uint256 _salt,
+        uint256 _intermediateRootsCount
+    )
+        private
+        view
+        returns (bytes memory)
+    {
+        bytes32[] memory intermediateRoots = new bytes32[](_intermediateRootsCount);
+        for (uint256 i = 1; i < _intermediateRootsCount; i++) {
+            intermediateRoots[i - 1] = keccak256(abi.encode(_proposedBlockNumber, i, _salt));
+        }
+        intermediateRoots[_intermediateRootsCount - 1] = _rootClaim.raw();
+
+        return abi.encodePacked(intermediateRoots);
+    }
+
+    function _expectWithdrawalProven(bytes32 _withdrawalHash_, address _proofSubmitter) internal {
+        vm.expectEmit(true, true, true, true, address(optimismPortal2));
+        emit WithdrawalProven(_withdrawalHash_, alice, bob);
+        vm.expectEmit(true, true, true, true, address(optimismPortal2));
+        emit WithdrawalProvenExtension1(_withdrawalHash_, _proofSubmitter);
+    }
+
+    function _proveDefaultWithdrawal() internal {
+        _expectWithdrawalProven(_withdrawalHash, address(this));
+        optimismPortal2.proveWithdrawalTransaction({
+            _tx: _defaultTx,
+            _disputeGameIndex: _proposedGameIndex,
+            _outputRootProof: _outputRootProof,
+            _withdrawalProof: _withdrawalProof
+        });
+    }
+
+    function _resolveGameAndWarpPastProofMaturity(IDisputeGame _game) internal {
+        _game.resolve();
+        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1 seconds);
+    }
+
+    function _proveFuzzedWithdrawal(
+        address _sender,
+        address _target,
+        uint256 _value,
+        uint256 _gasLimit,
+        bytes memory _data
+    )
+        internal
+        returns (Types.WithdrawalTransaction memory withdrawalTx_, bytes32 withdrawalHash_)
+    {
+        uint256 value = bound(_value, 0, 200_000_000 ether);
+        vm.deal(address(optimismPortal2), value);
+        if (isUsingLockbox()) {
+            vm.deal(address(ethLockbox), value);
+        }
+
+        uint256 gasLimit = bound(_gasLimit, 0, 50_000_000);
+        withdrawalTx_ = Types.WithdrawalTransaction({
+            nonce: l2ToL1MessagePasser.messageNonce(),
+            sender: _sender,
+            target: _target,
+            value: value,
+            gasLimit: gasLimit,
+            data: _data
+        });
+
+        (
+            bytes32 stateRoot,
+            bytes32 storageRoot,
+            bytes32 outputRoot,
+            bytes32 withdrawalHash,
+            bytes[] memory withdrawalProof
+        ) = ffi.getProveWithdrawalTransactionInputs(withdrawalTx_);
+        withdrawalHash_ = withdrawalHash;
+
+        Types.OutputRootProof memory proof = Types.OutputRootProof({
+            version: bytes32(uint256(0)),
+            stateRoot: stateRoot,
+            messagePasserStorageRoot: storageRoot,
+            latestBlockhash: bytes32(uint256(0))
+        });
+
+        assertEq(outputRoot, Hashing.hashOutputRootProof(proof));
+        assertEq(withdrawalHash_, Hashing.hashWithdrawal(withdrawalTx_));
+
+        vm.mockCall(address(game), abi.encodeCall(game.rootClaim, ()), abi.encode(outputRoot));
+        optimismPortal2.proveWithdrawalTransaction(withdrawalTx_, _proposedGameIndex, proof, withdrawalProof);
+        (IDisputeGame provenGame,) = optimismPortal2.provenWithdrawals(withdrawalHash_, address(this));
+        assertTrue(provenGame.rootClaim().raw() != bytes32(0));
     }
 
     /// @notice Asserts that the reentrant call will revert.
@@ -134,14 +241,14 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
 
     /// @notice Checks if the ETHLockbox feature is enabled.
     /// @return bool True if the ETHLockbox feature is enabled.
-    function isUsingLockbox() public view returns (bool) {
+    function isUsingLockbox() internal view returns (bool) {
         return
             systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX) && address(optimismPortal2.ethLockbox()) != address(0);
     }
 
     /// @notice Enables the ETHLockbox feature if not enabled.
     /// @param _lockbox Address of the lockbox to enable.
-    function forceEnableLockbox(address _lockbox) public {
+    function forceEnableLockbox(address _lockbox) internal {
         if (!isSysFeatureEnabled(Features.ETH_LOCKBOX)) {
             vm.prank(address(proxyAdmin));
             systemConfig.setFeature(Features.ETH_LOCKBOX, true);
@@ -172,14 +279,11 @@ contract OptimismPortal2_Version_Test is OptimismPortal2_TestInit {
 /// @notice Test contract for OptimismPortal2 `constructor` function.
 contract OptimismPortal2_Constructor_Test is OptimismPortal2_TestInit {
     /// @notice Tests that the constructor sets the correct values.
-    /// @dev Marked virtual to be overridden in
-    ///      test/kontrol/deployment/DeploymentSummary.t.sol
-    function test_constructor_succeeds() external virtual {
+    function test_constructor_succeeds() external view {
         IOptimismPortal opImpl = IOptimismPortal(payable(EIP1967Helper.getImplementation(address(optimismPortal2))));
         assertEq(address(opImpl.anchorStateRegistry()), address(0));
         assertEq(address(opImpl.systemConfig()), address(0));
         assertEq(opImpl.l2Sender(), address(0));
-        assertEq(address(opImpl.anchorStateRegistry()), address(0));
         assertEq(address(opImpl.ethLockbox()), address(0));
     }
 }
@@ -188,9 +292,7 @@ contract OptimismPortal2_Constructor_Test is OptimismPortal2_TestInit {
 /// @notice Test contract for OptimismPortal2 `initialize` function.
 contract OptimismPortal2_Initialize_Test is OptimismPortal2_TestInit {
     /// @notice Tests that the initializer sets the correct values.
-    /// @dev Marked virtual to be overridden in
-    ///      test/kontrol/deployment/DeploymentSummary.t.sol
-    function test_initialize_succeeds() public virtual {
+    function test_initialize_succeeds() public view {
         assertEq(address(optimismPortal2.anchorStateRegistry()), address(anchorStateRegistry));
         assertEq(address(optimismPortal2.disputeGameFactory()), address(disputeGameFactory));
         assertEq(address(optimismPortal2.superchainConfig()), address(superchainConfig));
@@ -223,7 +325,7 @@ contract OptimismPortal2_Initialize_Test is OptimismPortal2_TestInit {
     /// @notice Tests that the initializer value is correct. Trivial test for normal
     ///         initialization but confirms that the initValue is not incremented incorrectly if
     ///         an upgrade function is not present.
-    function test_initialize_correctInitializerValue_succeeds() public {
+    function test_initialize_correctInitializerValue_succeeds() public view {
         // Get the slot for _initialized.
         StorageSlot memory slot = ForgeArtifacts.getSlot("OptimismPortal2", "_initialized");
 
@@ -411,13 +513,7 @@ contract OptimismPortal2_NumProofSubmitters_Test is OptimismPortal2_TestInit {
     function test_numProofSubmitters_provenWithdrawal_succeeds() external {
         bytes32 withdrawalHash = Hashing.hashWithdrawal(_defaultTx);
 
-        // Prove the withdrawal
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         assertEq(optimismPortal2.numProofSubmitters(withdrawalHash), 1);
     }
@@ -427,13 +523,7 @@ contract OptimismPortal2_NumProofSubmitters_Test is OptimismPortal2_TestInit {
         vm.assume(_prover != address(0) && _prover != address(this));
         bytes32 withdrawalHash = Hashing.hashWithdrawal(_defaultTx);
 
-        // First proof by this contract
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Second proof by different prover
         vm.prank(_prover);
@@ -546,10 +636,8 @@ contract OptimismPortal2_DonateETH_Test is OptimismPortal2_TestInit {
         optimismPortal2.donateETH{ value: _amount }();
         VmSafe.AccountAccess[] memory accountAccesses = vm.stopAndReturnStateDiff();
 
-        // not necessary since it's checked below
         assertEq(address(optimismPortal2).balance, preBalance + _amount);
 
-        // check that the ETHLockbox balance is unchanged
         assertEq(address(ethLockbox).balance, lockboxBalanceBefore);
 
         // 0 for extcodesize of proxy before being called by this test,
@@ -559,28 +647,13 @@ contract OptimismPortal2_DonateETH_Test is OptimismPortal2_TestInit {
         assertEq(uint8(accountAccesses[1].kind), uint8(VmSafe.AccountAccessKind.Call));
         assertEq(uint8(accountAccesses[2].kind), uint8(VmSafe.AccountAccessKind.DelegateCall));
 
-        // to of 1 is the optimism portal proxy
         assertEq(accountAccesses[1].account, address(optimismPortal2));
-
-        // accessor is the pranked address
         assertEq(accountAccesses[1].accessor, alice);
-
-        // value is the amount of ETH donated
         assertEq(accountAccesses[1].value, _amount);
-
-        // old balance is the balance of the optimism portal before the donation
         assertEq(accountAccesses[1].oldBalance, preBalance);
-
-        // new balance is the balance of the optimism portal after the donation
         assertEq(accountAccesses[1].newBalance, preBalance + _amount);
-
-        // data is the selector of the donateETH function
         assertEq(accountAccesses[1].data, abi.encodePacked(optimismPortal2.donateETH.selector));
-
-        // reverted of alice call to proxy is false
         assertEq(accountAccesses[1].reverted, false);
-
-        // reverted of delegate call of proxy to impl is false
         assertEq(accountAccesses[2].reverted, false);
 
         // storage accesses of delegate call of proxy to impl is empty (No storage read or write!)
@@ -679,26 +752,13 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
     /// @notice Tests that `proveWithdrawalTransaction` reverts when the withdrawal has already
     ///         been proven, and the new game has the `CHALLENGER_WINS` status.
     function test_proveWithdrawalTransaction_replayProveDifferentGameChallengerWins_reverts() external {
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Create a new dispute game, and mock both games to be CHALLENGER_WINS.
-        IDisputeGame game2 = disputeGameFactory.create{
-            value: disputeGameFactory.initBonds(optimismPortal2.respectedGameType())
-        }(
-            optimismPortal2.respectedGameType(), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1)
-        );
+        IDisputeGame game2 = _createDisputeGame(Claim.wrap(_outputRoot), 1);
         _proposedGameIndex = disputeGameFactory.gameCount() - 1;
         vm.mockCall(address(game), abi.encodeCall(game.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
-        vm.mockCall(address(game2), abi.encodeCall(game.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
+        vm.mockCall(address(game2), abi.encodeCall(game2.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
 
         vm.expectRevert(IOptimismPortal.OptimismPortal_InvalidDisputeGame.selector);
         optimismPortal2.proveWithdrawalTransaction({
@@ -726,7 +786,7 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
     ///         does not implement `wasRespectedGameTypeWhenCreated`.
     function test_proveWithdrawalTransaction_legacyGame_reverts() external {
         vm.mockCallRevert(address(game), abi.encodeCall(game.wasRespectedGameTypeWhenCreated, ()), "");
-        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
+        vm.expectRevert(bytes(""));
         optimismPortal2.proveWithdrawalTransaction({
             _tx: _defaultTx,
             _disputeGameIndex: _proposedGameIndex,
@@ -768,62 +828,29 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
     /// @notice Tests that `proveWithdrawalTransaction` can be re-executed if the dispute game
     ///         proven against has resolved against the favor of the root claim.
     function test_proveWithdrawalTransaction_replayProveBadProposal_succeeds() external {
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Mock the status of the dispute game we just proved against to be CHALLENGER_WINS.
         vm.mockCall(address(game), abi.encodeCall(game.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
 
         // Create a new game to re-prove against
-        disputeGameFactory.create{ value: disputeGameFactory.initBonds(respectedGameType) }(
-            respectedGameType, Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1)
-        );
+        _createDisputeGame(Claim.wrap(_outputRoot), 1);
         _proposedGameIndex = disputeGameFactory.gameCount() - 1;
 
         // Warp 1 second into the future so we're not in the same block as the dispute game.
         vm.warp(block.timestamp + 1 seconds);
 
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
     }
 
     /// @notice Tests that `proveWithdrawalTransaction` can be re-executed if the dispute game
     ///         proven against is no longer of the respected game type.
     function test_proveWithdrawalTransaction_replayRespectedGameTypeChanged_succeeds() external {
         // Prove the withdrawal against a game with the current respected game type.
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Create a new game.
-        IDisputeGame newGame = disputeGameFactory.create{
-            value: disputeGameFactory.initBonds(optimismPortal2.respectedGameType())
-        }(
-            GameType.wrap(0), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1)
-        );
+        IDisputeGame newGame = _createDisputeGame(Claim.wrap(_outputRoot), 1);
 
         // Update the respected game type to 0xbeef.
         vm.prank(optimismPortal2.guardian());
@@ -840,10 +867,7 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
         vm.warp(block.timestamp + 1 seconds);
 
         // Re-proving should be successful against the new game.
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
+        _expectWithdrawalProven(_withdrawalHash, address(this));
         optimismPortal2.proveWithdrawalTransaction({
             _tx: _defaultTx,
             _disputeGameIndex: _proposedGameIndex + 1,
@@ -854,16 +878,7 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
 
     /// @notice Tests that `proveWithdrawalTransaction` succeeds.
     function test_proveWithdrawalTransaction_validWithdrawalProof_succeeds() external {
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
     }
 }
 
@@ -894,10 +909,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         emit WithdrawalProven(_withdrawalHash, alice, bob);
         optimismPortal2.proveWithdrawalTransaction(_defaultTx, _proposedGameIndex, _outputRootProof, _withdrawalProof);
 
-        // Warp and resolve the dispute game.
-        game.resolveClaim(0, 0);
-        game.resolve();
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1 seconds);
+        _resolveGameAndWarpPastProofMaturity(game);
 
         vm.startPrank(alice, Constants.ESTIMATION_ADDRESS);
         vm.expectRevert(IOptimismPortal.OptimismPortal_GasEstimation.selector);
@@ -910,36 +922,28 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
 
         // Get withdrawal proof data we can use for testing.
         (
-            bytes32 _stateRoot_noData,
-            bytes32 _storageRoot_noData,
-            bytes32 _outputRoot_noData,
-            bytes32 _withdrawalHash_noData,
-            bytes[] memory _withdrawalProof_noData
+            bytes32 stateRootNoData,
+            bytes32 storageRootNoData,
+            bytes32 outputRootNoData,
+            bytes32 withdrawalHashNoData,
+            bytes[] memory withdrawalProofNoData
         ) = ffi.getProveWithdrawalTransactionInputs(_defaultTx);
 
         // Setup a dummy output root proof for reuse.
-        Types.OutputRootProof memory _outputRootProof_noData = Types.OutputRootProof({
+        Types.OutputRootProof memory outputRootProofNoData = Types.OutputRootProof({
             version: bytes32(uint256(0)),
-            stateRoot: _stateRoot_noData,
-            messagePasserStorageRoot: _storageRoot_noData,
+            stateRoot: stateRootNoData,
+            messagePasserStorageRoot: storageRootNoData,
             latestBlockhash: bytes32(uint256(0))
         });
 
-        IFaultDisputeGameV2 game_noData = IFaultDisputeGameV2(
-            payable(address(
-                    disputeGameFactory.create{ value: disputeGameFactory.initBonds(respectedGameType) }(
-                        respectedGameType, Claim.wrap(_outputRoot_noData), abi.encode(_proposedBlockNumber)
-                    )
-                ))
-        );
+        IAggregateVerifier gameNoData = _createDisputeGame(Claim.wrap(outputRootNoData), 0);
 
-        uint256 _proposedGameIndex_noData = disputeGameFactory.gameCount() - 1;
+        uint256 proposedGameIndexNoData = disputeGameFactory.gameCount() - 1;
 
-        // Warp beyond the chess clocks and finalize the game.
-        vm.warp(block.timestamp + game_noData.maxClockDuration().raw() + 1 seconds);
+        // Warp beyond the resolution delay.
+        vm.warp(gameNoData.expectedResolution().raw() + 1 seconds);
 
-        // Fund the portal so that we can withdraw ETH.
-        vm.store(address(optimismPortal2), bytes32(uint256(61)), bytes32(uint256(0xFFFFFFFF)));
         vm.deal(address(optimismPortal2), 0xFFFFFFFF);
         if (isUsingLockbox()) {
             vm.deal(address(ethLockbox), 0xFFFFFFFF);
@@ -947,24 +951,18 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
 
         uint256 bobBalanceBefore = bob.balance;
 
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProven(_withdrawalHash_noData, alice, bob);
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProvenExtension1(_withdrawalHash_noData, address(this));
+        _expectWithdrawalProven(withdrawalHashNoData, address(this));
         optimismPortal2.proveWithdrawalTransaction({
             _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex_noData,
-            _outputRootProof: _outputRootProof_noData,
-            _withdrawalProof: _withdrawalProof_noData
+            _disputeGameIndex: proposedGameIndexNoData,
+            _outputRootProof: outputRootProofNoData,
+            _withdrawalProof: withdrawalProofNoData
         });
 
-        // Warp and resolve the dispute game.
-        game_noData.resolveClaim(0, 0);
-        game_noData.resolve();
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1 seconds);
+        _resolveGameAndWarpPastProofMaturity(gameNoData);
 
         vm.expectEmit(true, true, false, true);
-        emit WithdrawalFinalized(_withdrawalHash_noData, true);
+        emit WithdrawalFinalized(withdrawalHashNoData, true);
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
 
         assert(bob.balance == bobBalanceBefore + _defaultTx.value);
@@ -974,21 +972,9 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
     function test_finalizeWithdrawalTransaction_provenWithdrawalHashEther_succeeds() external {
         uint256 bobBalanceBefore = address(bob).balance;
 
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
-        // Warp and resolve the dispute game.
-        game.resolveClaim(0, 0);
-        game.resolve();
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1 seconds);
+        _resolveGameAndWarpPastProofMaturity(game);
 
         vm.expectEmit(true, true, false, true);
         emit WithdrawalFinalized(_withdrawalHash, true);
@@ -1003,20 +989,13 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         uint256 bobBalanceBefore = address(bob).balance;
 
         // Create a secondary dispute game.
-        IDisputeGame secondGame = disputeGameFactory.create{
-            value: disputeGameFactory.initBonds(optimismPortal2.respectedGameType())
-        }(
-            optimismPortal2.respectedGameType(), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber + 1)
-        );
+        IDisputeGame secondGame = _createDisputeGame(Claim.wrap(_outputRoot), 1);
 
         // Warp 1 second into the future so that the proof is submitted after the timestamp of game creation.
         vm.warp(block.timestamp + 1);
 
         // Prove the withdrawal transaction against the invalid dispute game, as 0xb0b.
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(0xb0b));
+        _expectWithdrawalProven(_withdrawalHash, address(0xb0b));
         vm.prank(address(0xb0b));
         optimismPortal2.proveWithdrawalTransaction({
             _tx: _defaultTx,
@@ -1026,25 +1005,13 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         });
 
         // Mock the status of the dispute game 0xb0b proves against to be CHALLENGER_WINS.
-        vm.mockCall(address(secondGame), abi.encodeCall(game.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
+        vm.mockCall(address(secondGame), abi.encodeCall(secondGame.status, ()), abi.encode(GameStatus.CHALLENGER_WINS));
 
         // Prove the withdrawal transaction against the invalid dispute game, as the test contract, against the original
         // game.
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
-        // Warp and resolve the original dispute game.
-        game.resolveClaim(0, 0);
-        game.resolve();
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1 seconds);
+        _resolveGameAndWarpPastProofMaturity(game);
 
         // Ensure both proofs are registered successfully.
         assertEq(optimismPortal2.numProofSubmitters(_withdrawalHash), 2);
@@ -1085,16 +1052,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
     function test_finalizeWithdrawalTransaction_ifWithdrawalProofNotOldEnough_reverts() external {
         uint256 bobBalanceBefore = address(bob).balance;
 
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         vm.expectRevert(IOptimismPortal.OptimismPortal_ProofNotOldEnough.selector);
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
@@ -1108,16 +1066,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         uint256 bobBalanceBefore = address(bob).balance;
 
         // Prove our withdrawal
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Warp to after the finalization period
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
@@ -1139,16 +1088,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         uint256 bobBalanceBefore = address(bob).balance;
 
         // Prove our withdrawal
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Warp to after the finalization period
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
@@ -1170,22 +1110,9 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         uint256 bobBalanceBefore = address(bob).balance;
         vm.etch(bob, hex"fe"); // Contract with just the invalid opcode.
 
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
-        // Resolve the dispute game.
-        game.resolveClaim(0, 0);
-        game.resolve();
-
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
+        _resolveGameAndWarpPastProofMaturity(game);
         vm.expectEmit(true, true, true, true);
         emit WithdrawalFinalized(_withdrawalHash, false);
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
@@ -1211,22 +1138,9 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         uint256 bobBalanceBefore = address(bob).balance;
         vm.etch(bob, hex"fe"); // Contract with just the invalid opcode.
 
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
-        // Resolve the dispute game.
-        game.resolveClaim(0, 0);
-        game.resolve();
-
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
+        _resolveGameAndWarpPastProofMaturity(game);
         vm.expectEmit(true, true, true, true);
         emit WithdrawalFinalized(_withdrawalHash, false);
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
@@ -1241,22 +1155,9 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
     /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the withdrawal has already
     ///         been finalized.
     function test_finalizeWithdrawalTransaction_onReplay_reverts() external {
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
-        // Resolve the dispute game.
-        game.resolveClaim(0, 0);
-        game.resolve();
-
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
+        _resolveGameAndWarpPastProofMaturity(game);
         vm.expectEmit(true, true, true, true);
         emit WithdrawalFinalized(_withdrawalHash, true);
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
@@ -1293,11 +1194,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
             _withdrawalProof: withdrawalProof
         });
 
-        // Resolve the dispute game.
-        game.resolveClaim(0, 0);
-        game.resolve();
-
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
+        _resolveGameAndWarpPastProofMaturity(game);
         vm.expectRevert("SafeCall: Not enough gas");
         optimismPortal2.finalizeWithdrawalTransaction{ gas: _defaultTx.gasLimit }(_defaultTx);
     }
@@ -1337,11 +1234,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         emit WithdrawalProvenExtension1(withdrawalHash, address(this));
         optimismPortal2.proveWithdrawalTransaction(_testTx, _proposedGameIndex, outputRootProof, withdrawalProof);
 
-        // Resolve the dispute game.
-        game.resolveClaim(0, 0);
-        game.resolve();
-
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
+        _resolveGameAndWarpPastProofMaturity(game);
         vm.expectCall(address(this), _testTx.data);
         vm.expectEmit(true, true, true, true);
         emit WithdrawalFinalized(withdrawalHash, true);
@@ -1370,58 +1263,13 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
                 && uint160(_target) > 9 // No precompiles (or zero address)
         );
 
-        // Total ETH supply is currently about 120M ETH.
-        uint256 value = bound(_value, 0, 200_000_000 ether);
-        vm.deal(address(optimismPortal2), value);
-        if (isUsingLockbox()) {
-            vm.deal(address(ethLockbox), value);
-        }
+        (Types.WithdrawalTransaction memory withdrawalTx, bytes32 withdrawalHash) =
+            _proveFuzzedWithdrawal(_sender, _target, _value, _gasLimit, _data);
 
-        uint256 gasLimit = bound(_gasLimit, 0, 50_000_000);
-        uint256 nonce = l2ToL1MessagePasser.messageNonce();
+        _resolveGameAndWarpPastProofMaturity(game);
 
-        // Get a withdrawal transaction and mock proof from the differential testing script.
-        Types.WithdrawalTransaction memory _tx = Types.WithdrawalTransaction({
-            nonce: nonce, sender: _sender, target: _target, value: value, gasLimit: gasLimit, data: _data
-        });
-        (
-            bytes32 stateRoot,
-            bytes32 storageRoot,
-            bytes32 outputRoot,
-            bytes32 withdrawalHash,
-            bytes[] memory withdrawalProof
-        ) = ffi.getProveWithdrawalTransactionInputs(_tx);
-
-        // Create the output root proof
-        Types.OutputRootProof memory proof = Types.OutputRootProof({
-            version: bytes32(uint256(0)),
-            stateRoot: stateRoot,
-            messagePasserStorageRoot: storageRoot,
-            latestBlockhash: bytes32(uint256(0))
-        });
-
-        // Ensure the values returned from ffi are correct
-        assertEq(outputRoot, Hashing.hashOutputRootProof(proof));
-        assertEq(withdrawalHash, Hashing.hashWithdrawal(_tx));
-
-        // Setup the dispute game to return the output root
-        vm.mockCall(address(game), abi.encodeCall(game.rootClaim, ()), abi.encode(outputRoot));
-
-        // Prove the withdrawal transaction
-        optimismPortal2.proveWithdrawalTransaction(_tx, _proposedGameIndex, proof, withdrawalProof);
-        (IDisputeGame _game,) = optimismPortal2.provenWithdrawals(withdrawalHash, address(this));
-        assertTrue(_game.rootClaim().raw() != bytes32(0));
-
-        // Resolve the dispute game
-        game.resolveClaim(0, 0);
-        game.resolve();
-
-        // Warp past the finalization period
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
-
-        // Finalize the withdrawal transaction
-        vm.expectCallMinGas(_tx.target, _tx.value, uint64(_tx.gasLimit), _tx.data);
-        optimismPortal2.finalizeWithdrawalTransaction(_tx);
+        vm.expectCallMinGas(withdrawalTx.target, withdrawalTx.value, uint64(withdrawalTx.gasLimit), withdrawalTx.data);
+        optimismPortal2.finalizeWithdrawalTransaction(withdrawalTx);
         assertTrue(optimismPortal2.finalizedWithdrawals(withdrawalHash));
     }
 
@@ -1449,81 +1297,27 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         // Bound to prevent changes in retirementTimestamp
         _newGameType = GameType.wrap(uint32(bound(_newGameType.raw(), 0, type(uint32).max - 1)));
 
-        // Total ETH supply is currently about 120M ETH.
-        uint256 value = bound(_value, 0, 200_000_000 ether);
-        vm.deal(address(optimismPortal2), value);
-        if (isUsingLockbox()) {
-            vm.deal(address(ethLockbox), value);
-        }
+        (Types.WithdrawalTransaction memory withdrawalTx, bytes32 withdrawalHash) =
+            _proveFuzzedWithdrawal(_sender, _target, _value, _gasLimit, _data);
 
-        uint256 gasLimit = bound(_gasLimit, 0, 50_000_000);
-        uint256 nonce = l2ToL1MessagePasser.messageNonce();
-
-        // Get a withdrawal transaction and mock proof from the differential testing script.
-        Types.WithdrawalTransaction memory _tx = Types.WithdrawalTransaction({
-            nonce: nonce, sender: _sender, target: _target, value: value, gasLimit: gasLimit, data: _data
-        });
-        (
-            bytes32 stateRoot,
-            bytes32 storageRoot,
-            bytes32 outputRoot,
-            bytes32 withdrawalHash,
-            bytes[] memory withdrawalProof
-        ) = ffi.getProveWithdrawalTransactionInputs(_tx);
-
-        // Create the output root proof
-        Types.OutputRootProof memory proof = Types.OutputRootProof({
-            version: bytes32(uint256(0)),
-            stateRoot: stateRoot,
-            messagePasserStorageRoot: storageRoot,
-            latestBlockhash: bytes32(uint256(0))
-        });
-
-        // Ensure the values returned from ffi are correct
-        assertEq(outputRoot, Hashing.hashOutputRootProof(proof));
-        assertEq(withdrawalHash, Hashing.hashWithdrawal(_tx));
-
-        // Setup the dispute game to return the output root
-        vm.mockCall(address(game), abi.encodeCall(game.rootClaim, ()), abi.encode(outputRoot));
-
-        // Prove the withdrawal transaction
-        optimismPortal2.proveWithdrawalTransaction(_tx, _proposedGameIndex, proof, withdrawalProof);
-        (IDisputeGame _game,) = optimismPortal2.provenWithdrawals(withdrawalHash, address(this));
-        assertTrue(_game.rootClaim().raw() != bytes32(0));
-
-        // Resolve the dispute game
-        game.resolveClaim(0, 0);
-        game.resolve();
-
-        // Warp past the finalization period
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
+        _resolveGameAndWarpPastProofMaturity(game);
 
         // Change the respectedGameType
         vm.prank(optimismPortal2.guardian());
         anchorStateRegistry.setRespectedGameType(_newGameType);
 
         // Withdrawal transaction still finalizable
-        vm.expectCallMinGas(_tx.target, _tx.value, uint64(_tx.gasLimit), _tx.data);
-        optimismPortal2.finalizeWithdrawalTransaction(_tx);
+        vm.expectCallMinGas(withdrawalTx.target, withdrawalTx.value, uint64(withdrawalTx.gasLimit), withdrawalTx.data);
+        optimismPortal2.finalizeWithdrawalTransaction(withdrawalTx);
         assertTrue(optimismPortal2.finalizedWithdrawals(withdrawalHash));
     }
 
     /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the withdrawal's dispute game
     ///         has been blacklisted.
     function test_finalizeWithdrawalTransaction_blacklisted_reverts() external {
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         vm.prank(optimismPortal2.guardian());
@@ -1538,22 +1332,12 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
     /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the withdrawal's dispute game
     ///         is still in the air gap.
     function test_finalizeWithdrawalTransaction_gameInAirGap_reverts() external {
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Warp past the finalization period.
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         // Attempt to finalize the withdrawal directly after the game resolves. This should fail.
@@ -1569,22 +1353,12 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
     /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the respected game type was
     ///         updated after the dispute game was created.
     function test_finalizeWithdrawalTransaction_gameOlderThanRespectedGameTypeUpdate_reverts() external {
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Warp past the finalization period.
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         // Warp past the dispute game finality delay.
@@ -1603,22 +1377,12 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
     ///         respected game type when it was created. `proveWithdrawalTransaction` should
     ///         already prevent this, but we remove that assumption here.
     function test_finalizeWithdrawalTransaction_gameWasNotRespectedGameType_reverts() external {
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Warp past the finalization period.
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         // Warp past the dispute game finality delay.
@@ -1635,22 +1399,12 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
     ///         `proveWithdrawalTransaction` should already prevent this, but we remove that
     ///         assumption here.
     function test_finalizeWithdrawalTransaction_legacyGame_reverts() external {
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(address(optimismPortal2));
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Warp past the finalization period.
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
 
         // Resolve the dispute game.
-        game.resolveClaim(0, 0);
         game.resolve();
 
         // Warp past the dispute game finality delay.
@@ -1659,8 +1413,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         // Mock the wasRespectedGameTypeWhenCreated call to revert.
         vm.mockCallRevert(address(game), abi.encodeCall(game.wasRespectedGameTypeWhenCreated, ()), "");
 
-        // Should revert.
-        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
+        vm.expectRevert(bytes(""));
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
     }
 
@@ -1668,16 +1421,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
     ///         correctness.
     function test_finalizeWithdrawalTransaction_delayEdges_succeeds() external {
         // Prove the withdrawal transaction.
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Attempt to finalize the withdrawal transaction 1 second before the proof has matured.
         // This should fail.
@@ -1693,7 +1437,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
 
         // Finalize the dispute game and attempt to finalize the withdrawal again. This should
         // also fail, since the air gap dispute game delay has not elapsed.
-        game.resolveClaim(0, 0);
         game.resolve();
         vm.warp(block.timestamp + optimismPortal2.disputeGameFinalityDelaySeconds());
         vm.expectRevert(IOptimismPortal.OptimismPortal_InvalidRootClaim.selector);
@@ -1716,22 +1459,10 @@ contract OptimismPortal2_FinalizeWithdrawalTransactionExternalProof_Test is Opti
         uint256 bobBalanceBefore = address(bob).balance;
 
         // Submit the first proof for the withdrawal hash.
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Submit a second proof for the same withdrawal hash.
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(0xb0b));
+        _expectWithdrawalProven(_withdrawalHash, address(0xb0b));
         vm.prank(address(0xb0b));
         optimismPortal2.proveWithdrawalTransaction({
             _tx: _defaultTx,
@@ -1740,10 +1471,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransactionExternalProof_Test is Opti
             _withdrawalProof: _withdrawalProof
         });
 
-        // Warp and resolve the dispute game.
-        game.resolveClaim(0, 0);
-        game.resolve();
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1 seconds);
+        _resolveGameAndWarpPastProofMaturity(game);
 
         vm.expectEmit(true, true, false, true);
         emit WithdrawalFinalized(_withdrawalHash, true);
@@ -1763,16 +1491,7 @@ contract OptimismPortal2_CheckWithdrawal_Test is OptimismPortal2_TestInit {
     ///         game has been finalized, and the root claim is valid.
     function test_checkWithdrawal_succeeds() external {
         // Prove the withdrawal transaction.
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Warp past the finalization period.
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
@@ -1792,21 +1511,9 @@ contract OptimismPortal2_CheckWithdrawal_Test is OptimismPortal2_TestInit {
     /// @notice Tests that checkWithdrawal reverts if the withdrawal has already been finalized.
     function test_checkWithdrawal_ifAlreadyFinalized_reverts() external {
         // Prove the withdrawal transaction.
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProven(_withdrawalHash, alice, bob);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalProvenExtension1(_withdrawalHash, address(this));
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
-        // Warp and resolve the dispute game.
-        game.resolveClaim(0, 0);
-        game.resolve();
-        vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);
+        _resolveGameAndWarpPastProofMaturity(game);
 
         // Finalize the withdrawal.
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
@@ -1827,13 +1534,7 @@ contract OptimismPortal2_CheckWithdrawal_Test is OptimismPortal2_TestInit {
     /// @notice Tests that checkWithdrawal reverts if the proof timestamp is greater than the game
     ///         creation timestamp.
     function testFuzz_checkWithdrawal_ifInvalidProofTimestamp_reverts(uint64 _createdAt) external {
-        // Prove the withdrawal transaction.
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Mock the game creation timestamp to be greater than the proof timestamp.
         _createdAt = uint64(bound(_createdAt, block.timestamp, type(uint64).max));
@@ -1858,13 +1559,7 @@ contract OptimismPortal2_CheckWithdrawal_Test is OptimismPortal2_TestInit {
     /// @notice Tests that checkWithdrawal reverts if the proof timestamp is less than the proof
     ///         maturity delay.
     function test_checkWithdrawal_ifProofNotOldEnough_reverts() external {
-        // Prove but don't warp ahead past the proof maturity delay.
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Should revert.
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() - 1);
@@ -1874,13 +1569,7 @@ contract OptimismPortal2_CheckWithdrawal_Test is OptimismPortal2_TestInit {
 
     /// @notice Tests that checkWithdrawal reverts if the root claim is invalid.
     function test_checkWithdrawal_ifInvalidRootClaim_reverts() external {
-        // Prove the withdrawal.
-        optimismPortal2.proveWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
+        _proveDefaultWithdrawal();
 
         // Warp past the proof maturity delay.
         vm.warp(block.timestamp + optimismPortal2.proofMaturityDelaySeconds() + 1);

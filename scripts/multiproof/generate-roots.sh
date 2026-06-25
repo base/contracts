@@ -25,8 +25,9 @@ set -euo pipefail
 #   The last root for each game is the root claim.
 # ══════════════════════════════════════════════════════════════════════════════
 
-ANCHOR_BLOCK="${1:?Usage: $0 <anchor_block> <l2_rpc_url> [game_count] [parallelism] [output_file]}"
-L2_RPC_URL="${2:?Usage: $0 <anchor_block> <l2_rpc_url> [game_count] [parallelism] [output_file]}"
+USAGE="Usage: $0 <anchor_block> <l2_rpc_url> [game_count] [parallelism] [output_file]"
+ANCHOR_BLOCK="${1:?$USAGE}"
+L2_RPC_URL="${2:?$USAGE}"
 GAME_COUNT="${3:-500}"
 PARALLELISM="${4:-20}"
 OUTPUT_FILE="${5:-roots.json}"
@@ -49,86 +50,56 @@ echo "Parallelism:      $PARALLELISM"
 echo "Output file:      $OUTPUT_FILE"
 echo ""
 
-# Verify tools are available
 command -v cast >/dev/null 2>&1 || { echo "ERROR: cast not found. Install Foundry first." >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq not found." >&2; exit 1; }
 
-# Quick sanity check: verify the RPC is reachable and the anchor block exists
 echo "Verifying RPC connectivity..."
 TEST_HEX=$(printf "0x%x" "$ANCHOR_BLOCK")
-TEST_RESULT=$(cast rpc optimism_outputAtBlock "$TEST_HEX" --rpc-url "$L2_RPC_URL" 2>&1) || {
+if ! TEST_RESULT=$(cast rpc optimism_outputAtBlock "$TEST_HEX" --rpc-url "$L2_RPC_URL" 2>&1); then
     echo "ERROR: Failed to query optimism_outputAtBlock for anchor block $ANCHOR_BLOCK" >&2
     echo "       RPC: $L2_RPC_URL" >&2
     echo "       Response: $TEST_RESULT" >&2
     exit 1
-}
+fi
 echo "RPC OK."
 echo ""
 
-# Create temp directory for individual root files
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
-
-# Fetch roots in batches of PARALLELISM
-echo "Fetching roots..."
-for ((batch_start=0; batch_start<TOTAL_ROOTS; batch_start+=PARALLELISM)); do
-    batch_end=$((batch_start + PARALLELISM))
-    if [ "$batch_end" -gt "$TOTAL_ROOTS" ]; then
-        batch_end=$TOTAL_ROOTS
+fetch_root() {
+    local i=$1
+    local game=$((i / ROOTS_PER_GAME))
+    local j=$(( (i % ROOTS_PER_GAME) + 1 ))
+    local block=$((ANCHOR_BLOCK + game * BLOCK_INTERVAL + j * INTERMEDIATE_BLOCK_INTERVAL))
+    local hex_block root
+    hex_block=$(printf "0x%x" "$block")
+    root=$(cast rpc optimism_outputAtBlock "$hex_block" --rpc-url "$L2_RPC_URL" | jq -r '.outputRoot')
+    if [ -z "$root" ] || [ "$root" = "null" ]; then
+        echo "ERROR: Failed to fetch root for block $block (index $i)" >&2
+        return 1
     fi
+    printf '%s\t%s\n' "$i" "$root"
+}
+export -f fetch_root
+export ANCHOR_BLOCK ROOTS_PER_GAME BLOCK_INTERVAL INTERMEDIATE_BLOCK_INTERVAL L2_RPC_URL
 
-    for ((i=batch_start; i<batch_end; i++)); do
-        game=$((i / ROOTS_PER_GAME))
-        j=$(( (i % ROOTS_PER_GAME) + 1 ))
-        block=$((ANCHOR_BLOCK + game * BLOCK_INTERVAL + j * INTERMEDIATE_BLOCK_INTERVAL))
+RESULTS_FILE=$(mktemp)
+trap 'rm -f "$RESULTS_FILE"' EXIT
 
-        (
-            hex_block=$(printf "0x%x" "$block")
-            root=$(cast rpc optimism_outputAtBlock "$hex_block" --rpc-url "$L2_RPC_URL" | jq -r '.outputRoot')
+echo "Fetching $TOTAL_ROOTS roots..."
+seq 0 $((TOTAL_ROOTS - 1)) \
+    | xargs -n 1 -P "$PARALLELISM" -I {} bash -c 'fetch_root "$@"' _ {} \
+    | tee "$RESULTS_FILE" \
+    | awk -v total="$TOTAL_ROOTS" '
+        NR % 200 == 0 || NR == total { printf "  Fetched %d / %d roots\n", NR, total > "/dev/stderr" }
+      '
 
-            if [ -z "$root" ] || [ "$root" = "null" ]; then
-                echo "ERROR: Failed to fetch root for block $block (index $i)" >&2
-                exit 1
-            fi
-
-            echo "$root" > "$TMPDIR/$i"
-        ) &
-    done
-
-    wait
-
-    # Progress reporting every 200 roots
-    if (( batch_end % 200 == 0 )) || [ "$batch_end" -eq "$TOTAL_ROOTS" ]; then
-        echo "  Fetched $batch_end / $TOTAL_ROOTS roots"
-    fi
-done
-
-# Verify all roots were fetched
-echo ""
-echo "Verifying completeness..."
-MISSING=0
-for ((i=0; i<TOTAL_ROOTS; i++)); do
-    if [ ! -f "$TMPDIR/$i" ]; then
-        echo "  MISSING root at index $i" >&2
-        MISSING=$((MISSING + 1))
-    fi
-done
-
-if [ "$MISSING" -gt 0 ]; then
-    echo "ERROR: $MISSING roots missing. Aborting." >&2
+FETCHED=$(wc -l < "$RESULTS_FILE")
+if [ "$FETCHED" -ne "$TOTAL_ROOTS" ]; then
+    echo "ERROR: fetched $FETCHED of $TOTAL_ROOTS roots. Aborting." >&2
     exit 1
 fi
 
-# Assemble JSON
 echo "Assembling JSON..."
-{
-    echo -n '{"roots":['
-    for ((i=0; i<TOTAL_ROOTS; i++)); do
-        if [ "$i" -gt 0 ]; then echo -n ','; fi
-        echo -n "\"$(cat "$TMPDIR/$i")\""
-    done
-    echo ']}'
-} > "$OUTPUT_FILE"
+sort -n "$RESULTS_FILE" | cut -f2- | jq -Rn '{roots: [inputs]}' > "$OUTPUT_FILE"
 
 echo ""
 echo "=== Done ==="

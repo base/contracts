@@ -2,7 +2,9 @@
 pragma solidity ^0.8.0;
 
 import { IInitializable } from "interfaces/L1/proofs/IInitializable.sol";
-import { Timestamp, GameStatus, GameType, Claim, Hash } from "src/libraries/bridge/Types.sol";
+import { IAnchorStateRegistry } from "./IAnchorStateRegistry.sol";
+import { GameStatus, GameType, Hash } from "src/libraries/bridge/Types.sol";
+import { Timestamp, Claim } from "src/libraries/bridge/LibUDT.sol";
 
 interface IDisputeGame is IInitializable {
     event Resolved(GameStatus indexed status);
@@ -19,4 +21,5 @@ interface IDisputeGame is IInitializable {
     function resolve() external returns (GameStatus status_);
     function gameData() external view returns (GameType gameType_, Claim rootClaim_, bytes memory extraData_);
     function wasRespectedGameTypeWhenCreated() external view returns (bool);
+    function anchorStateRegistry() external view returns (IAnchorStateRegistry);
 }

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Fork } from "scripts/libraries/Config.sol";
-
 /// @title Predeploys
 /// @notice Contains constant addresses for protocol contracts that are pre-deployed to the L2 system.
 //          This excludes the preinstalls (non-protocol contracts).

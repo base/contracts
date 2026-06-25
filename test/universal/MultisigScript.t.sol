@@ -20,7 +20,7 @@ contract MultisigScriptTest is Test, MultisigScript {
     Vm.Wallet internal wallet3 = vm.createWallet("3");
 
     address internal safe = address(1001);
-    Counter internal counter = new Counter(address(safe));
+    Counter internal counter = new Counter(safe);
 
     /// @dev Controls whether to use hash-based or EIP-712 JSON output. True by default.
     bool internal _useDataHashes = true;
@@ -58,7 +58,7 @@ contract MultisigScriptTest is Test, MultisigScript {
         assertEq(counterValue, 6, "Counter value is not 6");
 
         uint256 counterBalance = address(counter).balance;
-        assertEq(counterBalance, 3 ether, "Counter balance is not 1 ether");
+        assertEq(counterBalance, 3 ether, "Counter balance is not 3 ether");
     }
 
     /// @inheritdoc MultisigScript
@@ -94,12 +94,7 @@ contract MultisigScriptTest is Test, MultisigScript {
 
         Call[] memory calls = new Call[](4);
 
-        calls[0] = Call({
-            operation: Enum.Operation.Call,
-            target: address(counter),
-            data: abi.encodeCall(Counter.increment, ()),
-            value: 0
-        });
+        calls[0] = counterIncrementCall;
 
         // Use multicall to test the delegatecall use case
         calls[1] = Call({
@@ -109,12 +104,7 @@ contract MultisigScriptTest is Test, MultisigScript {
             value: 0
         });
 
-        calls[2] = Call({
-            operation: Enum.Operation.Call,
-            target: address(counter),
-            data: abi.encodeCall(Counter.incrementPayable, ()),
-            value: 1 ether
-        });
+        calls[2] = counterIncrementCallPayable;
 
         calls[3] = Call({
             operation: Enum.Operation.DelegateCall,
@@ -128,12 +118,10 @@ contract MultisigScriptTest is Test, MultisigScript {
 
     /// @inheritdoc MultisigScript
     function _ownerSafe() internal view override returns (address) {
-        return address(safe);
+        return safe;
     }
 
     /// @inheritdoc MultisigScript
-    ///
-    /// @dev Returns `_useDataHashes` which is true by default (hash-based signing).
     function _printDataHashes() internal view override returns (bool) {
         return _useDataHashes;
     }
@@ -145,6 +133,16 @@ contract MultisigScriptTest is Test, MultisigScript {
         return _encodeTransactionData(_ownerSafe(), _buildAggregatedScriptCall({ scriptCalls: _buildCalls() }));
     }
 
+    function _signDigest(Vm.Wallet memory wallet, bytes32 digest) internal returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wallet, digest);
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _lastLoggedBytes() internal returns (bytes memory) {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        return abi.decode(logs[logs.length - 1].data, (bytes));
+    }
+
     /// @notice Tests that sign() emits the correct data to sign
     function test_sign() external {
         vm.recordLogs();
@@ -152,43 +150,33 @@ contract MultisigScriptTest is Test, MultisigScript {
         vm.prank(wallet1.addr);
         this.sign(new address[](0));
 
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes memory logged = abi.decode(logs[logs.length - 1].data, (bytes));
+        bytes memory logged = _lastLoggedBytes();
         bytes memory expected = _expectedTxDataForCurrentBuildCalls();
 
-        assertEq(keccak256(logged), keccak256(expected));
+        assertEq(logged, expected);
     }
 
     /// @notice Tests that verify() accepts valid 2-of-2 signatures
     function test_verify_valid_signatures() external {
-        // Two-of-two signatures over the encoded transaction data should verify
         bytes32 digest = keccak256(_expectedTxDataForCurrentBuildCalls());
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, digest);
-        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, digest);
-        bytes memory signatures = abi.encodePacked(r1, s1, v1, r2, s2, v2);
+        bytes memory signatures = abi.encodePacked(_signDigest(wallet1, digest), _signDigest(wallet2, digest));
         verify(new address[](0), signatures);
     }
 
     /// @notice Tests that verify() reverts when given an invalid signature
     function test_verify_reverts_with_invalid_signature() external {
-        // One valid, one invalid should revert
         bytes32 digest = keccak256(_expectedTxDataForCurrentBuildCalls());
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, digest);
-        bytes memory signatures = abi.encodePacked(r1, s1, v1, bytes32(0), bytes32(0), uint8(27));
-        bytes memory callData = abi.encodeCall(this.verify, (new address[](0), signatures));
-        (bool success, bytes memory ret) = address(this).call(callData);
-        assertFalse(success);
-        assertTrue(ret.length > 0);
+        bytes memory signatures = abi.encodePacked(_signDigest(wallet1, digest), bytes32(0), bytes32(0), uint8(27));
+
+        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
+        this.verify(new address[](0), signatures);
     }
 
     /// @notice Tests that simulate() executes the transaction without broadcasting
     function test_simulate_only() external {
         bytes32 digest = keccak256(_expectedTxDataForCurrentBuildCalls());
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, digest);
-        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, digest);
-        bytes memory signatures = abi.encodePacked(r1, s1, v1, r2, s2, v2);
+        bytes memory signatures = abi.encodePacked(_signDigest(wallet1, digest), _signDigest(wallet2, digest));
 
-        // Simulate should execute successfully and satisfy _postCheck
         simulate(signatures);
     }
 
@@ -196,13 +184,9 @@ contract MultisigScriptTest is Test, MultisigScript {
     ///
     /// @dev Safe is 2/3, but we provide all 3 signatures
     function test_run_with_more_signatures_than_threshold() external {
-        // Sign with all 3 owners (threshold is 2, but we provide 3)
         bytes32 digest = keccak256(_expectedTxDataForCurrentBuildCalls());
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(wallet1, digest);
-        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(wallet2, digest);
-        (uint8 v3, bytes32 r3, bytes32 s3) = vm.sign(wallet3, digest);
-
-        bytes memory signatures = abi.encodePacked(r1, s1, v1, r2, s2, v2, r3, s3, v3);
+        bytes memory signatures =
+            abi.encodePacked(_signDigest(wallet1, digest), _signDigest(wallet2, digest), _signDigest(wallet3, digest));
         run(signatures);
     }
 
@@ -217,15 +201,235 @@ contract MultisigScriptTest is Test, MultisigScript {
         vm.prank(wallet1.addr);
         this.sign(new address[](0));
 
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes memory logged = abi.decode(logs[logs.length - 1].data, (bytes));
+        bytes memory logged = _lastLoggedBytes();
 
-        // Verify the logged data contains EIP-712 JSON structure markers
         string memory loggedStr = string(logged);
         assertTrue(LibString.contains(loggedStr, "EIP712Domain"), "EIP-712 output should contain EIP712Domain");
         assertTrue(LibString.contains(loggedStr, "SafeTx"), "EIP-712 output should contain SafeTx type");
         assertTrue(LibString.contains(loggedStr, "primaryType"), "EIP-712 output should contain primaryType");
         assertTrue(LibString.contains(loggedStr, "domain"), "EIP-712 output should contain domain");
         assertTrue(LibString.contains(loggedStr, "message"), "EIP-712 output should contain message");
+    }
+}
+
+abstract contract MultisigScriptNestedBase is Test, MultisigScript {
+    Vm.Wallet internal nestedWallet1 = vm.createWallet("nested-1");
+    Vm.Wallet internal nestedWallet2 = vm.createWallet("nested-2");
+
+    address internal safe1 = address(1001);
+    address internal safe2 = address(1002);
+    address internal safe3 = address(1003);
+    address internal safe4 = address(1004);
+
+    Counter internal nestedCounter;
+
+    function _setupSafe(address safeAddr, address[] memory owners, uint256 threshold) internal {
+        IGnosisSafe(safeAddr).setup(owners, threshold, address(0), "", address(0), address(0), 0, address(0));
+    }
+
+    function _setupLeafSafes() internal {
+        _setupSafe(safe1, _toArray(nestedWallet1.addr), 1);
+        _setupSafe(safe2, _toArray(nestedWallet2.addr), 1);
+    }
+
+    /// @inheritdoc MultisigScript
+    function _postCheck(Vm.AccountAccess[] memory, Simulation.Payload memory) internal view override {
+        assertEq(nestedCounter.count(), 1, "Counter value is not 1");
+    }
+
+    /// @inheritdoc MultisigScript
+    function _buildCalls() internal view override returns (Call[] memory) {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: address(nestedCounter),
+            operation: Enum.Operation.Call,
+            data: abi.encodeCall(Counter.increment, ()),
+            value: 0
+        });
+
+        return calls;
+    }
+
+    function _getSignerData(address signerSafe)
+        internal
+        view
+        returns (address[] memory safes, bytes memory dataToSign)
+    {
+        safes = _signerSafes(signerSafe);
+
+        Call[] memory callsChain = _buildCallsChain({ safes: _appendOwnerSafe(safes) });
+        dataToSign = _encodeTransactionData({ safe: signerSafe, call: callsChain[0] });
+    }
+
+    function _assertSignOutput(address[] memory safes, bytes memory dataToSign) internal {
+        this.sign(safes);
+
+        assertEq(_lastLoggedBytes(), dataToSign);
+    }
+
+    function _signData(Vm.Wallet memory wallet, bytes memory dataToSign) internal returns (bytes memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wallet, keccak256(dataToSign));
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _approveFrom(address signerSafe, Vm.Wallet memory wallet) internal {
+        (address[] memory safes, bytes memory dataToSign) = _getSignerData(signerSafe);
+        approve(safes, _signData(wallet, dataToSign));
+    }
+
+    function _lastLoggedBytes() internal returns (bytes memory) {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        return abi.decode(logs[logs.length - 1].data, (bytes));
+    }
+
+    function _signerSafes(address signerSafe) internal view virtual returns (address[] memory safes);
+}
+
+contract MultisigScriptNestedTest is MultisigScriptNestedBase {
+    function setUp() public {
+        bytes memory safeCode = Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid);
+        deployCodeTo("CBMulticall.sol", "", CB_MULTICALL);
+        vm.etch(safe1, safeCode);
+        vm.etch(safe2, safeCode);
+        vm.etch(safe3, safeCode);
+
+        nestedCounter = new Counter(safe3);
+
+        _setupLeafSafes();
+
+        address[] memory owners3 = new address[](2);
+        owners3[0] = safe1;
+        owners3[1] = safe2;
+        _setupSafe(safe3, owners3, 2);
+    }
+
+    /// @inheritdoc MultisigScript
+    function _ownerSafe() internal view override returns (address) {
+        return safe3;
+    }
+
+    function _signerSafes(address signerSafe) internal pure override returns (address[] memory safes) {
+        safes = new address[](1);
+        safes[0] = signerSafe;
+    }
+
+    /// @notice Tests that sign() emits the correct data to sign for safe1
+    function test_sign_safe1() external {
+        vm.recordLogs();
+        (address[] memory safes, bytes memory dataToSign) = _getSignerData(safe1);
+
+        vm.prank(nestedWallet1.addr);
+        _assertSignOutput(safes, dataToSign);
+    }
+
+    /// @notice Tests that sign() emits the correct data to sign for safe2
+    function test_sign_safe2() external {
+        vm.recordLogs();
+        (address[] memory safes, bytes memory dataToSign) = _getSignerData(safe2);
+
+        vm.prank(nestedWallet2.addr);
+        _assertSignOutput(safes, dataToSign);
+    }
+
+    /// @notice Tests that approve() succeeds with valid signature from safe1
+    function test_approve_safe1() external {
+        _approveFrom(safe1, nestedWallet1);
+    }
+
+    /// @notice Tests that approve() succeeds with valid signature from safe2
+    function test_approve_safe2() external {
+        _approveFrom(safe2, nestedWallet2);
+    }
+
+    /// @notice Tests that approve() fails when signature doesn't match the safe
+    function test_approve_notOwner() external {
+        (, bytes memory dataToSign) = _getSignerData(safe1);
+        bytes memory signature = _signData(nestedWallet1, dataToSign);
+
+        vm.expectRevert("not enough signatures");
+        this.approve(_signerSafes(safe2), signature);
+    }
+
+    /// @notice Tests the full flow: approve from both safes, then run
+    function test_run() external {
+        _approveFrom(safe1, nestedWallet1);
+        _approveFrom(safe2, nestedWallet2);
+
+        run("");
+    }
+
+    /// @notice Tests that run() fails when not all nested safes have approved
+    function test_run_notApproved() external {
+        _approveFrom(safe1, nestedWallet1);
+
+        vm.expectRevert("not enough signatures");
+        this.run("");
+    }
+}
+
+contract MultisigScriptDoubleNestedTest is MultisigScriptNestedBase {
+    function setUp() public {
+        bytes memory safeCode = Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid);
+        deployCodeTo("CBMulticall.sol", "", CB_MULTICALL);
+        vm.etch(safe1, safeCode);
+        vm.etch(safe2, safeCode);
+        vm.etch(safe3, safeCode);
+        vm.etch(safe4, safeCode);
+
+        nestedCounter = new Counter(safe4);
+
+        _setupLeafSafes();
+
+        address[] memory owners3 = new address[](2);
+        owners3[0] = safe1;
+        owners3[1] = safe2;
+        _setupSafe(safe3, owners3, 2);
+
+        _setupSafe(safe4, _toArray(safe3), 1);
+    }
+
+    /// @inheritdoc MultisigScript
+    function _ownerSafe() internal view override returns (address) {
+        return safe4;
+    }
+
+    function _signerSafes(address signerSafe) internal view override returns (address[] memory safes) {
+        safes = new address[](2);
+        safes[0] = signerSafe;
+        safes[1] = safe3;
+    }
+
+    /// @notice Tests that sign() emits the correct data to sign for a double-nested safe
+    function test_sign_double_nested() external {
+        vm.recordLogs();
+        (address[] memory safes, bytes memory dataToSign) = _getSignerData(safe1);
+
+        vm.prank(nestedWallet1.addr);
+        _assertSignOutput(safes, dataToSign);
+    }
+
+    /// @notice Tests the intermediate approval flow through nested safes
+    function test_approve_double_nested() external {
+        _approveFrom(safe1, nestedWallet1);
+        _approveFrom(safe2, nestedWallet2);
+
+        approve(_toArray(safe3), "");
+    }
+
+    /// @notice Tests that intermediate approve fails when not all leaf safes have approved
+    function test_runInit_double_nested_notApproved() external {
+        _approveFrom(safe1, nestedWallet1);
+
+        vm.expectRevert("not enough signatures");
+        this.approve(_toArray(safe3), "");
+    }
+
+    /// @notice Tests the full flow: approve from all nested safes, then run
+    function test_run_double_nested() external {
+        _approveFrom(safe1, nestedWallet1);
+        _approveFrom(safe2, nestedWallet2);
+        approve(_toArray(safe3), "");
+
+        run("");
     }
 }

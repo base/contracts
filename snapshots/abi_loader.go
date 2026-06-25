@@ -10,12 +10,6 @@ import (
 //go:embed abi/DisputeGameFactory.json
 var disputeGameFactory []byte
 
-//go:embed abi/PreimageOracle.json
-var preimageOracle []byte
-
-//go:embed abi/MIPS64.json
-var mips []byte
-
 //go:embed abi/DelayedWETH.json
 var delayedWETH []byte
 
@@ -24,12 +18,6 @@ var systemConfig []byte
 
 func LoadDisputeGameFactoryABI() *abi.ABI {
 	return loadABI(disputeGameFactory)
-}
-func LoadPreimageOracleABI() *abi.ABI {
-	return loadABI(preimageOracle)
-}
-func LoadMIPSABI() *abi.ABI {
-	return loadABI(mips)
 }
 func LoadDelayedWETHABI() *abi.ABI {
 	return loadABI(delayedWETH)

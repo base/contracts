@@ -9,34 +9,35 @@ import { CommonTest } from "test/setup/CommonTest.sol";
 ///         that the behavior is consistent.
 contract ExtendedPause_Test is CommonTest {
     /// @notice Tests that other contracts are paused when the superchain config is paused
-    function test_pause_fullSystem_succeeds() public {
-        assertFalse(superchainConfig.paused(address(0)));
+    function test_pause_fullSystem_succeeds() external {
+        _assertFullSystemPaused(false);
 
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(0));
+        _pauseSuperchain();
 
-        // validate the paused state
-        assertTrue(superchainConfig.paused(address(0)));
-        assertTrue(optimismPortal2.paused());
-        assertTrue(l1CrossDomainMessenger.paused());
-        assertTrue(l1StandardBridge.paused());
-        assertTrue(l1ERC721Bridge.paused());
+        _assertFullSystemPaused(true);
     }
 
     /// @notice Tests that other contracts are unpaused when the superchain config is paused and
     ///         then unpaused.
     function test_unpause_fullSystem_succeeds() external {
-        // first use the test above to pause the system
-        test_pause_fullSystem_succeeds();
+        _pauseSuperchain();
 
         vm.prank(superchainConfig.guardian());
         superchainConfig.unpause(address(0));
 
-        // validate the unpaused state
-        assertFalse(superchainConfig.paused(address(0)));
-        assertFalse(optimismPortal2.paused());
-        assertFalse(l1CrossDomainMessenger.paused());
-        assertFalse(l1StandardBridge.paused());
-        assertFalse(l1ERC721Bridge.paused());
+        _assertFullSystemPaused(false);
+    }
+
+    function _pauseSuperchain() internal {
+        vm.prank(superchainConfig.guardian());
+        superchainConfig.pause(address(0));
+    }
+
+    function _assertFullSystemPaused(bool _paused) internal view {
+        assertEq(superchainConfig.paused(address(0)), _paused);
+        assertEq(optimismPortal2.paused(), _paused);
+        assertEq(l1CrossDomainMessenger.paused(), _paused);
+        assertEq(l1StandardBridge.paused(), _paused);
+        assertEq(l1ERC721Bridge.paused(), _paused);
     }
 }
