@@ -68,6 +68,9 @@ struct TDXVerifierJournal {
 /// @title ITDXVerifier
 /// @notice Interface for Intel TDX quote verification used by TDX-aware TEE prover registries.
 interface ITDXVerifier {
+    /// @notice Address authorized to submit verified proofs.
+    function proofSubmitter() external view returns (address);
+
     /// @notice Verifies a ZK proof of Intel TDX DCAP quote verification and returns attested signer metadata.
     /// @param output ABI-encoded TDXVerifierJournal public values from the ZK verifier guest.
     /// @param zkCoprocessor ZK proving system used to generate the proof.

@@ -23,6 +23,14 @@ contract MockNitroEnclaveVerifier {
     }
 }
 
+contract MockTDXVerifier {
+    address public proofSubmitter;
+
+    function setProofSubmitter(address _proofSubmitter) external {
+        proofSubmitter = _proofSubmitter;
+    }
+}
+
 contract MockSP1Verifier {
     function verifyProof(bytes32, bytes calldata, bytes calldata) external pure { }
 }
@@ -40,6 +48,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     address internal proposer = makeAddr("proposer");
     address internal challenger = makeAddr("challenger");
     MockNitroEnclaveVerifier internal nitroEnclaveVerifier;
+    MockTDXVerifier internal tdxVerifier;
     MockSP1Verifier internal sp1Verifier;
 
     uint256 internal l2ChainId = 901;
@@ -47,6 +56,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     function setUp() public {
         systemDeploy = new SystemDeploy();
         nitroEnclaveVerifier = new MockNitroEnclaveVerifier();
+        tdxVerifier = new MockTDXVerifier();
         sp1Verifier = new MockSP1Verifier();
     }
 
@@ -184,12 +194,14 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             withdrawalDelaySeconds: 100,
             proofMaturityDelaySeconds: 400,
             disputeGameFinalityDelaySeconds: 500,
-            teeImageHash: bytes32(uint256(1)),
+            teeNitroImageHash: bytes32(uint256(1)),
+            teeTdxImageHash: bytes32(uint256(11)),
             zkRangeHash: bytes32(uint256(2)),
             zkAggregationHash: bytes32(uint256(3)),
             multiproofConfigHash: bytes32(uint256(4)),
             multiproofGameType: 621,
             nitroEnclaveVerifier: address(nitroEnclaveVerifier),
+            tdxVerifier: address(tdxVerifier),
             multiproofBlockInterval: 100,
             multiproofIntermediateBlockInterval: 10,
             sp1Verifier: ISP1Verifier(address(sp1Verifier)),
@@ -254,6 +266,11 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             "nitro proof submitter"
         );
         assertEq(
+            MockTDXVerifier(_input.implementationsInput.tdxVerifier).proofSubmitter(),
+            teeProverRegistryProxyAddr,
+            "tdx proof submitter"
+        );
+        assertEq(
             address(teeProverRegistry.DISPUTE_GAME_FACTORY()),
             address(_output.opChain.disputeGameFactoryProxy),
             "tee registry dgf"
@@ -288,7 +305,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             ethLockbox: _output.opChain.ethLockboxProxy,
             proxyAdminOwner: _input.opChainInput.roles.opChainProxyAdminOwner,
             multiproofGameType: GameType.wrap(uint32(_input.implementationsInput.multiproofGameType)),
-            teeImageHash: _input.implementationsInput.teeImageHash,
+            teeNitroImageHash: _input.implementationsInput.teeNitroImageHash,
+            teeTdxImageHash: _input.implementationsInput.teeTdxImageHash,
             zkRangeHash: _input.implementationsInput.zkRangeHash,
             zkAggregationHash: _input.implementationsInput.zkAggregationHash,
             multiproofConfigHash: _input.implementationsInput.multiproofConfigHash,

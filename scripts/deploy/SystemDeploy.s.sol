@@ -37,6 +37,7 @@ import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { Constants } from "src/libraries/Constants.sol";
@@ -72,12 +73,14 @@ contract SystemDeploy is Script {
         uint256 withdrawalDelaySeconds;
         uint256 proofMaturityDelaySeconds;
         uint256 disputeGameFinalityDelaySeconds;
-        bytes32 teeImageHash;
+        bytes32 teeNitroImageHash;
+        bytes32 teeTdxImageHash;
         bytes32 zkRangeHash;
         bytes32 zkAggregationHash;
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
         address nitroEnclaveVerifier;
+        address tdxVerifier;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
         ISP1Verifier sp1Verifier;
@@ -120,7 +123,8 @@ contract SystemDeploy is Script {
         IDelayedWETH delayedWETH;
         IVerifier teeVerifier;
         IVerifier zkVerifier;
-        bytes32 teeImageHash;
+        bytes32 teeNitroImageHash;
+        bytes32 teeTdxImageHash;
         bytes32 zkRangeHash;
         bytes32 zkAggregationHash;
         bytes32 multiproofConfigHash;
@@ -257,12 +261,14 @@ contract SystemDeploy is Script {
             withdrawalDelaySeconds: cfg.delayedWETHWithdrawalDelay(),
             proofMaturityDelaySeconds: cfg.proofMaturityDelaySeconds(),
             disputeGameFinalityDelaySeconds: cfg.disputeGameFinalityDelaySeconds(),
-            teeImageHash: cfg.teeImageHash(),
+            teeNitroImageHash: cfg.teeNitroImageHash(),
+            teeTdxImageHash: cfg.teeTdxImageHash(),
             zkRangeHash: cfg.zkRangeHash(),
             zkAggregationHash: cfg.zkAggregationHash(),
             multiproofConfigHash: cfg.multiproofConfigHash(),
             multiproofGameType: cfg.multiproofGameType(),
             nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
+            tdxVerifier: cfg.tdxVerifier(),
             multiproofBlockInterval: cfg.multiproofBlockInterval(),
             multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
             sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
@@ -961,7 +967,9 @@ contract SystemDeploy is Script {
 
         vm.broadcast(msg.sender);
         output_.teeProverRegistryImpl = new TEEProverRegistry(
-            INitroEnclaveVerifier(_input.nitroEnclaveVerifier), _output.disputeGameFactoryProxy
+            INitroEnclaveVerifier(_input.nitroEnclaveVerifier),
+            ITDXVerifier(_input.tdxVerifier),
+            _output.disputeGameFactoryProxy
         );
 
         output_.teeProverRegistryProxy =
@@ -989,6 +997,11 @@ contract SystemDeploy is Script {
             vm.broadcast(msg.sender);
             nitroVerifier.setProofSubmitter(address(output_.teeProverRegistryProxy));
         }
+        ITDXVerifier tdxVerifier = ITDXVerifier(_input.tdxVerifier);
+        if (tdxVerifier.proofSubmitter() != address(output_.teeProverRegistryProxy)) {
+            vm.broadcast(msg.sender);
+            tdxVerifier.setProofSubmitter(address(output_.teeProverRegistryProxy));
+        }
 
         vm.broadcast(msg.sender);
         output_.teeVerifier =
@@ -1003,7 +1016,8 @@ contract SystemDeploy is Script {
                 delayedWETH: _output.delayedWETHProxy,
                 teeVerifier: output_.teeVerifier,
                 zkVerifier: output_.zkVerifier,
-                teeImageHash: _input.teeImageHash,
+                teeNitroImageHash: _input.teeNitroImageHash,
+                teeTdxImageHash: _input.teeTdxImageHash,
                 zkRangeHash: _input.zkRangeHash,
                 zkAggregationHash: _input.zkAggregationHash,
                 multiproofConfigHash: _input.multiproofConfigHash,
@@ -1033,7 +1047,7 @@ contract SystemDeploy is Script {
                     _input.delayedWETH,
                     _input.teeVerifier,
                     _input.zkVerifier,
-                    _input.teeImageHash,
+                    AggregateVerifier.TeeHashes(_input.teeNitroImageHash, _input.teeTdxImageHash),
                     AggregateVerifier.ZkHashes(_input.zkRangeHash, _input.zkAggregationHash),
                     _input.multiproofConfigHash,
                     _input.l2ChainId,
@@ -1066,14 +1080,17 @@ contract SystemDeploy is Script {
     }
 
     function _assertValidMultiproofInput(ImplementationInput memory _input) internal view {
-        require(_input.teeImageHash != bytes32(0), "SystemDeploy: teeImageHash not set");
+        require(_input.teeNitroImageHash != bytes32(0), "SystemDeploy: teeNitroImageHash not set");
+        require(_input.teeTdxImageHash != bytes32(0), "SystemDeploy: teeTdxImageHash not set");
         require(_input.zkRangeHash != bytes32(0), "SystemDeploy: zkRangeHash not set");
         require(_input.zkAggregationHash != bytes32(0), "SystemDeploy: zkAggregationHash not set");
         require(_input.multiproofConfigHash != bytes32(0), "SystemDeploy: multiproofConfigHash not set");
         require(_input.multiproofGameType != 0, "SystemDeploy: multiproofGameType not set");
         require(_input.nitroEnclaveVerifier != address(0), "SystemDeploy: nitroEnclaveVerifier not set");
+        require(_input.tdxVerifier != address(0), "SystemDeploy: tdxVerifier not set");
         require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
         DeployUtils.assertValidContractAddress(_input.nitroEnclaveVerifier);
+        DeployUtils.assertValidContractAddress(_input.tdxVerifier);
         DeployUtils.assertValidContractAddress(address(_input.sp1Verifier));
         require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
         require(

@@ -43,6 +43,7 @@ contract MockDisputeGameFactoryForTDXRegistry {
 
 contract MockTDXVerifierForRegistry is ITDXVerifier {
     TDXVerifierJournal internal _journal;
+    address public proofSubmitter;
 
     function setJournal(TDXVerifierJournal memory journal) external {
         _journal = journal;
@@ -68,7 +69,9 @@ contract MockTDXVerifierForRegistry is ITDXVerifier {
         return true;
     }
 
-    function setProofSubmitter(address) external { }
+    function setProofSubmitter(address newProofSubmitter) external {
+        proofSubmitter = newProofSubmitter;
+    }
 }
 
 contract TEEProverRegistryTDXTest is Test {

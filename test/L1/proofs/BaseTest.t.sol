@@ -163,6 +163,7 @@ contract BaseTest is Test {
         returns (bytes memory)
     {
         uint256 l1OriginNumber = block.number - 1;
+        bytes32 l1OriginHash = blockhash(l1OriginNumber);
         return abi.encodePacked(uint8(proofType), l1OriginHash, l1OriginNumber, _generateProofBody(salt, proofType));
     }
 

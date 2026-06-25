@@ -111,7 +111,7 @@ abstract contract DeployDevBase is Script {
                 IDelayedWETH(payable(mockDelayedWETH)),
                 IVerifier(teeVerifier),
                 IVerifier(zkVerifier),
-                cfg.teeImageHash(),
+                AggregateVerifier.TeeHashes(cfg.teeNitroImageHash(), cfg.teeTdxImageHash()),
                 zkHashes,
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainId(),

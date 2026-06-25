@@ -190,7 +190,7 @@ contract DeployDevWithTDX is Script {
                 AggregateVerifier.TeeHashes(cfg.teeNitroImageHash(), cfg.teeTdxImageHash()),
                 zkHashes,
                 cfg.multiproofConfigHash(),
-                cfg.l2ChainID(),
+                cfg.l2ChainId(),
                 cfg.multiproofBlockInterval(),
                 cfg.multiproofIntermediateBlockInterval()
             )

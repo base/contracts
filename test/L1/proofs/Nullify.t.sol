@@ -20,6 +20,8 @@ contract NullifyTest is BaseTest {
 
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
         bytes memory teeProof2 = _generateProposalProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
+        game.nullify(teeProof2, LAST_INTERMEDIATE_ROOT_INDEX, rootClaim2.raw());
+        _assertNullifiedToNoProofs(game, TEE_PROVER);
 
         vm.warp(block.timestamp + NO_PROOF_CREDIT_CLAIM_DELAY);
         _claimCreditAfterDelay(game);

@@ -18,7 +18,8 @@ interface IAggregateVerifier is IDisputeGame {
     function DISPUTE_GAME_FACTORY() external view returns (IDisputeGameFactory);
     function DELAYED_WETH() external view returns (IDelayedWETH);
     function TEE_VERIFIER() external view returns (IVerifier);
-    function TEE_IMAGE_HASH() external view returns (bytes32);
+    function TEE_NITRO_IMAGE_HASH() external view returns (bytes32);
+    function TEE_TDX_IMAGE_HASH() external view returns (bytes32);
     function ZK_VERIFIER() external view returns (IVerifier);
     function ZK_RANGE_HASH() external view returns (bytes32);
     function ZK_AGGREGATE_HASH() external view returns (bytes32);

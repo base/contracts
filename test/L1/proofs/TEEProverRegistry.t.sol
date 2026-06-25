@@ -27,14 +27,14 @@ contract MockAggregateVerifierForRegistry {
 }
 
 contract MockDisputeGameFactoryForRegistry {
-    IDisputeGame internal immutable _impl;
+    mapping(uint32 => address) internal _impls;
 
-    constructor(address impl) {
-        _impl = IDisputeGame(impl);
+    function setImpl(GameType gameType, address impl) external {
+        _impls[GameType.unwrap(gameType)] = impl;
     }
 
-    function gameImpls(GameType) external view returns (IDisputeGame) {
-        return _impl;
+    function gameImpls(GameType gameType) external view returns (IDisputeGame) {
+        return IDisputeGame(_impls[GameType.unwrap(gameType)]);
     }
 }
 
@@ -62,37 +62,17 @@ contract TEEProverRegistryTest is Test {
         manager = makeAddr("manager");
         unauthorized = makeAddr("unauthorized");
 
-        // Deploy mock factory and verifier
-        mockVerifier = new MockAggregateVerifierForRegistry(TEST_IMAGE_HASH);
-        mockFactory = new MockDisputeGameFactoryForRegistry();
-        mockFactory.setImpl(TEST_GAME_TYPE, address(mockVerifier));
-
-        // Deploy implementation (using DevTEEProverRegistry for test flexibility)
-        DevTEEProverRegistry impl = new DevTEEProverRegistry(
-            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(address(mockFactory))
-        );
-
-        // Deploy proxy admin
-        proxyAdmin = new ProxyAdmin(address(this));
-
-        // Deploy proxy
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(impl),
-            address(proxyAdmin),
-            abi.encodeCall(
-                TEEProverRegistry.initialize, (owner, manager, new address[](0), GameType.wrap(TEST_GAME_TYPE))
-            )
-        );
-
-        teeProverRegistry = DevTEEProverRegistry(address(proxy));
+        teeProverRegistry = _deployRegistry(new address[](0), TEST_GAME_TYPE);
     }
 
     function _deployRegistry(address[] memory proposers, GameType gameType) internal returns (DevTEEProverRegistry) {
         MockAggregateVerifierForRegistry verifier = new MockAggregateVerifierForRegistry(TEST_IMAGE_HASH);
-        MockDisputeGameFactoryForRegistry factory = new MockDisputeGameFactoryForRegistry(address(verifier));
+        MockDisputeGameFactoryForRegistry factory = new MockDisputeGameFactoryForRegistry();
+        factory.setImpl(gameType, address(verifier));
 
-        DevTEEProverRegistry impl =
-            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(factory)));
+        DevTEEProverRegistry impl = new DevTEEProverRegistry(
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(address(factory))
+        );
 
         address proxyAdmin = makeAddr("proxy-admin");
         Proxy proxy = new Proxy(proxyAdmin);
@@ -145,10 +125,6 @@ contract TEEProverRegistryTest is Test {
         address proposer1 = makeAddr("proposer1");
         address proposer2 = makeAddr("proposer2");
         address proposer3 = makeAddr("proposer3");
-        DevTEEProverRegistry impl2 = new DevTEEProverRegistry(
-            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(address(1))
-        );
-        ProxyAdmin proxyAdmin2 = new ProxyAdmin(address(this));
         address[] memory proposers = new address[](3);
         proposers[0] = proposer1;
         proposers[1] = proposer2;

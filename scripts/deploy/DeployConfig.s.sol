@@ -22,6 +22,7 @@ contract DeployConfig is Script {
     address public sp1Verifier;
     address public superchainConfigGuardian;
     address public superchainConfigIncidentResponder;
+    address public tdxVerifier;
     address public teeChallenger;
     address public teeProposer;
 
@@ -31,6 +32,8 @@ contract DeployConfig is Script {
     bytes32 public multiproofConfigHash;
     bytes32 public multiproofGenesisOutputRoot;
     bytes32 public teeImageHash;
+    bytes32 public teeNitroImageHash;
+    bytes32 public teeTdxImageHash;
     bytes32 public zkAggregationHash;
     bytes32 public zkRangeHash;
 
@@ -75,6 +78,7 @@ contract DeployConfig is Script {
         sp1Verifier = _json.readAddress("$.sp1Verifier");
         superchainConfigGuardian = _json.readAddress("$.superchainConfigGuardian");
         superchainConfigIncidentResponder = _json.readAddress("$.superchainConfigIncidentResponder");
+        tdxVerifier = _json.readAddressOr("$.tdxVerifier", address(0));
         teeChallenger = _json.readAddress("$.teeChallenger");
         teeProposer = _json.readAddress("$.teeProposer");
 
@@ -82,7 +86,9 @@ contract DeployConfig is Script {
 
         multiproofConfigHash = _json.readBytes32("$.multiproofConfigHash");
         multiproofGenesisOutputRoot = _json.readBytes32("$.multiproofGenesisOutputRoot");
-        teeImageHash = _json.readBytes32("$.teeImageHash");
+        teeImageHash = _json.readBytes32Or("$.teeImageHash", bytes32(0));
+        teeNitroImageHash = _json.readBytes32Or("$.teeNitroImageHash", teeImageHash);
+        teeTdxImageHash = _json.readBytes32Or("$.teeTdxImageHash", teeImageHash);
         zkAggregationHash = _json.readBytes32("$.zkAggregationHash");
         zkRangeHash = _json.readBytes32("$.zkRangeHash");
 

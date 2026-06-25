@@ -40,9 +40,6 @@ contract ChallengeTest is BaseTest {
             TEE_PROVER, "tee1", "tee-proof-1", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
         );
 
-        Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
-        bytes memory teeProof2 = _generateProposalProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
-
         vm.expectRevert(AggregateVerifier.InvalidProofType.selector);
         _challenge(game, AggregateVerifier.ProofType.TEE, bytes32(0));
     }
@@ -92,10 +89,7 @@ contract ChallengeTest is BaseTest {
 
         game.nullify(teeProof2, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
 
-        // challenge game — TEE proof was nullified, so MissingProof(TEE) is expected
-        Claim rootClaim3 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "zk")));
-        bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
-
+        // challenge game: TEE proof was nullified, so MissingProof(TEE) is expected
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE)
         );
@@ -146,7 +140,7 @@ contract ChallengeTest is BaseTest {
         _assertChallengeRecorded(gameA);
 
         AggregateVerifier gameB =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaimB, currentL2BlockNumber, address(gameA), teeProofB);
+            _createGame(TEE_PROVER, "tee-nullify-b", "tee-proof-b", AggregateVerifier.ProofType.TEE, address(gameA));
 
         Claim rootNullifyB = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee-nullify-b")));
         bytes memory teeNullifyB = _generateProposalProof("tee-nullify-b", AggregateVerifier.ProofType.TEE);

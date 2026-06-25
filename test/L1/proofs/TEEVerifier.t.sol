@@ -29,14 +29,14 @@ contract MockAggregateVerifierForVerifier {
 }
 
 contract MockDisputeGameFactoryForVerifier {
-    IDisputeGame internal immutable _impl;
+    mapping(uint32 => address) internal _impls;
 
-    constructor(address impl) {
-        _impl = IDisputeGame(impl);
+    function setImpl(uint32 gameType, address impl) external {
+        _impls[gameType] = impl;
     }
 
-    function gameImpls(GameType) external view returns (IDisputeGame) {
-        return _impl;
+    function gameImpls(GameType gameType) external view returns (IDisputeGame) {
+        return IDisputeGame(_impls[GameType.unwrap(gameType)]);
     }
 }
 
@@ -57,8 +57,6 @@ contract TEEVerifierTest is Test {
     address internal immutable PROPOSER = makeAddr("proposer");
 
     function setUp() public {
-        owner = address(this);
-
         nitroSignerAddress = vm.addr(NITRO_SIGNER_PRIVATE_KEY);
         tdxSignerAddress = vm.addr(TDX_SIGNER_PRIVATE_KEY);
 
@@ -79,7 +77,8 @@ contract TEEVerifierTest is Test {
         proxy.upgradeToAndCall(
             address(impl),
             abi.encodeCall(
-                TEEProverRegistry.initialize, (address(this), address(this), new address[](0), TEST_GAME_TYPE)
+                TEEProverRegistry.initialize,
+                (address(this), address(this), new address[](0), GameType.wrap(TEST_GAME_TYPE))
             )
         );
 

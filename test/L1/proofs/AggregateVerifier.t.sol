@@ -78,9 +78,7 @@ contract AggregateVerifierTest is BaseTest {
             )
         );
 
-        AggregateVerifier game = _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
-        );
+        _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof);
     }
 
     function testInitializeWithZKProof() public {
@@ -425,6 +423,40 @@ contract AggregateVerifierTest is BaseTest {
         return abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, rootClaim.raw());
     }
 
+    function _generateIntermediateRootsExceptLast(uint256 l2BlockNumber) private pure returns (bytes memory) {
+        uint256 rootsCount = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;
+        bytes32[] memory intermediateRoots = new bytes32[](rootsCount - 1);
+        uint256 startingL2BlockNumber = l2BlockNumber - BLOCK_INTERVAL;
+        for (uint256 i = 1; i < rootsCount; i++) {
+            intermediateRoots[i - 1] = keccak256(abi.encode(startingL2BlockNumber + INTERMEDIATE_BLOCK_INTERVAL * i));
+        }
+        return abi.encodePacked(intermediateRoots);
+    }
+
+    function _deployAggregateVerifierCloneWithoutFactoryRegistration(
+        address creator,
+        Claim rootClaim,
+        uint256 l2BlockNumber,
+        address parentAddress,
+        bytes memory proof
+    )
+        private
+        returns (AggregateVerifier)
+    {
+        bytes memory extraData = _aggregateVerifierExtraData(rootClaim, l2BlockNumber, parentAddress);
+        Hash uuid = factory.getGameUUID(GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData);
+        address clone = address(aggregateVerifierImpl)
+            .cloneDeterministic(
+                abi.encodePacked(creator, rootClaim, blockhash(block.number - 1), extraData), Hash.unwrap(uuid)
+            );
+
+        vm.deal(creator, INIT_BOND);
+        vm.prank(creator);
+        AggregateVerifier(payable(clone)).initializeWithInitData{ value: INIT_BOND }(proof);
+
+        return AggregateVerifier(payable(clone));
+    }
+
     function _expectDeployWithInvalidBlockIntervalsReverts(
         uint256 blockInterval,
         uint256 intermediateBlockInterval
@@ -432,45 +464,11 @@ contract AggregateVerifierTest is BaseTest {
         private
     {
         vm.expectRevert(
-            abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, 0, INTERMEDIATE_BLOCK_INTERVAL)
-        );
-        new AggregateVerifier(
-            AGGREGATE_VERIFIER_GAME_TYPE,
-            IAnchorStateRegistry(address(anchorStateRegistry)),
-            IDelayedWETH(payable(address(delayedWETH))),
-            IVerifier(address(teeVerifier)),
-            IVerifier(address(zkVerifier)),
-            AggregateVerifier.TeeHashes(TEE_NITRO_IMAGE_HASH, TEE_TDX_IMAGE_HASH),
-            AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
-            CONFIG_HASH,
-            L2_CHAIN_ID,
-            0,
-            INTERMEDIATE_BLOCK_INTERVAL
+            abi.encodeWithSelector(
+                AggregateVerifier.InvalidBlockInterval.selector, blockInterval, intermediateBlockInterval
+            )
         );
         _deployAggregateVerifierWithIntervals(blockInterval, intermediateBlockInterval);
-    }
-
-        // Case 2: INTERMEDIATE_BLOCK_INTERVAL is 0
-        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, BLOCK_INTERVAL, 0));
-        new AggregateVerifier(
-            AGGREGATE_VERIFIER_GAME_TYPE,
-            IAnchorStateRegistry(address(anchorStateRegistry)),
-            IDelayedWETH(payable(address(delayedWETH))),
-            IVerifier(address(teeVerifier)),
-            IVerifier(address(zkVerifier)),
-            AggregateVerifier.TeeHashes(TEE_NITRO_IMAGE_HASH, TEE_TDX_IMAGE_HASH),
-            AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
-            CONFIG_HASH,
-            L2_CHAIN_ID,
-            BLOCK_INTERVAL,
-            0
-        );
-
-        vm.deal(creator, INIT_BOND);
-        vm.prank(creator);
-        AggregateVerifier(payable(clone)).initializeWithInitData{ value: INIT_BOND }(proof);
-
-        return AggregateVerifier(payable(clone));
     }
 
     function _deployAggregateVerifierWithIntervals(
