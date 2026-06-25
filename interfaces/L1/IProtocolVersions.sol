@@ -6,6 +6,13 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 /// @title IProtocolVersions
 /// @notice Interface for the ProtocolVersions upgrade schedule contract.
 interface IProtocolVersions is ISemver {
+    struct Upgrade {
+        string  name;
+        uint64  timestamp;
+        uint256 protocolVersion;
+        bytes32 scheduleId;
+    }
+
     error ProtocolVersions_ZeroOwner();
     error ProtocolVersions_InvalidL2ChainId();
     error ProtocolVersions_UnknownUpgradeName(string upgradeId);
@@ -33,6 +40,8 @@ interface IProtocolVersions is ISemver {
     function upgradeIds() external view returns (bytes32[] memory);
     function getTimestamp(string calldata upgradeId) external view returns (uint256);
     function getProtocolVersion(string calldata upgradeId) external view returns (uint256);
+
+    function getSchedule() external view returns (Upgrade[] memory);
 
     function registerUpgrade(string calldata upgradeId, uint256 protocolVersion) external;
     function setTimestamp(string calldata upgradeId, uint64 timestamp) external;

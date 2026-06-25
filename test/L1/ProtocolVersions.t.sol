@@ -530,4 +530,36 @@ contract ProtocolVersions_GetView_Test is ProtocolVersions_TestInit {
         );
         protocolVersions.getProtocolVersion("unknown");
     }
+
+    /// @notice Tests that `getSchedule` returns an empty array when no upgrades are registered.
+    function test_getSchedule_empty_succeeds() external view {
+        assertEq(protocolVersions.getSchedule().length, 0);
+    }
+
+    /// @notice Tests that `getSchedule` returns all upgrades in registration order with correct fields.
+    function test_getSchedule_returnsFullSchedule_succeeds() external {
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade("canyon", 1);
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade("ecotone", 2);
+
+        uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+        vm.prank(_owner);
+        protocolVersions.setTimestamp("canyon", ts);
+
+        IProtocolVersions.Upgrade[] memory s = protocolVersions.getSchedule();
+
+        assertEq(s.length, 2);
+
+        assertEq(s[0].name, "canyon");
+        assertEq(s[0].timestamp, ts);
+        assertEq(s[0].protocolVersion, 1);
+
+        assertEq(s[1].name, "ecotone");
+        assertEq(s[1].timestamp, 0);
+        assertEq(s[1].protocolVersion, 2);
+
+        // The last entry's scheduleId is the contract's current scheduleId.
+        assertEq(s[1].scheduleId, protocolVersions.scheduleId());
+    }
 }

@@ -127,6 +127,24 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
         return _protocolVersions[_registeredKey(upgradeId)];
     }
 
+    /// @notice Returns the full ordered schedule: every registered upgrade with its current
+    ///         activation timestamp, protocol version, and cumulative schedule hash.
+    /// @dev Calling via eth_call is gas-free; no transaction is submitted.
+    /// @return schedule_ Ordered array of Upgrade structs, one per registered upgrade.
+    function getSchedule() external view returns (Upgrade[] memory schedule_) {
+        uint256 n = _upgradeKeys.length;
+        schedule_ = new Upgrade[](n);
+        for (uint256 i = 0; i < n; i++) {
+            bytes32 key = _upgradeKeys[i];
+            schedule_[i] = Upgrade({
+                name: _nameFromKey(key),
+                timestamp: _timestamps[key],
+                protocolVersion: _protocolVersions[key],
+                scheduleId: _upgradeScheduleId[key]
+            });
+        }
+    }
+
     /// @notice Registers a new upgrade by upgradeId with its protocol version. Owner only.
     /// @dev The upgradeId is packed into a bytes32 key and `protocolVersion` is recorded for it.
     ///      Registration extends the scheduleId chain with the new (key, timestamp=0) link.
@@ -259,5 +277,15 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
         bytes memory raw = bytes(upgradeId);
         if (raw.length == 0 || raw.length > 32) revert ProtocolVersions_InvalidUpgradeId();
         key = bytes32(raw);
+    }
+
+    /// @dev Recovers the original upgradeId string from its bytes32 key by stripping trailing
+    ///      zero bytes. Correct for printable ASCII names, which contain no embedded null bytes.
+    function _nameFromKey(bytes32 key) internal pure returns (string memory) {
+        uint256 len = 32;
+        while (len > 0 && key[len - 1] == 0) len--;
+        bytes memory b = new bytes(len);
+        for (uint256 i = 0; i < len; i++) b[i] = key[i];
+        return string(b);
     }
 }
