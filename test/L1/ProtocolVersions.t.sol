@@ -151,7 +151,9 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         protocolVersions.registerUpgrade("canyon", 1);
 
         vm.expectRevert(
-            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_UpgradeAlreadyRegistered.selector, bytes32("canyon"))
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_UpgradeAlreadyRegistered.selector, bytes32("canyon")
+            )
         );
         vm.prank(_owner);
         protocolVersions.registerUpgrade("canyon", 1);

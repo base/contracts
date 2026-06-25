@@ -7,8 +7,8 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 /// @notice Interface for the ProtocolVersions upgrade schedule contract.
 interface IProtocolVersions is ISemver {
     struct Upgrade {
-        string  name;
-        uint64  timestamp;
+        string name;
+        uint64 timestamp;
         uint256 protocolVersion;
         bytes32 scheduleId;
     }

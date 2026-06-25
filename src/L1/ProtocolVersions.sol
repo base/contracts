@@ -159,7 +159,8 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
     ///      upgrade must not have already activated. Pass 0 to remove a not-yet-activated scheduled
     ///      timestamp; reverts if the upgrade has already passed its activation time.
     /// @param upgradeId  The upgrade to schedule.
-    /// @param timestamp  Future Unix timestamp for L2 activation (must be >= block.timestamp + MIN_NOTICE), or 0 to clear.
+    /// @param timestamp  Future Unix timestamp for L2 activation (must be >= block.timestamp + MIN_NOTICE), or 0 to
+    /// clear.
     function setTimestamp(string calldata upgradeId, uint64 timestamp) external onlyOwner {
         bytes32 key = _registeredKey(upgradeId);
         if (_applyTimestamp(key, timestamp)) {
@@ -285,7 +286,9 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
         uint256 len = 32;
         while (len > 0 && key[len - 1] == 0) len--;
         bytes memory b = new bytes(len);
-        for (uint256 i = 0; i < len; i++) b[i] = key[i];
+        for (uint256 i = 0; i < len; i++) {
+            b[i] = key[i];
+        }
         return string(b);
     }
 }
