@@ -37,6 +37,10 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
     /// @notice The L2 chain ID whose schedule this contract commits to.
     uint256 public immutable l2ChainId;
 
+    /// @notice Hash chain seed: keccak256(abi.encode(l2ChainId, address(this))). Cached to avoid
+    ///         recomputing on every _refreshScheduleId call.
+    bytes32 internal immutable _seed;
+
     /// @notice The latest block number in which `scheduleId` changed.
     uint256 public lastUpdatedAtBlock;
 
@@ -76,8 +80,9 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
 
         _transferOwnership(_owner);
         l2ChainId = _l2ChainId;
+        _seed = keccak256(abi.encode(_l2ChainId, address(this)));
 
-        _scheduleId = keccak256(abi.encode(l2ChainId, address(this)));
+        _scheduleId = _seed;
         lastUpdatedAtBlock = block.number;
         emit ScheduleIdUpdated(bytes32(0), _scheduleId, block.number);
     }
@@ -241,14 +246,13 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
     ///      0-based registration index of `changedKey`.
     function _refreshScheduleId(bytes32 changedKey) internal {
         uint256 n = _upgradeKeys.length;
-        bytes32 seed = keccak256(abi.encode(l2ChainId, address(this)));
 
         // Locate changedKey and initialise prev to the hash of the preceding link (or seed).
         uint256 startIndex;
         for (startIndex = 0; startIndex < n; startIndex++) {
             if (_upgradeKeys[startIndex] == changedKey) break;
         }
-        bytes32 prev = startIndex == 0 ? seed : _upgradeScheduleId[_upgradeKeys[startIndex - 1]];
+        bytes32 prev = startIndex == 0 ? _seed : _upgradeScheduleId[_upgradeKeys[startIndex - 1]];
 
         // Recompute from startIndex onward, storing each link.
         for (uint256 i = startIndex; i < n; i++) {
