@@ -21,6 +21,8 @@ import { Constants } from "src/libraries/Constants.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
 import { Features } from "src/libraries/Features.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
+import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import "src/libraries/bridge/Types.sol";
 import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 
@@ -79,6 +81,7 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
         respectedGameType = optimismPortal2.respectedGameType();
         MockVerifier teeVerifier = new MockVerifier(anchorStateRegistry);
         MockVerifier zkVerifier = new MockVerifier(anchorStateRegistry);
+        ProtocolVersions pv = new ProtocolVersions(address(this), deploy.cfg().l2ChainId());
         AggregateVerifier gameImpl = new AggregateVerifier(
             respectedGameType,
             anchorStateRegistry,
@@ -90,7 +93,8 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
             bytes32(uint256(4)),
             deploy.cfg().l2ChainId(),
             100,
-            10
+            10,
+            IProtocolVersions(address(pv))
         );
         disputeGameFactory.setImplementation(respectedGameType, IDisputeGame(address(gameImpl)));
         disputeGameFactory.setInitBond(respectedGameType, 0);

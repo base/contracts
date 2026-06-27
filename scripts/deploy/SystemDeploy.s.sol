@@ -23,6 +23,7 @@ import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IL1ChugSplashProxy } from "interfaces/legacy/IL1ChugSplashProxy.sol";
 import { IResolvedDelegateProxy } from "interfaces/legacy/IResolvedDelegateProxy.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
@@ -81,6 +82,7 @@ contract SystemDeploy is Script {
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
         ISP1Verifier sp1Verifier;
+        IProtocolVersions protocolVersions;
         address teeProposer;
         address teeChallenger;
         address guardian;
@@ -127,6 +129,7 @@ contract SystemDeploy is Script {
         uint256 l2ChainId;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+        IProtocolVersions protocolVersions;
     }
 
     struct MultiproofOutput {
@@ -266,6 +269,7 @@ contract SystemDeploy is Script {
             multiproofBlockInterval: cfg.multiproofBlockInterval(),
             multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
             sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
+            protocolVersions: IProtocolVersions(cfg.protocolVersionsAddr()),
             teeProposer: cfg.teeProposer(),
             teeChallenger: cfg.teeChallenger(),
             guardian: cfg.superchainConfigGuardian(),
@@ -1009,7 +1013,8 @@ contract SystemDeploy is Script {
                 multiproofConfigHash: _input.multiproofConfigHash,
                 l2ChainId: _opChainInput.l2ChainId,
                 multiproofBlockInterval: _input.multiproofBlockInterval,
-                multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval
+                multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval,
+                protocolVersions: _input.protocolVersions
             })
         );
 
@@ -1038,7 +1043,8 @@ contract SystemDeploy is Script {
                     _input.multiproofConfigHash,
                     _input.l2ChainId,
                     _input.multiproofBlockInterval,
-                    _input.multiproofIntermediateBlockInterval
+                    _input.multiproofIntermediateBlockInterval,
+                    _input.protocolVersions
                 )
             )
         );
@@ -1073,8 +1079,10 @@ contract SystemDeploy is Script {
         require(_input.multiproofGameType != 0, "SystemDeploy: multiproofGameType not set");
         require(_input.nitroEnclaveVerifier != address(0), "SystemDeploy: nitroEnclaveVerifier not set");
         require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
+        require(address(_input.protocolVersions) != address(0), "SystemDeploy: protocolVersions not set");
         DeployUtils.assertValidContractAddress(_input.nitroEnclaveVerifier);
         DeployUtils.assertValidContractAddress(address(_input.sp1Verifier));
+        DeployUtils.assertValidContractAddress(address(_input.protocolVersions));
         require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
         require(
             _input.multiproofIntermediateBlockInterval != 0, "SystemDeploy: multiproof intermediate interval not set"

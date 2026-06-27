@@ -16,6 +16,7 @@ import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
@@ -43,6 +44,7 @@ abstract contract SystemDeployAssertions is Test {
         bytes32 zkRangeHash;
         bytes32 zkAggregationHash;
         bytes32 multiproofConfigHash;
+        IProtocolVersions protocolVersions;
         uint256 l2ChainId;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
@@ -254,6 +256,7 @@ abstract contract SystemDeployAssertions is Test {
         assertEq(_aggregateVerifier.ZK_RANGE_HASH(), _expected.zkRangeHash, "AV-100");
         assertEq(_aggregateVerifier.ZK_AGGREGATE_HASH(), _expected.zkAggregationHash, "AV-110");
         assertEq(_aggregateVerifier.CONFIG_HASH(), _expected.multiproofConfigHash, "AV-120");
+        assertEq(address(_aggregateVerifier.PROTOCOL_VERSIONS()), address(_expected.protocolVersions), "AV-125");
         assertEq(_aggregateVerifier.L2_CHAIN_ID(), _expected.l2ChainId, "AV-130");
         assertEq(_aggregateVerifier.BLOCK_INTERVAL(), _expected.multiproofBlockInterval, "AV-140");
         assertEq(

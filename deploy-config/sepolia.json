@@ -34,6 +34,7 @@
   "sequencerFeeVaultRecipient": "0xfd1D2e729aE8eEe2E146c033bf4400fE75284301",
   "sequencerFeeVaultWithdrawalNetwork": 0,
   "sp1Verifier": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B",
+  "protocolVersionsAddr": "0x79ADD5713B383DAa0a138d3C4780C7A1804a8090",
   "superchainConfigGuardian": "0xfd1D2e729aE8eEe2E146c033bf4400fE75284301",
   "superchainConfigIncidentResponder": "0x0000000000000000000000000000000000000000",
   "teeChallenger": "0xadc09b63a3ac57a2ce86d946617a18df9db029a1",

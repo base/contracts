@@ -20,6 +20,7 @@ contract DeployConfig is Script {
     address public proxyAdminOwner;
     address public sequencerFeeVaultRecipient;
     address public sp1Verifier;
+    address public protocolVersionsAddr;
     address public superchainConfigGuardian;
     address public superchainConfigIncidentResponder;
     address public teeChallenger;
@@ -73,6 +74,7 @@ contract DeployConfig is Script {
         proxyAdminOwner = _json.readAddress("$.proxyAdminOwner");
         sequencerFeeVaultRecipient = _json.readAddress("$.sequencerFeeVaultRecipient");
         sp1Verifier = _json.readAddress("$.sp1Verifier");
+        protocolVersionsAddr = _json.readAddress("$.protocolVersionsAddr");
         superchainConfigGuardian = _json.readAddress("$.superchainConfigGuardian");
         superchainConfigIncidentResponder = _json.readAddress("$.superchainConfigIncidentResponder");
         teeChallenger = _json.readAddress("$.teeChallenger");

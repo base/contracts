@@ -19,6 +19,8 @@ import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
+import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
 
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 
@@ -54,6 +56,7 @@ contract BaseTest is Test {
 
     MockVerifier internal teeVerifier;
     MockVerifier internal zkVerifier;
+    ProtocolVersions internal protocolVersions;
 
     function setUp() public virtual {
         _deployContractsAndProxies();
@@ -84,6 +87,7 @@ contract BaseTest is Test {
 
         teeVerifier = new MockVerifier(IAnchorStateRegistry(address(anchorStateRegistry)));
         zkVerifier = new MockVerifier(IAnchorStateRegistry(address(anchorStateRegistry)));
+        protocolVersions = new ProtocolVersions(address(this), L2_CHAIN_ID);
     }
 
     function _deployProxy(address implementation) private returns (address) {
@@ -117,7 +121,8 @@ contract BaseTest is Test {
             CONFIG_HASH,
             L2_CHAIN_ID,
             BLOCK_INTERVAL,
-            INTERMEDIATE_BLOCK_INTERVAL
+            INTERMEDIATE_BLOCK_INTERVAL,
+            IProtocolVersions(address(protocolVersions))
         );
 
         factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(aggregateVerifierImpl)));

@@ -11,12 +11,14 @@ import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.so
 import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 import "src/libraries/bridge/Types.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
+import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
 
 // Interfaces
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 
 // Mocks
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
@@ -219,6 +221,7 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
     function test_create_implArgs_succeeds() public {
         MockVerifier teeVerifier = new MockVerifier(anchorStateRegistry);
         MockVerifier zkVerifier = new MockVerifier(anchorStateRegistry);
+        ProtocolVersions pv = new ProtocolVersions(address(this), L2_CHAIN_ID);
         AggregateVerifier gameImpl = new AggregateVerifier(
             GameTypes.AGGREGATE_VERIFIER,
             anchorStateRegistry,
@@ -230,7 +233,8 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
             bytes32(uint256(4)),
             L2_CHAIN_ID,
             AGGREGATE_BLOCK_INTERVAL,
-            AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL
+            AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL,
+            IProtocolVersions(address(pv))
         );
         _setGame(address(gameImpl), GameTypes.AGGREGATE_VERIFIER);
 

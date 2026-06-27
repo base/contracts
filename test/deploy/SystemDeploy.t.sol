@@ -14,6 +14,8 @@ import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
+import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
 
 contract MockNitroEnclaveVerifier {
     address public proofSubmitter;
@@ -41,6 +43,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     address internal challenger = makeAddr("challenger");
     MockNitroEnclaveVerifier internal nitroEnclaveVerifier;
     MockSP1Verifier internal sp1Verifier;
+    ProtocolVersions internal protocolVersions;
 
     uint256 internal l2ChainId = 901;
 
@@ -48,6 +51,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         systemDeploy = new SystemDeploy();
         nitroEnclaveVerifier = new MockNitroEnclaveVerifier();
         sp1Verifier = new MockSP1Verifier();
+        protocolVersions = new ProtocolVersions(address(this), l2ChainId);
     }
 
     function testFuzz_deploySuperchain_succeeds(
@@ -193,6 +197,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             multiproofBlockInterval: 100,
             multiproofIntermediateBlockInterval: 10,
             sp1Verifier: ISP1Verifier(address(sp1Verifier)),
+            protocolVersions: IProtocolVersions(address(protocolVersions)),
             teeProposer: proposer,
             teeChallenger: challenger,
             guardian: guardian,
@@ -292,6 +297,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             zkRangeHash: _input.implementationsInput.zkRangeHash,
             zkAggregationHash: _input.implementationsInput.zkAggregationHash,
             multiproofConfigHash: _input.implementationsInput.multiproofConfigHash,
+            protocolVersions: _input.implementationsInput.protocolVersions,
             l2ChainId: _input.opChainInput.l2ChainId,
             multiproofBlockInterval: _input.implementationsInput.multiproofBlockInterval,
             multiproofIntermediateBlockInterval: _input.implementationsInput.multiproofIntermediateBlockInterval,

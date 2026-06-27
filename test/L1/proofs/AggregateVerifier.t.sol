@@ -11,6 +11,7 @@ import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 
 import { LibClone } from "lib/solady/src/utils/LibClone.sol";
 
@@ -34,6 +35,23 @@ contract AggregateVerifierTest is BaseTest {
 
     function testInitializeWithZKProof() public {
         _createAndAssertInitializedGame("zk-proof", AggregateVerifier.ProofType.ZK, ZK_PROVER, address(0), ZK_PROVER);
+    }
+
+    function testActivationScheduleHashIsSnapshottedAtInitialization() public {
+        bytes32 initialScheduleHash = protocolVersions.scheduleId();
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
+
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
+        );
+
+        assertEq(game.activationScheduleHash(), initialScheduleHash);
+
+        protocolVersions.registerUpgrade("canyon", 1);
+
+        assertNotEq(protocolVersions.scheduleId(), initialScheduleHash);
+        assertEq(game.activationScheduleHash(), initialScheduleHash);
     }
 
     function testInitializeFailsIfInvalidCallDataSize() public {
@@ -312,6 +330,7 @@ contract AggregateVerifierTest is BaseTest {
             game.extraData(),
             abi.encodePacked(currentL2BlockNumber, address(anchorStateRegistry), intermediateOutputRoots)
         );
+        assertEq(game.activationScheduleHash(), protocolVersions.scheduleId());
         assertEq(game.bondRecipient(), expectedCreator);
         assertTrue(anchorStateRegistry.isGameProper(IDisputeGame(address(game))));
         assertEq(delayedWETH.balanceOf(address(game)), INIT_BOND);
@@ -417,7 +436,8 @@ contract AggregateVerifierTest is BaseTest {
             CONFIG_HASH,
             L2_CHAIN_ID,
             blockInterval,
-            intermediateBlockInterval
+            intermediateBlockInterval,
+            IProtocolVersions(address(protocolVersions))
         );
     }
 }

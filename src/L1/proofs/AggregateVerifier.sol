@@ -26,6 +26,7 @@ import { ReentrancyGuard } from "lib/solady/src/utils/ReentrancyGuard.sol";
 
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 
 contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     ////////////////////////////////////////////////////////////////
@@ -113,6 +114,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The game type ID.
     GameType internal immutable GAME_TYPE;
 
+    /// @notice The ProtocolVersions upgrade schedule contract.
+    IProtocolVersions public immutable PROTOCOL_VERSIONS;
+
     ////////////////////////////////////////////////////////////////
     //                         State Vars                         //
     ////////////////////////////////////////////////////////////////
@@ -161,6 +165,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The number of proofs provided.
     uint8 public proofCount;
+
+    /// @notice The activation schedule hash snapshotted from ProtocolVersions at game initialization.
+    /// @dev Pinned once at init; all proofs within this game must commit to this value.
+    bytes32 public activationScheduleHash;
 
     ////////////////////////////////////////////////////////////////
     //                         Events                             //
@@ -270,7 +278,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 configHash,
         uint256 l2ChainId,
         uint256 blockInterval,
-        uint256 intermediateBlockInterval
+        uint256 intermediateBlockInterval,
+        IProtocolVersions protocolVersions
     ) {
         // Block interval and intermediate block interval must be positive and divisible.
         if (blockInterval == 0 || intermediateBlockInterval == 0 || blockInterval % intermediateBlockInterval != 0) {
@@ -291,6 +300,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         L2_CHAIN_ID = l2ChainId;
         BLOCK_INTERVAL = blockInterval;
         INTERMEDIATE_BLOCK_INTERVAL = intermediateBlockInterval;
+        PROTOCOL_VERSIONS = protocolVersions;
 
         INITIALIZE_CALLDATA_SIZE = 0x8E + 0x20 * intermediateOutputRootsCount();
     }
@@ -363,6 +373,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         // Set the game as initialized.
         initialized = true;
+
+        // Snapshot the activation schedule from ProtocolVersions. All proofs within this game
+        // must commit to this value, pinning them to the schedule at the game's creation block.
+        activationScheduleHash = PROTOCOL_VERSIONS.scheduleId();
 
         // Set the game's starting timestamp.
         createdAt = Timestamp.wrap(uint64(block.timestamp));
@@ -899,7 +913,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
                 endingL2SequenceNumber,
                 intermediateRoots,
                 CONFIG_HASH,
-                TEE_IMAGE_HASH
+                TEE_IMAGE_HASH,
+                activationScheduleHash
             )
         );
 
@@ -933,7 +948,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
                 endingL2SequenceNumber,
                 intermediateRoots,
                 CONFIG_HASH,
-                ZK_RANGE_HASH
+                ZK_RANGE_HASH,
+                activationScheduleHash
             )
         );
 
