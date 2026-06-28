@@ -34,6 +34,8 @@ abstract contract DeployDevBase is Script {
     IAnchorStateRegistry public mockAnchorRegistry;
     address public mockDelayedWETH;
     address public aggregateVerifier;
+    Hash public startingAnchorRoot;
+    uint256 public startingAnchorBlockNumber;
 
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
@@ -41,6 +43,14 @@ abstract contract DeployDevBase is Script {
     }
 
     function run() public {
+        run(cfg.multiproofGenesisOutputRoot(), cfg.multiproofGenesisBlockNumber());
+    }
+
+    function run(bytes32 asrStartingOutputRoot, uint256 asrStartingBlockNumber) public {
+        require(asrStartingOutputRoot != bytes32(0), "asrStartingOutputRoot must be non-zero");
+        startingAnchorRoot = Hash.wrap(asrStartingOutputRoot);
+        startingAnchorBlockNumber = asrStartingBlockNumber;
+
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
 
         _preflight();
@@ -71,12 +81,7 @@ abstract contract DeployDevBase is Script {
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
         mockAnchorRegistry = IAnchorStateRegistry(address(asr));
-        asr.initialize(
-            disputeGameFactory,
-            Hash.wrap(cfg.multiproofGenesisOutputRoot()),
-            cfg.multiproofGenesisBlockNumber(),
-            gameType
-        );
+        asr.initialize(disputeGameFactory, startingAnchorRoot, startingAnchorBlockNumber, gameType);
     }
 
     function _deployTEEContracts(GameType gameType) internal {
@@ -135,6 +140,8 @@ abstract contract DeployDevBase is Script {
         _serializeExtra(key);
         vm.serializeAddress(key, "DisputeGameFactory", disputeGameFactory);
         vm.serializeAddress(key, "AnchorStateRegistry", address(mockAnchorRegistry));
+        vm.serializeBytes32(key, "ASRStartingOutputRoot", startingAnchorRoot.raw());
+        vm.serializeUint(key, "ASRStartingBlockNumber", startingAnchorBlockNumber);
         vm.serializeAddress(key, "DelayedWETH", mockDelayedWETH);
         string memory json = vm.serializeAddress(key, "AggregateVerifier", aggregateVerifier);
 

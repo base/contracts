@@ -43,6 +43,7 @@ contract MockDisputeGameFactoryForVerifier {
 contract TEEVerifierTest is Test {
     TEEVerifier public verifier;
     DevTEEProverRegistry public teeProverRegistry;
+    MockAnchorStateRegistry public anchorStateRegistry;
 
     uint256 internal constant NITRO_SIGNER_PRIVATE_KEY =
         0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
@@ -91,10 +92,14 @@ contract TEEVerifierTest is Test {
         // Set the proposer as valid
         teeProverRegistry.setProposer(PROPOSER, true);
 
-        MockAnchorStateRegistry anchorStateRegistry = new MockAnchorStateRegistry();
+        anchorStateRegistry = new MockAnchorStateRegistry();
         verifier = new TEEVerifier(
             TEEProverRegistry(address(teeProverRegistry)), IAnchorStateRegistry(address(anchorStateRegistry))
         );
+    }
+
+    function testMockAnchorGameStartsUnset() public view {
+        assertEq(address(anchorStateRegistry.anchorGame()), address(0));
     }
 
     function testVerifyValidNitroSignature() public view {
