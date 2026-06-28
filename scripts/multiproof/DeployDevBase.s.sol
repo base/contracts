@@ -65,8 +65,8 @@ abstract contract DeployDevBase is Script {
 
         Proxy proxy = new Proxy(msg.sender);
         proxy.upgradeTo(factoryImpl);
+        DisputeGameFactory(address(proxy)).initialize(msg.sender);
         proxy.changeAdmin(address(proxyAdmin));
-        DisputeGameFactory(address(proxy)).initialize(owner);
         disputeGameFactory = address(proxy);
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
@@ -123,6 +123,9 @@ abstract contract DeployDevBase is Script {
         DisputeGameFactory factory = DisputeGameFactory(disputeGameFactory);
         factory.setImplementation(gameType, IDisputeGame(aggregateVerifier), "");
         factory.setInitBond(gameType, _initBond());
+        if (factory.owner() != cfg.finalSystemOwner()) {
+            factory.transferOwnership(cfg.finalSystemOwner());
+        }
     }
 
     function _writeOutput() internal {

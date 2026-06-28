@@ -164,8 +164,8 @@ contract DeployDevWithTDX is Script {
 
         Proxy proxy = new Proxy(msg.sender);
         proxy.upgradeTo(factoryImpl);
+        DisputeGameFactory(address(proxy)).initialize(msg.sender);
         proxy.changeAdmin(address(proxyAdmin));
-        DisputeGameFactory(address(proxy)).initialize(cfg.finalSystemOwner());
         disputeGameFactory = address(proxy);
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
@@ -199,6 +199,9 @@ contract DeployDevWithTDX is Script {
         DisputeGameFactory factory = DisputeGameFactory(disputeGameFactory);
         factory.setImplementation(gameType, IDisputeGame(aggregateVerifier), "");
         factory.setInitBond(gameType, INIT_BOND);
+        if (factory.owner() != cfg.finalSystemOwner()) {
+            factory.transferOwnership(cfg.finalSystemOwner());
+        }
     }
 
     function _printSummary() internal view {
