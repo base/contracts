@@ -12,15 +12,12 @@ pragma solidity ^0.8.20;
  * Usage:
  *
  *   forge script scripts/multiproof/DeployNitroVerifier.s.sol:DeployNitroVerifier \
- *     --sig "run(address,address,bytes32,bytes32,bytes32)" \
+ *     --sig "run(address,address,bytes32,bytes32,bytes32,bytes32)" \
  *     <OWNER> <RISC0_VERIFIER_ROUTER> <SET_BUILDER_IMAGE_ID> \
- *     <NITRO_ROOT_CERT> <NITRO_VERIFIER_ID> \
+ *     <NITRO_ROOT_CERT> <NITRO_VERIFIER_ID> <NITRO_VERIFIER_PROOF_ID> \
  *     --rpc-url <RPC_URL> --broadcast --private-key <DEPLOYER_KEY>
  *
- * If using batched Nitro proofs, use the overload that also supplies
- * <NITRO_VERIFIER_PROOF_ID>:
- *
- *   --sig "run(address,address,bytes32,bytes32,bytes32,bytes32)"
+ * Use bytes32(0) for <NITRO_VERIFIER_PROOF_ID> unless using batched Nitro proofs.
  *
  * The broadcaster must be the owner because this script calls addVerifyRoute()
  * on the freshly deployed NitroEnclaveVerifier.
@@ -40,28 +37,13 @@ import { NitroEnclaveVerifier } from "src/L1/proofs/tee/NitroEnclaveVerifier.sol
 
 contract DeployNitroVerifier is Script {
     /// @notice Maximum Nitro attestation age accepted by NitroEnclaveVerifier.
-    uint64 internal constant NITRO_MAX_TIME_DIFF = 3600;
-
-    address public setVerifier;
-    address public nitroEnclaveVerifier;
+    uint64 internal constant NITRO_MAX_TIME_DIFF = 1 hours;
 
     /// @param owner Owner for NitroEnclaveVerifier. Must be the broadcaster for route setup.
     /// @param risc0VerifierRouter Existing RISC Zero verifier router.
     /// @param setBuilderImageId RISC Zero set builder image ID.
     /// @param nitroRootCert SHA-256 hash of the AWS Nitro root certificate.
     /// @param nitroVerifierId RISC Zero image ID for the Nitro attestation verifier guest.
-    function run(
-        address owner,
-        address risc0VerifierRouter,
-        bytes32 setBuilderImageId,
-        bytes32 nitroRootCert,
-        bytes32 nitroVerifierId
-    )
-        public
-    {
-        run(owner, risc0VerifierRouter, setBuilderImageId, nitroRootCert, nitroVerifierId, bytes32(0));
-    }
-
     /// @param nitroVerifierProofId Optional verifier proof ID used by Nitro batch verification.
     function run(
         address owner,
@@ -73,8 +55,13 @@ contract DeployNitroVerifier is Script {
     )
         public
     {
-        bytes4 setVerifierSelector =
-            _validateInputs(owner, risc0VerifierRouter, setBuilderImageId, nitroRootCert, nitroVerifierId);
+        require(owner != address(0), "owner must be non-zero");
+        require(risc0VerifierRouter != address(0), "risc0VerifierRouter must be non-zero");
+        require(setBuilderImageId != bytes32(0), "setBuilderImageId must be non-zero");
+        require(nitroRootCert != bytes32(0), "nitroRootCert must be non-zero");
+        require(nitroVerifierId != bytes32(0), "nitroVerifierId must be non-zero");
+
+        bytes4 setVerifierSelector = RiscZeroSetVerifierLib.selector(setBuilderImageId);
 
         console.log("=== Deploying NitroEnclaveVerifier ===");
         console.log("Owner:", owner);
@@ -90,49 +77,22 @@ contract DeployNitroVerifier is Script {
         console.log("      DeployDevWithTDX.s.sol updates it to TEEProverRegistry.");
         console.log("");
 
-        vm.startBroadcast();
-
-        (setVerifier, nitroEnclaveVerifier) = _deployNitroVerifier(
-            owner, risc0VerifierRouter, setBuilderImageId, nitroRootCert, nitroVerifierId, nitroVerifierProofId
-        );
-
-        vm.stopBroadcast();
-
-        console.log("RiscZeroSetVerifier:", setVerifier);
-        console.log("NitroEnclaveVerifier:", nitroEnclaveVerifier);
-        console.log("");
-        console.log(">>> Use this NitroEnclaveVerifier address in the deploy config <<<");
-
-        _writeOutput(
-            setVerifier,
-            nitroEnclaveVerifier,
-            risc0VerifierRouter,
-            setBuilderImageId,
-            setVerifierSelector,
-            nitroRootCert,
-            nitroVerifierId,
-            nitroVerifierProofId
-        );
-    }
-
-    function _deployNitroVerifier(
-        address owner,
-        address risc0VerifierRouter,
-        bytes32 setBuilderImageId,
-        bytes32 nitroRootCert,
-        bytes32 nitroVerifierId,
-        bytes32 nitroVerifierProofId
-    )
-        internal
-        returns (address deployedSetVerifier, address deployedNitroVerifier)
-    {
-        deployedSetVerifier =
-            address(new RiscZeroSetVerifier(IRiscZeroVerifier(risc0VerifierRouter), setBuilderImageId, ""));
+        string memory key = "deployment";
+        vm.serializeAddress(key, "RiscZeroVerifierRouter", risc0VerifierRouter);
+        vm.serializeBytes32(key, "RiscZeroSetBuilderImageId", setBuilderImageId);
+        vm.serializeString(key, "RiscZeroSetVerifierSelector", vm.toString(setVerifierSelector));
+        vm.serializeBytes32(key, "NitroRootCert", nitroRootCert);
+        vm.serializeBytes32(key, "NitroVerifierId", nitroVerifierId);
+        vm.serializeBytes32(key, "NitroVerifierProofId", nitroVerifierProofId);
 
         ZkCoProcessorConfig memory zkConfig = ZkCoProcessorConfig({
             verifierId: nitroVerifierId, aggregatorId: bytes32(0), zkVerifier: risc0VerifierRouter
         });
 
+        vm.startBroadcast();
+
+        address setVerifier =
+            address(new RiscZeroSetVerifier(IRiscZeroVerifier(risc0VerifierRouter), setBuilderImageId, ""));
         NitroEnclaveVerifier verifier = new NitroEnclaveVerifier(
             owner,
             NITRO_MAX_TIME_DIFF,
@@ -145,53 +105,19 @@ contract DeployNitroVerifier is Script {
             zkConfig,
             nitroVerifierProofId
         );
-        deployedNitroVerifier = address(verifier);
+        address nitroEnclaveVerifier = address(verifier);
 
-        bytes4 setVerifierSelector = RiscZeroSetVerifierLib.selector(setBuilderImageId);
-        verifier.addVerifyRoute(ZkCoProcessorType.RiscZero, setVerifierSelector, deployedSetVerifier);
-    }
+        verifier.addVerifyRoute(ZkCoProcessorType.RiscZero, setVerifierSelector, setVerifier);
 
-    function _validateInputs(
-        address owner,
-        address risc0VerifierRouter,
-        bytes32 setBuilderImageId,
-        bytes32 nitroRootCert,
-        bytes32 nitroVerifierId
-    )
-        internal
-        pure
-        returns (bytes4 setVerifierSelector)
-    {
-        require(owner != address(0), "owner must be non-zero");
-        require(risc0VerifierRouter != address(0), "risc0VerifierRouter must be non-zero");
-        require(setBuilderImageId != bytes32(0), "setBuilderImageId must be non-zero");
-        require(nitroRootCert != bytes32(0), "nitroRootCert must be non-zero");
-        require(nitroVerifierId != bytes32(0), "nitroVerifierId must be non-zero");
+        vm.stopBroadcast();
 
-        setVerifierSelector = RiscZeroSetVerifierLib.selector(setBuilderImageId);
-    }
+        console.log("RiscZeroSetVerifier:", setVerifier);
+        console.log("NitroEnclaveVerifier:", nitroEnclaveVerifier);
+        console.log("");
+        console.log(">>> Use this NitroEnclaveVerifier address in the deploy config <<<");
 
-    function _writeOutput(
-        address deployedSetVerifier,
-        address deployedNitroVerifier,
-        address risc0VerifierRouter,
-        bytes32 setBuilderImageId,
-        bytes4 setVerifierSelector,
-        bytes32 nitroRootCert,
-        bytes32 nitroVerifierId,
-        bytes32 nitroVerifierProofId
-    )
-        internal
-    {
-        string memory key = "deployment";
-        vm.serializeAddress(key, "RiscZeroSetVerifier", deployedSetVerifier);
-        vm.serializeAddress(key, "NitroEnclaveVerifier", deployedNitroVerifier);
-        vm.serializeAddress(key, "RiscZeroVerifierRouter", risc0VerifierRouter);
-        vm.serializeBytes32(key, "RiscZeroSetBuilderImageId", setBuilderImageId);
-        vm.serializeString(key, "RiscZeroSetVerifierSelector", vm.toString(setVerifierSelector));
-        vm.serializeBytes32(key, "NitroRootCert", nitroRootCert);
-        vm.serializeBytes32(key, "NitroVerifierId", nitroVerifierId);
-        vm.serializeBytes32(key, "NitroVerifierProofId", nitroVerifierProofId);
+        vm.serializeAddress(key, "RiscZeroSetVerifier", setVerifier);
+        vm.serializeAddress(key, "NitroEnclaveVerifier", nitroEnclaveVerifier);
         string memory json = vm.serializeUint(key, "MaxTimeDiff", NITRO_MAX_TIME_DIFF);
 
         string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-nitro-verifier.json");

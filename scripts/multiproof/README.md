@@ -243,12 +243,13 @@ To override Nitro inputs manually:
 
 ```bash
 forge script scripts/multiproof/DeployNitroVerifier.s.sol:DeployNitroVerifier \
-  --sig "run(address,address,bytes32,bytes32,bytes32)" \
+  --sig "run(address,address,bytes32,bytes32,bytes32,bytes32)" \
   $OWNER \
   $NITRO_RISC0_VERIFIER_ROUTER \
   $RISC0_SET_BUILDER_IMAGE_ID \
   $NITRO_ROOT_CERT \
   $NITRO_VERIFIER_ID \
+  $NITRO_VERIFIER_PROOF_ID \
   --rpc-url $L1_RPC_URL \
   --broadcast \
   --private-key $PRIVATE_KEY
