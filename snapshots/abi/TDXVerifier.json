@@ -39,7 +39,7 @@
     "inputs": [
       {
         "internalType": "enum TDXTcbStatus",
-        "name": "",
+        "name": "status",
         "type": "uint8"
       }
     ],
@@ -51,7 +51,7 @@
         "type": "bool"
       }
     ],
-    "stateMutability": "view",
+    "stateMutability": "pure",
     "type": "function"
   },
   {
@@ -175,74 +175,12 @@
   {
     "inputs": [
       {
-        "internalType": "uint64",
-        "name": "newMaxTimeDiff",
-        "type": "uint64"
-      }
-    ],
-    "name": "setMaxTimeDiff",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "address",
         "name": "newProofSubmitter",
         "type": "address"
       }
     ],
     "name": "setProofSubmitter",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "newRiscZeroVerifier",
-        "type": "address"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "newVerifierId",
-        "type": "bytes32"
-      }
-    ],
-    "name": "setRiscZeroConfiguration",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "newRootCaHash",
-        "type": "bytes32"
-      }
-    ],
-    "name": "setRootCaHash",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "enum TDXTcbStatus",
-        "name": "status",
-        "type": "uint8"
-      },
-      {
-        "internalType": "bool",
-        "name": "allowed",
-        "type": "bool"
-      }
-    ],
-    "name": "setTcbStatusAllowed",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -366,7 +304,7 @@
         "type": "tuple"
       }
     ],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -381,62 +319,6 @@
     ],
     "stateMutability": "pure",
     "type": "function"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "signer",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "imageHash",
-        "type": "bytes32"
-      },
-      {
-        "indexed": true,
-        "internalType": "enum TDXTcbStatus",
-        "name": "tcbStatus",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "pckCertHash",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "tcbInfoHash",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "qeIdentityHash",
-        "type": "bytes32"
-      }
-    ],
-    "name": "AttestationSubmitted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint64",
-        "name": "maxTimeDiff",
-        "type": "uint64"
-      }
-    ],
-    "name": "MaxTimeDiffUpdated",
-    "type": "event"
   },
   {
     "anonymous": false,
@@ -494,57 +376,6 @@
       }
     ],
     "name": "ProofSubmitterChanged",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "riscZeroVerifier",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "verifierId",
-        "type": "bytes32"
-      }
-    ],
-    "name": "RiscZeroConfigurationUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "rootCaHash",
-        "type": "bytes32"
-      }
-    ],
-    "name": "RootCaHashUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "enum TDXTcbStatus",
-        "name": "status",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "allowed",
-        "type": "bool"
-      }
-    ],
-    "name": "TcbStatusPolicyUpdated",
     "type": "event"
   },
   {

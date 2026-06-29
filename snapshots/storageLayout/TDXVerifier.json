@@ -1,44 +1,9 @@
 [
   {
-    "bytes": "8",
-    "label": "maxTimeDiff",
-    "offset": 0,
-    "slot": "0",
-    "type": "uint64"
-  },
-  {
     "bytes": "20",
     "label": "proofSubmitter",
-    "offset": 8,
+    "offset": 0,
     "slot": "0",
     "type": "address"
-  },
-  {
-    "bytes": "32",
-    "label": "rootCaHash",
-    "offset": 0,
-    "slot": "1",
-    "type": "bytes32"
-  },
-  {
-    "bytes": "20",
-    "label": "riscZeroVerifier",
-    "offset": 0,
-    "slot": "2",
-    "type": "address"
-  },
-  {
-    "bytes": "32",
-    "label": "verifierId",
-    "offset": 0,
-    "slot": "3",
-    "type": "bytes32"
-  },
-  {
-    "bytes": "32",
-    "label": "allowedTcbStatuses",
-    "offset": 0,
-    "slot": "4",
-    "type": "mapping(enum TDXTcbStatus => bool)"
   }
 ]

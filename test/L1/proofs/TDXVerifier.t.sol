@@ -48,22 +48,6 @@ contract TDXVerifierTest is Test {
         assertEq(uint256(result.tcbStatus), uint256(TDXTcbStatus.UpToDate));
     }
 
-    function testOwnerCanUpdateRiscZeroConfiguration() public {
-        address newVerifier = makeAddr("new-risc-zero");
-        bytes32 newVerifierId = keccak256("new-tdx-verifier-id");
-        verifier.setRiscZeroConfiguration(newVerifier, newVerifierId);
-
-        TDXVerifierJournal memory journal = _successJournal();
-        bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = hex"5678";
-        _mockRiscZeroVerify(newVerifier, newVerifierId, output, proofBytes);
-
-        TDXVerifierJournal memory result = verifier.verify(output, proofBytes);
-
-        assertEq(result.signer, journal.signer);
-        assertEq(result.imageHash, IMAGE_HASH);
-    }
-
     function testVerifyRevertsIfNotProofSubmitter() public {
         bytes memory output = abi.encode(_successJournal());
 
@@ -72,9 +56,15 @@ contract TDXVerifierTest is Test {
         verifier.verify(output, "");
     }
 
-    function testSetRiscZeroConfigurationRevertsIfZeroVerifier() public {
+    function testConstructorRevertsIfZeroRiscZeroVerifier() public {
         vm.expectRevert(TDXVerifier.ZeroRiscZeroVerifier.selector);
-        verifier.setRiscZeroConfiguration(address(0), VERIFIER_ID);
+        new TDXVerifier(owner, MAX_TIME_DIFF, ROOT_CA_HASH, proofSubmitter, address(0), VERIFIER_ID);
+    }
+
+    function testAllowedTcbStatusesAreFixed() public view {
+        assertTrue(verifier.allowedTcbStatuses(TDXTcbStatus.UpToDate));
+        assertTrue(verifier.allowedTcbStatuses(TDXTcbStatus.SwHardeningNeeded));
+        assertFalse(verifier.allowedTcbStatuses(TDXTcbStatus.ConfigurationNeeded));
     }
 
     function testVerifyRevertsWhenGuestReportsFailure() public {
@@ -110,20 +100,6 @@ contract TDXVerifierTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(TDXVerifier.TcbStatusNotAllowed.selector, journal.tcbStatus));
         verifier.verify(output, proofBytes);
-    }
-
-    function testOwnerCanAllowAdditionalTcbStatus() public {
-        verifier.setTcbStatusAllowed(TDXTcbStatus.ConfigurationNeeded, true);
-
-        TDXVerifierJournal memory journal = _successJournal();
-        journal.tcbStatus = TDXTcbStatus.ConfigurationNeeded;
-        bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = hex"1234";
-        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
-
-        TDXVerifierJournal memory result = verifier.verify(output, proofBytes);
-
-        assertEq(uint256(result.tcbStatus), uint256(TDXTcbStatus.ConfigurationNeeded));
     }
 
     function testVerifyRevertsWhenCollateralExpired() public {

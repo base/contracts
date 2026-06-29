@@ -18,51 +18,23 @@ import {
 ///      validation, TCB info validation, QE identity validation, CRL checks, and extraction of TDREPORT fields.
 ///      This contract verifies the ZK proof and enforces onchain policy over the verified journal.
 contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
-    /// @notice Conversion factor from milliseconds to seconds.
-    uint256 private constant MS_PER_SECOND = 1000;
-
     /// @notice Maximum accepted age of a TDX quote, in seconds.
-    uint64 public maxTimeDiff;
+    uint64 public immutable maxTimeDiff;
 
     /// @notice Address authorized to submit TDX proofs, expected to be the TDX-aware registry.
     address public proofSubmitter;
 
     /// @notice Hash of the trusted Intel root CA used by the ZK verifier guest.
-    bytes32 public rootCaHash;
+    bytes32 public immutable rootCaHash;
 
     /// @notice RISC Zero verifier router.
-    address public riscZeroVerifier;
+    address public immutable riscZeroVerifier;
 
     /// @notice RISC Zero image ID for the TDX DCAP verifier guest.
-    bytes32 public verifierId;
-
-    /// @inheritdoc ITDXVerifier
-    mapping(TDXTcbStatus => bool) public allowedTcbStatuses;
-
-    /// @notice Emitted when the trusted Intel root CA hash changes.
-    event RootCaHashUpdated(bytes32 indexed rootCaHash);
+    bytes32 public immutable verifierId;
 
     /// @notice Emitted when the proof submitter changes.
     event ProofSubmitterChanged(address indexed proofSubmitter);
-
-    /// @notice Emitted when the quote timestamp tolerance changes.
-    event MaxTimeDiffUpdated(uint64 maxTimeDiff);
-
-    /// @notice Emitted when a TCB status policy changes.
-    event TcbStatusPolicyUpdated(TDXTcbStatus indexed status, bool allowed);
-
-    /// @notice Emitted when RISC Zero verification configuration changes.
-    event RiscZeroConfigurationUpdated(address indexed riscZeroVerifier, bytes32 verifierId);
-
-    /// @notice Emitted after a TDX attestation journal is accepted.
-    event AttestationSubmitted(
-        address indexed signer,
-        bytes32 indexed imageHash,
-        TDXTcbStatus indexed tcbStatus,
-        bytes32 pckCertHash,
-        bytes32 tcbInfoHash,
-        bytes32 qeIdentityHash
-    );
 
     /// @notice Thrown when a zero maxTimeDiff is provided.
     error ZeroMaxTimeDiff();
@@ -115,17 +87,15 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
         bytes32 initialVerifierId
     ) {
         _initializeOwner(owner);
-        _setMaxTimeDiff(initialMaxTimeDiff);
-        _setRootCaHash(initialRootCaHash);
+        if (initialMaxTimeDiff == 0) revert ZeroMaxTimeDiff();
+        if (initialRootCaHash == bytes32(0)) revert ZeroRootCaHash();
+        if (initialRiscZeroVerifier == address(0)) revert ZeroRiscZeroVerifier();
+        if (initialVerifierId == bytes32(0)) revert ZeroVerifierId();
+        maxTimeDiff = initialMaxTimeDiff;
+        rootCaHash = initialRootCaHash;
+        riscZeroVerifier = initialRiscZeroVerifier;
+        verifierId = initialVerifierId;
         _setProofSubmitter(initialProofSubmitter);
-        _setRiscZeroConfiguration(initialRiscZeroVerifier, initialVerifierId);
-        _setTcbStatusAllowed(TDXTcbStatus.UpToDate, true);
-        _setTcbStatusAllowed(TDXTcbStatus.SwHardeningNeeded, true);
-    }
-
-    /// @notice Sets the trusted Intel root CA hash.
-    function setRootCaHash(bytes32 newRootCaHash) external onlyOwner {
-        _setRootCaHash(newRootCaHash);
     }
 
     /// @notice Sets the proof submitter, expected to be the TDX-aware registry.
@@ -133,19 +103,9 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
         _setProofSubmitter(newProofSubmitter);
     }
 
-    /// @notice Sets maximum allowed quote age, in seconds.
-    function setMaxTimeDiff(uint64 newMaxTimeDiff) external onlyOwner {
-        _setMaxTimeDiff(newMaxTimeDiff);
-    }
-
-    /// @notice Sets whether a TDX TCB status is accepted.
-    function setTcbStatusAllowed(TDXTcbStatus status, bool allowed) external onlyOwner {
-        _setTcbStatusAllowed(status, allowed);
-    }
-
-    /// @notice Configures the RISC Zero verifier/program.
-    function setRiscZeroConfiguration(address newRiscZeroVerifier, bytes32 newVerifierId) external onlyOwner {
-        _setRiscZeroConfiguration(newRiscZeroVerifier, newVerifierId);
+    /// @inheritdoc ITDXVerifier
+    function allowedTcbStatuses(TDXTcbStatus status) public pure returns (bool) {
+        return status == TDXTcbStatus.UpToDate || status == TDXTcbStatus.SwHardeningNeeded;
     }
 
     /// @inheritdoc ITDXVerifier
@@ -154,6 +114,7 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
         bytes calldata proofBytes
     )
         external
+        view
         returns (TDXVerifierJournal memory journal)
     {
         if (msg.sender != proofSubmitter) revert CallerNotProofSubmitter();
@@ -161,33 +122,23 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
         IRiscZeroVerifier(riscZeroVerifier).verify(proofBytes, verifierId, sha256(output));
         journal = abi.decode(output, (TDXVerifierJournal));
         _verifyJournal(journal);
-
-        emit AttestationSubmitted(
-            journal.signer,
-            journal.imageHash,
-            journal.tcbStatus,
-            journal.pckCertHash,
-            journal.tcbInfoHash,
-            journal.qeIdentityHash
-        );
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.2.0
+    /// @custom:semver 0.3.0
     function version() public pure virtual returns (string memory) {
-        return "0.2.0";
+        return "0.3.0";
     }
 
     function _verifyJournal(TDXVerifierJournal memory journal) internal view {
         if (journal.result != TDXVerificationResult.Success) revert TDXVerificationFailed(journal.result);
-        bytes32 expectedRootCaHash = rootCaHash;
-        if (journal.rootCaHash != expectedRootCaHash) {
-            revert RootCaHashMismatch(expectedRootCaHash, journal.rootCaHash);
+        if (journal.rootCaHash != rootCaHash) {
+            revert RootCaHashMismatch(rootCaHash, journal.rootCaHash);
         }
-        if (!allowedTcbStatuses[journal.tcbStatus]) revert TcbStatusNotAllowed(journal.tcbStatus);
+        if (!allowedTcbStatuses(journal.tcbStatus)) revert TcbStatusNotAllowed(journal.tcbStatus);
         if (journal.collateralExpiration <= block.timestamp) revert CollateralExpired(journal.collateralExpiration);
 
-        uint64 timestamp = journal.timestamp / uint64(MS_PER_SECOND);
+        uint64 timestamp = journal.timestamp / 1000;
         if (timestamp + maxTimeDiff <= block.timestamp || timestamp >= block.timestamp) {
             revert InvalidTimestamp(timestamp, block.timestamp);
         }
@@ -208,34 +159,9 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
         }
     }
 
-    function _setRootCaHash(bytes32 newRootCaHash) internal {
-        if (newRootCaHash == bytes32(0)) revert ZeroRootCaHash();
-        rootCaHash = newRootCaHash;
-        emit RootCaHashUpdated(newRootCaHash);
-    }
-
     function _setProofSubmitter(address newProofSubmitter) internal {
         if (newProofSubmitter == address(0)) revert ZeroProofSubmitter();
         proofSubmitter = newProofSubmitter;
         emit ProofSubmitterChanged(newProofSubmitter);
-    }
-
-    function _setMaxTimeDiff(uint64 newMaxTimeDiff) internal {
-        if (newMaxTimeDiff == 0) revert ZeroMaxTimeDiff();
-        maxTimeDiff = newMaxTimeDiff;
-        emit MaxTimeDiffUpdated(newMaxTimeDiff);
-    }
-
-    function _setTcbStatusAllowed(TDXTcbStatus status, bool allowed) internal {
-        allowedTcbStatuses[status] = allowed;
-        emit TcbStatusPolicyUpdated(status, allowed);
-    }
-
-    function _setRiscZeroConfiguration(address newRiscZeroVerifier, bytes32 newVerifierId) internal {
-        if (newRiscZeroVerifier == address(0)) revert ZeroRiscZeroVerifier();
-        if (newVerifierId == bytes32(0)) revert ZeroVerifierId();
-        riscZeroVerifier = newRiscZeroVerifier;
-        verifierId = newVerifierId;
-        emit RiscZeroConfigurationUpdated(newRiscZeroVerifier, newVerifierId);
     }
 }

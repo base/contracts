@@ -78,6 +78,7 @@ interface ITDXVerifier {
         bytes calldata proofBytes
     )
         external
+        view
         returns (TDXVerifierJournal memory journal);
 
     /// @notice Returns whether a TCB status is accepted by verifier policy.
