@@ -11,7 +11,6 @@ pragma solidity ^0.8.20;
  */
 
 import { Script } from "forge-std/Script.sol";
-import { console2 as console } from "forge-std/console2.sol";
 
 import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
 import { RiscZeroSetVerifier, RiscZeroSetVerifierLib } from "lib/risc0-ethereum/contracts/src/RiscZeroSetVerifier.sol";
@@ -42,8 +41,6 @@ contract DeployNitroVerifier is Script {
         require(nitroRootCert != bytes32(0), "nitroRootCert must be non-zero");
         require(nitroVerifierId != bytes32(0), "nitroVerifierId must be non-zero");
 
-        bytes4 setVerifierSelector = RiscZeroSetVerifierLib.selector(setBuilderImageId);
-
         ZkCoProcessorConfig memory zkConfig = ZkCoProcessorConfig({
             verifierId: nitroVerifierId, aggregatorId: bytes32(0), zkVerifier: risc0VerifierRouter
         });
@@ -65,19 +62,16 @@ contract DeployNitroVerifier is Script {
             nitroVerifierProofId
         );
 
-        verifier.addVerifyRoute(ZkCoProcessorType.RiscZero, setVerifierSelector, setVerifier);
+        verifier.addVerifyRoute(
+            ZkCoProcessorType.RiscZero, RiscZeroSetVerifierLib.selector(setBuilderImageId), setVerifier
+        );
 
         vm.stopBroadcast();
 
-        console.log("RiscZeroSetVerifier:", setVerifier);
-        console.log("NitroEnclaveVerifier:", address(verifier));
-
-        string memory key = "deployment";
-        vm.serializeAddress(key, "RiscZeroSetVerifier", setVerifier);
-        string memory json = vm.serializeAddress(key, "NitroEnclaveVerifier", address(verifier));
+        vm.serializeAddress("deployment", "RiscZeroSetVerifier", setVerifier);
+        string memory json = vm.serializeAddress("deployment", "NitroEnclaveVerifier", address(verifier));
 
         string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-nitro-verifier.json");
         vm.writeJson(json, outPath);
-        console.log("Deployment saved to:", outPath);
     }
 }
