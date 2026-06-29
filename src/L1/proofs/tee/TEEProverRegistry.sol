@@ -9,7 +9,7 @@ import {
     Pcr,
     Bytes48
 } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-import { ITDXVerifier, TDXVerifierJournal } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
+import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { OwnableManagedUpgradeable } from "src/universal/OwnableManagedUpgradeable.sol";
@@ -195,11 +195,11 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @param output ABI-encoded TDXVerifierJournal public values from the ZK verifier guest.
     /// @param proofBytes ZK proof bytes.
     function registerTDXSigner(bytes calldata output, bytes calldata proofBytes) external onlyOwnerOrManager {
-        TDXVerifierJournal memory journal = TDX_VERIFIER.verify(output, proofBytes);
+        (address signer, bytes32 imageHash, bytes32 reportDataSuffix) = TDX_VERIFIER.verify(output, proofBytes);
 
-        _registerSigner(journal.signer, journal.imageHash, TEEType.TDX);
+        _registerSigner(signer, imageHash, TEEType.TDX);
 
-        emit TDXSignerRegistered(journal.signer, journal.imageHash, journal.reportDataSuffix);
+        emit TDXSignerRegistered(signer, imageHash, reportDataSuffix);
     }
 
     /// @notice Deregisters a signer.

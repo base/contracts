@@ -6,7 +6,7 @@ import { Test } from "forge-std/Test.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-import { ITDXVerifier, TDXTcbStatus, TDXVerifierJournal } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
+import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { GameType } from "src/libraries/bridge/Types.sol";
 
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
@@ -36,14 +36,18 @@ contract MockDisputeGameFactoryForTDXRegistry {
 }
 
 contract MockTDXVerifierForRegistry is ITDXVerifier {
-    TDXVerifierJournal internal _journal;
+    address internal _signer;
+    bytes32 internal _imageHash;
+    bytes32 internal _reportDataSuffix;
 
-    function setJournal(TDXVerifierJournal memory journal) external {
-        _journal = journal;
+    function setResult(address signer, bytes32 imageHash, bytes32 reportDataSuffix) external {
+        _signer = signer;
+        _imageHash = imageHash;
+        _reportDataSuffix = reportDataSuffix;
     }
 
-    function verify(bytes calldata, bytes calldata) external view returns (TDXVerifierJournal memory) {
-        return _journal;
+    function verify(bytes calldata, bytes calldata) external view returns (address, bytes32, bytes32) {
+        return (_signer, _imageHash, _reportDataSuffix);
     }
 }
 
@@ -52,9 +56,9 @@ contract TEEProverRegistryTDXTest is Test {
     bytes32 internal constant REPORT_DATA_SUFFIX = keccak256("multiproof-tdx-poc");
 
     function testRegisterTDXSignerStoresImageHash() public {
-        TDXVerifierJournal memory journal = _successJournal();
+        address signer = address(0x1234);
         MockTDXVerifierForRegistry verifier = new MockTDXVerifierForRegistry();
-        verifier.setJournal(journal);
+        verifier.setResult(signer, IMAGE_HASH, REPORT_DATA_SUFFIX);
 
         MockDisputeGameFactoryForTDXRegistry factory = new MockDisputeGameFactoryForTDXRegistry();
         factory.setImpl(0, address(new MockAggregateVerifierForTDXRegistry(IMAGE_HASH)));
@@ -66,10 +70,10 @@ contract TEEProverRegistryTDXTest is Test {
         vm.prank(address(0xdEaD));
         registry.registerTDXSigner("", "");
 
-        assertTrue(registry.isRegisteredSigner(journal.signer));
-        assertEq(registry.signerImageHash(journal.signer), IMAGE_HASH);
-        assertEq(uint8(registry.signerTEEType(journal.signer)), uint8(TEEProverRegistry.TEEType.TDX));
-        assertTrue(registry.isValidSigner(journal.signer));
+        assertTrue(registry.isRegisteredSigner(signer));
+        assertEq(registry.signerImageHash(signer), IMAGE_HASH);
+        assertEq(uint8(registry.signerTEEType(signer)), uint8(TEEProverRegistry.TEEType.TDX));
+        assertTrue(registry.isValidSigner(signer));
     }
 
     function testConstructorRevertsIfTDXVerifierNotSet() public {
@@ -80,22 +84,5 @@ contract TEEProverRegistryTDXTest is Test {
         new TEEProverRegistry(
             INitroEnclaveVerifier(address(0)), ITDXVerifier(address(0)), IDisputeGameFactory(address(factory))
         );
-    }
-
-    function _successJournal() internal pure returns (TDXVerifierJournal memory journal) {
-        address signer = address(0x1234);
-
-        journal = TDXVerifierJournal({
-            success: true,
-            tcbStatus: TDXTcbStatus.UpToDate,
-            timestamp: 0,
-            collateralExpiration: 0,
-            rootCaHash: bytes32(0),
-            publicKey: "",
-            signer: signer,
-            imageHash: IMAGE_HASH,
-            reportDataPrefix: bytes32(0),
-            reportDataSuffix: REPORT_DATA_SUFFIX
-        });
     }
 }

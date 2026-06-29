@@ -17,6 +17,8 @@ contract TDXVerifierTest is Test {
     bytes32 internal constant VERIFIER_ID = keccak256("tdx-verifier-id");
     bytes32 internal constant IMAGE_HASH = keccak256("tdx-image");
     bytes32 internal constant REPORT_DATA_SUFFIX = keccak256("multiproof-tdx-poc");
+    bytes32 internal constant PUBLIC_KEY_X = hex"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
+    bytes32 internal constant PUBLIC_KEY_Y = hex"2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40";
 
     uint64 internal constant MAX_TIME_DIFF = 3600;
     uint256 internal constant NOW = 1_700_000_000;
@@ -35,11 +37,11 @@ contract TDXVerifierTest is Test {
         bytes memory proofBytes = hex"1234";
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
-        TDXVerifierJournal memory result = verifier.verify(output, proofBytes);
+        (address signer, bytes32 imageHash, bytes32 reportDataSuffix) = verifier.verify(output, proofBytes);
 
-        assertEq(result.signer, journal.signer);
-        assertEq(result.imageHash, IMAGE_HASH);
-        assertEq(uint256(result.tcbStatus), uint256(TDXTcbStatus.UpToDate));
+        assertEq(signer, _signer());
+        assertEq(imageHash, IMAGE_HASH);
+        assertEq(reportDataSuffix, REPORT_DATA_SUFFIX);
     }
 
     function testConstructorRevertsIfZeroInput() public {
@@ -135,25 +137,8 @@ contract TDXVerifierTest is Test {
         verifier.verify(output, proofBytes);
     }
 
-    function testVerifyDerivesSignerFromPublicKey() public {
-        TDXVerifierJournal memory journal = _successJournal();
-        address expected = journal.signer;
-        journal.signer = makeAddr("wrong-signer");
-        bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = hex"1234";
-        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
-
-        TDXVerifierJournal memory result = verifier.verify(output, proofBytes);
-
-        assertEq(result.signer, expected);
-    }
-
     function _successJournal() internal view returns (TDXVerifierJournal memory journal) {
-        bytes memory publicKey = _publicKey();
-        bytes32 publicKeyHash;
-        assembly {
-            publicKeyHash := keccak256(add(publicKey, 0x21), 64)
-        }
+        bytes32 publicKeyHash = _publicKeyHash();
 
         journal = TDXVerifierJournal({
             success: true,
@@ -161,20 +146,20 @@ contract TDXVerifierTest is Test {
             timestamp: uint64(block.timestamp - 1) * 1000,
             collateralExpiration: uint64(block.timestamp + 1 days),
             rootCaHash: ROOT_CA_HASH,
-            publicKey: publicKey,
-            signer: address(uint160(uint256(publicKeyHash))),
+            publicKeyX: PUBLIC_KEY_X,
+            publicKeyY: PUBLIC_KEY_Y,
             imageHash: IMAGE_HASH,
             reportDataPrefix: publicKeyHash,
             reportDataSuffix: REPORT_DATA_SUFFIX
         });
     }
 
-    function _publicKey() internal pure returns (bytes memory publicKey) {
-        publicKey = new bytes(65);
-        publicKey[0] = 0x04;
-        for (uint256 i = 1; i < publicKey.length; i++) {
-            publicKey[i] = bytes1(uint8(i));
-        }
+    function _publicKeyHash() internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(PUBLIC_KEY_X, PUBLIC_KEY_Y));
+    }
+
+    function _signer() internal pure returns (address) {
+        return address(uint160(uint256(_publicKeyHash())));
     }
 
     function _mockRiscZeroVerify(bytes32 programId, bytes memory output, bytes memory proofBytes) internal {

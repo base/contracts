@@ -24,28 +24,12 @@ contract TDXVerifier is ITDXVerifier, ISemver {
     /// @notice RISC Zero image ID for the TDX DCAP verifier guest.
     bytes32 public immutable verifierId;
 
-    /// @notice Thrown when a zero constructor input is provided.
     error ZeroInput();
-
-    /// @notice Thrown when the TDX verifier guest did not report success.
     error TDXVerificationFailed();
-
-    /// @notice Thrown when the journal root does not match the trusted Intel root.
     error RootCaHashMismatch(bytes32 expected, bytes32 actual);
-
-    /// @notice Thrown when the journal's TCB status is not allowed.
     error TcbStatusNotAllowed(TDXTcbStatus status);
-
-    /// @notice Thrown when collateral consumed by the ZK guest is expired.
     error CollateralExpired(uint64 collateralExpiration);
-
-    /// @notice Thrown when the quote timestamp is outside policy.
     error InvalidTimestamp(uint64 timestampSeconds, uint256 currentTimestamp);
-
-    /// @notice Thrown when the public key is not an uncompressed secp256k1 public key.
-    error InvalidPublicKey();
-
-    /// @notice Thrown when TDREPORT.REPORTDATA does not bind the supplied public key.
     error ReportDataMismatch(bytes32 expected, bytes32 actual);
 
     constructor(
@@ -71,10 +55,10 @@ contract TDXVerifier is ITDXVerifier, ISemver {
     )
         external
         view
-        returns (TDXVerifierJournal memory journal)
+        returns (address signer, bytes32 imageHash, bytes32 reportDataSuffix)
     {
         riscZeroVerifier.verify(proofBytes, verifierId, sha256(output));
-        journal = abi.decode(output, (TDXVerifierJournal));
+        TDXVerifierJournal memory journal = abi.decode(output, (TDXVerifierJournal));
 
         if (!journal.success) revert TDXVerificationFailed();
         if (journal.rootCaHash != rootCaHash) revert RootCaHashMismatch(rootCaHash, journal.rootCaHash);
@@ -88,15 +72,14 @@ contract TDXVerifier is ITDXVerifier, ISemver {
             revert InvalidTimestamp(timestamp, block.timestamp);
         }
 
-        bytes memory publicKey = journal.publicKey;
-        if (publicKey.length != 65 || publicKey[0] != 0x04) revert InvalidPublicKey();
-        bytes32 publicKeyHash;
-        assembly {
-            publicKeyHash := keccak256(add(publicKey, 0x21), 64)
+        bytes32 publicKeyHash = keccak256(abi.encodePacked(journal.publicKeyX, journal.publicKeyY));
+        if (journal.reportDataPrefix != publicKeyHash) {
+            revert ReportDataMismatch(publicKeyHash, journal.reportDataPrefix);
         }
-        if (journal.reportDataPrefix != publicKeyHash) revert ReportDataMismatch(publicKeyHash, journal.reportDataPrefix);
 
-        journal.signer = address(uint160(uint256(publicKeyHash)));
+        signer = address(uint160(uint256(publicKeyHash)));
+        imageHash = journal.imageHash;
+        reportDataSuffix = journal.reportDataSuffix;
     }
 
     /// @notice Semantic version.

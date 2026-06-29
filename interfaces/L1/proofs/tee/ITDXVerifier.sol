@@ -20,8 +20,8 @@ enum TDXTcbStatus {
 /// @param timestamp Quote timestamp in milliseconds since Unix epoch.
 /// @param collateralExpiration Earliest expiration timestamp in seconds across accepted collateral.
 /// @param rootCaHash Hash of the Intel root CA used to validate the PCK/collateral signing chains.
-/// @param publicKey Uncompressed secp256k1 public key: 0x04 || x || y.
-/// @param signer Ethereum address derived from publicKey.
+/// @param publicKeyX secp256k1 public key x-coordinate.
+/// @param publicKeyY secp256k1 public key y-coordinate.
 /// @param imageHash Multiproof-compatible image hash derived from MRTD and RTMR0-3.
 /// @param reportDataPrefix First 32 bytes of TDREPORT.REPORTDATA.
 /// @param reportDataSuffix Last 32 bytes of TDREPORT.REPORTDATA, available for app-specific binding.
@@ -31,8 +31,8 @@ struct TDXVerifierJournal {
     uint64 timestamp;
     uint64 collateralExpiration;
     bytes32 rootCaHash;
-    bytes publicKey;
-    address signer;
+    bytes32 publicKeyX;
+    bytes32 publicKeyY;
     bytes32 imageHash;
     bytes32 reportDataPrefix;
     bytes32 reportDataSuffix;
@@ -44,12 +44,14 @@ interface ITDXVerifier {
     /// @notice Verifies a ZK proof of Intel TDX DCAP quote verification and returns attested signer metadata.
     /// @param output ABI-encoded TDXVerifierJournal public values from the ZK verifier guest.
     /// @param proofBytes ZK proof bytes.
-    /// @return journal Verified TDX attestation metadata.
+    /// @return signer Ethereum address derived from the attested public key.
+    /// @return imageHash Multiproof-compatible image hash derived from MRTD and RTMR0-3.
+    /// @return reportDataSuffix Last 32 bytes of TDREPORT.REPORTDATA.
     function verify(
         bytes calldata output,
         bytes calldata proofBytes
     )
         external
         view
-        returns (TDXVerifierJournal memory journal);
+        returns (address signer, bytes32 imageHash, bytes32 reportDataSuffix);
 }
