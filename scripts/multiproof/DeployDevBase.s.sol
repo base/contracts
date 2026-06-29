@@ -94,10 +94,15 @@ abstract contract DeployDevBase is Script {
 
         Proxy teeProxy = new Proxy(msg.sender);
         teeProxy.upgradeToAndCall(
-            teeRegistryImpl, abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, initialProposers, gameType))
+            teeRegistryImpl,
+            abi.encodeCall(
+                TEEProverRegistry.initialize, (owner, _teeRegistrationManager(owner), initialProposers, gameType)
+            )
         );
         teeProxy.changeAdmin(address(0xdead));
         teeProverRegistryProxy = address(teeProxy);
+
+        _afterTEERegistryDeploy();
 
         teeVerifier = address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), mockAnchorRegistry));
     }
@@ -151,8 +156,8 @@ abstract contract DeployDevBase is Script {
         console.log("Deployment saved to:", outPath);
     }
 
-    function _blockInterval() internal pure virtual returns (uint256);
-    function _intermediateBlockInterval() internal pure virtual returns (uint256);
+    function _blockInterval() internal view virtual returns (uint256);
+    function _intermediateBlockInterval() internal view virtual returns (uint256);
     function _initBond() internal pure virtual returns (uint256);
     function _outputSuffix() internal pure virtual returns (string memory);
     function _deployTEERegistryImpl() internal virtual returns (address);
@@ -161,4 +166,9 @@ abstract contract DeployDevBase is Script {
 
     function _preflight() internal virtual { }
     function _serializeExtra(string memory key) internal virtual { }
+
+    function _teeRegistrationManager(address owner) internal view virtual returns (address) {
+        return owner;
+    }
+    function _afterTEERegistryDeploy() internal virtual { }
 }
