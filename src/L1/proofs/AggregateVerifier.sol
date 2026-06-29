@@ -67,9 +67,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The minimum number of proofs required to resolve the game.
     uint256 public constant PROOF_THRESHOLD = 1;
 
-    /// @notice TEE proof payload size: nitro signature(65) + tdx signature(65).
-    uint256 internal constant TEE_PROOF_BYTES_LENGTH = 130;
-
     ////////////////////////////////////////////////////////////////
     //                         Immutables                         //
     ////////////////////////////////////////////////////////////////
@@ -899,7 +896,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         internal
         view
     {
-        if (proofBytes.length != TEE_PROOF_BYTES_LENGTH) revert InvalidProof();
+        if (proofBytes.length != 130) revert InvalidProof();
 
         bytes memory journalPrefix = abi.encodePacked(
             proposer,
