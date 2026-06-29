@@ -15,8 +15,8 @@ hoodi_l1_rpc_url := env_var_or_default("HOODI_L1_RPC_URL", "https://c3-chainprox
 hoodi_l2_rpc_url := env_var_or_default("HOODI_L2_RPC_URL", "https://base-zeronet-reth-proofs-donotuse.cbhq.net:8545")
 hoodi_rollup_rpc_url := env_var_or_default("HOODI_ROLLUP_RPC_URL", "https://base-zeronet-reth-rpc-donotuse.cbhq.net:7545")
 hoodi_l2_output_root_rpc_url := env_var_or_default("HOODI_L2_OUTPUT_ROOT_RPC_URL", hoodi_rollup_rpc_url)
-l2_rpc_url := env_var_or_default("L2_RPC_URL", "https://base-sepolia-archive-k8s-dev.cbhq.net:8545")
-l2_output_root_rpc_url := env_var_or_default("L2_OUTPUT_ROOT_RPC_URL", "https://base-sepolia-archive-k8s-dev.cbhq.net:7545")
+l2_rpc_url := env_var_or_default("L2_RPC_URL", "https://base-sepolia-reth-proofs-k8s-donotuse.cbhq.net:8545")
+l2_output_root_rpc_url := env_var_or_default("L2_OUTPUT_ROOT_RPC_URL", "https://base-sepolia-reth-internal-rpc-donotuse.cbhq.net:7545")
 
 sepolia_nitro_risc0_verifier_router := "0xB121B667dd2cf27F95f9F5107137696F56f188f6"
 sepolia_tdx_risc0_verifier_router := "0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187"
@@ -173,6 +173,25 @@ deploy-hoodi-zeronet-tdx-local rpc=hoodi_l1_rpc_url deploy_config=hoodi_zeronet_
     --account "{{forge_account}}" \
     --sender "$deployer"
 
+# Deploy the TDX multiproof dev/test stack on Sepolia.
+deploy-sepolia-tdx-dev tdx_manager=sepolia_tdx_registration_manager deploy_config=zeronet_tdx_deploy_config l2_rpc=l2_rpc_url l2_output_root_rpc=l2_output_root_rpc_url:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd "{{repo_root}}"
+
+  tdx_verifier="$(jq -r '.tdxVerifier // empty' "{{deploy_config}}")"
+  if [[ -z "$tdx_verifier" || "$tdx_verifier" == "null" ]]; then
+    echo "Missing tdxVerifier in {{deploy_config}}" >&2
+    exit 1
+  fi
+
+  just --justfile "{{justfile_path}}" deploy-tdx-stack \
+    "$tdx_verifier" \
+    "{{tdx_manager}}" \
+    "{{deploy_config}}" \
+    "{{l2_rpc}}" \
+    "{{l2_output_root_rpc}}"
+
 # Register a TDX signer in the Hoodi no-attestation local testing registry.
 register-dev-tdx-signer signer registry="" image_hash="" rpc=hoodi_l1_rpc_url deploy_config=hoodi_zeronet_tdx_local_deploy_config deployments=hoodi_zeronet_tdx_local_deployments:
   #!/usr/bin/env bash
@@ -212,9 +231,9 @@ register-dev-tdx-signer signer registry="" image_hash="" rpc=hoodi_l1_rpc_url de
     --account "{{forge_account}}" \
     --from "$owner"
 
-# Run the local offchain services needed to submit dual TEE proposals to Hoodi.
-run-hoodi-zeronet-tdx-local-offchain:
-  cd "{{workspace_root}}/base" && just hoodi-zeronet-tdx-local-offchain
+# Run the local offchain services needed to submit dual TEE proposals on Base Sepolia.
+run-sepolia-tdx-dev-offchain:
+  cd "{{workspace_root}}/base" && just sepolia-tdx-dev-offchain
 
 # Deploy the TDX multiproof dev/test stack using the zeronet TDX config.
 #
@@ -422,9 +441,9 @@ tdx-sepolia-help:
   @echo 'just deploy-tdx-verifier'
   @echo 'just deploy-tee-verifiers <nitro-root-cert> <nitro-verifier-id>'
   @echo 'just deploy-tdx-system <nitro-root-cert> <nitro-verifier-id>'
+  @echo 'just deploy-sepolia-tdx-dev'
+  @echo 'just run-sepolia-tdx-dev-offchain'
   @echo 'just deploy-tdx-stack <tdx-verifier> [tdx-manager] [deploy-config] [l2-rpc] [l2-output-root-rpc]'
   @echo 'just deploy-tdx-stack-with-verifiers <nitro-verifier> <tdx-verifier> [tdx-manager] [deploy-config] [l2-rpc] [l2-output-root-rpc]'
-  @echo 'just deploy-hoodi-zeronet-tdx-local'
-  @echo 'just register-dev-tdx-signer <tdx-signer-address>'
   @echo 'just tee-registered-signers'
   @echo 'just tdx-sepolia-config'

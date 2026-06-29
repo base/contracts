@@ -35,6 +35,7 @@ import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
+import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 
 import { MinimalProxyAdmin } from "./mocks/MinimalProxyAdmin.sol";
 import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";
@@ -133,7 +134,7 @@ contract DeployDevWithTDX is Script {
     function _deployTDXContracts(GameType gameType) internal {
         address owner = cfg.finalSystemOwner();
         address registryImpl = address(
-            new TEEProverRegistry(
+            new DevTEEProverRegistry(
                 INitroEnclaveVerifier(nitroEnclaveVerifierAddr),
                 ITDXVerifier(tdxVerifierAddr),
                 IDisputeGameFactory(disputeGameFactory)

@@ -40,14 +40,14 @@ Ensure `finalSystemOwner` is set to the address you will deploy from (i.e. the a
 
 Other relevant fields:
 
-| Field                          | Description                                                                       |
-| ------------------------------ | --------------------------------------------------------------------------------- |
-| `teeProposer`                  | Address to be registered as the TEE proposer                                      |
-| `teeNitroImageHash`            | PCR0 hash used when registering the Nitro dev signer                              |
-| `teeTdxImageHash`              | TDX image hash used when registering the TDX dev signer                           |
-| `multiproofGameType`           | Game type ID for the dispute game                                                 |
-| `multiproofGenesisOutputRoot`  | Initial anchor output root                                                        |
-| `multiproofGenesisBlockNumber` | Initial anchor L2 block number                                                    |
+| Field                          | Description                                             |
+| ------------------------------ | ------------------------------------------------------- |
+| `teeProposer`                  | Address to be registered as the TEE proposer            |
+| `teeNitroImageHash`            | PCR0 hash used when registering the Nitro dev signer    |
+| `teeTdxImageHash`              | TDX image hash used when registering the TDX dev signer |
+| `multiproofGameType`           | Game type ID for the dispute game                       |
+| `multiproofGenesisOutputRoot`  | Initial anchor output root                              |
+| `multiproofGenesisBlockNumber` | Initial anchor L2 block number                          |
 
 ### Step 2: Deploy contracts
 
@@ -63,10 +63,10 @@ The proving system needs a recent anchor state to catch up to chain tip. Set thi
 
 ```bash
 # 1. Get the latest L2 block number
-BLOCK=$(cast block-number --rpc-url https://base-sepolia-archive-k8s-dev.cbhq.net:8545)
+BLOCK=$(cast block-number --rpc-url https://base-sepolia-reth-proofs-k8s-donotuse.cbhq.net:8545)
 
 # 2. Get the output root at that block
-OUTPUT_ROOT=$(cast rpc optimism_outputAtBlock $(cast 2h $BLOCK) --rpc-url https://base-sepolia-archive-k8s-dev.cbhq.net:7545 | jq -r '.outputRoot')
+OUTPUT_ROOT=$(cast rpc optimism_outputAtBlock $(cast 2h $BLOCK) --rpc-url https://base-sepolia-reth-internal-rpc-donotuse.cbhq.net:7545 | jq -r '.outputRoot')
 
 # 3. Set the anchor state on the deployed MockAnchorStateRegistry
 #    Replace 0x983b... with the AnchorStateRegistry address from your deployment output
