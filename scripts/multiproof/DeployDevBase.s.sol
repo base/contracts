@@ -33,8 +33,6 @@ abstract contract DeployDevBase is Script {
     IAnchorStateRegistry internal mockAnchorRegistry;
     address internal mockDelayedWETH;
     address internal aggregateVerifier;
-    Hash internal startingAnchorRoot;
-    uint256 internal startingAnchorBlockNumber;
 
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
@@ -47,8 +45,7 @@ abstract contract DeployDevBase is Script {
 
     function run(bytes32 asrStartingOutputRoot, uint256 asrStartingBlockNumber) public {
         require(asrStartingOutputRoot != bytes32(0), "asrStartingOutputRoot must be non-zero");
-        startingAnchorRoot = Hash.wrap(asrStartingOutputRoot);
-        startingAnchorBlockNumber = asrStartingBlockNumber;
+        Hash startingAnchorRoot = Hash.wrap(asrStartingOutputRoot);
 
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
 
@@ -56,16 +53,22 @@ abstract contract DeployDevBase is Script {
 
         vm.startBroadcast();
 
-        _deployInfrastructure(gameType);
+        _deployInfrastructure(gameType, startingAnchorRoot, asrStartingBlockNumber);
         _deployTEEContracts(gameType);
         _deployAggregateVerifier(gameType);
 
         vm.stopBroadcast();
 
-        _writeOutput();
+        _writeOutput(startingAnchorRoot, asrStartingBlockNumber);
     }
 
-    function _deployInfrastructure(GameType gameType) internal {
+    function _deployInfrastructure(
+        GameType gameType,
+        Hash startingAnchorRoot,
+        uint256 startingAnchorBlockNumber
+    )
+        internal
+    {
         Proxy proxy = new Proxy(msg.sender);
         proxy.upgradeTo(address(new DisputeGameFactory()));
         DisputeGameFactory(address(proxy)).initialize(msg.sender);
@@ -99,11 +102,7 @@ abstract contract DeployDevBase is Script {
     }
 
     function _deployAggregateVerifier(GameType gameType) internal {
-        address zkVerifier = address(new MockVerifier(mockAnchorRegistry));
         mockDelayedWETH = address(new MockDelayedWETH());
-
-        AggregateVerifier.ZkHashes memory zkHashes =
-            AggregateVerifier.ZkHashes({ rangeHash: cfg.zkRangeHash(), aggregateHash: cfg.zkAggregationHash() });
 
         aggregateVerifier = address(
             new AggregateVerifier(
@@ -111,10 +110,10 @@ abstract contract DeployDevBase is Script {
                 mockAnchorRegistry,
                 IDelayedWETH(payable(mockDelayedWETH)),
                 IVerifier(teeVerifier),
-                IVerifier(zkVerifier),
+                IVerifier(address(new MockVerifier(mockAnchorRegistry))),
                 cfg.teeNitroImageHash(),
                 cfg.teeTdxImageHash(),
-                zkHashes,
+                AggregateVerifier.ZkHashes({ rangeHash: cfg.zkRangeHash(), aggregateHash: cfg.zkAggregationHash() }),
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainId(),
                 cfg.multiproofBlockInterval(),
@@ -122,13 +121,12 @@ abstract contract DeployDevBase is Script {
             )
         );
 
-        DisputeGameFactory factory = DisputeGameFactory(disputeGameFactory);
-        factory.setImplementation(gameType, IDisputeGame(aggregateVerifier), "");
-        factory.setInitBond(gameType, _initBond());
-        factory.transferOwnership(cfg.finalSystemOwner());
+        DisputeGameFactory(disputeGameFactory).setImplementation(gameType, IDisputeGame(aggregateVerifier), "");
+        DisputeGameFactory(disputeGameFactory).setInitBond(gameType, _initBond());
+        DisputeGameFactory(disputeGameFactory).transferOwnership(cfg.finalSystemOwner());
     }
 
-    function _writeOutput() internal {
+    function _writeOutput(Hash startingAnchorRoot, uint256 startingAnchorBlockNumber) internal {
         string memory key = "deployment";
         vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
         vm.serializeAddress(key, "TEEVerifier", teeVerifier);
