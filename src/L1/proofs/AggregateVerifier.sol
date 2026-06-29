@@ -50,17 +50,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 tdxHash;
     }
 
-    /// @notice Common public inputs used to compute each TEE signature journal.
-    struct TeeJournalInputs {
-        address proposer;
-        bytes32 l1OriginHash;
-        bytes32 startingRoot;
-        uint64 startingL2SequenceNumber;
-        bytes32 endingRoot;
-        uint64 endingL2SequenceNumber;
-        bytes intermediateRoots;
-    }
-
     ////////////////////////////////////////////////////////////////
     //                         Constants                          //
     ////////////////////////////////////////////////////////////////
@@ -922,44 +911,32 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 tdxImageHash = bytes32(proofBytes[97:129]);
         if (nitroImageHash != TEE_NITRO_IMAGE_HASH || tdxImageHash != TEE_TDX_IMAGE_HASH) revert InvalidProof();
 
-        TeeJournalInputs memory inputs = TeeJournalInputs({
-            proposer: proposer,
-            l1OriginHash: l1OriginHash,
-            startingRoot: startingRoot,
-            startingL2SequenceNumber: startingL2SequenceNumber,
-            endingRoot: endingRoot,
-            endingL2SequenceNumber: endingL2SequenceNumber,
-            intermediateRoots: intermediateRoots
-        });
-
-        _verifyTeeSignature(proofBytes[32:97], nitroImageHash, inputs);
-        _verifyTeeSignature(proofBytes[129:194], tdxImageHash, inputs);
-    }
-
-    function _verifyTeeSignature(
-        bytes calldata signature,
-        bytes32 imageHash,
-        TeeJournalInputs memory inputs
-    )
-        internal
-        view
-    {
-        bytes32 journal = keccak256(
-            abi.encodePacked(
-                inputs.proposer,
-                inputs.l1OriginHash,
-                inputs.startingRoot,
-                inputs.startingL2SequenceNumber,
-                inputs.endingRoot,
-                inputs.endingL2SequenceNumber,
-                inputs.intermediateRoots,
-                CONFIG_HASH,
-                imageHash
-            )
+        bytes memory journalPrefix = abi.encodePacked(
+            proposer,
+            l1OriginHash,
+            startingRoot,
+            startingL2SequenceNumber,
+            endingRoot,
+            endingL2SequenceNumber,
+            intermediateRoots,
+            CONFIG_HASH
         );
 
-        bytes memory verifierProof = abi.encodePacked(inputs.proposer, signature);
-        if (!TEE_VERIFIER.verify(verifierProof, imageHash, journal)) revert InvalidProof();
+        if (!TEE_VERIFIER.verify(
+                abi.encodePacked(proposer, proofBytes[32:97]),
+                nitroImageHash,
+                keccak256(abi.encodePacked(journalPrefix, nitroImageHash))
+            )) {
+            revert InvalidProof();
+        }
+
+        if (!TEE_VERIFIER.verify(
+                abi.encodePacked(proposer, proofBytes[129:194]),
+                tdxImageHash,
+                keccak256(abi.encodePacked(journalPrefix, tdxImageHash))
+            )) {
+            revert InvalidProof();
+        }
     }
 
     /// @notice Verifies a ZK proof for the current game.
