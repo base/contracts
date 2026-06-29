@@ -20,11 +20,8 @@ contract TEEVerifier is Verifier, ISemver {
     /// @dev Signers are registered via Nitro or TDX attestation in TEEProverRegistry.
     TEEProverRegistry public immutable TEE_PROVER_REGISTRY;
 
-    /// @notice Size of an ECDSA signature in bytes.
-    uint256 internal constant SIGNATURE_SIZE = 65;
-
     /// @notice Size of a TEE proof: proposer(20) + signature(65).
-    uint256 internal constant TEE_PROOF_SIZE = 20 + SIGNATURE_SIZE;
+    uint256 internal constant TEE_PROOF_SIZE = 85;
 
     /// @notice Thrown when a recovered signer is not a valid registered signer.
     error InvalidSigner(address signer);
@@ -75,21 +72,11 @@ contract TEEVerifier is Verifier, ISemver {
             revert InvalidProposer(proposer);
         }
 
-        bytes calldata signature = proofBytes[20:TEE_PROOF_SIZE];
-        address signer = _recoverSigner(journal, signature);
-        _validateSigner(signer, imageId);
-
-        return true;
-    }
-
-    function _recoverSigner(bytes32 journal, bytes calldata signature) internal pure returns (address signer) {
         // The signature should be over the journal hash directly (not eth-signed-message prefixed).
-        ECDSA.RecoverError err;
-        (signer, err) = ECDSA.tryRecover(journal, signature);
+        bytes calldata signature = proofBytes[20:TEE_PROOF_SIZE];
+        (address signer, ECDSA.RecoverError err) = ECDSA.tryRecover(journal, signature);
         if (err != ECDSA.RecoverError.NoError) revert InvalidSignature();
-    }
 
-    function _validateSigner(address signer, bytes32 imageId) internal view {
         // A registered signer always has a non-NONE TEE type, so this single read also
         // serves as the registration check (saves an SLOAD versus calling isRegisteredSigner).
         TEEProverRegistry.TEEType signerTEEType = TEE_PROVER_REGISTRY.signerTEEType(signer);
@@ -101,6 +88,8 @@ contract TEEVerifier is Verifier, ISemver {
         if (registeredImageHash != imageId) {
             revert ImageIdMismatch(registeredImageHash, imageId);
         }
+
+        return true;
     }
 
     /// @notice Semantic version.
