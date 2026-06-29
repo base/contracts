@@ -94,8 +94,7 @@ contract TDXVerifier is ITDXVerifier, ISemver {
         assembly {
             publicKeyHash := keccak256(add(publicKey, 0x21), 64)
         }
-        bytes32 reportDataPrefix = journal.reportDataPrefix;
-        if (reportDataPrefix != publicKeyHash) revert ReportDataMismatch(publicKeyHash, reportDataPrefix);
+        if (journal.reportDataPrefix != publicKeyHash) revert ReportDataMismatch(publicKeyHash, journal.reportDataPrefix);
 
         journal.signer = address(uint160(uint256(publicKeyHash)));
     }
