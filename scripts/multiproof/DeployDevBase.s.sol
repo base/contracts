@@ -36,14 +36,6 @@ abstract contract DeployDevBase is Script {
         cfg.read(Config.deployConfigPath());
     }
 
-    function run() public virtual {
-        run(cfg.multiproofGenesisOutputRoot(), cfg.multiproofGenesisBlockNumber());
-    }
-
-    function run(bytes32 asrStartingOutputRoot, uint256 asrStartingBlockNumber) public virtual {
-        _run(asrStartingOutputRoot, asrStartingBlockNumber, address(0), cfg.tdxVerifier(), cfg.finalSystemOwner());
-    }
-
     function _run(
         bytes32 asrStartingOutputRoot,
         uint256 asrStartingBlockNumber,

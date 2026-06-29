@@ -5,14 +5,6 @@ import { DeployDevBase } from "./DeployDevBase.s.sol";
 
 /// @notice Development deployment using the TDX signer-registration path.
 contract DeployDevWithTDX is DeployDevBase {
-    function run() public pure override {
-        revert("use parameterized run");
-    }
-
-    function run(bytes32, uint256) public pure override {
-        revert("use parameterized run");
-    }
-
     function run(
         address nitroEnclaveVerifier,
         address tdxVerifier,
