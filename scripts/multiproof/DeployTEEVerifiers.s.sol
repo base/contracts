@@ -8,24 +8,14 @@ pragma solidity ^0.8.20;
  * Usage:
  *
  *   forge script scripts/multiproof/DeployTEEVerifiers.s.sol:DeployTEEVerifiers \
- *     --sig "run(address,address,bytes32,bytes32,bytes32,bytes32,bytes32)" \
- *     <OWNER> <RISC0_VERIFIER_ROUTER> <SET_BUILDER_IMAGE_ID> \
+ *     --sig "run(address,address,address,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)" \
+ *     <OWNER> <NITRO_RISC0_VERIFIER_ROUTER> <TDX_RISC0_VERIFIER_ROUTER> <SET_BUILDER_IMAGE_ID> \
  *     <NITRO_ROOT_CERT> <NITRO_VERIFIER_ID> \
- *     <TDX_VERIFIER_ID> <INTEL_ROOT_CA_HASH> \
+ *     <NITRO_VERIFIER_PROOF_ID> <TDX_VERIFIER_ID> <INTEL_ROOT_CA_HASH> \
  *     --rpc-url <RPC_URL> --broadcast --private-key <DEPLOYER_KEY>
  *
- * If using batched Nitro proofs, use the overload that also supplies
- * <NITRO_VERIFIER_PROOF_ID>:
- *
- *   --sig "run(address,address,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)"
- *
- * If Nitro and TDX use different RISC Zero verifier routers, use:
- *
- *   --sig "run(address,address,address,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)"
- *
  * The broadcaster must be the owner because this script calls addVerifyRoute()
- * on the freshly deployed NitroEnclaveVerifier. Use the longest overload when
- * Nitro and TDX proofs use different RISC Zero verifier router contracts.
+ * on the freshly deployed NitroEnclaveVerifier.
  */
 
 import { Script } from "forge-std/Script.sol";
@@ -39,87 +29,19 @@ import { NitroEnclaveVerifier } from "src/L1/proofs/tee/NitroEnclaveVerifier.sol
 import { TDXVerifier } from "src/L1/proofs/tee/TDXVerifier.sol";
 
 contract DeployTEEVerifiers is Script {
-    /// @notice Maximum Nitro attestation age accepted by NitroEnclaveVerifier.
-    uint64 internal constant NITRO_MAX_TIME_DIFF = 3600;
+    /// @notice Maximum Nitro attestation and TDX quote age accepted by the verifiers.
+    uint64 internal constant MAX_TIME_DIFF = 3600;
 
-    /// @notice Maximum TDX quote age accepted by TDXVerifier.
-    uint64 internal constant TDX_MAX_TIME_DIFF = 3600;
-
-    address public setVerifier;
-    address public nitroEnclaveVerifier;
-    address public tdxVerifier;
-
-    function run(
-        address owner,
-        address risc0VerifierRouter,
-        bytes32 setBuilderImageId,
-        bytes32 nitroRootCert,
-        bytes32 nitroVerifierId,
-        bytes32 tdxVerifierId,
-        bytes32 intelRootCaHash
-    )
-        public
-    {
-        run(
-            owner,
-            risc0VerifierRouter,
-            setBuilderImageId,
-            nitroRootCert,
-            nitroVerifierId,
-            bytes32(0),
-            tdxVerifierId,
-            intelRootCaHash
-        );
-    }
-
-    function run(
-        address owner,
-        address nitroRisc0VerifierRouter,
-        address tdxRisc0VerifierRouter,
-        bytes32 setBuilderImageId,
-        bytes32 nitroRootCert,
-        bytes32 nitroVerifierId,
-        bytes32 tdxVerifierId,
-        bytes32 intelRootCaHash
-    )
-        public
-    {
-        run(
-            owner,
-            nitroRisc0VerifierRouter,
-            tdxRisc0VerifierRouter,
-            setBuilderImageId,
-            nitroRootCert,
-            nitroVerifierId,
-            bytes32(0),
-            tdxVerifierId,
-            intelRootCaHash
-        );
-    }
-
-    function run(
-        address owner,
-        address risc0VerifierRouter,
-        bytes32 setBuilderImageId,
-        bytes32 nitroRootCert,
-        bytes32 nitroVerifierId,
-        bytes32 nitroVerifierProofId,
-        bytes32 tdxVerifierId,
-        bytes32 intelRootCaHash
-    )
-        public
-    {
-        run(
-            owner,
-            risc0VerifierRouter,
-            risc0VerifierRouter,
-            setBuilderImageId,
-            nitroRootCert,
-            nitroVerifierId,
-            nitroVerifierProofId,
-            tdxVerifierId,
-            intelRootCaHash
-        );
+    struct Input {
+        address owner;
+        address nitroRisc0VerifierRouter;
+        address tdxRisc0VerifierRouter;
+        bytes32 setBuilderImageId;
+        bytes32 nitroRootCert;
+        bytes32 nitroVerifierId;
+        bytes32 nitroVerifierProofId;
+        bytes32 tdxVerifierId;
+        bytes32 intelRootCaHash;
     }
 
     function run(
@@ -135,38 +57,72 @@ contract DeployTEEVerifiers is Script {
     )
         public
     {
-        bytes4 setVerifierSelector = _validateInputs(
-            owner,
-            nitroRisc0VerifierRouter,
-            tdxRisc0VerifierRouter,
-            setBuilderImageId,
-            nitroRootCert,
-            nitroVerifierId,
-            tdxVerifierId,
-            intelRootCaHash
-        );
+        Input memory input = Input({
+            owner: owner,
+            nitroRisc0VerifierRouter: nitroRisc0VerifierRouter,
+            tdxRisc0VerifierRouter: tdxRisc0VerifierRouter,
+            setBuilderImageId: setBuilderImageId,
+            nitroRootCert: nitroRootCert,
+            nitroVerifierId: nitroVerifierId,
+            nitroVerifierProofId: nitroVerifierProofId,
+            tdxVerifierId: tdxVerifierId,
+            intelRootCaHash: intelRootCaHash
+        });
+
+        require(input.owner != address(0), "owner must be non-zero");
+        require(input.nitroRisc0VerifierRouter != address(0), "nitroRisc0VerifierRouter must be non-zero");
+        require(input.tdxRisc0VerifierRouter != address(0), "tdxRisc0VerifierRouter must be non-zero");
+        require(input.setBuilderImageId != bytes32(0), "setBuilderImageId must be non-zero");
+        require(input.nitroRootCert != bytes32(0), "nitroRootCert must be non-zero");
+        require(input.nitroVerifierId != bytes32(0), "nitroVerifierId must be non-zero");
+        require(input.tdxVerifierId != bytes32(0), "tdxVerifierId must be non-zero");
+        require(input.intelRootCaHash != bytes32(0), "intelRootCaHash must be non-zero");
+
+        bytes4 setVerifierSelector = RiscZeroSetVerifierLib.selector(input.setBuilderImageId);
 
         console.log("=== Deploying TEE Verifiers ===");
-        console.log("Owner:", owner);
-        console.log("Nitro RISC Zero Verifier Router:", nitroRisc0VerifierRouter);
-        console.log("TDX RISC Zero Verifier Router:", tdxRisc0VerifierRouter);
-        console.log("Set Builder Image ID:", vm.toString(setBuilderImageId));
+        console.log("Owner:", input.owner);
+        console.log("Nitro RISC Zero Verifier Router:", input.nitroRisc0VerifierRouter);
+        console.log("TDX RISC Zero Verifier Router:", input.tdxRisc0VerifierRouter);
+        console.log("Set Builder Image ID:", vm.toString(input.setBuilderImageId));
         console.log("Set Verifier Selector:", vm.toString(setVerifierSelector));
-        console.log("Nitro Root Cert:", vm.toString(nitroRootCert));
-        console.log("Nitro Verifier ID:", vm.toString(nitroVerifierId));
-        console.log("Nitro Verifier Proof ID:", vm.toString(nitroVerifierProofId));
-        console.log("TDX Verifier ID:", vm.toString(tdxVerifierId));
-        console.log("Intel Root CA Hash:", vm.toString(intelRootCaHash));
+        console.log("Nitro Root Cert:", vm.toString(input.nitroRootCert));
+        console.log("Nitro Verifier ID:", vm.toString(input.nitroVerifierId));
+        console.log("Nitro Verifier Proof ID:", vm.toString(input.nitroVerifierProofId));
+        console.log("TDX Verifier ID:", vm.toString(input.tdxVerifierId));
+        console.log("Intel Root CA Hash:", vm.toString(input.intelRootCaHash));
         console.log("");
         console.log("NOTE: Nitro proofSubmitter is set to owner as placeholder.");
         console.log("");
 
         vm.startBroadcast();
 
-        (setVerifier, nitroEnclaveVerifier) = _deployNitroVerifier(
-            owner, nitroRisc0VerifierRouter, setBuilderImageId, nitroRootCert, nitroVerifierId, nitroVerifierProofId
+        address setVerifier = address(
+            new RiscZeroSetVerifier(IRiscZeroVerifier(input.nitroRisc0VerifierRouter), input.setBuilderImageId, "")
         );
-        tdxVerifier = _deployTDXVerifier(tdxRisc0VerifierRouter, tdxVerifierId, intelRootCaHash);
+
+        ZkCoProcessorConfig memory zkConfig = ZkCoProcessorConfig({
+            verifierId: input.nitroVerifierId, aggregatorId: bytes32(0), zkVerifier: input.nitroRisc0VerifierRouter
+        });
+
+        NitroEnclaveVerifier nitroEnclaveVerifierContract = new NitroEnclaveVerifier(
+            input.owner,
+            MAX_TIME_DIFF,
+            new bytes32[](0),
+            new uint64[](0),
+            input.nitroRootCert,
+            input.owner,
+            address(0),
+            ZkCoProcessorType.RiscZero,
+            zkConfig,
+            input.nitroVerifierProofId
+        );
+        address nitroEnclaveVerifier = address(nitroEnclaveVerifierContract);
+        nitroEnclaveVerifierContract.addVerifyRoute(ZkCoProcessorType.RiscZero, setVerifierSelector, setVerifier);
+
+        address tdxVerifier = address(
+            new TDXVerifier(MAX_TIME_DIFF, input.intelRootCaHash, input.tdxRisc0VerifierRouter, input.tdxVerifierId)
+        );
 
         vm.stopBroadcast();
 
@@ -176,128 +132,21 @@ contract DeployTEEVerifiers is Script {
         console.log("");
         console.log(">>> Use these verifier addresses for the TDX multiproof deployment <<<");
 
-        _writeOutput(
-            setVerifier,
-            nitroEnclaveVerifier,
-            tdxVerifier,
-            nitroRisc0VerifierRouter,
-            tdxRisc0VerifierRouter,
-            setBuilderImageId,
-            setVerifierSelector,
-            nitroRootCert,
-            nitroVerifierId,
-            nitroVerifierProofId,
-            tdxVerifierId,
-            intelRootCaHash
-        );
-    }
-
-    function _deployNitroVerifier(
-        address owner,
-        address risc0VerifierRouter,
-        bytes32 setBuilderImageId,
-        bytes32 nitroRootCert,
-        bytes32 nitroVerifierId,
-        bytes32 nitroVerifierProofId
-    )
-        internal
-        returns (address deployedSetVerifier, address deployedNitroVerifier)
-    {
-        deployedSetVerifier =
-            address(new RiscZeroSetVerifier(IRiscZeroVerifier(risc0VerifierRouter), setBuilderImageId, ""));
-
-        ZkCoProcessorConfig memory zkConfig = ZkCoProcessorConfig({
-            verifierId: nitroVerifierId, aggregatorId: bytes32(0), zkVerifier: risc0VerifierRouter
-        });
-
-        NitroEnclaveVerifier verifier = new NitroEnclaveVerifier(
-            owner,
-            NITRO_MAX_TIME_DIFF,
-            new bytes32[](0),
-            new uint64[](0),
-            nitroRootCert,
-            owner,
-            address(0),
-            ZkCoProcessorType.RiscZero,
-            zkConfig,
-            nitroVerifierProofId
-        );
-        deployedNitroVerifier = address(verifier);
-
-        bytes4 setVerifierSelector = RiscZeroSetVerifierLib.selector(setBuilderImageId);
-        verifier.addVerifyRoute(ZkCoProcessorType.RiscZero, setVerifierSelector, deployedSetVerifier);
-    }
-
-    function _deployTDXVerifier(
-        address risc0VerifierRouter,
-        bytes32 tdxVerifierId,
-        bytes32 intelRootCaHash
-    )
-        internal
-        returns (address deployedTDXVerifier)
-    {
-        deployedTDXVerifier =
-            address(new TDXVerifier(TDX_MAX_TIME_DIFF, intelRootCaHash, risc0VerifierRouter, tdxVerifierId));
-    }
-
-    function _validateInputs(
-        address owner,
-        address nitroRisc0VerifierRouter,
-        address tdxRisc0VerifierRouter,
-        bytes32 setBuilderImageId,
-        bytes32 nitroRootCert,
-        bytes32 nitroVerifierId,
-        bytes32 tdxVerifierId,
-        bytes32 intelRootCaHash
-    )
-        internal
-        pure
-        returns (bytes4 setVerifierSelector)
-    {
-        require(owner != address(0), "owner must be non-zero");
-        require(nitroRisc0VerifierRouter != address(0), "nitroRisc0VerifierRouter must be non-zero");
-        require(tdxRisc0VerifierRouter != address(0), "tdxRisc0VerifierRouter must be non-zero");
-        require(setBuilderImageId != bytes32(0), "setBuilderImageId must be non-zero");
-        require(nitroRootCert != bytes32(0), "nitroRootCert must be non-zero");
-        require(nitroVerifierId != bytes32(0), "nitroVerifierId must be non-zero");
-        require(tdxVerifierId != bytes32(0), "tdxVerifierId must be non-zero");
-        require(intelRootCaHash != bytes32(0), "intelRootCaHash must be non-zero");
-
-        setVerifierSelector = RiscZeroSetVerifierLib.selector(setBuilderImageId);
-    }
-
-    function _writeOutput(
-        address deployedSetVerifier,
-        address deployedNitroVerifier,
-        address deployedTDXVerifier,
-        address nitroRisc0VerifierRouter,
-        address tdxRisc0VerifierRouter,
-        bytes32 setBuilderImageId,
-        bytes4 setVerifierSelector,
-        bytes32 nitroRootCert,
-        bytes32 nitroVerifierId,
-        bytes32 nitroVerifierProofId,
-        bytes32 tdxVerifierId,
-        bytes32 intelRootCaHash
-    )
-        internal
-    {
         string memory key = "deployment";
-        vm.serializeAddress(key, "RiscZeroSetVerifier", deployedSetVerifier);
-        vm.serializeAddress(key, "NitroEnclaveVerifier", deployedNitroVerifier);
-        vm.serializeAddress(key, "TDXVerifier", deployedTDXVerifier);
-        vm.serializeAddress(key, "RiscZeroVerifierRouter", tdxRisc0VerifierRouter);
-        vm.serializeAddress(key, "NitroRiscZeroVerifierRouter", nitroRisc0VerifierRouter);
-        vm.serializeAddress(key, "TDXRiscZeroVerifierRouter", tdxRisc0VerifierRouter);
-        vm.serializeBytes32(key, "RiscZeroSetBuilderImageId", setBuilderImageId);
+        vm.serializeAddress(key, "RiscZeroSetVerifier", setVerifier);
+        vm.serializeAddress(key, "NitroEnclaveVerifier", nitroEnclaveVerifier);
+        vm.serializeAddress(key, "TDXVerifier", tdxVerifier);
+        vm.serializeAddress(key, "NitroRiscZeroVerifierRouter", input.nitroRisc0VerifierRouter);
+        vm.serializeAddress(key, "TDXRiscZeroVerifierRouter", input.tdxRisc0VerifierRouter);
+        vm.serializeBytes32(key, "RiscZeroSetBuilderImageId", input.setBuilderImageId);
         vm.serializeString(key, "RiscZeroSetVerifierSelector", vm.toString(setVerifierSelector));
-        vm.serializeBytes32(key, "NitroRootCert", nitroRootCert);
-        vm.serializeBytes32(key, "NitroVerifierId", nitroVerifierId);
-        vm.serializeBytes32(key, "NitroVerifierProofId", nitroVerifierProofId);
-        vm.serializeBytes32(key, "TDXVerifierId", tdxVerifierId);
-        vm.serializeBytes32(key, "IntelRootCaHash", intelRootCaHash);
-        vm.serializeUint(key, "NitroMaxTimeDiff", NITRO_MAX_TIME_DIFF);
-        string memory json = vm.serializeUint(key, "TDXMaxTimeDiff", TDX_MAX_TIME_DIFF);
+        vm.serializeBytes32(key, "NitroRootCert", input.nitroRootCert);
+        vm.serializeBytes32(key, "NitroVerifierId", input.nitroVerifierId);
+        vm.serializeBytes32(key, "NitroVerifierProofId", input.nitroVerifierProofId);
+        vm.serializeBytes32(key, "TDXVerifierId", input.tdxVerifierId);
+        vm.serializeBytes32(key, "IntelRootCaHash", input.intelRootCaHash);
+        vm.serializeUint(key, "NitroMaxTimeDiff", MAX_TIME_DIFF);
+        string memory json = vm.serializeUint(key, "TDXMaxTimeDiff", MAX_TIME_DIFF);
 
         string memory outPath = string.concat("deployments/", vm.toString(block.chainid), "-tee-verifiers.json");
         vm.writeJson(json, outPath);
