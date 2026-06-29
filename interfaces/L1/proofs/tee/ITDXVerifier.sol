@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { ZkCoProcessorType, ZkCoProcessorConfig } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-
 /// @notice Statuses that a TDX quote/collateral verifier may emit.
 /// @dev Unknown is index 0 so uninitialized values fail closed.
 enum TDXVerificationResult {
@@ -33,7 +31,7 @@ enum TDXTcbStatus {
     Revoked
 }
 
-/// @notice Public journal emitted by the off-chain/ZK TDX DCAP verifier.
+/// @notice Public journal emitted by the offchain/ZK TDX DCAP verifier.
 /// @param result Overall verification result after quote and collateral validation in the guest.
 /// @param tcbStatus Intel TDX TCB status for the platform.
 /// @param timestamp Quote timestamp in milliseconds since Unix epoch.
@@ -73,19 +71,14 @@ interface ITDXVerifier {
 
     /// @notice Verifies a ZK proof of Intel TDX DCAP quote verification and returns attested signer metadata.
     /// @param output ABI-encoded TDXVerifierJournal public values from the ZK verifier guest.
-    /// @param zkCoprocessor ZK proving system used to generate the proof.
     /// @param proofBytes ZK proof bytes.
     /// @return journal Verified TDX attestation metadata.
     function verify(
         bytes calldata output,
-        ZkCoProcessorType zkCoprocessor,
         bytes calldata proofBytes
     )
         external
         returns (TDXVerifierJournal memory journal);
-
-    /// @notice Retrieves the configuration for a specific coprocessor.
-    function getZkConfig(ZkCoProcessorType zkCoprocessor) external view returns (ZkCoProcessorConfig memory);
 
     /// @notice Returns whether a TCB status is accepted by verifier policy.
     function allowedTcbStatuses(TDXTcbStatus status) external view returns (bool);

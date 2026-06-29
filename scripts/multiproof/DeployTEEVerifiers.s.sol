@@ -35,7 +35,6 @@ import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVer
 import { RiscZeroSetVerifier, RiscZeroSetVerifierLib } from "lib/risc0-ethereum/contracts/src/RiscZeroSetVerifier.sol";
 
 import { ZkCoProcessorConfig, ZkCoProcessorType } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-import { TDXTcbStatus } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { NitroEnclaveVerifier } from "src/L1/proofs/tee/NitroEnclaveVerifier.sol";
 import { TDXVerifier } from "src/L1/proofs/tee/TDXVerifier.sol";
 
@@ -239,18 +238,8 @@ contract DeployTEEVerifiers is Script {
         internal
         returns (address deployedTDXVerifier)
     {
-        TDXTcbStatus[] memory allowedStatuses = new TDXTcbStatus[](2);
-        allowedStatuses[0] = TDXTcbStatus.UpToDate;
-        allowedStatuses[1] = TDXTcbStatus.SwHardeningNeeded;
-
-        ZkCoProcessorConfig memory zkConfig = ZkCoProcessorConfig({
-            verifierId: tdxVerifierId, aggregatorId: bytes32(0), zkVerifier: risc0VerifierRouter
-        });
-
         deployedTDXVerifier = address(
-            new TDXVerifier(
-                owner, TDX_MAX_TIME_DIFF, intelRootCaHash, owner, ZkCoProcessorType.RiscZero, zkConfig, allowedStatuses
-            )
+            new TDXVerifier(owner, TDX_MAX_TIME_DIFF, intelRootCaHash, owner, risc0VerifierRouter, tdxVerifierId)
         );
     }
 

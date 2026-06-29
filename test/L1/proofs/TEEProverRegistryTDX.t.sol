@@ -12,7 +12,6 @@ import {
     TDXVerificationResult,
     TDXVerifierJournal
 } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
-import { ZkCoProcessorConfig, ZkCoProcessorType } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { GameType } from "src/libraries/bridge/Types.sol";
 
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
@@ -49,20 +48,8 @@ contract MockTDXVerifierForRegistry is ITDXVerifier {
         _journal = journal;
     }
 
-    function verify(
-        bytes calldata,
-        ZkCoProcessorType,
-        bytes calldata
-    )
-        external
-        view
-        returns (TDXVerifierJournal memory)
-    {
+    function verify(bytes calldata, bytes calldata) external view returns (TDXVerifierJournal memory) {
         return _journal;
-    }
-
-    function getZkConfig(ZkCoProcessorType) external pure returns (ZkCoProcessorConfig memory) {
-        return ZkCoProcessorConfig({ verifierId: bytes32(0), aggregatorId: bytes32(0), zkVerifier: address(0) });
     }
 
     function allowedTcbStatuses(TDXTcbStatus) external pure returns (bool) {

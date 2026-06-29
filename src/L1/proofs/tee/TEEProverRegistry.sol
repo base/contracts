@@ -62,7 +62,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     ///      TEEVerifier checks this against the AggregateVerifier's type-specific TEE image hash at
     ///      proof-submission time, so signers automatically become unusable when the
     ///      AggregateVerifier upgrades to a new image hash. isValidSigner also uses
-    ///      this for off-chain pre-submission checks.
+    ///      this for offchain pre-submission checks.
     mapping(address => bytes32) public signerImageHash;
 
     /// @notice Mapping of whether an address is a valid proposer.
@@ -70,7 +70,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
     /// @notice Enumerable set of all currently registered signer addresses.
     /// @dev Kept in sync with `isRegisteredSigner`: add on register, remove on deregister.
-    ///      Enables O(1) on-chain enumeration via `getRegisteredSigners()`.
+    ///      Enables O(1) onchain enumeration via `getRegisteredSigners()`.
     EnumerableSetLib.AddressSet internal _registeredSigners;
 
     /// @notice Mapping of signer address to the attestation type used to register it.
@@ -161,7 +161,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     ///      2. Is less than MAX_AGE old
     ///      Registration is PCR0-agnostic: any enclave with a valid attestation can register.
     ///      This enables pre-registration of new-PCR0 enclaves before a hardfork, eliminating
-    ///      proof-generation delay when the on-chain Nitro image hash rotates. The TEEVerifier
+    ///      proof-generation delay when the onchain Nitro image hash rotates. The TEEVerifier
     ///      enforces PCR0 correctness at proof-submission time by checking signerImageHash
     ///      against the AggregateVerifier's TEE_NITRO_IMAGE_HASH, so pre-registered enclaves cannot
     ///      produce accepted proofs until the hardfork activates.
@@ -195,7 +195,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @param output ABI-encoded TDXVerifierJournal public values from the ZK verifier guest.
     /// @param proofBytes ZK proof bytes.
     function registerTDXSigner(bytes calldata output, bytes calldata proofBytes) external onlyOwnerOrManager {
-        TDXVerifierJournal memory journal = TDX_VERIFIER.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+        TDXVerifierJournal memory journal = TDX_VERIFIER.verify(output, proofBytes);
 
         _registerSigner(journal.signer, journal.imageHash, TEEType.TDX);
 
@@ -226,7 +226,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     }
 
     /// @notice Returns all currently registered signer addresses.
-    /// @dev Reads directly from the on-chain enumerable set — no event scanning required.
+    /// @dev Reads directly from the onchain enumerable set — no event scanning required.
     ///      The order of addresses in the returned array is not guaranteed.
     /// @return An array of all registered signer addresses.
     function getRegisteredSigners() external view returns (address[] memory) {

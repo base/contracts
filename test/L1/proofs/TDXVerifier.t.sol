@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import { Test } from "forge-std/Test.sol";
 
 import { TDXTcbStatus, TDXVerificationResult, TDXVerifierJournal } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
-import { ZkCoProcessorConfig, ZkCoProcessorType } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 
 import { TDXVerifier } from "src/L1/proofs/tee/TDXVerifier.sol";
 
@@ -14,12 +13,10 @@ contract TDXVerifierTest is Test {
     address internal owner;
     address internal proofSubmitter;
     address internal mockRiscZeroVerifier;
-    address internal mockSP1Verifier;
 
     bytes32 internal constant ROOT_CA_HASH = keccak256("intel-root-ca");
     bytes32 internal constant WRONG_ROOT_CA_HASH = keccak256("wrong-root-ca");
     bytes32 internal constant VERIFIER_ID = keccak256("tdx-verifier-id");
-    bytes32 internal constant AGGREGATOR_ID = keccak256("tdx-aggregator-id");
     bytes32 internal constant IMAGE_HASH = keccak256("tdx-image");
     bytes32 internal constant MRTD_HASH = keccak256("mrtd");
     bytes32 internal constant REPORT_DATA_SUFFIX = keccak256("multiproof-tdx-poc");
@@ -33,48 +30,35 @@ contract TDXVerifierTest is Test {
         owner = address(this);
         proofSubmitter = address(this);
         mockRiscZeroVerifier = makeAddr("mock-risc-zero");
-        mockSP1Verifier = makeAddr("mock-sp1");
 
-        TDXTcbStatus[] memory allowedStatuses = new TDXTcbStatus[](2);
-        allowedStatuses[0] = TDXTcbStatus.UpToDate;
-        allowedStatuses[1] = TDXTcbStatus.SwHardeningNeeded;
-
-        verifier = new TDXVerifier(
-            owner,
-            MAX_TIME_DIFF,
-            ROOT_CA_HASH,
-            proofSubmitter,
-            ZkCoProcessorType.Succinct,
-            ZkCoProcessorConfig({ verifierId: VERIFIER_ID, aggregatorId: AGGREGATOR_ID, zkVerifier: mockSP1Verifier }),
-            allowedStatuses
-        );
+        verifier =
+            new TDXVerifier(owner, MAX_TIME_DIFF, ROOT_CA_HASH, proofSubmitter, mockRiscZeroVerifier, VERIFIER_ID);
     }
 
-    function testVerifySucceedsWithSP1ProofAndAllowedJournal() public {
+    function testVerifySucceedsWithRiscZeroProofAndAllowedJournal() public {
         TDXVerifierJournal memory journal = _successJournal();
         bytes memory output = abi.encode(journal);
         bytes memory proofBytes = hex"1234";
-        _mockSP1Verify(VERIFIER_ID, output, proofBytes);
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
-        TDXVerifierJournal memory result = verifier.verify(output, ZkCoProcessorType.Succinct, proofBytes);
+        TDXVerifierJournal memory result = verifier.verify(output, proofBytes);
 
         assertEq(result.signer, journal.signer);
         assertEq(result.imageHash, IMAGE_HASH);
         assertEq(uint256(result.tcbStatus), uint256(TDXTcbStatus.UpToDate));
     }
 
-    function testVerifySucceedsWithRiscZeroProof() public {
-        ZkCoProcessorConfig memory config = ZkCoProcessorConfig({
-            verifierId: VERIFIER_ID, aggregatorId: AGGREGATOR_ID, zkVerifier: mockRiscZeroVerifier
-        });
-        verifier.setZkConfiguration(ZkCoProcessorType.RiscZero, config);
+    function testOwnerCanUpdateRiscZeroConfiguration() public {
+        address newVerifier = makeAddr("new-risc-zero");
+        bytes32 newVerifierId = keccak256("new-tdx-verifier-id");
+        verifier.setRiscZeroConfiguration(newVerifier, newVerifierId);
 
         TDXVerifierJournal memory journal = _successJournal();
         bytes memory output = abi.encode(journal);
         bytes memory proofBytes = hex"5678";
-        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
+        _mockRiscZeroVerify(newVerifier, newVerifierId, output, proofBytes);
 
-        TDXVerifierJournal memory result = verifier.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+        TDXVerifierJournal memory result = verifier.verify(output, proofBytes);
 
         assertEq(result.signer, journal.signer);
         assertEq(result.imageHash, IMAGE_HASH);
@@ -85,27 +69,12 @@ contract TDXVerifierTest is Test {
 
         vm.prank(makeAddr("not-submitter"));
         vm.expectRevert(TDXVerifier.CallerNotProofSubmitter.selector);
-        verifier.verify(output, ZkCoProcessorType.Succinct, "");
+        verifier.verify(output, "");
     }
 
-    function testVerifyRevertsIfZkVerifierNotConfigured() public {
-        bytes memory output = abi.encode(_successJournal());
-
-        vm.expectRevert(
-            abi.encodeWithSelector(TDXVerifier.ZkVerifierNotConfigured.selector, ZkCoProcessorType.RiscZero)
-        );
-        verifier.verify(output, ZkCoProcessorType.RiscZero, "");
-    }
-
-    function testVerifyRevertsForUnknownCoprocessor() public {
-        ZkCoProcessorConfig memory config =
-            ZkCoProcessorConfig({ verifierId: VERIFIER_ID, aggregatorId: AGGREGATOR_ID, zkVerifier: mockSP1Verifier });
-        verifier.setZkConfiguration(ZkCoProcessorType.Unknown, config);
-
-        bytes memory output = abi.encode(_successJournal());
-
-        vm.expectRevert(TDXVerifier.UnknownZkCoprocessor.selector);
-        verifier.verify(output, ZkCoProcessorType.Unknown, "");
+    function testSetRiscZeroConfigurationRevertsIfZeroVerifier() public {
+        vm.expectRevert(TDXVerifier.ZeroRiscZeroVerifier.selector);
+        verifier.setRiscZeroConfiguration(address(0), VERIFIER_ID);
     }
 
     function testVerifyRevertsWhenGuestReportsFailure() public {
@@ -113,10 +82,10 @@ contract TDXVerifierTest is Test {
         journal.result = TDXVerificationResult.PckCertChainInvalid;
         bytes memory output = abi.encode(journal);
         bytes memory proofBytes = hex"1234";
-        _mockSP1Verify(VERIFIER_ID, output, proofBytes);
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
         vm.expectRevert(abi.encodeWithSelector(TDXVerifier.TDXVerificationFailed.selector, journal.result));
-        verifier.verify(output, ZkCoProcessorType.Succinct, proofBytes);
+        verifier.verify(output, proofBytes);
     }
 
     function testVerifyRevertsWhenRootCaHashMismatches() public {
@@ -124,12 +93,12 @@ contract TDXVerifierTest is Test {
         journal.rootCaHash = WRONG_ROOT_CA_HASH;
         bytes memory output = abi.encode(journal);
         bytes memory proofBytes = hex"1234";
-        _mockSP1Verify(VERIFIER_ID, output, proofBytes);
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
         vm.expectRevert(
             abi.encodeWithSelector(TDXVerifier.RootCaHashMismatch.selector, ROOT_CA_HASH, WRONG_ROOT_CA_HASH)
         );
-        verifier.verify(output, ZkCoProcessorType.Succinct, proofBytes);
+        verifier.verify(output, proofBytes);
     }
 
     function testVerifyRevertsWhenTcbStatusIsNotAllowed() public {
@@ -137,10 +106,10 @@ contract TDXVerifierTest is Test {
         journal.tcbStatus = TDXTcbStatus.ConfigurationNeeded;
         bytes memory output = abi.encode(journal);
         bytes memory proofBytes = hex"1234";
-        _mockSP1Verify(VERIFIER_ID, output, proofBytes);
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
         vm.expectRevert(abi.encodeWithSelector(TDXVerifier.TcbStatusNotAllowed.selector, journal.tcbStatus));
-        verifier.verify(output, ZkCoProcessorType.Succinct, proofBytes);
+        verifier.verify(output, proofBytes);
     }
 
     function testOwnerCanAllowAdditionalTcbStatus() public {
@@ -150,9 +119,9 @@ contract TDXVerifierTest is Test {
         journal.tcbStatus = TDXTcbStatus.ConfigurationNeeded;
         bytes memory output = abi.encode(journal);
         bytes memory proofBytes = hex"1234";
-        _mockSP1Verify(VERIFIER_ID, output, proofBytes);
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
-        TDXVerifierJournal memory result = verifier.verify(output, ZkCoProcessorType.Succinct, proofBytes);
+        TDXVerifierJournal memory result = verifier.verify(output, proofBytes);
 
         assertEq(uint256(result.tcbStatus), uint256(TDXTcbStatus.ConfigurationNeeded));
     }
@@ -162,10 +131,10 @@ contract TDXVerifierTest is Test {
         journal.collateralExpiration = uint64(block.timestamp);
         bytes memory output = abi.encode(journal);
         bytes memory proofBytes = hex"1234";
-        _mockSP1Verify(VERIFIER_ID, output, proofBytes);
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
         vm.expectRevert(abi.encodeWithSelector(TDXVerifier.CollateralExpired.selector, journal.collateralExpiration));
-        verifier.verify(output, ZkCoProcessorType.Succinct, proofBytes);
+        verifier.verify(output, proofBytes);
     }
 
     function testVerifyRevertsWhenTimestampTooOld() public {
@@ -173,14 +142,14 @@ contract TDXVerifierTest is Test {
         journal.timestamp = uint64(block.timestamp - MAX_TIME_DIFF) * 1000;
         bytes memory output = abi.encode(journal);
         bytes memory proofBytes = hex"1234";
-        _mockSP1Verify(VERIFIER_ID, output, proofBytes);
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 TDXVerifier.InvalidTimestamp.selector, uint64(block.timestamp - MAX_TIME_DIFF), block.timestamp
             )
         );
-        verifier.verify(output, ZkCoProcessorType.Succinct, proofBytes);
+        verifier.verify(output, proofBytes);
     }
 
     function testVerifyRevertsWhenTimestampIsFromFuture() public {
@@ -188,12 +157,12 @@ contract TDXVerifierTest is Test {
         journal.timestamp = uint64(block.timestamp) * 1000;
         bytes memory output = abi.encode(journal);
         bytes memory proofBytes = hex"1234";
-        _mockSP1Verify(VERIFIER_ID, output, proofBytes);
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
         vm.expectRevert(
             abi.encodeWithSelector(TDXVerifier.InvalidTimestamp.selector, uint64(block.timestamp), block.timestamp)
         );
-        verifier.verify(output, ZkCoProcessorType.Succinct, proofBytes);
+        verifier.verify(output, proofBytes);
     }
 
     function testVerifyRevertsWhenReportDataDoesNotBindPublicKey() public {
@@ -202,12 +171,12 @@ contract TDXVerifierTest is Test {
         journal.reportDataPrefix = keccak256("wrong-report-data");
         bytes memory output = abi.encode(journal);
         bytes memory proofBytes = hex"1234";
-        _mockSP1Verify(VERIFIER_ID, output, proofBytes);
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
         vm.expectRevert(
             abi.encodeWithSelector(TDXVerifier.ReportDataMismatch.selector, expected, journal.reportDataPrefix)
         );
-        verifier.verify(output, ZkCoProcessorType.Succinct, proofBytes);
+        verifier.verify(output, proofBytes);
     }
 
     function testVerifyRevertsWhenSignerDoesNotMatchPublicKey() public {
@@ -216,10 +185,10 @@ contract TDXVerifierTest is Test {
         journal.signer = makeAddr("wrong-signer");
         bytes memory output = abi.encode(journal);
         bytes memory proofBytes = hex"1234";
-        _mockSP1Verify(VERIFIER_ID, output, proofBytes);
+        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
         vm.expectRevert(abi.encodeWithSelector(TDXVerifier.SignerMismatch.selector, expected, journal.signer));
-        verifier.verify(output, ZkCoProcessorType.Succinct, proofBytes);
+        verifier.verify(output, proofBytes);
     }
 
     function _successJournal() internal view returns (TDXVerifierJournal memory journal) {
@@ -256,20 +225,21 @@ contract TDXVerifierTest is Test {
     }
 
     function _mockRiscZeroVerify(bytes32 programId, bytes memory output, bytes memory proofBytes) internal {
-        vm.mockCall(
-            mockRiscZeroVerifier,
-            abi.encodeWithSelector(
-                bytes4(keccak256("verify(bytes,bytes32,bytes32)")), proofBytes, programId, sha256(output)
-            ),
-            ""
-        );
+        _mockRiscZeroVerify(mockRiscZeroVerifier, programId, output, proofBytes);
     }
 
-    function _mockSP1Verify(bytes32 programId, bytes memory output, bytes memory proofBytes) internal {
+    function _mockRiscZeroVerify(
+        address verifierAddress,
+        bytes32 programId,
+        bytes memory output,
+        bytes memory proofBytes
+    )
+        internal
+    {
         vm.mockCall(
-            mockSP1Verifier,
+            verifierAddress,
             abi.encodeWithSelector(
-                bytes4(keccak256("verifyProof(bytes32,bytes,bytes)")), programId, output, proofBytes
+                bytes4(keccak256("verify(bytes,bytes32,bytes32)")), proofBytes, programId, sha256(output)
             ),
             ""
         );

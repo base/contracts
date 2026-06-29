@@ -28,8 +28,8 @@
     "sourceCodeHash": "0xf122a50487efe9bd5a620262ba20ef4adbca14eeec2af7fd32e6e16739001596"
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0x6e50ad8219dfc59503395bf63d2a4d91c002bd21a1df7c902debedea9c2e13eb",
-    "sourceCodeHash": "0x802a3645c05ae98232b091f779f6321f60230dd22f536b00dcbacccde6af4d3a"
+    "initCodeHash": "0x222bb03bc906afac854b7c073ca984c63880c945a0f8d21db94cc5fe2896e952",
+    "sourceCodeHash": "0xceda0cd8df108723b38dc67c097d0d188da976fd0d0b15843be5182c015e0299"
   },
   "src/L1/proofs/AnchorStateRegistry.sol:AnchorStateRegistry": {
     "initCodeHash": "0x6f3afd2d0ef97a82ca3111976322b99343a270e54cd4a405028f2f29c75f7fb1",
@@ -48,12 +48,12 @@
     "sourceCodeHash": "0x03c164216b27f82ee13064ace6079d5e24e187d888f41bd01c8daffa60c575d6"
   },
   "src/L1/proofs/tee/TDXVerifier.sol:TDXVerifier": {
-    "initCodeHash": "0xab68cfaae62a40d02a7d096bf1c81ec8ac2c106b19859ffa772a22b477a55af2",
-    "sourceCodeHash": "0x82a3eff9a7566e483b5f015dc97a88d90bdc4d9d7d49794556106bfc86d55ea0"
+    "initCodeHash": "0xf7c689996242db58682e81e76bde2d8355520d5d5012d491d0c88c77c333c017",
+    "sourceCodeHash": "0x59c7bfbc91a32cce592f9bea996f3e2a30de02eaa4aa8ceb9a9bf725394c9a8d"
   },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0x4b2fb8ba42668b1b9a8ebb99518fc0552703dfda190acde45d771847b450ac65",
-    "sourceCodeHash": "0x3e763a25f5353756c2ab52f6ae003f8cc7c1da2965aa2fd8b6ec6a0ac0ae6720"
+    "initCodeHash": "0xc7efbb8f5e4c1d75c0f88b62003df0dc984e3a00689e718699e2cb13c836a87e",
+    "sourceCodeHash": "0xcdbe2ba1aeac4e3dc6a4e138bda7bd3dd9d072b7d419f5a8af4f3e9a4a045217"
   },
   "src/L1/proofs/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0x5f42455c6d41c0a49e05681a6fa7dbf21eb22c89705fd11b6030952b3227e559",

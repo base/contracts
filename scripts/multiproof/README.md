@@ -137,12 +137,12 @@ The deployer address (`finalSystemOwner`) is the owner of `DevTEEProverRegistry`
 
 ## Path 3: TDX (Production-Path PoC)
 
-The TDX path follows the same split as Nitro: expensive attestation verification happens off-chain in a ZK guest,
-and Solidity verifies the proof plus the on-chain acceptance policy before registering the signer.
+The TDX path follows the same split as Nitro: expensive attestation verification happens offchain in a ZK guest,
+and Solidity verifies the proof plus the onchain acceptance policy before registering the signer.
 
 | Contract            | Purpose                                                                                                                                                                                                                                       |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TDXVerifier`       | Verifies a RISC Zero or SP1 proof whose public values are an ABI-encoded `TDXVerifierJournal`, then checks trusted Intel root, TCB status policy, collateral expiry, quote freshness, signer derivation, and `REPORTDATA` public-key binding. |
+| `TDXVerifier`       | Verifies a RISC Zero proof whose public values are an ABI-encoded `TDXVerifierJournal`, then checks trusted Intel root, TCB status policy, collateral expiry, quote freshness, signer derivation, and `REPORTDATA` public-key binding. |
 | `TEEProverRegistry` | Registers Nitro signers through `registerSigner(bytes,bytes)` and TDX signers through `registerTDXSigner(bytes,bytes)`, tracking which TEE type each signer came from for `TEEVerifier`.                                                      |
 
 The ZK verifier guest is expected to perform the full Intel DCAP verification path:
@@ -172,7 +172,7 @@ The quote's TDREPORT `REPORTDATA` must put `keccak256(x || y)` in the first 32 b
 
 `TEEVerifier` is still the proposal-proof verifier, but a TEE proposal proof now requires two signatures over the same journal: one from a Nitro-registered signer and one from a TDX-registered signer. The proof bytes are `proposer || signatureA || signatureB`; either signature order is accepted as long as both registered TEE types are present and both signers match their expected type-specific image hash.
 
-> **PoC boundary:** this repo now contains the production-shaped Solidity path and policy checks. The remaining off-chain piece is the actual RISC Zero/SP1 TDX DCAP guest that emits `TDXVerifierJournal` after verifying Intel collateral.
+> **PoC boundary:** this repo now contains the production-shaped Solidity path and policy checks. The remaining offchain piece is the actual RISC Zero TDX DCAP guest that emits `TDXVerifierJournal` after verifying Intel collateral.
 
 ### Step 1: Deploy verifier policy contracts
 
@@ -370,7 +370,7 @@ mv roots.json deployments/roots.json
 
 ### Step 4: Run the seeding script
 
-Create all games on-chain. Each game is chained to the previous one (game 0's parent is the `AnchorStateRegistry`, game N's parent is game N-1). The account running this needs enough ETH for bonds and gas (500 games at 0.00001 ETH bond = 0.005 ETH + gas).
+Create all games onchain. Each game is chained to the previous one (game 0's parent is the `AnchorStateRegistry`, game N's parent is game N-1). The account running this needs enough ETH for bonds and gas (500 games at 0.00001 ETH bond = 0.005 ETH + gas).
 
 ```bash
 ROOTS_FILE=./deployments/roots.json \
@@ -389,7 +389,7 @@ Optional env vars:
 | `GAME_COUNT` | 500          | Number of games to create     |
 | `ROOTS_FILE` | `roots.json` | Path to the output roots JSON |
 
-### Step 5: Verify on-chain
+### Step 5: Verify onchain
 
 ```bash
 # Check total game count

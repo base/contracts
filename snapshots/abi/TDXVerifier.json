@@ -22,36 +22,14 @@
         "type": "address"
       },
       {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoprocessor",
-        "type": "uint8"
+        "internalType": "address",
+        "name": "initialRiscZeroVerifier",
+        "type": "address"
       },
       {
-        "components": [
-          {
-            "internalType": "bytes32",
-            "name": "verifierId",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "aggregatorId",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "address",
-            "name": "zkVerifier",
-            "type": "address"
-          }
-        ],
-        "internalType": "struct ZkCoProcessorConfig",
-        "name": "config",
-        "type": "tuple"
-      },
-      {
-        "internalType": "enum TDXTcbStatus[]",
-        "name": "initialAllowedTcbStatuses",
-        "type": "uint8[]"
+        "internalType": "bytes32",
+        "name": "initialVerifierId",
+        "type": "bytes32"
       }
     ],
     "stateMutability": "nonpayable",
@@ -94,42 +72,6 @@
     "name": "completeOwnershipHandover",
     "outputs": [],
     "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoprocessor",
-        "type": "uint8"
-      }
-    ],
-    "name": "getZkConfig",
-    "outputs": [
-      {
-        "components": [
-          {
-            "internalType": "bytes32",
-            "name": "verifierId",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "aggregatorId",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "address",
-            "name": "zkVerifier",
-            "type": "address"
-          }
-        ],
-        "internalType": "struct ZkCoProcessorConfig",
-        "name": "",
-        "type": "tuple"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -206,6 +148,19 @@
   },
   {
     "inputs": [],
+    "name": "riscZeroVerifier",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "rootCaHash",
     "outputs": [
       {
@@ -246,6 +201,24 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "newRiscZeroVerifier",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "newVerifierId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "setRiscZeroConfiguration",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes32",
         "name": "newRootCaHash",
         "type": "bytes32"
@@ -277,41 +250,6 @@
   {
     "inputs": [
       {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoprocessor",
-        "type": "uint8"
-      },
-      {
-        "components": [
-          {
-            "internalType": "bytes32",
-            "name": "verifierId",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "aggregatorId",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "address",
-            "name": "zkVerifier",
-            "type": "address"
-          }
-        ],
-        "internalType": "struct ZkCoProcessorConfig",
-        "name": "config",
-        "type": "tuple"
-      }
-    ],
-    "name": "setZkConfiguration",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "address",
         "name": "newOwner",
         "type": "address"
@@ -323,16 +261,24 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "verifierId",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "bytes",
         "name": "output",
         "type": "bytes"
-      },
-      {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoprocessor",
-        "type": "uint8"
       },
       {
         "internalType": "bytes",
@@ -434,35 +380,6 @@
       }
     ],
     "stateMutability": "pure",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "",
-        "type": "uint8"
-      }
-    ],
-    "name": "zkConfig",
-    "outputs": [
-      {
-        "internalType": "bytes32",
-        "name": "verifierId",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "aggregatorId",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "address",
-        "name": "zkVerifier",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -584,6 +501,25 @@
     "inputs": [
       {
         "indexed": true,
+        "internalType": "address",
+        "name": "riscZeroVerifier",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "verifierId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RiscZeroConfigurationUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
         "internalType": "bytes32",
         "name": "rootCaHash",
         "type": "bytes32"
@@ -609,42 +545,6 @@
       }
     ],
     "name": "TcbStatusPolicyUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoprocessor",
-        "type": "uint8"
-      },
-      {
-        "components": [
-          {
-            "internalType": "bytes32",
-            "name": "verifierId",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "aggregatorId",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "address",
-            "name": "zkVerifier",
-            "type": "address"
-          }
-        ],
-        "indexed": false,
-        "internalType": "struct ZkCoProcessorConfig",
-        "name": "config",
-        "type": "tuple"
-      }
-    ],
-    "name": "ZKConfigurationUpdated",
     "type": "event"
   },
   {
@@ -776,11 +676,6 @@
   },
   {
     "inputs": [],
-    "name": "UnknownZkCoprocessor",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "ZeroMaxTimeDiff",
     "type": "error"
   },
@@ -791,18 +686,17 @@
   },
   {
     "inputs": [],
+    "name": "ZeroRiscZeroVerifier",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ZeroRootCaHash",
     "type": "error"
   },
   {
-    "inputs": [
-      {
-        "internalType": "enum ZkCoProcessorType",
-        "name": "zkCoprocessor",
-        "type": "uint8"
-      }
-    ],
-    "name": "ZkVerifierNotConfigured",
+    "inputs": [],
+    "name": "ZeroVerifierId",
     "type": "error"
   }
 ]

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import { Ownable } from "lib/solady/src/auth/Ownable.sol";
-import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
 
 import { ISemver } from "interfaces/universal/ISemver.sol";
@@ -10,16 +9,14 @@ import {
     ITDXVerifier,
     TDXTcbStatus,
     TDXVerificationResult,
-    TDXVerifierJournal,
-    ZkCoProcessorType,
-    ZkCoProcessorConfig
+    TDXVerifierJournal
 } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 
 /// @title TDXVerifier
 /// @notice Production-shape Intel TDX DCAP verifier for multiproof signer registration.
 /// @dev The heavy TDX work is expected to happen in a ZK guest: quote signature verification, PCK chain
 ///      validation, TCB info validation, QE identity validation, CRL checks, and extraction of TDREPORT fields.
-///      This contract verifies the ZK proof and enforces on-chain policy over the verified journal.
+///      This contract verifies the ZK proof and enforces onchain policy over the verified journal.
 contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
     /// @notice Conversion factor from milliseconds to seconds.
     uint256 private constant MS_PER_SECOND = 1000;
@@ -33,8 +30,11 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
     /// @notice Hash of the trusted Intel root CA used by the ZK verifier guest.
     bytes32 public rootCaHash;
 
-    /// @notice Configuration mapping for each supported ZK coprocessor type.
-    mapping(ZkCoProcessorType => ZkCoProcessorConfig) public zkConfig;
+    /// @notice RISC Zero verifier router.
+    address public riscZeroVerifier;
+
+    /// @notice RISC Zero image ID for the TDX DCAP verifier guest.
+    bytes32 public verifierId;
 
     /// @inheritdoc ITDXVerifier
     mapping(TDXTcbStatus => bool) public allowedTcbStatuses;
@@ -51,8 +51,8 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
     /// @notice Emitted when a TCB status policy changes.
     event TcbStatusPolicyUpdated(TDXTcbStatus indexed status, bool allowed);
 
-    /// @notice Emitted when ZK configuration changes.
-    event ZKConfigurationUpdated(ZkCoProcessorType indexed zkCoprocessor, ZkCoProcessorConfig config);
+    /// @notice Emitted when RISC Zero verification configuration changes.
+    event RiscZeroConfigurationUpdated(address indexed riscZeroVerifier, bytes32 verifierId);
 
     /// @notice Emitted after a TDX attestation journal is accepted.
     event AttestationSubmitted(
@@ -76,11 +76,11 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
     /// @notice Thrown when the caller is not the configured proof submitter.
     error CallerNotProofSubmitter();
 
-    /// @notice Thrown when the ZK coprocessor type is unknown.
-    error UnknownZkCoprocessor();
+    /// @notice Thrown when a zero RISC Zero verifier address is provided.
+    error ZeroRiscZeroVerifier();
 
-    /// @notice Thrown when the configured ZK verifier address is zero.
-    error ZkVerifierNotConfigured(ZkCoProcessorType zkCoprocessor);
+    /// @notice Thrown when a zero verifier ID is provided.
+    error ZeroVerifierId();
 
     /// @notice Thrown when the TDX verifier guest did not report success.
     error TDXVerificationFailed(TDXVerificationResult result);
@@ -111,24 +111,16 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
         uint64 initialMaxTimeDiff,
         bytes32 initialRootCaHash,
         address initialProofSubmitter,
-        ZkCoProcessorType zkCoprocessor,
-        ZkCoProcessorConfig memory config,
-        TDXTcbStatus[] memory initialAllowedTcbStatuses
+        address initialRiscZeroVerifier,
+        bytes32 initialVerifierId
     ) {
         _initializeOwner(owner);
         _setMaxTimeDiff(initialMaxTimeDiff);
         _setRootCaHash(initialRootCaHash);
         _setProofSubmitter(initialProofSubmitter);
-        _setZkConfiguration(zkCoprocessor, config);
-
-        for (uint256 i = 0; i < initialAllowedTcbStatuses.length; i++) {
-            _setTcbStatusAllowed(initialAllowedTcbStatuses[i], true);
-        }
-    }
-
-    /// @inheritdoc ITDXVerifier
-    function getZkConfig(ZkCoProcessorType zkCoprocessor) external view returns (ZkCoProcessorConfig memory) {
-        return zkConfig[zkCoprocessor];
+        _setRiscZeroConfiguration(initialRiscZeroVerifier, initialVerifierId);
+        _setTcbStatusAllowed(TDXTcbStatus.UpToDate, true);
+        _setTcbStatusAllowed(TDXTcbStatus.SwHardeningNeeded, true);
     }
 
     /// @notice Sets the trusted Intel root CA hash.
@@ -151,15 +143,14 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
         _setTcbStatusAllowed(status, allowed);
     }
 
-    /// @notice Configures a ZK verifier/program for a coprocessor.
-    function setZkConfiguration(ZkCoProcessorType zkCoprocessor, ZkCoProcessorConfig memory config) external onlyOwner {
-        _setZkConfiguration(zkCoprocessor, config);
+    /// @notice Configures the RISC Zero verifier/program.
+    function setRiscZeroConfiguration(address newRiscZeroVerifier, bytes32 newVerifierId) external onlyOwner {
+        _setRiscZeroConfiguration(newRiscZeroVerifier, newVerifierId);
     }
 
     /// @inheritdoc ITDXVerifier
     function verify(
         bytes calldata output,
-        ZkCoProcessorType zkCoprocessor,
         bytes calldata proofBytes
     )
         external
@@ -167,7 +158,7 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
     {
         if (msg.sender != proofSubmitter) revert CallerNotProofSubmitter();
 
-        _verifyZk(zkCoprocessor, output, proofBytes);
+        IRiscZeroVerifier(riscZeroVerifier).verify(proofBytes, verifierId, sha256(output));
         journal = abi.decode(output, (TDXVerifierJournal));
         _verifyJournal(journal);
 
@@ -209,26 +200,6 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
         }
     }
 
-    function _verifyZk(
-        ZkCoProcessorType zkCoprocessor,
-        bytes calldata output,
-        bytes calldata proofBytes
-    )
-        internal
-        view
-    {
-        ZkCoProcessorConfig memory config = zkConfig[zkCoprocessor];
-        if (config.zkVerifier == address(0)) revert ZkVerifierNotConfigured(zkCoprocessor);
-
-        if (zkCoprocessor == ZkCoProcessorType.RiscZero) {
-            IRiscZeroVerifier(config.zkVerifier).verify(proofBytes, config.verifierId, sha256(output));
-        } else if (zkCoprocessor == ZkCoProcessorType.Succinct) {
-            ISP1Verifier(config.zkVerifier).verifyProof(config.verifierId, output, proofBytes);
-        } else {
-            revert UnknownZkCoprocessor();
-        }
-    }
-
     function _derivePublicKeyHash(bytes memory publicKey) internal pure returns (bytes32 publicKeyHash) {
         if (publicKey.length != 65 || publicKey[0] != 0x04) revert InvalidPublicKey();
         // Skip the 32-byte length word and the 0x04 uncompressed prefix; hash the 64-byte X||Y.
@@ -260,8 +231,11 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
         emit TcbStatusPolicyUpdated(status, allowed);
     }
 
-    function _setZkConfiguration(ZkCoProcessorType zkCoprocessor, ZkCoProcessorConfig memory config) internal {
-        zkConfig[zkCoprocessor] = config;
-        emit ZKConfigurationUpdated(zkCoprocessor, config);
+    function _setRiscZeroConfiguration(address newRiscZeroVerifier, bytes32 newVerifierId) internal {
+        if (newRiscZeroVerifier == address(0)) revert ZeroRiscZeroVerifier();
+        if (newVerifierId == bytes32(0)) revert ZeroVerifierId();
+        riscZeroVerifier = newRiscZeroVerifier;
+        verifierId = newVerifierId;
+        emit RiscZeroConfigurationUpdated(newRiscZeroVerifier, newVerifierId);
     }
 }

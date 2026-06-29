@@ -23,8 +23,6 @@ pragma solidity ^0.8.20;
 import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
 
-import { ZkCoProcessorConfig, ZkCoProcessorType } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-import { TDXTcbStatus } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { TDXVerifier } from "src/L1/proofs/tee/TDXVerifier.sol";
 
 contract DeployTDXVerifier is Script {
@@ -41,14 +39,6 @@ contract DeployTDXVerifier is Script {
         require(tdxVerifierId != bytes32(0), "tdxVerifierId must be non-zero");
         require(intelRootCaHash != bytes32(0), "intelRootCaHash must be non-zero");
 
-        TDXTcbStatus[] memory allowedStatuses = new TDXTcbStatus[](2);
-        allowedStatuses[0] = TDXTcbStatus.UpToDate;
-        allowedStatuses[1] = TDXTcbStatus.SwHardeningNeeded;
-
-        ZkCoProcessorConfig memory zkConfig = ZkCoProcessorConfig({
-            verifierId: tdxVerifierId, aggregatorId: bytes32(0), zkVerifier: risc0VerifierRouter
-        });
-
         console.log("=== Deploying TDXVerifier ===");
         console.log("Owner:", owner);
         console.log("RISC Zero Verifier Router:", risc0VerifierRouter);
@@ -60,9 +50,7 @@ contract DeployTDXVerifier is Script {
         vm.startBroadcast();
 
         address tdxVerifier = address(
-            new TDXVerifier(
-                owner, TDX_MAX_TIME_DIFF, intelRootCaHash, owner, ZkCoProcessorType.RiscZero, zkConfig, allowedStatuses
-            )
+            new TDXVerifier(owner, TDX_MAX_TIME_DIFF, intelRootCaHash, owner, risc0VerifierRouter, tdxVerifierId)
         );
 
         vm.stopBroadcast();

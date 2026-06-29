@@ -21,17 +21,24 @@
     "type": "bytes32"
   },
   {
-    "bytes": "32",
-    "label": "zkConfig",
+    "bytes": "20",
+    "label": "riscZeroVerifier",
     "offset": 0,
     "slot": "2",
-    "type": "mapping(enum ZkCoProcessorType => struct ZkCoProcessorConfig)"
+    "type": "address"
+  },
+  {
+    "bytes": "32",
+    "label": "verifierId",
+    "offset": 0,
+    "slot": "3",
+    "type": "bytes32"
   },
   {
     "bytes": "32",
     "label": "allowedTcbStatuses",
     "offset": 0,
-    "slot": "3",
+    "slot": "4",
     "type": "mapping(enum TDXTcbStatus => bool)"
   }
 ]
