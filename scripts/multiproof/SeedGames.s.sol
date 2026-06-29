@@ -26,7 +26,7 @@ import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";
 ///         All transactions must confirm within the 256-block blockhash window of the
 ///         L1 origin captured at simulation time. For large counts, use --slow.
 contract SeedGames is Script {
-    /// @notice Must match the AggregateVerifier deployment constants from DeployDevWithNitro/NoNitro.
+    /// @notice Must match the AggregateVerifier deployment constants from DeployDevWithTDX/NoNitro.
     uint256 public constant BLOCK_INTERVAL = 600;
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
     uint256 public constant INTERMEDIATE_ROOTS_COUNT = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;

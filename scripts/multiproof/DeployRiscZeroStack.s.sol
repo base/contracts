@@ -40,11 +40,8 @@ pragma solidity ^0.8.20;
  *   - NitroEnclaveVerifier with route wired to the local SetVerifier
  *
  * POST-DEPLOY:
- *   After deploying TEEProverRegistry via DeployDevWithNitro.s.sol, update the
- *   proofSubmitter on NitroEnclaveVerifier to the TEEProverRegistry address:
- *
- *     cast send <NITRO_ENCLAVE_VERIFIER> "setProofSubmitter(address)" <TEE_PROVER_REGISTRY> \
- *       --rpc-url <RPC_URL> --private-key <OWNER_KEY>
+ *   Deploy the multiproof stack with DeployDevWithTDX.s.sol; it updates
+ *   proofSubmitter on NitroEnclaveVerifier to the TEEProverRegistry address.
  *
  * ─────────────────────────────────────────────────────────────────────────────────
  */
@@ -154,9 +151,7 @@ contract DeployRiscZeroStack is Script {
         console.log("NitroEnclaveVerifier:", nitroEnclaveVerifier);
         console.log("RISC Zero Router (external):", risc0VerifierRouter);
         console.log("");
-        console.log(">>> Set nitroEnclaveVerifier in deploy config to:", nitroEnclaveVerifier);
-        console.log(">>> Then run DeployDevWithNitro.s.sol <<<");
-        console.log(">>> Then call setProofSubmitter(TEEProverRegistry) on NitroEnclaveVerifier <<<");
+        console.log(">>> Then deploy the multiproof stack with DeployDevWithTDX.s.sol <<<");
         console.log("========================================");
 
         string memory key = "deployment";

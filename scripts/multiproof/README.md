@@ -129,13 +129,7 @@ The deployer address (`finalSystemOwner`) is the owner of `DevTEEProverRegistry`
 
 ---
 
-## Path 2: WithNitro (Dev — Real Attestation)
-
-> **TODO:** Add deployment and registration guide for `DeployDevWithNitro.s.sol`.
-
----
-
-## Path 3: TDX (Production-Path PoC)
+## Path 2: TDX (Production-Path PoC)
 
 The TDX path follows the same split as Nitro: expensive attestation verification happens offchain in a ZK guest,
 and Solidity verifies the proof plus the onchain acceptance policy before registering the signer.
