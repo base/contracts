@@ -235,7 +235,7 @@ contract AggregateVerifierTest is BaseTest {
         bytes32 l1OriginHash = bytes32(uint256(1));
 
         bytes memory proofBytes =
-            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(194));
+            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(130));
 
         _expectCreateGameRevertsForTeeProof(
             rootClaim,
@@ -253,7 +253,7 @@ contract AggregateVerifierTest is BaseTest {
         bytes32 l1OriginHash = bytes32(uint256(1));
 
         bytes memory proofBytes =
-            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(194));
+            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(130));
 
         _expectCreateGameRevertsForTeeProof(
             rootClaim,
@@ -484,7 +484,8 @@ contract AggregateVerifierTest is BaseTest {
             IDelayedWETH(payable(address(delayedWETH))),
             IVerifier(address(teeVerifier)),
             IVerifier(address(zkVerifier)),
-            AggregateVerifier.TeeHashes(TEE_NITRO_IMAGE_HASH, TEE_TDX_IMAGE_HASH),
+            TEE_NITRO_IMAGE_HASH,
+            TEE_TDX_IMAGE_HASH,
             AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
             CONFIG_HASH,
             L2_CHAIN_ID,

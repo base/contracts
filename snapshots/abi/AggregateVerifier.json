@@ -27,21 +27,14 @@
         "type": "address"
       },
       {
-        "components": [
-          {
-            "internalType": "bytes32",
-            "name": "nitroHash",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "tdxHash",
-            "type": "bytes32"
-          }
-        ],
-        "internalType": "struct AggregateVerifier.TeeHashes",
-        "name": "teeHashes",
-        "type": "tuple"
+        "internalType": "bytes32",
+        "name": "teeNitroImageHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "teeTdxImageHash",
+        "type": "bytes32"
       },
       {
         "components": [

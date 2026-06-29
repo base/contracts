@@ -113,7 +113,8 @@ contract BaseTest is Test {
             IDelayedWETH(payable(address(delayedWETH))),
             IVerifier(address(teeVerifier)),
             IVerifier(address(zkVerifier)),
-            AggregateVerifier.TeeHashes(TEE_NITRO_IMAGE_HASH, TEE_TDX_IMAGE_HASH),
+            TEE_NITRO_IMAGE_HASH,
+            TEE_TDX_IMAGE_HASH,
             AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
             CONFIG_HASH,
             L2_CHAIN_ID,
@@ -172,7 +173,7 @@ contract BaseTest is Test {
         AggregateVerifier.ProofType proofType
     )
         internal
-        view
+        pure
         returns (bytes memory)
     {
         return abi.encodePacked(uint8(proofType), _generateProofBody(salt, proofType));
@@ -183,21 +184,12 @@ contract BaseTest is Test {
         AggregateVerifier.ProofType proofType
     )
         internal
-        view
+        pure
         returns (bytes memory)
     {
         if (proofType == AggregateVerifier.ProofType.TEE) {
             bytes32 saltHash = keccak256(salt);
-            return abi.encodePacked(
-                TEE_NITRO_IMAGE_HASH,
-                saltHash,
-                bytes32(0),
-                uint8(27),
-                TEE_TDX_IMAGE_HASH,
-                saltHash,
-                bytes32(uint256(1)),
-                uint8(28)
-            );
+            return abi.encodePacked(saltHash, bytes32(0), uint8(27), saltHash, bytes32(uint256(1)), uint8(28));
         }
         return abi.encodePacked(salt, bytes32(0), bytes32(0), uint8(27));
     }

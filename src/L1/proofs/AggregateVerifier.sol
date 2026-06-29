@@ -44,12 +44,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 aggregateHash;
     }
 
-    /// @notice Hashes for the TEE proving images.
-    struct TeeHashes {
-        bytes32 nitroHash;
-        bytes32 tdxHash;
-    }
-
     ////////////////////////////////////////////////////////////////
     //                         Constants                          //
     ////////////////////////////////////////////////////////////////
@@ -73,9 +67,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The minimum number of proofs required to resolve the game.
     uint256 public constant PROOF_THRESHOLD = 1;
 
-    /// @notice TEE proof payload size:
-    ///         nitro image hash(32) + nitro signature(65) + tdx image hash(32) + tdx signature(65).
-    uint256 internal constant TEE_PROOF_BYTES_LENGTH = 194;
+    /// @notice TEE proof payload size: nitro signature(65) + tdx signature(65).
+    uint256 internal constant TEE_PROOF_BYTES_LENGTH = 130;
 
     ////////////////////////////////////////////////////////////////
     //                         Immutables                         //
@@ -267,7 +260,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param delayedWETH The delayed WETH contract.
     /// @param teeVerifier The TEE verifier.
     /// @param zkVerifier The ZK verifier.
-    /// @param teeHashes The hashes of the Nitro and TDX TEE images.
+    /// @param teeNitroImageHash The hash of the Nitro TEE image.
+    /// @param teeTdxImageHash The hash of the TDX TEE image.
     /// @param zkHashes The hashes of the ZK range and aggregate programs.
     /// @param configHash The hash of the rollup configuration.
     /// @param l2ChainId The chain ID of the L2 network.
@@ -279,7 +273,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         IDelayedWETH delayedWETH,
         IVerifier teeVerifier,
         IVerifier zkVerifier,
-        TeeHashes memory teeHashes,
+        bytes32 teeNitroImageHash,
+        bytes32 teeTdxImageHash,
         ZkHashes memory zkHashes,
         bytes32 configHash,
         uint256 l2ChainId,
@@ -298,8 +293,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         DELAYED_WETH = delayedWETH;
         TEE_VERIFIER = teeVerifier;
         ZK_VERIFIER = zkVerifier;
-        TEE_NITRO_IMAGE_HASH = teeHashes.nitroHash;
-        TEE_TDX_IMAGE_HASH = teeHashes.tdxHash;
+        TEE_NITRO_IMAGE_HASH = teeNitroImageHash;
+        TEE_TDX_IMAGE_HASH = teeTdxImageHash;
         ZK_RANGE_HASH = zkHashes.rangeHash;
         ZK_AGGREGATE_HASH = zkHashes.aggregateHash;
         CONFIG_HASH = configHash;
@@ -890,8 +885,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Verifies a TEE proof for the current game.
-    /// @param proofBytes The proof: nitro image hash(32) + nitro signature(65) + tdx image hash(32)
-    ///        + tdx signature(65).
+    /// @param proofBytes The proof: nitro signature(65) + tdx signature(65).
     function _verifyTeeProof(
         bytes calldata proofBytes,
         address proposer,
@@ -907,10 +901,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     {
         if (proofBytes.length != TEE_PROOF_BYTES_LENGTH) revert InvalidProof();
 
-        bytes32 nitroImageHash = bytes32(proofBytes[:32]);
-        bytes32 tdxImageHash = bytes32(proofBytes[97:129]);
-        if (nitroImageHash != TEE_NITRO_IMAGE_HASH || tdxImageHash != TEE_TDX_IMAGE_HASH) revert InvalidProof();
-
         bytes memory journalPrefix = abi.encodePacked(
             proposer,
             l1OriginHash,
@@ -923,17 +913,17 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         );
 
         if (!TEE_VERIFIER.verify(
-                abi.encodePacked(proposer, proofBytes[32:97]),
-                nitroImageHash,
-                keccak256(abi.encodePacked(journalPrefix, nitroImageHash))
+                abi.encodePacked(proposer, proofBytes[:65]),
+                TEE_NITRO_IMAGE_HASH,
+                keccak256(abi.encodePacked(journalPrefix, TEE_NITRO_IMAGE_HASH))
             )) {
             revert InvalidProof();
         }
 
         if (!TEE_VERIFIER.verify(
-                abi.encodePacked(proposer, proofBytes[129:194]),
-                tdxImageHash,
-                keccak256(abi.encodePacked(journalPrefix, tdxImageHash))
+                abi.encodePacked(proposer, proofBytes[65:130]),
+                TEE_TDX_IMAGE_HASH,
+                keccak256(abi.encodePacked(journalPrefix, TEE_TDX_IMAGE_HASH))
             )) {
             revert InvalidProof();
         }
