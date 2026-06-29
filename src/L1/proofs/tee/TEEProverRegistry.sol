@@ -208,10 +208,8 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @param signer The address to check.
     /// @return True if the signer is registered with the current image hash, false otherwise.
     function isValidSigner(address signer) external view returns (bool) {
-        if (!isRegisteredSigner[signer]) return false;
         TEEType teeType = signerTEEType[signer];
-        if (teeType == TEEType.NONE) return false;
-        return signerImageHash[signer] == _getExpectedImageHash(gameType, teeType);
+        return teeType != TEEType.NONE && signerImageHash[signer] == _getExpectedImageHash(gameType, teeType);
     }
 
     /// @notice Returns all currently registered signer addresses.
