@@ -20,9 +20,6 @@ contract TEEVerifier is Verifier, ISemver {
     /// @dev Signers are registered via Nitro or TDX attestation in TEEProverRegistry.
     TEEProverRegistry public immutable TEE_PROVER_REGISTRY;
 
-    /// @notice Size of a TEE proof: proposer(20) + signature(65).
-    uint256 internal constant TEE_PROOF_SIZE = 85;
-
     /// @notice Thrown when a recovered signer is not a valid registered signer.
     error InvalidSigner(address signer);
 
@@ -65,7 +62,7 @@ contract TEEVerifier is Verifier, ISemver {
         notNullified
         returns (bool)
     {
-        if (proofBytes.length != TEE_PROOF_SIZE) revert InvalidProofFormat();
+        if (proofBytes.length != 85) revert InvalidProofFormat();
 
         address proposer = address(bytes20(proofBytes[0:20]));
         if (!TEE_PROVER_REGISTRY.isValidProposer(proposer)) {
@@ -73,14 +70,11 @@ contract TEEVerifier is Verifier, ISemver {
         }
 
         // The signature should be over the journal hash directly (not eth-signed-message prefixed).
-        bytes calldata signature = proofBytes[20:TEE_PROOF_SIZE];
+        bytes calldata signature = proofBytes[20:85];
         (address signer, ECDSA.RecoverError err) = ECDSA.tryRecover(journal, signature);
         if (err != ECDSA.RecoverError.NoError) revert InvalidSignature();
 
-        // A registered signer always has a non-NONE TEE type, so this single read also
-        // serves as the registration check (saves an SLOAD versus calling isRegisteredSigner).
-        TEEProverRegistry.TEEType signerTEEType = TEE_PROVER_REGISTRY.signerTEEType(signer);
-        if (signerTEEType == TEEProverRegistry.TEEType.NONE) revert InvalidSigner(signer);
+        if (!TEE_PROVER_REGISTRY.isRegisteredSigner(signer)) revert InvalidSigner(signer);
 
         // Prevents a signer registered under one enclave image from being used in a game
         // that expects a different image (e.g., after an upgrade or across game types).
