@@ -9,7 +9,6 @@ import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { DisputeGameFactory } from "src/L1/proofs/DisputeGameFactory.sol";
 import { GameType, Hash } from "src/libraries/bridge/Types.sol";
-import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
 import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
@@ -70,7 +69,7 @@ abstract contract DeployDevBase is Script {
         Proxy proxy = new Proxy(msg.sender);
         proxy.upgradeTo(address(new DisputeGameFactory()));
         DisputeGameFactory(address(proxy)).initialize(msg.sender);
-        proxy.changeAdmin(address(new ProxyAdmin(cfg.finalSystemOwner())));
+        proxy.changeAdmin(address(0xdead));
         disputeGameFactory = address(proxy);
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
@@ -126,9 +125,7 @@ abstract contract DeployDevBase is Script {
         DisputeGameFactory factory = DisputeGameFactory(disputeGameFactory);
         factory.setImplementation(gameType, IDisputeGame(aggregateVerifier), "");
         factory.setInitBond(gameType, _initBond());
-        if (factory.owner() != cfg.finalSystemOwner()) {
-            factory.transferOwnership(cfg.finalSystemOwner());
-        }
+        factory.transferOwnership(cfg.finalSystemOwner());
     }
 
     function _writeOutput() internal {
