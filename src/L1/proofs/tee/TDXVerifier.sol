@@ -45,9 +45,6 @@ contract TDXVerifier is ITDXVerifier, ISemver {
     /// @notice Thrown when the public key is not an uncompressed secp256k1 public key.
     error InvalidPublicKey();
 
-    /// @notice Thrown when the journal signer does not match the supplied public key.
-    error SignerMismatch(address expected, address actual);
-
     /// @notice Thrown when TDREPORT.REPORTDATA does not bind the supplied public key.
     error ReportDataMismatch(bytes32 expected, bytes32 actual);
 
@@ -93,25 +90,22 @@ contract TDXVerifier is ITDXVerifier, ISemver {
             revert InvalidTimestamp(timestamp, block.timestamp);
         }
 
-        bytes32 publicKeyHash = _derivePublicKeyHash(journal.publicKey);
-        address signer = address(uint160(uint256(publicKeyHash)));
-        if (journal.signer != signer) revert SignerMismatch(signer, journal.signer);
+        bytes memory publicKey = journal.publicKey;
+        if (publicKey.length != 65 || publicKey[0] != 0x04) revert InvalidPublicKey();
+        bytes32 publicKeyHash;
+        assembly {
+            publicKeyHash := keccak256(add(publicKey, 0x21), 64)
+        }
         if (journal.reportDataPrefix != publicKeyHash) {
             revert ReportDataMismatch(publicKeyHash, journal.reportDataPrefix);
         }
+
+        journal.signer = address(uint160(uint256(publicKeyHash)));
     }
 
     /// @notice Semantic version.
     /// @custom:semver 0.3.0
     function version() public pure virtual returns (string memory) {
         return "0.3.0";
-    }
-
-    function _derivePublicKeyHash(bytes memory publicKey) internal pure returns (bytes32 publicKeyHash) {
-        if (publicKey.length != 65 || publicKey[0] != 0x04) revert InvalidPublicKey();
-        // Skip the 32-byte length word and the 0x04 uncompressed prefix; hash the 64-byte X||Y.
-        assembly {
-            publicKeyHash := keccak256(add(publicKey, 0x21), 64)
-        }
     }
 }

@@ -135,7 +135,7 @@ contract TDXVerifierTest is Test {
         verifier.verify(output, proofBytes);
     }
 
-    function testVerifyRevertsWhenSignerDoesNotMatchPublicKey() public {
+    function testVerifyDerivesSignerFromPublicKey() public {
         TDXVerifierJournal memory journal = _successJournal();
         address expected = journal.signer;
         journal.signer = makeAddr("wrong-signer");
@@ -143,8 +143,9 @@ contract TDXVerifierTest is Test {
         bytes memory proofBytes = hex"1234";
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
-        vm.expectRevert(abi.encodeWithSelector(TDXVerifier.SignerMismatch.selector, expected, journal.signer));
-        verifier.verify(output, proofBytes);
+        TDXVerifierJournal memory result = verifier.verify(output, proofBytes);
+
+        assertEq(result.signer, expected);
     }
 
     function _successJournal() internal view returns (TDXVerifierJournal memory journal) {
