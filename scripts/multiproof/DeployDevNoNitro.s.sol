@@ -25,10 +25,11 @@ contract DeployDevNoNitro is DeployDevBase {
     }
 
     function _deployTEERegistryImpl() internal override returns (address) {
-        address tdxVerifier = cfg.tdxVerifier();
         return address(
             new DevTEEProverRegistry(
-                INitroEnclaveVerifier(address(0)), ITDXVerifier(tdxVerifier), IDisputeGameFactory(disputeGameFactory)
+                INitroEnclaveVerifier(address(0)),
+                ITDXVerifier(cfg.tdxVerifier()),
+                IDisputeGameFactory(disputeGameFactory)
             )
         );
     }
