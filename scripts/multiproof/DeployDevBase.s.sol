@@ -25,17 +25,17 @@ import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";
 import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 
 abstract contract DeployDevBase is Script {
-    DeployConfig public constant cfg =
+    DeployConfig internal constant cfg =
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
 
-    address public teeProverRegistryProxy;
-    address public teeVerifier;
-    address public disputeGameFactory;
-    IAnchorStateRegistry public mockAnchorRegistry;
-    address public mockDelayedWETH;
-    address public aggregateVerifier;
-    Hash public startingAnchorRoot;
-    uint256 public startingAnchorBlockNumber;
+    address internal teeProverRegistryProxy;
+    address internal teeVerifier;
+    address internal disputeGameFactory;
+    IAnchorStateRegistry internal mockAnchorRegistry;
+    address internal mockDelayedWETH;
+    address internal aggregateVerifier;
+    Hash internal startingAnchorRoot;
+    uint256 internal startingAnchorBlockNumber;
 
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
@@ -67,14 +67,10 @@ abstract contract DeployDevBase is Script {
     }
 
     function _deployInfrastructure(GameType gameType) internal {
-        address owner = cfg.finalSystemOwner();
-        address factoryImpl = address(new DisputeGameFactory());
-        ProxyAdmin proxyAdmin = new ProxyAdmin(owner);
-
         Proxy proxy = new Proxy(msg.sender);
-        proxy.upgradeTo(factoryImpl);
+        proxy.upgradeTo(address(new DisputeGameFactory()));
         DisputeGameFactory(address(proxy)).initialize(msg.sender);
-        proxy.changeAdmin(address(proxyAdmin));
+        proxy.changeAdmin(address(new ProxyAdmin(cfg.finalSystemOwner())));
         disputeGameFactory = address(proxy);
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
@@ -83,17 +79,17 @@ abstract contract DeployDevBase is Script {
     }
 
     function _deployTEEContracts(GameType gameType) internal {
-        address owner = cfg.finalSystemOwner();
-        address teeRegistryImpl = _deployTEERegistryImpl();
-
         address[] memory initialProposers = new address[](2);
         initialProposers[0] = cfg.teeProposer();
         initialProposers[1] = cfg.teeChallenger();
 
         Proxy teeProxy = new Proxy(msg.sender);
         teeProxy.upgradeToAndCall(
-            teeRegistryImpl,
-            abi.encodeCall(TEEProverRegistry.initialize, (owner, _teeRegistrationManager(), initialProposers, gameType))
+            _deployTEERegistryImpl(),
+            abi.encodeCall(
+                TEEProverRegistry.initialize,
+                (cfg.finalSystemOwner(), _teeRegistrationManager(), initialProposers, gameType)
+            )
         );
         teeProxy.changeAdmin(address(0xdead));
         teeProverRegistryProxy = address(teeProxy);
@@ -145,10 +141,9 @@ abstract contract DeployDevBase is Script {
         vm.serializeBytes32(key, "ASRStartingOutputRoot", startingAnchorRoot.raw());
         vm.serializeUint(key, "ASRStartingBlockNumber", startingAnchorBlockNumber);
         vm.serializeAddress(key, "DelayedWETH", mockDelayedWETH);
-        string memory json = vm.serializeAddress(key, "AggregateVerifier", aggregateVerifier);
 
         string memory outPath = string.concat("deployments/", vm.toString(block.chainid), _outputSuffix());
-        vm.writeJson(json, outPath);
+        vm.writeJson(vm.serializeAddress(key, "AggregateVerifier", aggregateVerifier), outPath);
         console.log("Deployment saved to:", outPath);
     }
 
@@ -158,9 +153,8 @@ abstract contract DeployDevBase is Script {
 
     function _outputSuffix() internal pure virtual returns (string memory);
     function _deployTEERegistryImpl() internal virtual returns (address);
-
-    function _preflight() internal virtual { }
-    function _serializeExtra(string memory key) internal virtual { }
+    function _preflight() internal view virtual;
+    function _serializeExtra(string memory key) internal virtual;
 
     function _teeRegistrationManager() internal view virtual returns (address) {
         return cfg.finalSystemOwner();
