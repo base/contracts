@@ -121,7 +121,7 @@ abstract contract DeployDevBase is Script {
             )
         );
 
-        DisputeGameFactory(disputeGameFactory).setImplementation(gameType, IDisputeGame(aggregateVerifier), "");
+        DisputeGameFactory(disputeGameFactory).setImplementation(gameType, IDisputeGame(aggregateVerifier));
         DisputeGameFactory(disputeGameFactory).setInitBond(gameType, _initBond());
         DisputeGameFactory(disputeGameFactory).transferOwnership(cfg.finalSystemOwner());
     }
