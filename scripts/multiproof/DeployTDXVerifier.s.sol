@@ -30,17 +30,6 @@ contract DeployTDXVerifier is Script {
     /// @param tdxVerifierId RISC Zero image ID for the TDX DCAP verifier guest.
     /// @param intelRootCaHash Hash of the trusted Intel root CA consumed by the guest.
     function run(address risc0VerifierRouter, bytes32 tdxVerifierId, bytes32 intelRootCaHash) public {
-        require(risc0VerifierRouter != address(0), "risc0VerifierRouter must be non-zero");
-        require(tdxVerifierId != bytes32(0), "tdxVerifierId must be non-zero");
-        require(intelRootCaHash != bytes32(0), "intelRootCaHash must be non-zero");
-
-        console.log("=== Deploying TDXVerifier ===");
-        console.log("RISC Zero Verifier Router:", risc0VerifierRouter);
-        console.log("TDX Verifier ID:", vm.toString(tdxVerifierId));
-        console.log("Intel Root CA Hash:", vm.toString(intelRootCaHash));
-        console.log("Max Time Diff:", TDX_MAX_TIME_DIFF);
-        console.log("");
-
         vm.startBroadcast();
 
         address tdxVerifier =
@@ -49,20 +38,6 @@ contract DeployTDXVerifier is Script {
         vm.stopBroadcast();
 
         console.log("TDXVerifier:", tdxVerifier);
-        console.log("");
-        console.log(">>> Use this address as the DeployDevWithTDX.s.sol argument <<<");
-
-        _writeOutput(tdxVerifier, risc0VerifierRouter, tdxVerifierId, intelRootCaHash);
-    }
-
-    function _writeOutput(
-        address tdxVerifier,
-        address risc0VerifierRouter,
-        bytes32 tdxVerifierId,
-        bytes32 intelRootCaHash
-    )
-        internal
-    {
         string memory key = "deployment";
         vm.serializeAddress(key, "TDXVerifier", tdxVerifier);
         vm.serializeAddress(key, "RiscZeroVerifierRouter", risc0VerifierRouter);
