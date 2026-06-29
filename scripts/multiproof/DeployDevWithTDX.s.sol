@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
-import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
-
 import { DeployDevBase } from "./DeployDevBase.s.sol";
 
 /// @notice Development deployment using the TDX signer-registration path.
@@ -39,22 +34,16 @@ contract DeployDevWithTDX is DeployDevBase {
         require(tdxRegistrationManager != address(0), "registrationManager must be non-zero");
     }
 
-    function _deployTEERegistryImpl(address disputeGameFactory) internal override returns (address) {
-        return address(
-            new DevTEEProverRegistry(
-                INitroEnclaveVerifier(nitroEnclaveVerifierAddr),
-                ITDXVerifier(tdxVerifierAddr),
-                IDisputeGameFactory(disputeGameFactory)
-            )
-        );
+    function _nitroEnclaveVerifier() internal view override returns (address) {
+        return nitroEnclaveVerifierAddr;
+    }
+
+    function _tdxVerifier() internal view override returns (address) {
+        return tdxVerifierAddr;
     }
 
     function _teeRegistrationManager() internal view override returns (address) {
         return tdxRegistrationManager;
-    }
-
-    function _afterTEERegistryDeploy(address teeProverRegistryProxy) internal override {
-        INitroEnclaveVerifier(nitroEnclaveVerifierAddr).setProofSubmitter(teeProverRegistryProxy);
     }
 
     function _serializeExtra(string memory key) internal override {

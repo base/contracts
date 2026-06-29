@@ -7,6 +7,9 @@ import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { DisputeGameFactory } from "src/L1/proofs/DisputeGameFactory.sol";
 import { GameType, Hash } from "src/libraries/bridge/Types.sol";
 
@@ -16,6 +19,7 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
@@ -53,9 +57,8 @@ abstract contract DeployDevBase is Script {
         vm.serializeAddress(key, "DisputeGameFactory", disputeGameFactory);
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
-        IAnchorStateRegistry mockAnchorRegistry = IAnchorStateRegistry(address(asr));
         asr.initialize(disputeGameFactory, Hash.wrap(asrStartingOutputRoot), asrStartingBlockNumber, gameType);
-        vm.serializeAddress(key, "AnchorStateRegistry", address(mockAnchorRegistry));
+        vm.serializeAddress(key, "AnchorStateRegistry", address(asr));
         vm.serializeBytes32(key, "ASRStartingOutputRoot", asrStartingOutputRoot);
         vm.serializeUint(key, "ASRStartingBlockNumber", asrStartingBlockNumber);
 
@@ -63,9 +66,16 @@ abstract contract DeployDevBase is Script {
         initialProposers[0] = cfg.teeProposer();
         initialProposers[1] = cfg.teeChallenger();
 
+        address nitroVerifier = _nitroEnclaveVerifier();
         Proxy teeProxy = new Proxy(msg.sender);
         teeProxy.upgradeToAndCall(
-            _deployTEERegistryImpl(disputeGameFactory),
+            address(
+                new DevTEEProverRegistry(
+                    INitroEnclaveVerifier(nitroVerifier),
+                    ITDXVerifier(_tdxVerifier()),
+                    IDisputeGameFactory(disputeGameFactory)
+                )
+            ),
             abi.encodeCall(
                 TEEProverRegistry.initialize,
                 (cfg.finalSystemOwner(), _teeRegistrationManager(), initialProposers, gameType)
@@ -75,9 +85,12 @@ abstract contract DeployDevBase is Script {
         address teeProverRegistryProxy = address(teeProxy);
         vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
 
-        _afterTEERegistryDeploy(teeProverRegistryProxy);
+        if (nitroVerifier != address(0)) {
+            INitroEnclaveVerifier(nitroVerifier).setProofSubmitter(teeProverRegistryProxy);
+        }
 
-        address teeVerifier = address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), mockAnchorRegistry));
+        address teeVerifier =
+            address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), IAnchorStateRegistry(address(asr))));
         vm.serializeAddress(key, "TEEVerifier", teeVerifier);
 
         address mockDelayedWETH = address(new MockDelayedWETH());
@@ -86,10 +99,10 @@ abstract contract DeployDevBase is Script {
         address aggregateVerifier = address(
             new AggregateVerifier(
                 gameType,
-                mockAnchorRegistry,
+                IAnchorStateRegistry(address(asr)),
                 IDelayedWETH(payable(mockDelayedWETH)),
                 IVerifier(teeVerifier),
-                IVerifier(address(new MockVerifier(mockAnchorRegistry))),
+                IVerifier(address(new MockVerifier(IAnchorStateRegistry(address(asr))))),
                 cfg.teeNitroImageHash(),
                 cfg.teeTdxImageHash(),
                 AggregateVerifier.ZkHashes({ rangeHash: cfg.zkRangeHash(), aggregateHash: cfg.zkAggregationHash() }),
@@ -119,13 +132,15 @@ abstract contract DeployDevBase is Script {
     }
 
     function _outputSuffix() internal pure virtual returns (string memory);
-    function _deployTEERegistryImpl(address disputeGameFactory) internal virtual returns (address);
+    function _tdxVerifier() internal view virtual returns (address);
     function _preflight() internal view virtual;
     function _serializeExtra(string memory key) internal virtual;
+
+    function _nitroEnclaveVerifier() internal view virtual returns (address) {
+        return address(0);
+    }
 
     function _teeRegistrationManager() internal view virtual returns (address) {
         return cfg.finalSystemOwner();
     }
-
-    function _afterTEERegistryDeploy(address teeProverRegistryProxy) internal virtual { }
 }

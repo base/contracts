@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
-import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
-
 import { DeployDevBase } from "./DeployDevBase.s.sol";
 
 /// @title DeployDevNoNitro
@@ -24,14 +19,8 @@ contract DeployDevNoNitro is DeployDevBase {
         require(cfg.tdxVerifier() != address(0), "tdxVerifier must be set in config");
     }
 
-    function _deployTEERegistryImpl(address disputeGameFactory) internal override returns (address) {
-        return address(
-            new DevTEEProverRegistry(
-                INitroEnclaveVerifier(address(0)),
-                ITDXVerifier(cfg.tdxVerifier()),
-                IDisputeGameFactory(disputeGameFactory)
-            )
-        );
+    function _tdxVerifier() internal view override returns (address) {
+        return cfg.tdxVerifier();
     }
 
     function _serializeExtra(string memory key) internal override {
