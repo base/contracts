@@ -196,14 +196,6 @@ just --justfile scripts/multiproof/justfile deploy-tee-verifiers $NITRO_ROOT_CER
 
 This saves output to `deployments/<chainId>-tee-verifiers.json`.
 
-To deploy a fresh Nitro verifier, a fresh TDX verifier, and then the TDX
-multiproof stack against those exact verifier addresses without editing
-`deploy-config/sepolia.json`, use:
-
-```bash
-just --justfile scripts/multiproof/justfile deploy-tdx-system $NITRO_ROOT_CERT $NITRO_VERIFIER_ID
-```
-
 To deploy Nitro separately:
 
 ```bash

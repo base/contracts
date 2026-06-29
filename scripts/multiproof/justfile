@@ -3,16 +3,8 @@ set dotenv-load
 repo_root := justfile_directory() + "/../.."
 justfile_path := justfile_directory() + "/justfile"
 zeronet_tdx_deploy_config := "deploy-config/zeronet-tdx.json"
-hoodi_zeronet_tdx_local_deploy_config := "deploy-config/hoodi-zeronet-tdx-local.json"
-hoodi_zeronet_tdx_local_deployments := "deployments/560048-dev-no-nitro.json"
-sepolia_tdx_stack_deployments := "deployments/11155111-dev-with-tdx.json"
-sepolia_tee_verifiers_deployments := "deployments/11155111-tee-verifiers.json"
 forge_account := "testnet-admin"
 l1_rpc_url := env_var_or_default("L1_RPC_URL", "https://ethereum-full-sepolia-k8s-dev.cbhq.net")
-hoodi_l1_rpc_url := env_var_or_default("HOODI_L1_RPC_URL", "https://c3-chainproxy-eth-hoodi-full-dev.cbhq.net")
-hoodi_l2_rpc_url := env_var_or_default("HOODI_L2_RPC_URL", "https://base-zeronet-reth-proofs-donotuse.cbhq.net:8545")
-hoodi_rollup_rpc_url := env_var_or_default("HOODI_ROLLUP_RPC_URL", "https://base-zeronet-reth-rpc-donotuse.cbhq.net:7545")
-hoodi_l2_output_root_rpc_url := env_var_or_default("HOODI_L2_OUTPUT_ROOT_RPC_URL", hoodi_rollup_rpc_url)
 l2_rpc_url := env_var_or_default("L2_RPC_URL", "https://base-sepolia-reth-proofs-k8s-donotuse.cbhq.net:8545")
 l2_output_root_rpc_url := env_var_or_default("L2_OUTPUT_ROOT_RPC_URL", "https://base-sepolia-reth-internal-rpc-donotuse.cbhq.net:7545")
 
@@ -152,82 +144,6 @@ deploy-tee-verifiers nitro_root_cert nitro_verifier_id nitro_risc0_router=sepoli
     '{NitroEnclaveVerifier: $nitro, TDXVerifier: $tdx}' > "$out_path"
   echo "Deployment saved to: $out_path"
 
-# Print the Sepolia TDX constants used by these recipes.
-tdx-sepolia-config:
-  @echo "L1_RPC_URL={{l1_rpc_url}}"
-  @jq -r '"TEE_PROVER_REGISTRY=" + (.TEEProverRegistry // "")' "{{repo_root}}/{{sepolia_tdx_stack_deployments}}"
-  @echo "NITRO_RISC0_VERIFIER_ROUTER={{sepolia_nitro_risc0_verifier_router}}"
-  @echo "TDX_RISC0_VERIFIER_ROUTER={{sepolia_tdx_risc0_verifier_router}}"
-  @echo "RISC0_SET_BUILDER_IMAGE_ID={{sepolia_risc0_set_builder_image_id}}"
-  @echo "TDX_VERIFIER_ID={{sepolia_tdx_verifier_id}}"
-  @echo "INTEL_ROOT_CA_HASH={{sepolia_intel_root_ca_hash}}"
-  @echo "TDX_REGISTRATION_MANAGER={{sepolia_tdx_registration_manager}}"
-  @echo "L2_RPC_URL={{l2_rpc_url}}"
-  @echo "L2_OUTPUT_ROOT_RPC_URL={{l2_output_root_rpc_url}}"
-
-# Deploy the no-attestation TDX local testing stack on Hoodi.
-deploy-hoodi-zeronet-tdx-local rpc=hoodi_l1_rpc_url deploy_config=hoodi_zeronet_tdx_local_deploy_config l2_rpc=hoodi_l2_rpc_url l2_output_root_rpc=hoodi_l2_output_root_rpc_url:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  cd "{{repo_root}}"
-  deployer="$(cast wallet address --account "{{forge_account}}")"
-  echo "Using {{forge_account}} as deployer: $deployer"
-  echo "Using deploy config: {{deploy_config}}"
-
-  read -r asr_anchor_block asr_anchor_output_root < <(just --justfile "{{justfile_path}}" _asr-anchor "{{l2_rpc}}" "{{l2_output_root_rpc}}")
-
-  echo "Using ASR anchor output root: $asr_anchor_output_root"
-  echo "Using ASR anchor L2 block: $asr_anchor_block"
-
-  DEPLOY_CONFIG_PATH="{{deploy_config}}" \
-  forge script scripts/multiproof/DeployDevNoNitro.s.sol:DeployDevNoNitro \
-    --sig "run(bytes32,uint256)" \
-    "$asr_anchor_output_root" \
-    "$asr_anchor_block" \
-    --rpc-url "{{rpc}}" \
-    --broadcast \
-    --account "{{forge_account}}" \
-    --sender "$deployer"
-
-# Register a TDX signer in the Hoodi no-attestation local testing registry.
-register-dev-tdx-signer signer registry="" image_hash="" rpc=hoodi_l1_rpc_url deploy_config=hoodi_zeronet_tdx_local_deploy_config deployments=hoodi_zeronet_tdx_local_deployments:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  cd "{{repo_root}}"
-
-  registry="{{registry}}"
-  if [[ -z "$registry" ]]; then
-    registry="$(jq -r '.TEEProverRegistry // empty' "{{repo_root}}/{{deployments}}")"
-  fi
-
-  image_hash="{{image_hash}}"
-  if [[ -z "$image_hash" ]]; then
-    image_hash="$(jq -r '.teeTdxImageHash // empty' "{{repo_root}}/{{deploy_config}}")"
-  fi
-
-  if [[ -z "$registry" || "$registry" == "null" ]]; then
-    echo "Missing TEEProverRegistry address. Pass one explicitly or deploy {{deployments}}." >&2
-    exit 1
-  fi
-  if [[ -z "$image_hash" || "$image_hash" == "null" ]]; then
-    echo "Missing teeTdxImageHash. Pass one explicitly or update {{deploy_config}}." >&2
-    exit 1
-  fi
-
-  owner="$(cast wallet address --account "{{forge_account}}")"
-  echo "Using {{forge_account}} as owner: $owner"
-  echo "TEEProverRegistry: $registry"
-  echo "TDX signer: {{signer}}"
-  echo "TDX image hash: $image_hash"
-
-  cast send "$registry" \
-    "addDevTDXSigner(address,bytes32)" \
-    "{{signer}}" \
-    "$image_hash" \
-    --rpc-url "{{rpc}}" \
-    --account "{{forge_account}}" \
-    --from "$owner"
-
 # Deploy the TDX multiproof dev/test stack using the zeronet TDX config.
 #
 # Required env:
@@ -286,75 +202,12 @@ deploy-tdx-stack nitro_verifier="" tdx_verifier="" tdx_manager=sepolia_tdx_regis
     --account "{{forge_account}}" \
     --sender "$owner"
 
-# Deploy fresh Nitro and TDX verifier policy contracts, then deploy the TDX stack
-# against those verifier addresses without editing shared Sepolia deploy config.
-#
-# Required args:
-#   nitro_root_cert    SHA-256 hash of the AWS Nitro root certificate
-#   nitro_verifier_id  RISC Zero image ID for the Nitro attestation verifier guest
-deploy-tdx-system nitro_root_cert nitro_verifier_id tdx_manager=sepolia_tdx_registration_manager deploy_config=zeronet_tdx_deploy_config l2_rpc=l2_rpc_url l2_output_root_rpc=l2_output_root_rpc_url:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  cd "{{repo_root}}"
-
-  just --justfile "{{justfile_path}}" deploy-tee-verifiers "{{nitro_root_cert}}" "{{nitro_verifier_id}}"
-
-  nitro_verifier="$(jq -r '.NitroEnclaveVerifier // empty' "{{sepolia_tee_verifiers_deployments}}")"
-  tdx_verifier="$(jq -r '.TDXVerifier // empty' "{{sepolia_tee_verifiers_deployments}}")"
-
-  if [[ -z "$nitro_verifier" || -z "$tdx_verifier" ]]; then
-    echo "Missing verifier address in {{sepolia_tee_verifiers_deployments}}" >&2
-    exit 1
-  fi
-
+# Deploy the TDX multiproof dev/test stack on Sepolia.
+deploy-sepolia-tdx-dev tdx_manager=sepolia_tdx_registration_manager deploy_config=zeronet_tdx_deploy_config l2_rpc=l2_rpc_url l2_output_root_rpc=l2_output_root_rpc_url:
   just --justfile "{{justfile_path}}" deploy-tdx-stack \
-    "$nitro_verifier" \
-    "$tdx_verifier" \
+    "" \
+    "" \
     "{{tdx_manager}}" \
     "{{deploy_config}}" \
     "{{l2_rpc}}" \
     "{{l2_output_root_rpc}}"
-
-# Args:
-#   registry TEEProverRegistry address. Defaults to deployments/11155111-dev-with-tdx.json.
-#   rpc      L1 Sepolia RPC URL.
-#
-# Query currently registered TEE signer addresses on Sepolia.
-tee-registered-signers registry="" rpc=l1_rpc_url:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  cd "{{repo_root}}"
-
-  registry="{{registry}}"
-  if [[ -z "$registry" ]]; then
-    registry="$(jq -r '.TEEProverRegistry // empty' "{{sepolia_tdx_stack_deployments}}")"
-  fi
-
-  if [[ -z "$registry" || "$registry" == "null" ]]; then
-    echo "Missing TEEProverRegistry address. Pass one explicitly or update {{sepolia_tdx_stack_deployments}}." >&2
-    exit 1
-  fi
-
-  echo "TEEProverRegistry: $registry"
-  echo "RPC: {{rpc}}"
-
-  signers="$(cast call "$registry" 'getRegisteredSigners()(address[])' --rpc-url "{{rpc}}" --json | jq -r '.[0][]')"
-  if [[ -z "$signers" ]]; then
-    echo "No registered TEE signers found."
-    exit 0
-  fi
-
-  printf "%-42s  %-6s  %-66s  %-5s\n" "SIGNER" "TYPE" "IMAGE_HASH" "VALID"
-  while IFS= read -r signer; do
-    tee_type_id="$(cast call "$registry" 'signerTEEType(address)(uint8)' "$signer" --rpc-url "{{rpc}}" --json | jq -r '.[0]')"
-    image_hash="$(cast call "$registry" 'signerImageHash(address)(bytes32)' "$signer" --rpc-url "{{rpc}}" --json | jq -r '.[0]')"
-    valid="$(cast call "$registry" 'isValidSigner(address)(bool)' "$signer" --rpc-url "{{rpc}}" --json 2>/dev/null | jq -r '.[0]' || echo unknown)"
-
-    case "$tee_type_id" in
-      1) tee_type="NITRO" ;;
-      2) tee_type="TDX" ;;
-      *) tee_type="NONE" ;;
-    esac
-
-    printf "%-42s  %-6s  %-66s  %-5s\n" "$signer" "$tee_type" "$image_hash" "$valid"
-  done <<< "$signers"
