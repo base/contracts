@@ -12,11 +12,9 @@ import { DeployDevBase } from "./DeployDevBase.s.sol";
 
 /// @notice Development deployment using the TDX signer-registration path.
 contract DeployDevWithTDX is DeployDevBase {
-    uint256 public constant INIT_BOND = 0.00001 ether;
-
-    address public nitroEnclaveVerifierAddr;
-    address public tdxVerifierAddr;
-    address public tdxRegistrationManager;
+    address internal nitroEnclaveVerifierAddr;
+    address internal tdxVerifierAddr;
+    address internal tdxRegistrationManager;
 
     function run(
         address tdxVerifier,
@@ -53,7 +51,7 @@ contract DeployDevWithTDX is DeployDevBase {
     }
 
     function _initBond() internal pure override returns (uint256) {
-        return INIT_BOND;
+        return 0.00001 ether;
     }
 
     function _outputSuffix() internal pure override returns (string memory) {
@@ -90,20 +88,8 @@ contract DeployDevWithTDX is DeployDevBase {
         vm.serializeAddress(key, "TDXRegistrationManager", tdxRegistrationManager);
     }
 
-    function _logHeader() internal view override {
+    function _logHeader() internal pure override {
         console.log("=== Deploying Dev Infrastructure (WITH TDX) ===");
-        console.log("Chain ID:", block.chainid);
-        console.log("Owner:", cfg.finalSystemOwner());
-        console.log("TEE Proposer:", cfg.teeProposer());
-        console.log("TEE Challenger:", cfg.teeChallenger());
-        console.log("Game Type:", cfg.multiproofGameType());
-        console.log("NitroEnclaveVerifier:", nitroEnclaveVerifierAddr);
-        console.log("TDXVerifier:", tdxVerifierAddr);
-        console.log("TDX Registration Manager:", tdxRegistrationManager);
-        console.log("ASR Starting Output Root:", vm.toString(startingAnchorRoot.raw()));
-        console.log("ASR Starting L2 Block:", startingAnchorBlockNumber);
-        console.log("");
-        console.log("NOTE: NitroEnclaveVerifier owner must be the broadcaster/finalSystemOwner.");
     }
 
     function _printSummary() internal view override {
