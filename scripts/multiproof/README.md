@@ -229,7 +229,7 @@ To override any TDX verifier input manually, pass all three verifier args:
 ```bash
 forge script scripts/multiproof/DeployTDXVerifier.s.sol:DeployTDXVerifier \
   --sig "run(address,address,bytes32,bytes32)" \
-  $OWNER \
+  $TEE_PROVER_REGISTRY \
   $TDX_RISC0_VERIFIER_ROUTER \
   $TDX_VERIFIER_ID \
   $INTEL_ROOT_CA_HASH \
@@ -259,7 +259,7 @@ Use `DeployTEEVerifiers.s.sol` with `run(address,address,address,bytes32,bytes32
 
 ### Step 2: Deploy the TDX multiproof test stack
 
-Set `DEPLOY_CONFIG_PATH` to the Sepolia deploy config and pass the `TDXVerifier` address from Step 1. The deploy config must also contain the `NitroEnclaveVerifier` address, because TEE proposal proofs now require both Nitro and TDX signatures. `finalSystemOwner` in the deploy config must be the account broadcasting this transaction because the script updates both `TDXVerifier.proofSubmitter` and `NitroEnclaveVerifier.proofSubmitter` to the deployed `TEEProverRegistry`.
+Set `DEPLOY_CONFIG_PATH` to the Sepolia deploy config and pass the `TDXVerifier` address from Step 1. The deploy config must also contain the `NitroEnclaveVerifier` address, because TEE proposal proofs now require both Nitro and TDX signatures. The `TDXVerifier` must be deployed with `proofSubmitter` set to the `TEEProverRegistry`; `finalSystemOwner` in the deploy config must be the account broadcasting this transaction because the script updates `NitroEnclaveVerifier.proofSubmitter` to the deployed `TEEProverRegistry`.
 
 The TDX registry manager is set to `TDX_REGISTRATION_MANAGER`, allowing that address to call `registerTDXSigner(bytes,bytes)`. Register a Nitro signer through `registerSigner(bytes,bytes)` as well before submitting TEE proposal proofs.
 

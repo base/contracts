@@ -51,14 +51,6 @@ contract MockTDXVerifierForRegistry is ITDXVerifier {
     function verify(bytes calldata, bytes calldata) external view returns (TDXVerifierJournal memory) {
         return _journal;
     }
-
-    function allowedTcbStatuses(TDXTcbStatus) external pure returns (bool) {
-        return true;
-    }
-
-    function setProofSubmitter(address newProofSubmitter) external {
-        proofSubmitter = newProofSubmitter;
-    }
 }
 
 contract TEEProverRegistryTDXTest is Test {
@@ -105,13 +97,9 @@ contract TEEProverRegistryTDXTest is Test {
             timestamp: 0,
             collateralExpiration: 0,
             rootCaHash: bytes32(0),
-            pckCertHash: bytes32(0),
-            tcbInfoHash: bytes32(0),
-            qeIdentityHash: bytes32(0),
             publicKey: "",
             signer: signer,
             imageHash: IMAGE_HASH,
-            mrTdHash: bytes32(0),
             reportDataPrefix: bytes32(0),
             reportDataSuffix: REPORT_DATA_SUFFIX
         });

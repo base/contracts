@@ -37,13 +37,9 @@ enum TDXTcbStatus {
 /// @param timestamp Quote timestamp in milliseconds since Unix epoch.
 /// @param collateralExpiration Earliest expiration timestamp in seconds across accepted collateral.
 /// @param rootCaHash Hash of the Intel root CA used to validate the PCK/collateral signing chains.
-/// @param pckCertHash Hash of the PCK leaf certificate that signed the quote attestation key chain.
-/// @param tcbInfoHash Hash of the TCB info collateral consumed by the guest.
-/// @param qeIdentityHash Hash of the QE identity collateral consumed by the guest.
 /// @param publicKey Uncompressed secp256k1 public key: 0x04 || x || y.
 /// @param signer Ethereum address derived from publicKey.
 /// @param imageHash Multiproof-compatible image hash derived from MRTD and RTMR0-3.
-/// @param mrTdHash keccak256 hash of the 48-byte MRTD measurement.
 /// @param reportDataPrefix First 32 bytes of TDREPORT.REPORTDATA.
 /// @param reportDataSuffix Last 32 bytes of TDREPORT.REPORTDATA, available for app-specific binding.
 struct TDXVerifierJournal {
@@ -52,13 +48,9 @@ struct TDXVerifierJournal {
     uint64 timestamp;
     uint64 collateralExpiration;
     bytes32 rootCaHash;
-    bytes32 pckCertHash;
-    bytes32 tcbInfoHash;
-    bytes32 qeIdentityHash;
     bytes publicKey;
     address signer;
     bytes32 imageHash;
-    bytes32 mrTdHash;
     bytes32 reportDataPrefix;
     bytes32 reportDataSuffix;
 }
@@ -80,10 +72,4 @@ interface ITDXVerifier {
         external
         view
         returns (TDXVerifierJournal memory journal);
-
-    /// @notice Returns whether a TCB status is accepted by verifier policy.
-    function allowedTcbStatuses(TDXTcbStatus status) external view returns (bool);
-
-    /// @notice Updates the address authorized to submit verified proofs.
-    function setProofSubmitter(address newProofSubmitter) external;
 }

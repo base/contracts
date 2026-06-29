@@ -117,7 +117,8 @@ contract DeployDevWithTDX is Script {
         console.log("ASR Starting Output Root:", vm.toString(startingAnchorRoot.raw()));
         console.log("ASR Starting L2 Block:", startingAnchorBlockNumber);
         console.log("");
-        console.log("NOTE: TDXVerifier and NitroEnclaveVerifier owners must be the broadcaster/finalSystemOwner.");
+        console.log("NOTE: TDXVerifier proofSubmitter must already be this TEEProverRegistry.");
+        console.log("      NitroEnclaveVerifier owner must be the broadcaster/finalSystemOwner.");
 
         vm.startBroadcast();
 
@@ -153,7 +154,6 @@ contract DeployDevWithTDX is Script {
         registryProxy.changeAdmin(address(0xdead));
         teeProverRegistryProxy = address(registryProxy);
 
-        ITDXVerifier(tdxVerifierAddr).setProofSubmitter(teeProverRegistryProxy);
         INitroEnclaveVerifier(nitroEnclaveVerifierAddr).setProofSubmitter(teeProverRegistryProxy);
 
         teeVerifier = address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), mockAnchorRegistry));

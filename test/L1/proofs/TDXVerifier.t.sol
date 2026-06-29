@@ -10,7 +10,6 @@ import { TDXVerifier } from "src/L1/proofs/tee/TDXVerifier.sol";
 contract TDXVerifierTest is Test {
     TDXVerifier internal verifier;
 
-    address internal owner;
     address internal proofSubmitter;
     address internal mockRiscZeroVerifier;
 
@@ -18,7 +17,6 @@ contract TDXVerifierTest is Test {
     bytes32 internal constant WRONG_ROOT_CA_HASH = keccak256("wrong-root-ca");
     bytes32 internal constant VERIFIER_ID = keccak256("tdx-verifier-id");
     bytes32 internal constant IMAGE_HASH = keccak256("tdx-image");
-    bytes32 internal constant MRTD_HASH = keccak256("mrtd");
     bytes32 internal constant REPORT_DATA_SUFFIX = keccak256("multiproof-tdx-poc");
 
     uint64 internal constant MAX_TIME_DIFF = 3600;
@@ -27,12 +25,10 @@ contract TDXVerifierTest is Test {
     function setUp() public {
         vm.warp(NOW);
 
-        owner = address(this);
         proofSubmitter = address(this);
         mockRiscZeroVerifier = makeAddr("mock-risc-zero");
 
-        verifier =
-            new TDXVerifier(owner, MAX_TIME_DIFF, ROOT_CA_HASH, proofSubmitter, mockRiscZeroVerifier, VERIFIER_ID);
+        verifier = new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, proofSubmitter, mockRiscZeroVerifier, VERIFIER_ID);
     }
 
     function testVerifySucceedsWithRiscZeroProofAndAllowedJournal() public {
@@ -58,13 +54,12 @@ contract TDXVerifierTest is Test {
 
     function testConstructorRevertsIfZeroRiscZeroVerifier() public {
         vm.expectRevert(TDXVerifier.ZeroRiscZeroVerifier.selector);
-        new TDXVerifier(owner, MAX_TIME_DIFF, ROOT_CA_HASH, proofSubmitter, address(0), VERIFIER_ID);
+        new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, proofSubmitter, address(0), VERIFIER_ID);
     }
 
-    function testAllowedTcbStatusesAreFixed() public view {
-        assertTrue(verifier.allowedTcbStatuses(TDXTcbStatus.UpToDate));
-        assertTrue(verifier.allowedTcbStatuses(TDXTcbStatus.SwHardeningNeeded));
-        assertFalse(verifier.allowedTcbStatuses(TDXTcbStatus.ConfigurationNeeded));
+    function testConstructorRevertsIfZeroProofSubmitter() public {
+        vm.expectRevert(TDXVerifier.ZeroProofSubmitter.selector);
+        new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, address(0), mockRiscZeroVerifier, VERIFIER_ID);
     }
 
     function testVerifyRevertsWhenGuestReportsFailure() public {
@@ -180,13 +175,9 @@ contract TDXVerifierTest is Test {
             timestamp: uint64(block.timestamp - 1) * 1000,
             collateralExpiration: uint64(block.timestamp + 1 days),
             rootCaHash: ROOT_CA_HASH,
-            pckCertHash: keccak256("pck-cert"),
-            tcbInfoHash: keccak256("tcb-info"),
-            qeIdentityHash: keccak256("qe-identity"),
             publicKey: publicKey,
             signer: address(uint160(uint256(publicKeyHash))),
             imageHash: IMAGE_HASH,
-            mrTdHash: MRTD_HASH,
             reportDataPrefix: publicKeyHash,
             reportDataSuffix: REPORT_DATA_SUFFIX
         });

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Ownable } from "lib/solady/src/auth/Ownable.sol";
 import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
 
 import { ISemver } from "interfaces/universal/ISemver.sol";
@@ -17,12 +16,12 @@ import {
 /// @dev The heavy TDX work is expected to happen in a ZK guest: quote signature verification, PCK chain
 ///      validation, TCB info validation, QE identity validation, CRL checks, and extraction of TDREPORT fields.
 ///      This contract verifies the ZK proof and enforces onchain policy over the verified journal.
-contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
+contract TDXVerifier is ITDXVerifier, ISemver {
     /// @notice Maximum accepted age of a TDX quote, in seconds.
     uint64 public immutable maxTimeDiff;
 
     /// @notice Address authorized to submit TDX proofs, expected to be the TDX-aware registry.
-    address public proofSubmitter;
+    address public immutable proofSubmitter;
 
     /// @notice Hash of the trusted Intel root CA used by the ZK verifier guest.
     bytes32 public immutable rootCaHash;
@@ -32,9 +31,6 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
 
     /// @notice RISC Zero image ID for the TDX DCAP verifier guest.
     bytes32 public immutable verifierId;
-
-    /// @notice Emitted when the proof submitter changes.
-    event ProofSubmitterChanged(address indexed proofSubmitter);
 
     /// @notice Thrown when a zero maxTimeDiff is provided.
     error ZeroMaxTimeDiff();
@@ -79,33 +75,22 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
     error ReportDataMismatch(bytes32 expected, bytes32 actual);
 
     constructor(
-        address owner,
         uint64 initialMaxTimeDiff,
         bytes32 initialRootCaHash,
         address initialProofSubmitter,
         address initialRiscZeroVerifier,
         bytes32 initialVerifierId
     ) {
-        _initializeOwner(owner);
         if (initialMaxTimeDiff == 0) revert ZeroMaxTimeDiff();
         if (initialRootCaHash == bytes32(0)) revert ZeroRootCaHash();
+        if (initialProofSubmitter == address(0)) revert ZeroProofSubmitter();
         if (initialRiscZeroVerifier == address(0)) revert ZeroRiscZeroVerifier();
         if (initialVerifierId == bytes32(0)) revert ZeroVerifierId();
         maxTimeDiff = initialMaxTimeDiff;
         rootCaHash = initialRootCaHash;
+        proofSubmitter = initialProofSubmitter;
         riscZeroVerifier = initialRiscZeroVerifier;
         verifierId = initialVerifierId;
-        _setProofSubmitter(initialProofSubmitter);
-    }
-
-    /// @notice Sets the proof submitter, expected to be the TDX-aware registry.
-    function setProofSubmitter(address newProofSubmitter) external onlyOwner {
-        _setProofSubmitter(newProofSubmitter);
-    }
-
-    /// @inheritdoc ITDXVerifier
-    function allowedTcbStatuses(TDXTcbStatus status) public pure returns (bool) {
-        return status == TDXTcbStatus.UpToDate || status == TDXTcbStatus.SwHardeningNeeded;
     }
 
     /// @inheritdoc ITDXVerifier
@@ -135,7 +120,9 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
         if (journal.rootCaHash != rootCaHash) {
             revert RootCaHashMismatch(rootCaHash, journal.rootCaHash);
         }
-        if (!allowedTcbStatuses(journal.tcbStatus)) revert TcbStatusNotAllowed(journal.tcbStatus);
+        if (journal.tcbStatus != TDXTcbStatus.UpToDate && journal.tcbStatus != TDXTcbStatus.SwHardeningNeeded) {
+            revert TcbStatusNotAllowed(journal.tcbStatus);
+        }
         if (journal.collateralExpiration <= block.timestamp) revert CollateralExpired(journal.collateralExpiration);
 
         uint64 timestamp = journal.timestamp / 1000;
@@ -157,11 +144,5 @@ contract TDXVerifier is Ownable, ITDXVerifier, ISemver {
         assembly {
             publicKeyHash := keccak256(add(publicKey, 0x21), 64)
         }
-    }
-
-    function _setProofSubmitter(address newProofSubmitter) internal {
-        if (newProofSubmitter == address(0)) revert ZeroProofSubmitter();
-        proofSubmitter = newProofSubmitter;
-        emit ProofSubmitterChanged(newProofSubmitter);
     }
 }

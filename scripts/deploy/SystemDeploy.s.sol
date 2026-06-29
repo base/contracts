@@ -997,11 +997,6 @@ contract SystemDeploy is Script {
             vm.broadcast(msg.sender);
             nitroVerifier.setProofSubmitter(address(output_.teeProverRegistryProxy));
         }
-        ITDXVerifier tdxVerifier = ITDXVerifier(_input.tdxVerifier);
-        if (tdxVerifier.proofSubmitter() != address(output_.teeProverRegistryProxy)) {
-            vm.broadcast(msg.sender);
-            tdxVerifier.setProofSubmitter(address(output_.teeProverRegistryProxy));
-        }
 
         vm.broadcast(msg.sender);
         output_.teeVerifier =

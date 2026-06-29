@@ -158,8 +158,8 @@ contract DeployTEEVerifiers is Script {
         console.log("TDX Verifier ID:", vm.toString(tdxVerifierId));
         console.log("Intel Root CA Hash:", vm.toString(intelRootCaHash));
         console.log("");
-        console.log("NOTE: proofSubmitter is set to owner as placeholder on both verifiers.");
-        console.log("      DeployDevWithTDX.s.sol updates both to TEEProverRegistry.");
+        console.log("NOTE: Nitro proofSubmitter is set to owner as placeholder.");
+        console.log("      TDX proofSubmitter is immutable and set to owner by this script.");
         console.log("");
 
         vm.startBroadcast();
@@ -230,7 +230,7 @@ contract DeployTEEVerifiers is Script {
     }
 
     function _deployTDXVerifier(
-        address owner,
+        address proofSubmitter,
         address risc0VerifierRouter,
         bytes32 tdxVerifierId,
         bytes32 intelRootCaHash
@@ -239,7 +239,7 @@ contract DeployTEEVerifiers is Script {
         returns (address deployedTDXVerifier)
     {
         deployedTDXVerifier = address(
-            new TDXVerifier(owner, TDX_MAX_TIME_DIFF, intelRootCaHash, owner, risc0VerifierRouter, tdxVerifierId)
+            new TDXVerifier(TDX_MAX_TIME_DIFF, intelRootCaHash, proofSubmitter, risc0VerifierRouter, tdxVerifierId)
         );
     }
 

@@ -25,10 +25,6 @@ contract MockNitroEnclaveVerifier {
 
 contract MockTDXVerifier {
     address public proofSubmitter;
-
-    function setProofSubmitter(address _proofSubmitter) external {
-        proofSubmitter = _proofSubmitter;
-    }
 }
 
 contract MockSP1Verifier {
@@ -264,11 +260,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             MockNitroEnclaveVerifier(_input.implementationsInput.nitroEnclaveVerifier).proofSubmitter(),
             teeProverRegistryProxyAddr,
             "nitro proof submitter"
-        );
-        assertEq(
-            MockTDXVerifier(_input.implementationsInput.tdxVerifier).proofSubmitter(),
-            teeProverRegistryProxyAddr,
-            "tdx proof submitter"
         );
         assertEq(
             address(teeProverRegistry.DISPUTE_GAME_FACTORY()),
