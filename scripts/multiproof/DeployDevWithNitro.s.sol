@@ -17,7 +17,6 @@ import { DeployDevBase } from "./DeployDevBase.s.sol";
 contract DeployDevWithNitro is DeployDevBase {
     uint256 public constant BLOCK_INTERVAL = 600;
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
-    uint256 public constant INIT_BOND = 0.00001 ether;
 
     address public nitroEnclaveVerifierAddr;
     address public tdxVerifierAddr;
@@ -28,10 +27,6 @@ contract DeployDevWithNitro is DeployDevBase {
 
     function _intermediateBlockInterval() internal pure override returns (uint256) {
         return INTERMEDIATE_BLOCK_INTERVAL;
-    }
-
-    function _initBond() internal pure override returns (uint256) {
-        return INIT_BOND;
     }
 
     function _outputSuffix() internal pure override returns (string memory) {

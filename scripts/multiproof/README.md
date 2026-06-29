@@ -259,21 +259,14 @@ To override all Nitro and TDX inputs while still deploying both, pass the option
 
 ### Step 2: Deploy the TDX multiproof test stack
 
-Set `DEPLOY_CONFIG_PATH` to the Sepolia deploy config and pass the `TDXVerifier` address from Step 1. The deploy config must also contain the `NitroEnclaveVerifier` address, because TEE proposal proofs now require both Nitro and TDX signatures. `finalSystemOwner` in the deploy config must be the account broadcasting this transaction because the script updates `NitroEnclaveVerifier.proofSubmitter` to the deployed `TEEProverRegistry`.
+Set `DEPLOY_CONFIG_PATH` to the Sepolia deploy config and pass the `NitroEnclaveVerifier` and `TDXVerifier` addresses from Step 1. `finalSystemOwner` in the deploy config must be the account broadcasting this transaction because the script updates `NitroEnclaveVerifier.proofSubmitter` to the deployed `TEEProverRegistry`.
 
 The TDX registry manager is set to `TDX_REGISTRATION_MANAGER`, allowing that address to call `registerTDXSigner(bytes,bytes)`. Register a Nitro signer through `registerSigner(bytes,bytes)` as well before submitting TEE proposal proofs.
 
-The `deploy-tdx-stack` recipe resolves a recent L2 output root before invoking `DeployDevWithTDX`, then injects the resolved output root and L2 block through `run(address,address,bytes32,uint256)`. Use `L2_OUTPUT_ROOT_RPC_URL` if the `optimism_outputAtBlock` endpoint differs from the L2 execution RPC, and `ASR_ANCHOR_BLOCK_LOOKBACK` to anchor a fixed number of L2 blocks behind head. For a fixed anchor, set both `ASR_ANCHOR_OUTPUT_ROOT` and `ASR_ANCHOR_BLOCK_NUMBER`.
+The `deploy-tdx-stack` recipe resolves a recent L2 output root before invoking `DeployDevWithTDX`, then injects the verifier addresses, resolved output root, and L2 block through `run(address,address,address,bytes32,uint256)`. Use `L2_OUTPUT_ROOT_RPC_URL` if the `optimism_outputAtBlock` endpoint differs from the L2 execution RPC, and `ASR_ANCHOR_BLOCK_LOOKBACK` to anchor a fixed number of L2 blocks behind head. For a fixed anchor, set both `ASR_ANCHOR_OUTPUT_ROOT` and `ASR_ANCHOR_BLOCK_NUMBER`.
 
 ```bash
-just --justfile scripts/multiproof/justfile deploy-tdx-stack $TDX_VERIFIER
-```
-
-If the Nitro verifier in `deploy-config/sepolia.json` is owned by another account, do not edit the shared Sepolia deploy
-config. Pass both verifier addresses explicitly instead:
-
-```bash
-just --justfile scripts/multiproof/justfile deploy-tdx-stack-with-verifiers $NITRO_VERIFIER $TDX_VERIFIER
+just --justfile scripts/multiproof/justfile deploy-tdx-stack $NITRO_VERIFIER $TDX_VERIFIER
 ```
 
 To override the manager manually, use:
@@ -286,7 +279,8 @@ ASR_ANCHOR_OUTPUT_ROOT=$(cast rpc optimism_outputAtBlock $(cast to-hex $ASR_ANCH
   --rpc-url $L2_OUTPUT_ROOT_RPC_URL | jq -r '.outputRoot')
 
 forge script scripts/multiproof/DeployDevWithTDX.s.sol:DeployDevWithTDX \
-  --sig "run(address,address,bytes32,uint256)" \
+  --sig "run(address,address,address,bytes32,uint256)" \
+  $NITRO_VERIFIER \
   $TDX_VERIFIER \
   $TDX_REGISTRATION_MANAGER \
   $ASR_ANCHOR_OUTPUT_ROOT \

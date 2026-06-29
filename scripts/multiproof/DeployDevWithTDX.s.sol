@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { console2 as console } from "lib/forge-std/src/console2.sol";
-
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
@@ -17,17 +15,6 @@ contract DeployDevWithTDX is DeployDevBase {
     address internal tdxRegistrationManager;
 
     function run(
-        address tdxVerifier,
-        address registrationManager,
-        bytes32 asrStartingOutputRoot,
-        uint256 asrStartingBlockNumber
-    )
-        public
-    {
-        run(cfg.nitroEnclaveVerifier(), tdxVerifier, registrationManager, asrStartingOutputRoot, asrStartingBlockNumber);
-    }
-
-    function run(
         address nitroEnclaveVerifier,
         address tdxVerifier,
         address registrationManager,
@@ -40,18 +27,6 @@ contract DeployDevWithTDX is DeployDevBase {
         tdxVerifierAddr = tdxVerifier;
         tdxRegistrationManager = registrationManager;
         run(asrStartingOutputRoot, asrStartingBlockNumber);
-    }
-
-    function _blockInterval() internal view override returns (uint256) {
-        return cfg.multiproofBlockInterval();
-    }
-
-    function _intermediateBlockInterval() internal view override returns (uint256) {
-        return cfg.multiproofIntermediateBlockInterval();
-    }
-
-    function _initBond() internal pure override returns (uint256) {
-        return 0.00001 ether;
     }
 
     function _outputSuffix() internal pure override returns (string memory) {
@@ -74,7 +49,7 @@ contract DeployDevWithTDX is DeployDevBase {
         );
     }
 
-    function _teeRegistrationManager(address) internal view override returns (address) {
+    function _teeRegistrationManager() internal view override returns (address) {
         return tdxRegistrationManager;
     }
 
@@ -86,34 +61,5 @@ contract DeployDevWithTDX is DeployDevBase {
         vm.serializeAddress(key, "NitroEnclaveVerifier", nitroEnclaveVerifierAddr);
         vm.serializeAddress(key, "TDXVerifier", tdxVerifierAddr);
         vm.serializeAddress(key, "TDXRegistrationManager", tdxRegistrationManager);
-    }
-
-    function _logHeader() internal pure override {
-        console.log("=== Deploying Dev Infrastructure (WITH TDX) ===");
-    }
-
-    function _printSummary() internal view override {
-        console.log("\n========================================");
-        console.log("      DEV DEPLOYMENT COMPLETE (TDX)");
-        console.log("========================================");
-        console.log("\nTDX Contracts:");
-        console.log("  NitroEnclaveVerifier:", nitroEnclaveVerifierAddr);
-        console.log("  TDXVerifier:", tdxVerifierAddr);
-        console.log("  TEEProverRegistry:", teeProverRegistryProxy);
-        console.log("  TDX Registration Manager:", tdxRegistrationManager);
-        console.log("  TEEVerifier:", teeVerifier);
-        console.log("\nInfrastructure:");
-        console.log("  DisputeGameFactory:", disputeGameFactory);
-        console.log("  AnchorStateRegistry (mock):", address(mockAnchorRegistry));
-        console.log("  ASR Starting Output Root:", vm.toString(startingAnchorRoot.raw()));
-        console.log("  ASR Starting L2 Block:", startingAnchorBlockNumber);
-        console.log("  DelayedWETH (mock):", mockDelayedWETH);
-        console.log("\nGame:");
-        console.log("  AggregateVerifier:", aggregateVerifier);
-        console.log("  Game Type:", cfg.multiproofGameType());
-        console.log("  Nitro Image Hash:", vm.toString(cfg.teeNitroImageHash()));
-        console.log("  TDX Image Hash:", vm.toString(cfg.teeTdxImageHash()));
-        console.log("  Config Hash:", vm.toString(cfg.multiproofConfigHash()));
-        console.log("========================================");
     }
 }

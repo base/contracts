@@ -189,13 +189,19 @@ deploy-sepolia-tdx-dev tdx_manager=sepolia_tdx_registration_manager deploy_confi
   set -euo pipefail
   cd "{{repo_root}}"
 
+  nitro_verifier="$(jq -r '.nitroEnclaveVerifier // empty' "{{deploy_config}}")"
   tdx_verifier="$(jq -r '.tdxVerifier // empty' "{{deploy_config}}")"
+  if [[ -z "$nitro_verifier" || "$nitro_verifier" == "null" ]]; then
+    echo "Missing nitroEnclaveVerifier in {{deploy_config}}" >&2
+    exit 1
+  fi
   if [[ -z "$tdx_verifier" || "$tdx_verifier" == "null" ]]; then
     echo "Missing tdxVerifier in {{deploy_config}}" >&2
     exit 1
   fi
 
   just --justfile "{{justfile_path}}" deploy-tdx-stack \
+    "$nitro_verifier" \
     "$tdx_verifier" \
     "{{tdx_manager}}" \
     "{{deploy_config}}" \
@@ -256,63 +262,10 @@ run-sepolia-tdx-dev-offchain:
 #   ASR_ANCHOR_OUTPUT_ROOT     Optional explicit output root. Requires ASR_ANCHOR_BLOCK_NUMBER.
 #
 # Args:
-#   tdx_verifier TDXVerifier address from deploy-tdx-verifier
-#   tdx_manager  Manager that can call registerTDXSigner()
-deploy-tdx-stack tdx_verifier tdx_manager=sepolia_tdx_registration_manager deploy_config=zeronet_tdx_deploy_config l2_rpc=l2_rpc_url l2_output_root_rpc=l2_output_root_rpc_url:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  cd "{{repo_root}}"
-  owner="$(cast wallet address --account "{{forge_account}}")"
-  echo "Using {{forge_account}} as deployer: $owner"
-
-  if [[ -n "${ASR_ANCHOR_BLOCK_NUMBER:-}" || -n "${ASR_ANCHOR_OUTPUT_ROOT:-}" ]]; then
-    if [[ -z "${ASR_ANCHOR_BLOCK_NUMBER:-}" || -z "${ASR_ANCHOR_OUTPUT_ROOT:-}" ]]; then
-      echo "ASR_ANCHOR_BLOCK_NUMBER and ASR_ANCHOR_OUTPUT_ROOT must be set together" >&2
-      exit 1
-    fi
-    asr_anchor_block="$ASR_ANCHOR_BLOCK_NUMBER"
-    asr_anchor_output_root="$ASR_ANCHOR_OUTPUT_ROOT"
-  else
-    lookback="${ASR_ANCHOR_BLOCK_LOOKBACK:-0}"
-    l2_head="$(cast block-number --rpc-url "{{l2_rpc}}")"
-    if (( lookback > l2_head )); then
-      echo "ASR_ANCHOR_BLOCK_LOOKBACK ($lookback) exceeds L2 head ($l2_head)" >&2
-      exit 1
-    fi
-    asr_anchor_block=$((l2_head - lookback))
-    asr_anchor_block_hex="$(cast to-hex "$asr_anchor_block")"
-    asr_anchor_output_root="$(cast rpc optimism_outputAtBlock "$asr_anchor_block_hex" --rpc-url "{{l2_output_root_rpc}}" | jq -r '.outputRoot')"
-  fi
-
-  if [[ -z "$asr_anchor_output_root" || "$asr_anchor_output_root" == "null" || "$asr_anchor_output_root" == "0x0000000000000000000000000000000000000000000000000000000000000000" ]]; then
-    echo "Invalid ASR anchor output root: $asr_anchor_output_root" >&2
-    exit 1
-  fi
-
-  echo "Using ASR anchor output root: $asr_anchor_output_root"
-  echo "Using ASR anchor L2 block: $asr_anchor_block"
-
-  DEPLOY_CONFIG_PATH="{{deploy_config}}" \
-  forge script scripts/multiproof/DeployDevWithTDX.s.sol:DeployDevWithTDX \
-    --sig "run(address,address,bytes32,uint256)" \
-    "{{tdx_verifier}}" \
-    "{{tdx_manager}}" \
-    "$asr_anchor_output_root" \
-    "$asr_anchor_block" \
-    --rpc-url "{{l1_rpc_url}}" \
-    --broadcast \
-    --account "{{forge_account}}" \
-    --sender "$owner"
-
-# Deploy the TDX multiproof dev/test stack with both verifier addresses supplied explicitly.
-#
-# Use this when you want to bind the deployed stack to explicit verifier addresses.
-#
-# Args:
-#   nitro_verifier NitroEnclaveVerifier address from deploy-nitro-verifier or deploy-tee-verifiers
-#   tdx_verifier   TDXVerifier address from deploy-tdx-verifier or deploy-tee-verifiers
+#   nitro_verifier NitroEnclaveVerifier address from deploy-nitro-verifier
+#   tdx_verifier   TDXVerifier address from deploy-tdx-verifier
 #   tdx_manager    Manager that can call registerTDXSigner()
-deploy-tdx-stack-with-verifiers nitro_verifier tdx_verifier tdx_manager=sepolia_tdx_registration_manager deploy_config=zeronet_tdx_deploy_config l2_rpc=l2_rpc_url l2_output_root_rpc=l2_output_root_rpc_url:
+deploy-tdx-stack nitro_verifier tdx_verifier tdx_manager=sepolia_tdx_registration_manager deploy_config=zeronet_tdx_deploy_config l2_rpc=l2_rpc_url l2_output_root_rpc=l2_output_root_rpc_url:
   #!/usr/bin/env bash
   set -euo pipefail
   cd "{{repo_root}}"
@@ -382,7 +335,7 @@ deploy-tdx-system nitro_root_cert nitro_verifier_id tdx_manager=sepolia_tdx_regi
     exit 1
   fi
 
-  just --justfile "{{justfile_path}}" deploy-tdx-stack-with-verifiers \
+  just --justfile "{{justfile_path}}" deploy-tdx-stack \
     "$nitro_verifier" \
     "$tdx_verifier" \
     "{{tdx_manager}}" \
@@ -453,7 +406,6 @@ tdx-sepolia-help:
   @echo 'just deploy-tdx-system <nitro-root-cert> <nitro-verifier-id>'
   @echo 'just deploy-sepolia-tdx-dev'
   @echo 'just run-sepolia-tdx-dev-offchain'
-  @echo 'just deploy-tdx-stack <tdx-verifier> [tdx-manager] [deploy-config] [l2-rpc] [l2-output-root-rpc]'
-  @echo 'just deploy-tdx-stack-with-verifiers <nitro-verifier> <tdx-verifier> [tdx-manager] [deploy-config] [l2-rpc] [l2-output-root-rpc]'
+  @echo 'just deploy-tdx-stack <nitro-verifier> <tdx-verifier> [tdx-manager] [deploy-config] [l2-rpc] [l2-output-root-rpc]'
   @echo 'just tee-registered-signers'
   @echo 'just tdx-sepolia-config'

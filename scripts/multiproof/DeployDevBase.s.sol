@@ -95,9 +95,7 @@ abstract contract DeployDevBase is Script {
         Proxy teeProxy = new Proxy(msg.sender);
         teeProxy.upgradeToAndCall(
             teeRegistryImpl,
-            abi.encodeCall(
-                TEEProverRegistry.initialize, (owner, _teeRegistrationManager(owner), initialProposers, gameType)
-            )
+            abi.encodeCall(TEEProverRegistry.initialize, (owner, _teeRegistrationManager(), initialProposers, gameType))
         );
         teeProxy.changeAdmin(address(0xdead));
         teeProverRegistryProxy = address(teeProxy);
@@ -156,19 +154,29 @@ abstract contract DeployDevBase is Script {
         console.log("Deployment saved to:", outPath);
     }
 
-    function _blockInterval() internal view virtual returns (uint256);
-    function _intermediateBlockInterval() internal view virtual returns (uint256);
-    function _initBond() internal pure virtual returns (uint256);
+    function _blockInterval() internal view virtual returns (uint256) {
+        return cfg.multiproofBlockInterval();
+    }
+
+    function _intermediateBlockInterval() internal view virtual returns (uint256) {
+        return cfg.multiproofIntermediateBlockInterval();
+    }
+
+    function _initBond() internal pure virtual returns (uint256) {
+        return 0.00001 ether;
+    }
+
     function _outputSuffix() internal pure virtual returns (string memory);
     function _deployTEERegistryImpl() internal virtual returns (address);
-    function _logHeader() internal view virtual;
-    function _printSummary() internal view virtual;
 
     function _preflight() internal virtual { }
     function _serializeExtra(string memory key) internal virtual { }
+    function _logHeader() internal view virtual { }
+    function _printSummary() internal view virtual { }
 
-    function _teeRegistrationManager(address owner) internal view virtual returns (address) {
-        return owner;
+    function _teeRegistrationManager() internal view virtual returns (address) {
+        return cfg.finalSystemOwner();
     }
+
     function _afterTEERegistryDeploy() internal virtual { }
 }
