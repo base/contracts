@@ -16,7 +16,6 @@ contract TDXVerifierTest is Test {
     bytes32 internal constant WRONG_ROOT_CA_HASH = keccak256("wrong-root-ca");
     bytes32 internal constant VERIFIER_ID = keccak256("tdx-verifier-id");
     bytes32 internal constant IMAGE_HASH = keccak256("tdx-image");
-    bytes32 internal constant REPORT_DATA_SUFFIX = keccak256("multiproof-tdx-poc");
     bytes32 internal constant PUBLIC_KEY_X = hex"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
     bytes32 internal constant PUBLIC_KEY_Y = hex"2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40";
 
@@ -136,8 +135,7 @@ contract TDXVerifierTest is Test {
             publicKeyX: PUBLIC_KEY_X,
             publicKeyY: PUBLIC_KEY_Y,
             imageHash: IMAGE_HASH,
-            reportDataPrefix: publicKeyHash,
-            reportDataSuffix: REPORT_DATA_SUFFIX
+            reportDataPrefix: publicKeyHash
         });
     }
 

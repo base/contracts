@@ -23,7 +23,6 @@ enum TDXTcbStatus {
 /// @param publicKeyY secp256k1 public key y-coordinate.
 /// @param imageHash Multiproof-compatible image hash derived from MRTD and RTMR0-3.
 /// @param reportDataPrefix First 32 bytes of TDREPORT.REPORTDATA.
-/// @param reportDataSuffix Last 32 bytes of TDREPORT.REPORTDATA, available for app-specific binding.
 struct TDXVerifierJournal {
     TDXTcbStatus tcbStatus;
     uint64 timestamp;
@@ -33,7 +32,6 @@ struct TDXVerifierJournal {
     bytes32 publicKeyY;
     bytes32 imageHash;
     bytes32 reportDataPrefix;
-    bytes32 reportDataSuffix;
 }
 
 /// @title ITDXVerifier
