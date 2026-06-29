@@ -84,7 +84,7 @@ deploy-nitro-verifier nitro_root_cert nitro_verifier_id risc0_router=sepolia_nit
     --account "{{forge_account}}" \
     --sender "$owner"
 
-# Deploy both TEE verifier policy contracts in one broadcast.
+# Deploy both TEE verifier policy contracts with the existing single-verifier scripts.
 #
 # Required args:
 #   nitro_root_cert    SHA-256 hash of the AWS Nitro root certificate
@@ -95,23 +95,34 @@ deploy-tee-verifiers nitro_root_cert nitro_verifier_id nitro_risc0_router=sepoli
   #!/usr/bin/env bash
   set -euo pipefail
   cd "{{repo_root}}"
-  owner="$(cast wallet address --account "{{forge_account}}")"
-  echo "Using {{forge_account}} as owner/deployer: $owner"
-  forge script scripts/multiproof/DeployTEEVerifiers.s.sol:DeployTEEVerifiers \
-    --sig "run(address,address,address,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)" \
-    "$owner" \
-    "{{nitro_risc0_router}}" \
-    "{{tdx_risc0_router}}" \
-    "{{set_builder_image_id}}" \
+
+  just --justfile "{{justfile_path}}" deploy-nitro-verifier \
     "{{nitro_root_cert}}" \
     "{{nitro_verifier_id}}" \
-    "{{nitro_verifier_proof_id}}" \
+    "{{nitro_risc0_router}}" \
+    "{{set_builder_image_id}}" \
+    "{{nitro_verifier_proof_id}}"
+
+  just --justfile "{{justfile_path}}" deploy-tdx-verifier \
+    "{{tdx_risc0_router}}" \
     "{{tdx_verifier_id}}" \
-    "{{intel_root_ca_hash}}" \
-    --rpc-url "{{l1_rpc_url}}" \
-    --broadcast \
-    --account "{{forge_account}}" \
-    --sender "$owner"
+    "{{intel_root_ca_hash}}"
+
+  chain_id="$(cast chain-id --rpc-url "{{l1_rpc_url}}")"
+  nitro_path="deployments/${chain_id}-nitro-verifier.json"
+  tdx_path="deployments/${chain_id}-tdx-verifier.json"
+  out_path="deployments/${chain_id}-tee-verifiers.json"
+  nitro_verifier="$(jq -r '.NitroEnclaveVerifier // empty' "$nitro_path")"
+  tdx_verifier="$(jq -r '.TDXVerifier // empty' "$tdx_path")"
+
+  if [[ -z "$nitro_verifier" || -z "$tdx_verifier" ]]; then
+    echo "Missing verifier address in $nitro_path or $tdx_path" >&2
+    exit 1
+  fi
+
+  jq -n --arg nitro "$nitro_verifier" --arg tdx "$tdx_verifier" \
+    '{NitroEnclaveVerifier: $nitro, TDXVerifier: $tdx}' > "$out_path"
+  echo "Deployment saved to: $out_path"
 
 # Print the Sepolia TDX constants used by these recipes.
 tdx-sepolia-config:

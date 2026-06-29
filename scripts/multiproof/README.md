@@ -254,7 +254,7 @@ forge script scripts/multiproof/DeployNitroVerifier.s.sol:DeployNitroVerifier \
   --private-key $PRIVATE_KEY
 ```
 
-Use `DeployTEEVerifiers.s.sol` with `run(address,address,address,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)` to override all Nitro and TDX inputs while still deploying both in one broadcast.
+To override all Nitro and TDX inputs while still deploying both, pass the optional args to `deploy-tee-verifiers`.
 
 ### Step 2: Deploy the TDX multiproof test stack
 
