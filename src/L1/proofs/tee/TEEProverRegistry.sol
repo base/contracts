@@ -80,7 +80,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     event SignerRegistered(address indexed signer);
 
     /// @notice Emitted when a TDX signer is registered.
-    event TDXSignerRegistered(address indexed signer, bytes32 indexed imageHash, bytes32 reportDataSuffix);
+    event TDXSignerRegistered(address indexed signer, bytes32 indexed imageHash);
 
     /// @notice Emitted when a signer is deregistered.
     event SignerDeregistered(address indexed signer);
@@ -195,11 +195,11 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @param output ABI-encoded TDXVerifierJournal public values from the ZK verifier guest.
     /// @param proofBytes ZK proof bytes.
     function registerTDXSigner(bytes calldata output, bytes calldata proofBytes) external onlyOwnerOrManager {
-        (address signer, bytes32 imageHash, bytes32 reportDataSuffix) = TDX_VERIFIER.verify(output, proofBytes);
+        (address signer, bytes32 imageHash) = TDX_VERIFIER.verify(output, proofBytes);
 
         _registerSigner(signer, imageHash, TEEType.TDX);
 
-        emit TDXSignerRegistered(signer, imageHash, reportDataSuffix);
+        emit TDXSignerRegistered(signer, imageHash);
     }
 
     /// @notice Deregisters a signer.

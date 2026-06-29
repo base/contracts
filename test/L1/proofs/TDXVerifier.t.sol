@@ -37,27 +37,15 @@ contract TDXVerifierTest is Test {
         bytes memory proofBytes = hex"1234";
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
-        (address signer, bytes32 imageHash, bytes32 reportDataSuffix) = verifier.verify(output, proofBytes);
+        (address signer, bytes32 imageHash) = verifier.verify(output, proofBytes);
 
         assertEq(signer, _signer());
         assertEq(imageHash, IMAGE_HASH);
-        assertEq(reportDataSuffix, REPORT_DATA_SUFFIX);
     }
 
     function testConstructorRevertsIfZeroInput() public {
         vm.expectRevert(TDXVerifier.ZeroInput.selector);
         new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, address(0), VERIFIER_ID);
-    }
-
-    function testVerifyRevertsWhenGuestReportsFailure() public {
-        TDXVerifierJournal memory journal = _successJournal();
-        journal.success = false;
-        bytes memory output = abi.encode(journal);
-        bytes memory proofBytes = hex"1234";
-        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
-
-        vm.expectRevert(TDXVerifier.TDXVerificationFailed.selector);
-        verifier.verify(output, proofBytes);
     }
 
     function testVerifyRevertsWhenRootCaHashMismatches() public {
@@ -141,7 +129,6 @@ contract TDXVerifierTest is Test {
         bytes32 publicKeyHash = _publicKeyHash();
 
         journal = TDXVerifierJournal({
-            success: true,
             tcbStatus: TDXTcbStatus.UpToDate,
             timestamp: uint64(block.timestamp - 1) * 1000,
             collateralExpiration: uint64(block.timestamp + 1 days),

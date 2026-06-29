@@ -15,7 +15,6 @@ enum TDXTcbStatus {
 }
 
 /// @notice Public journal emitted by the offchain/ZK TDX DCAP verifier.
-/// @param success Whether quote and collateral validation succeeded in the guest.
 /// @param tcbStatus Intel TDX TCB status for the platform.
 /// @param timestamp Quote timestamp in milliseconds since Unix epoch.
 /// @param collateralExpiration Earliest expiration timestamp in seconds across accepted collateral.
@@ -26,7 +25,6 @@ enum TDXTcbStatus {
 /// @param reportDataPrefix First 32 bytes of TDREPORT.REPORTDATA.
 /// @param reportDataSuffix Last 32 bytes of TDREPORT.REPORTDATA, available for app-specific binding.
 struct TDXVerifierJournal {
-    bool success;
     TDXTcbStatus tcbStatus;
     uint64 timestamp;
     uint64 collateralExpiration;
@@ -46,12 +44,11 @@ interface ITDXVerifier {
     /// @param proofBytes ZK proof bytes.
     /// @return signer Ethereum address derived from the attested public key.
     /// @return imageHash Multiproof-compatible image hash derived from MRTD and RTMR0-3.
-    /// @return reportDataSuffix Last 32 bytes of TDREPORT.REPORTDATA.
     function verify(
         bytes calldata output,
         bytes calldata proofBytes
     )
         external
         view
-        returns (address signer, bytes32 imageHash, bytes32 reportDataSuffix);
+        returns (address signer, bytes32 imageHash);
 }

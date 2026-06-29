@@ -38,27 +38,24 @@ contract MockDisputeGameFactoryForTDXRegistry {
 contract MockTDXVerifierForRegistry is ITDXVerifier {
     address internal _signer;
     bytes32 internal _imageHash;
-    bytes32 internal _reportDataSuffix;
 
-    function setResult(address signer, bytes32 imageHash, bytes32 reportDataSuffix) external {
+    function setResult(address signer, bytes32 imageHash) external {
         _signer = signer;
         _imageHash = imageHash;
-        _reportDataSuffix = reportDataSuffix;
     }
 
-    function verify(bytes calldata, bytes calldata) external view returns (address, bytes32, bytes32) {
-        return (_signer, _imageHash, _reportDataSuffix);
+    function verify(bytes calldata, bytes calldata) external view returns (address, bytes32) {
+        return (_signer, _imageHash);
     }
 }
 
 contract TEEProverRegistryTDXTest is Test {
     bytes32 internal constant IMAGE_HASH = keccak256("tdx-image");
-    bytes32 internal constant REPORT_DATA_SUFFIX = keccak256("multiproof-tdx-poc");
 
     function testRegisterTDXSignerStoresImageHash() public {
         address signer = address(0x1234);
         MockTDXVerifierForRegistry verifier = new MockTDXVerifierForRegistry();
-        verifier.setResult(signer, IMAGE_HASH, REPORT_DATA_SUFFIX);
+        verifier.setResult(signer, IMAGE_HASH);
 
         MockDisputeGameFactoryForTDXRegistry factory = new MockDisputeGameFactoryForTDXRegistry();
         factory.setImpl(0, address(new MockAggregateVerifierForTDXRegistry(IMAGE_HASH)));

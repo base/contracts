@@ -25,7 +25,6 @@ contract TDXVerifier is ITDXVerifier, ISemver {
     bytes32 public immutable verifierId;
 
     error ZeroInput();
-    error TDXVerificationFailed();
     error RootCaHashMismatch(bytes32 expected, bytes32 actual);
     error TcbStatusNotAllowed(TDXTcbStatus status);
     error CollateralExpired(uint64 collateralExpiration);
@@ -55,12 +54,11 @@ contract TDXVerifier is ITDXVerifier, ISemver {
     )
         external
         view
-        returns (address signer, bytes32 imageHash, bytes32 reportDataSuffix)
+        returns (address signer, bytes32 imageHash)
     {
         riscZeroVerifier.verify(proofBytes, verifierId, sha256(output));
         TDXVerifierJournal memory journal = abi.decode(output, (TDXVerifierJournal));
 
-        if (!journal.success) revert TDXVerificationFailed();
         if (journal.rootCaHash != rootCaHash) revert RootCaHashMismatch(rootCaHash, journal.rootCaHash);
         if (journal.tcbStatus != TDXTcbStatus.UpToDate && journal.tcbStatus != TDXTcbStatus.SwHardeningNeeded) {
             revert TcbStatusNotAllowed(journal.tcbStatus);
@@ -77,9 +75,7 @@ contract TDXVerifier is ITDXVerifier, ISemver {
             revert ReportDataMismatch(publicKeyHash, journal.reportDataPrefix);
         }
 
-        signer = address(uint160(uint256(publicKeyHash)));
-        imageHash = journal.imageHash;
-        reportDataSuffix = journal.reportDataSuffix;
+        return (address(uint160(uint256(publicKeyHash))), journal.imageHash);
     }
 
     /// @notice Semantic version.
