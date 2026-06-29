@@ -24,7 +24,7 @@ contract DeployDevNoNitro is DeployDevBase {
         require(cfg.tdxVerifier() != address(0), "tdxVerifier must be set in config");
     }
 
-    function _deployTEERegistryImpl() internal override returns (address) {
+    function _deployTEERegistryImpl(address disputeGameFactory) internal override returns (address) {
         return address(
             new DevTEEProverRegistry(
                 INitroEnclaveVerifier(address(0)),

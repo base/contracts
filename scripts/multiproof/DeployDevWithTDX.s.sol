@@ -39,7 +39,7 @@ contract DeployDevWithTDX is DeployDevBase {
         require(tdxRegistrationManager != address(0), "registrationManager must be non-zero");
     }
 
-    function _deployTEERegistryImpl() internal override returns (address) {
+    function _deployTEERegistryImpl(address disputeGameFactory) internal override returns (address) {
         return address(
             new DevTEEProverRegistry(
                 INitroEnclaveVerifier(nitroEnclaveVerifierAddr),
@@ -53,7 +53,7 @@ contract DeployDevWithTDX is DeployDevBase {
         return tdxRegistrationManager;
     }
 
-    function _afterTEERegistryDeploy() internal override {
+    function _afterTEERegistryDeploy(address teeProverRegistryProxy) internal override {
         INitroEnclaveVerifier(nitroEnclaveVerifierAddr).setProofSubmitter(teeProverRegistryProxy);
     }
 

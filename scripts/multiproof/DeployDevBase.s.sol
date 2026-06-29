@@ -27,13 +27,6 @@ abstract contract DeployDevBase is Script {
     DeployConfig internal constant cfg =
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
 
-    address internal teeProverRegistryProxy;
-    address internal teeVerifier;
-    address internal disputeGameFactory;
-    IAnchorStateRegistry internal mockAnchorRegistry;
-    address internal mockDelayedWETH;
-    address internal aggregateVerifier;
-
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
         cfg.read(Config.deployConfigPath());
@@ -45,66 +38,52 @@ abstract contract DeployDevBase is Script {
 
     function run(bytes32 asrStartingOutputRoot, uint256 asrStartingBlockNumber) public {
         require(asrStartingOutputRoot != bytes32(0), "asrStartingOutputRoot must be non-zero");
-        Hash startingAnchorRoot = Hash.wrap(asrStartingOutputRoot);
-
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
+        string memory key = "deployment";
 
         _preflight();
 
         vm.startBroadcast();
 
-        _deployInfrastructure(gameType, startingAnchorRoot, asrStartingBlockNumber);
-        _deployTEEContracts(gameType);
-        _deployAggregateVerifier(gameType);
-
-        vm.stopBroadcast();
-
-        _writeOutput(startingAnchorRoot, asrStartingBlockNumber);
-    }
-
-    function _deployInfrastructure(
-        GameType gameType,
-        Hash startingAnchorRoot,
-        uint256 startingAnchorBlockNumber
-    )
-        internal
-    {
         Proxy proxy = new Proxy(msg.sender);
         proxy.upgradeTo(address(new DisputeGameFactory()));
         DisputeGameFactory(address(proxy)).initialize(msg.sender);
         proxy.changeAdmin(address(0xdead));
-        disputeGameFactory = address(proxy);
+        address disputeGameFactory = address(proxy);
+        vm.serializeAddress(key, "DisputeGameFactory", disputeGameFactory);
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
-        mockAnchorRegistry = IAnchorStateRegistry(address(asr));
-        asr.initialize(disputeGameFactory, startingAnchorRoot, startingAnchorBlockNumber, gameType);
-    }
+        IAnchorStateRegistry mockAnchorRegistry = IAnchorStateRegistry(address(asr));
+        asr.initialize(disputeGameFactory, Hash.wrap(asrStartingOutputRoot), asrStartingBlockNumber, gameType);
+        vm.serializeAddress(key, "AnchorStateRegistry", address(mockAnchorRegistry));
+        vm.serializeBytes32(key, "ASRStartingOutputRoot", asrStartingOutputRoot);
+        vm.serializeUint(key, "ASRStartingBlockNumber", asrStartingBlockNumber);
 
-    function _deployTEEContracts(GameType gameType) internal {
         address[] memory initialProposers = new address[](2);
         initialProposers[0] = cfg.teeProposer();
         initialProposers[1] = cfg.teeChallenger();
 
         Proxy teeProxy = new Proxy(msg.sender);
         teeProxy.upgradeToAndCall(
-            _deployTEERegistryImpl(),
+            _deployTEERegistryImpl(disputeGameFactory),
             abi.encodeCall(
                 TEEProverRegistry.initialize,
                 (cfg.finalSystemOwner(), _teeRegistrationManager(), initialProposers, gameType)
             )
         );
         teeProxy.changeAdmin(address(0xdead));
-        teeProverRegistryProxy = address(teeProxy);
+        address teeProverRegistryProxy = address(teeProxy);
+        vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
 
-        _afterTEERegistryDeploy();
+        _afterTEERegistryDeploy(teeProverRegistryProxy);
 
-        teeVerifier = address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), mockAnchorRegistry));
-    }
+        address teeVerifier = address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), mockAnchorRegistry));
+        vm.serializeAddress(key, "TEEVerifier", teeVerifier);
 
-    function _deployAggregateVerifier(GameType gameType) internal {
-        mockDelayedWETH = address(new MockDelayedWETH());
+        address mockDelayedWETH = address(new MockDelayedWETH());
+        vm.serializeAddress(key, "DelayedWETH", mockDelayedWETH);
 
-        aggregateVerifier = address(
+        address aggregateVerifier = address(
             new AggregateVerifier(
                 gameType,
                 mockAnchorRegistry,
@@ -124,21 +103,14 @@ abstract contract DeployDevBase is Script {
         DisputeGameFactory(disputeGameFactory).setImplementation(gameType, IDisputeGame(aggregateVerifier));
         DisputeGameFactory(disputeGameFactory).setInitBond(gameType, _initBond());
         DisputeGameFactory(disputeGameFactory).transferOwnership(cfg.finalSystemOwner());
-    }
 
-    function _writeOutput(Hash startingAnchorRoot, uint256 startingAnchorBlockNumber) internal {
-        string memory key = "deployment";
-        vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
-        vm.serializeAddress(key, "TEEVerifier", teeVerifier);
         _serializeExtra(key);
-        vm.serializeAddress(key, "DisputeGameFactory", disputeGameFactory);
-        vm.serializeAddress(key, "AnchorStateRegistry", address(mockAnchorRegistry));
-        vm.serializeBytes32(key, "ASRStartingOutputRoot", startingAnchorRoot.raw());
-        vm.serializeUint(key, "ASRStartingBlockNumber", startingAnchorBlockNumber);
-        vm.serializeAddress(key, "DelayedWETH", mockDelayedWETH);
+        string memory json = vm.serializeAddress(key, "AggregateVerifier", aggregateVerifier);
+
+        vm.stopBroadcast();
 
         string memory outPath = string.concat("deployments/", vm.toString(block.chainid), _outputSuffix());
-        vm.writeJson(vm.serializeAddress(key, "AggregateVerifier", aggregateVerifier), outPath);
+        vm.writeJson(json, outPath);
         console.log("Deployment saved to:", outPath);
     }
 
@@ -147,7 +119,7 @@ abstract contract DeployDevBase is Script {
     }
 
     function _outputSuffix() internal pure virtual returns (string memory);
-    function _deployTEERegistryImpl() internal virtual returns (address);
+    function _deployTEERegistryImpl(address disputeGameFactory) internal virtual returns (address);
     function _preflight() internal view virtual;
     function _serializeExtra(string memory key) internal virtual;
 
@@ -155,5 +127,5 @@ abstract contract DeployDevBase is Script {
         return cfg.finalSystemOwner();
     }
 
-    function _afterTEERegistryDeploy() internal virtual { }
+    function _afterTEERegistryDeploy(address teeProverRegistryProxy) internal virtual { }
 }
