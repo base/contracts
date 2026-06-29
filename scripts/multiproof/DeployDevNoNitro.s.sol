@@ -12,14 +12,14 @@ contract DeployDevNoNitro is DeployDevBase {
     }
 
     function run(bytes32 asrStartingOutputRoot, uint256 asrStartingBlockNumber) public {
-        _run(asrStartingOutputRoot, asrStartingBlockNumber, address(0), cfg.tdxVerifier(), cfg.finalSystemOwner());
-    }
-
-    function _initBond() internal pure override returns (uint256) {
-        return 0.001 ether;
-    }
-
-    function _outputSuffix() internal pure override returns (string memory) {
-        return "-dev-no-nitro.json";
+        _run(
+            asrStartingOutputRoot,
+            asrStartingBlockNumber,
+            address(0),
+            cfg.tdxVerifier(),
+            cfg.finalSystemOwner(),
+            0.001 ether,
+            "-dev-no-nitro.json"
+        );
     }
 }

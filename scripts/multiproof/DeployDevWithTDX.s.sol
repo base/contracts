@@ -15,10 +15,14 @@ contract DeployDevWithTDX is DeployDevBase {
         public
     {
         require(nitroEnclaveVerifier != address(0), "nitroEnclaveVerifier must be non-zero");
-        _run(asrStartingOutputRoot, asrStartingBlockNumber, nitroEnclaveVerifier, tdxVerifier, registrationManager);
-    }
-
-    function _outputSuffix() internal pure override returns (string memory) {
-        return "-dev-with-tdx.json";
+        _run(
+            asrStartingOutputRoot,
+            asrStartingBlockNumber,
+            nitroEnclaveVerifier,
+            tdxVerifier,
+            registrationManager,
+            0.00001 ether,
+            "-dev-with-tdx.json"
+        );
     }
 }

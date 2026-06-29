@@ -41,7 +41,9 @@ abstract contract DeployDevBase is Script {
         uint256 asrStartingBlockNumber,
         address nitroVerifier,
         address tdxVerifier,
-        address registrationManager
+        address registrationManager,
+        uint256 initBond,
+        string memory outputSuffix
     )
         internal
     {
@@ -60,13 +62,14 @@ abstract contract DeployDevBase is Script {
 
         Proxy proxy = new Proxy(msg.sender);
         proxy.upgradeTo(address(new DisputeGameFactory()));
-        DisputeGameFactory(address(proxy)).initialize(msg.sender);
+        DisputeGameFactory factory = DisputeGameFactory(address(proxy));
+        factory.initialize(msg.sender);
         proxy.changeAdmin(address(0xdead));
-        address disputeGameFactory = address(proxy);
-        vm.serializeAddress(key, "DisputeGameFactory", disputeGameFactory);
+        factory.setInitBond(gameType, initBond);
+        vm.serializeAddress(key, "DisputeGameFactory", address(factory));
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
-        asr.initialize(disputeGameFactory, Hash.wrap(asrStartingOutputRoot), asrStartingBlockNumber, gameType);
+        asr.initialize(address(factory), Hash.wrap(asrStartingOutputRoot), asrStartingBlockNumber, gameType);
         vm.serializeAddress(key, "AnchorStateRegistry", address(asr));
         vm.serializeBytes32(key, "ASRStartingOutputRoot", asrStartingOutputRoot);
         vm.serializeUint(key, "ASRStartingBlockNumber", asrStartingBlockNumber);
@@ -81,7 +84,7 @@ abstract contract DeployDevBase is Script {
                 new DevTEEProverRegistry(
                     INitroEnclaveVerifier(nitroVerifier),
                     ITDXVerifier(tdxVerifier),
-                    IDisputeGameFactory(disputeGameFactory)
+                    IDisputeGameFactory(address(factory))
                 )
             ),
             abi.encodeCall(
@@ -100,14 +103,14 @@ abstract contract DeployDevBase is Script {
             address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), IAnchorStateRegistry(address(asr))));
         vm.serializeAddress(key, "TEEVerifier", teeVerifier);
 
-        address mockDelayedWETH = address(new MockDelayedWETH());
-        vm.serializeAddress(key, "DelayedWETH", mockDelayedWETH);
+        MockDelayedWETH delayedWETH = new MockDelayedWETH();
+        vm.serializeAddress(key, "DelayedWETH", address(delayedWETH));
 
         address aggregateVerifier = address(
             new AggregateVerifier(
                 gameType,
                 IAnchorStateRegistry(address(asr)),
-                IDelayedWETH(payable(mockDelayedWETH)),
+                IDelayedWETH(payable(address(delayedWETH))),
                 IVerifier(teeVerifier),
                 IVerifier(address(new MockVerifier(IAnchorStateRegistry(address(asr))))),
                 cfg.teeNitroImageHash(),
@@ -120,22 +123,15 @@ abstract contract DeployDevBase is Script {
             )
         );
 
-        DisputeGameFactory(disputeGameFactory).setImplementation(gameType, IDisputeGame(aggregateVerifier));
-        DisputeGameFactory(disputeGameFactory).setInitBond(gameType, _initBond());
-        DisputeGameFactory(disputeGameFactory).transferOwnership(cfg.finalSystemOwner());
+        factory.setImplementation(gameType, IDisputeGame(aggregateVerifier));
+        factory.transferOwnership(cfg.finalSystemOwner());
 
         string memory json = vm.serializeAddress(key, "AggregateVerifier", aggregateVerifier);
 
         vm.stopBroadcast();
 
-        string memory outPath = string.concat("deployments/", vm.toString(block.chainid), _outputSuffix());
+        string memory outPath = string.concat("deployments/", vm.toString(block.chainid), outputSuffix);
         vm.writeJson(json, outPath);
         console.log("Deployment saved to:", outPath);
     }
-
-    function _initBond() internal pure virtual returns (uint256) {
-        return 0.00001 ether;
-    }
-
-    function _outputSuffix() internal pure virtual returns (string memory);
 }
