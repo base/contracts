@@ -117,8 +117,7 @@ contract DeployDevWithTDX is Script {
         console.log("ASR Starting Output Root:", vm.toString(startingAnchorRoot.raw()));
         console.log("ASR Starting L2 Block:", startingAnchorBlockNumber);
         console.log("");
-        console.log("NOTE: TDXVerifier proofSubmitter must already be this TEEProverRegistry.");
-        console.log("      NitroEnclaveVerifier owner must be the broadcaster/finalSystemOwner.");
+        console.log("NOTE: NitroEnclaveVerifier owner must be the broadcaster/finalSystemOwner.");
 
         vm.startBroadcast();
 

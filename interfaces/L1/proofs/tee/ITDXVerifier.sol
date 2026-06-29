@@ -1,23 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-/// @notice Statuses that a TDX quote/collateral verifier may emit.
-/// @dev Unknown is index 0 so uninitialized values fail closed.
-enum TDXVerificationResult {
-    Unknown,
-    Success,
-    InvalidQuote,
-    QuoteSignatureInvalid,
-    RootCaNotTrusted,
-    PckCertChainInvalid,
-    TcbInfoInvalid,
-    QeIdentityInvalid,
-    TcbStatusNotAllowed,
-    CollateralExpired,
-    InvalidTimestamp,
-    ReportDataMismatch
-}
-
 /// @notice Intel TDX TCB status reduced to the statuses this contract's policy needs.
 /// @dev Unknown is index 0 so uninitialized values fail closed.
 enum TDXTcbStatus {
@@ -32,7 +15,7 @@ enum TDXTcbStatus {
 }
 
 /// @notice Public journal emitted by the offchain/ZK TDX DCAP verifier.
-/// @param result Overall verification result after quote and collateral validation in the guest.
+/// @param success Whether quote and collateral validation succeeded in the guest.
 /// @param tcbStatus Intel TDX TCB status for the platform.
 /// @param timestamp Quote timestamp in milliseconds since Unix epoch.
 /// @param collateralExpiration Earliest expiration timestamp in seconds across accepted collateral.
@@ -43,7 +26,7 @@ enum TDXTcbStatus {
 /// @param reportDataPrefix First 32 bytes of TDREPORT.REPORTDATA.
 /// @param reportDataSuffix Last 32 bytes of TDREPORT.REPORTDATA, available for app-specific binding.
 struct TDXVerifierJournal {
-    TDXVerificationResult result;
+    bool success;
     TDXTcbStatus tcbStatus;
     uint64 timestamp;
     uint64 collateralExpiration;
@@ -58,9 +41,6 @@ struct TDXVerifierJournal {
 /// @title ITDXVerifier
 /// @notice Interface for Intel TDX quote verification used by TDX-aware TEE prover registries.
 interface ITDXVerifier {
-    /// @notice Address authorized to submit verified proofs.
-    function proofSubmitter() external view returns (address);
-
     /// @notice Verifies a ZK proof of Intel TDX DCAP quote verification and returns attested signer metadata.
     /// @param output ABI-encoded TDXVerifierJournal public values from the ZK verifier guest.
     /// @param proofBytes ZK proof bytes.

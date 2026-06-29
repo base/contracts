@@ -4,12 +4,7 @@ pragma solidity ^0.8.0;
 import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
 
 import { ISemver } from "interfaces/universal/ISemver.sol";
-import {
-    ITDXVerifier,
-    TDXTcbStatus,
-    TDXVerificationResult,
-    TDXVerifierJournal
-} from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
+import { ITDXVerifier, TDXTcbStatus, TDXVerifierJournal } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 
 /// @title TDXVerifier
 /// @notice Production-shape Intel TDX DCAP verifier for multiproof signer registration.
@@ -20,9 +15,6 @@ contract TDXVerifier is ITDXVerifier, ISemver {
     /// @notice Maximum accepted age of a TDX quote, in seconds.
     uint64 public immutable maxTimeDiff;
 
-    /// @notice Address authorized to submit TDX proofs, expected to be the TDX-aware registry.
-    address public immutable proofSubmitter;
-
     /// @notice Hash of the trusted Intel root CA used by the ZK verifier guest.
     bytes32 public immutable rootCaHash;
 
@@ -32,26 +24,11 @@ contract TDXVerifier is ITDXVerifier, ISemver {
     /// @notice RISC Zero image ID for the TDX DCAP verifier guest.
     bytes32 public immutable verifierId;
 
-    /// @notice Thrown when a zero maxTimeDiff is provided.
-    error ZeroMaxTimeDiff();
-
-    /// @notice Thrown when a zero address is provided for the proof submitter.
-    error ZeroProofSubmitter();
-
-    /// @notice Thrown when a zero root CA hash is provided.
-    error ZeroRootCaHash();
-
-    /// @notice Thrown when the caller is not the configured proof submitter.
-    error CallerNotProofSubmitter();
-
-    /// @notice Thrown when a zero RISC Zero verifier address is provided.
-    error ZeroRiscZeroVerifier();
-
-    /// @notice Thrown when a zero verifier ID is provided.
-    error ZeroVerifierId();
+    /// @notice Thrown when a zero constructor input is provided.
+    error ZeroInput();
 
     /// @notice Thrown when the TDX verifier guest did not report success.
-    error TDXVerificationFailed(TDXVerificationResult result);
+    error TDXVerificationFailed();
 
     /// @notice Thrown when the journal root does not match the trusted Intel root.
     error RootCaHashMismatch(bytes32 expected, bytes32 actual);
@@ -77,18 +54,15 @@ contract TDXVerifier is ITDXVerifier, ISemver {
     constructor(
         uint64 initialMaxTimeDiff,
         bytes32 initialRootCaHash,
-        address initialProofSubmitter,
         address initialRiscZeroVerifier,
         bytes32 initialVerifierId
     ) {
-        if (initialMaxTimeDiff == 0) revert ZeroMaxTimeDiff();
-        if (initialRootCaHash == bytes32(0)) revert ZeroRootCaHash();
-        if (initialProofSubmitter == address(0)) revert ZeroProofSubmitter();
-        if (initialRiscZeroVerifier == address(0)) revert ZeroRiscZeroVerifier();
-        if (initialVerifierId == bytes32(0)) revert ZeroVerifierId();
+        if (
+            initialMaxTimeDiff == 0 || initialRootCaHash == bytes32(0) || initialRiscZeroVerifier == address(0)
+                || initialVerifierId == bytes32(0)
+        ) revert ZeroInput();
         maxTimeDiff = initialMaxTimeDiff;
         rootCaHash = initialRootCaHash;
-        proofSubmitter = initialProofSubmitter;
         riscZeroVerifier = initialRiscZeroVerifier;
         verifierId = initialVerifierId;
     }
@@ -102,8 +76,6 @@ contract TDXVerifier is ITDXVerifier, ISemver {
         view
         returns (TDXVerifierJournal memory journal)
     {
-        if (msg.sender != proofSubmitter) revert CallerNotProofSubmitter();
-
         IRiscZeroVerifier(riscZeroVerifier).verify(proofBytes, verifierId, sha256(output));
         journal = abi.decode(output, (TDXVerifierJournal));
         _verifyJournal(journal);
@@ -116,7 +88,7 @@ contract TDXVerifier is ITDXVerifier, ISemver {
     }
 
     function _verifyJournal(TDXVerifierJournal memory journal) internal view {
-        if (journal.result != TDXVerificationResult.Success) revert TDXVerificationFailed(journal.result);
+        if (!journal.success) revert TDXVerificationFailed();
         if (journal.rootCaHash != rootCaHash) {
             revert RootCaHashMismatch(rootCaHash, journal.rootCaHash);
         }

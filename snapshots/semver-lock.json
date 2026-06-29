@@ -48,11 +48,11 @@
     "sourceCodeHash": "0x03c164216b27f82ee13064ace6079d5e24e187d888f41bd01c8daffa60c575d6"
   },
   "src/L1/proofs/tee/TDXVerifier.sol:TDXVerifier": {
-    "initCodeHash": "0x4f217be5fd1e333ef50a49014af962b3e4c6df978b7aa050555f7a764afef8fa",
-    "sourceCodeHash": "0xebbc9e5b57730e6c1a10aa87b10901efbbecb92452a9fbd2bb5827285c30dd7d"
+    "initCodeHash": "0x14ec4c0f99e2c957fa5dc7284fd74c9e24347c68557b01719f0709f08f4bda0b",
+    "sourceCodeHash": "0x28bb714117e586feaafdc8846c82615fa3b106d256426fef12133f8c4a3dcd70"
   },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0x8f835cc538a6aca33adfc9f66e17c06822e518587d34b8cadd77de10d041b462",
+    "initCodeHash": "0xa21dc34428175e2781ba786b87542da46bb39318f7001b31606387df8a94fde9",
     "sourceCodeHash": "0xcdbe2ba1aeac4e3dc6a4e138bda7bd3dd9d072b7d419f5a8af4f3e9a4a045217"
   },
   "src/L1/proofs/tee/TEEVerifier.sol:TEEVerifier": {

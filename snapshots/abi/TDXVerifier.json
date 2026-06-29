@@ -1,533 +1,270 @@
 [
   {
+    "type": "constructor",
     "inputs": [
       {
-        "internalType": "address",
-        "name": "owner",
-        "type": "address"
-      },
-      {
-        "internalType": "uint64",
         "name": "initialMaxTimeDiff",
-        "type": "uint64"
+        "type": "uint64",
+        "internalType": "uint64"
       },
       {
-        "internalType": "bytes32",
         "name": "initialRootCaHash",
-        "type": "bytes32"
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
-        "internalType": "address",
-        "name": "initialProofSubmitter",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
         "name": "initialRiscZeroVerifier",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "internalType": "bytes32",
         "name": "initialVerifierId",
-        "type": "bytes32"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
+    "stateMutability": "nonpayable"
   },
   {
-    "inputs": [
-      {
-        "internalType": "enum TDXTcbStatus",
-        "name": "status",
-        "type": "uint8"
-      }
-    ],
-    "name": "allowedTcbStatuses",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "pure",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "cancelOwnershipHandover",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "pendingOwner",
-        "type": "address"
-      }
-    ],
-    "name": "completeOwnershipHandover",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
+    "type": "function",
     "name": "maxTimeDiff",
+    "inputs": [],
     "outputs": [
       {
-        "internalType": "uint64",
         "name": "",
-        "type": "uint64"
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [],
-    "name": "owner",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "result",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "pendingOwner",
-        "type": "address"
-      }
-    ],
-    "name": "ownershipHandoverExpiresAt",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "result",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "proofSubmitter",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "renounceOwnership",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "requestOwnershipHandover",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
+    "type": "function",
     "name": "riscZeroVerifier",
+    "inputs": [],
     "outputs": [
       {
-        "internalType": "address",
         "name": "",
-        "type": "address"
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [],
+    "type": "function",
     "name": "rootCaHash",
-    "outputs": [
-      {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "newProofSubmitter",
-        "type": "address"
-      }
-    ],
-    "name": "setProofSubmitter",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "newOwner",
-        "type": "address"
-      }
-    ],
-    "name": "transferOwnership",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
     "inputs": [],
-    "name": "verifierId",
     "outputs": [
       {
-        "internalType": "bytes32",
         "name": "",
-        "type": "bytes32"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
+    "type": "function",
+    "name": "verifierId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "verify",
     "inputs": [
       {
-        "internalType": "bytes",
         "name": "output",
-        "type": "bytes"
+        "type": "bytes",
+        "internalType": "bytes"
       },
       {
-        "internalType": "bytes",
         "name": "proofBytes",
-        "type": "bytes"
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
-    "name": "verify",
     "outputs": [
       {
+        "name": "journal",
+        "type": "tuple",
+        "internalType": "struct TDXVerifierJournal",
         "components": [
           {
-            "internalType": "enum TDXVerificationResult",
-            "name": "result",
-            "type": "uint8"
+            "name": "success",
+            "type": "bool",
+            "internalType": "bool"
           },
           {
-            "internalType": "enum TDXTcbStatus",
             "name": "tcbStatus",
-            "type": "uint8"
+            "type": "uint8",
+            "internalType": "enum TDXTcbStatus"
           },
           {
-            "internalType": "uint64",
             "name": "timestamp",
-            "type": "uint64"
+            "type": "uint64",
+            "internalType": "uint64"
           },
           {
-            "internalType": "uint64",
             "name": "collateralExpiration",
-            "type": "uint64"
+            "type": "uint64",
+            "internalType": "uint64"
           },
           {
-            "internalType": "bytes32",
             "name": "rootCaHash",
-            "type": "bytes32"
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "internalType": "bytes32",
-            "name": "pckCertHash",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "tcbInfoHash",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "qeIdentityHash",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "bytes",
             "name": "publicKey",
-            "type": "bytes"
+            "type": "bytes",
+            "internalType": "bytes"
           },
           {
-            "internalType": "address",
             "name": "signer",
-            "type": "address"
+            "type": "address",
+            "internalType": "address"
           },
           {
-            "internalType": "bytes32",
             "name": "imageHash",
-            "type": "bytes32"
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "internalType": "bytes32",
-            "name": "mrTdHash",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "bytes32",
             "name": "reportDataPrefix",
-            "type": "bytes32"
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "internalType": "bytes32",
             "name": "reportDataSuffix",
-            "type": "bytes32"
+            "type": "bytes32",
+            "internalType": "bytes32"
           }
-        ],
-        "internalType": "struct TDXVerifierJournal",
-        "name": "journal",
-        "type": "tuple"
+        ]
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    "stateMutability": "view"
   },
   {
-    "inputs": [],
+    "type": "function",
     "name": "version",
+    "inputs": [],
     "outputs": [
       {
-        "internalType": "string",
         "name": "",
-        "type": "string"
+        "type": "string",
+        "internalType": "string"
       }
     ],
-    "stateMutability": "pure",
-    "type": "function"
+    "stateMutability": "pure"
   },
   {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "pendingOwner",
-        "type": "address"
-      }
-    ],
-    "name": "OwnershipHandoverCanceled",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "pendingOwner",
-        "type": "address"
-      }
-    ],
-    "name": "OwnershipHandoverRequested",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "oldOwner",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "newOwner",
-        "type": "address"
-      }
-    ],
-    "name": "OwnershipTransferred",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "proofSubmitter",
-        "type": "address"
-      }
-    ],
-    "name": "ProofSubmitterChanged",
-    "type": "event"
-  },
-  {
-    "inputs": [],
-    "name": "AlreadyInitialized",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "CallerNotProofSubmitter",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint64",
-        "name": "collateralExpiration",
-        "type": "uint64"
-      }
-    ],
+    "type": "error",
     "name": "CollateralExpired",
-    "type": "error"
+    "inputs": [
+      {
+        "name": "collateralExpiration",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
   },
   {
-    "inputs": [],
+    "type": "error",
     "name": "InvalidPublicKey",
-    "type": "error"
+    "inputs": []
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint64",
-        "name": "timestampSeconds",
-        "type": "uint64"
-      },
-      {
-        "internalType": "uint256",
-        "name": "currentTimestamp",
-        "type": "uint256"
-      }
-    ],
+    "type": "error",
     "name": "InvalidTimestamp",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NewOwnerIsZeroAddress",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NoHandoverRequest",
-    "type": "error"
-  },
-  {
     "inputs": [
       {
-        "internalType": "bytes32",
-        "name": "expected",
-        "type": "bytes32"
+        "name": "timestampSeconds",
+        "type": "uint64",
+        "internalType": "uint64"
       },
       {
-        "internalType": "bytes32",
-        "name": "actual",
-        "type": "bytes32"
+        "name": "currentTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
       }
-    ],
+    ]
+  },
+  {
+    "type": "error",
     "name": "ReportDataMismatch",
-    "type": "error"
-  },
-  {
     "inputs": [
       {
-        "internalType": "bytes32",
         "name": "expected",
-        "type": "bytes32"
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
-        "internalType": "bytes32",
         "name": "actual",
-        "type": "bytes32"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
-    ],
+    ]
+  },
+  {
+    "type": "error",
     "name": "RootCaHashMismatch",
-    "type": "error"
-  },
-  {
     "inputs": [
       {
-        "internalType": "address",
         "name": "expected",
-        "type": "address"
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
-        "internalType": "address",
         "name": "actual",
-        "type": "address"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
-    ],
+    ]
+  },
+  {
+    "type": "error",
     "name": "SignerMismatch",
-    "type": "error"
-  },
-  {
     "inputs": [
       {
-        "internalType": "enum TDXVerificationResult",
-        "name": "result",
-        "type": "uint8"
+        "name": "expected",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "actual",
+        "type": "address",
+        "internalType": "address"
       }
-    ],
+    ]
+  },
+  {
+    "type": "error",
     "name": "TDXVerificationFailed",
-    "type": "error"
+    "inputs": []
   },
   {
+    "type": "error",
+    "name": "TcbStatusNotAllowed",
     "inputs": [
       {
-        "internalType": "enum TDXTcbStatus",
         "name": "status",
-        "type": "uint8"
+        "type": "uint8",
+        "internalType": "enum TDXTcbStatus"
       }
-    ],
-    "name": "TcbStatusNotAllowed",
-    "type": "error"
+    ]
   },
   {
-    "inputs": [],
-    "name": "Unauthorized",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ZeroMaxTimeDiff",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ZeroProofSubmitter",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ZeroRiscZeroVerifier",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ZeroRootCaHash",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ZeroVerifierId",
-    "type": "error"
+    "type": "error",
+    "name": "ZeroInput",
+    "inputs": []
   }
 ]

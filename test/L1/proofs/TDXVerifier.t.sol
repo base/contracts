@@ -3,14 +3,13 @@ pragma solidity ^0.8.0;
 
 import { Test } from "forge-std/Test.sol";
 
-import { TDXTcbStatus, TDXVerificationResult, TDXVerifierJournal } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
+import { TDXTcbStatus, TDXVerifierJournal } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 
 import { TDXVerifier } from "src/L1/proofs/tee/TDXVerifier.sol";
 
 contract TDXVerifierTest is Test {
     TDXVerifier internal verifier;
 
-    address internal proofSubmitter;
     address internal mockRiscZeroVerifier;
 
     bytes32 internal constant ROOT_CA_HASH = keccak256("intel-root-ca");
@@ -25,10 +24,9 @@ contract TDXVerifierTest is Test {
     function setUp() public {
         vm.warp(NOW);
 
-        proofSubmitter = address(this);
         mockRiscZeroVerifier = makeAddr("mock-risc-zero");
 
-        verifier = new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, proofSubmitter, mockRiscZeroVerifier, VERIFIER_ID);
+        verifier = new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, mockRiscZeroVerifier, VERIFIER_ID);
     }
 
     function testVerifySucceedsWithRiscZeroProofAndAllowedJournal() public {
@@ -44,32 +42,19 @@ contract TDXVerifierTest is Test {
         assertEq(uint256(result.tcbStatus), uint256(TDXTcbStatus.UpToDate));
     }
 
-    function testVerifyRevertsIfNotProofSubmitter() public {
-        bytes memory output = abi.encode(_successJournal());
-
-        vm.prank(makeAddr("not-submitter"));
-        vm.expectRevert(TDXVerifier.CallerNotProofSubmitter.selector);
-        verifier.verify(output, "");
-    }
-
-    function testConstructorRevertsIfZeroRiscZeroVerifier() public {
-        vm.expectRevert(TDXVerifier.ZeroRiscZeroVerifier.selector);
-        new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, proofSubmitter, address(0), VERIFIER_ID);
-    }
-
-    function testConstructorRevertsIfZeroProofSubmitter() public {
-        vm.expectRevert(TDXVerifier.ZeroProofSubmitter.selector);
-        new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, address(0), mockRiscZeroVerifier, VERIFIER_ID);
+    function testConstructorRevertsIfZeroInput() public {
+        vm.expectRevert(TDXVerifier.ZeroInput.selector);
+        new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, address(0), VERIFIER_ID);
     }
 
     function testVerifyRevertsWhenGuestReportsFailure() public {
         TDXVerifierJournal memory journal = _successJournal();
-        journal.result = TDXVerificationResult.PckCertChainInvalid;
+        journal.success = false;
         bytes memory output = abi.encode(journal);
         bytes memory proofBytes = hex"1234";
         _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
 
-        vm.expectRevert(abi.encodeWithSelector(TDXVerifier.TDXVerificationFailed.selector, journal.result));
+        vm.expectRevert(TDXVerifier.TDXVerificationFailed.selector);
         verifier.verify(output, proofBytes);
     }
 
@@ -170,7 +155,7 @@ contract TDXVerifierTest is Test {
         }
 
         journal = TDXVerifierJournal({
-            result: TDXVerificationResult.Success,
+            success: true,
             tcbStatus: TDXTcbStatus.UpToDate,
             timestamp: uint64(block.timestamp - 1) * 1000,
             collateralExpiration: uint64(block.timestamp + 1 days),

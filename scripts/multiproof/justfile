@@ -36,24 +36,17 @@ default:
 #   L1_RPC_URL
 #
 # Args:
-#   proof_submitter    TEEProverRegistry allowed to call verify(); defaults to owner
 #   risc0_router       RISC Zero verifier router
 #   tdx_verifier_id    RISC Zero image ID for the TDX DCAP verifier guest
 #   intel_root_ca_hash Trusted Intel root CA hash consumed by the guest
-deploy-tdx-verifier proof_submitter="" risc0_router=sepolia_tdx_risc0_verifier_router tdx_verifier_id=sepolia_tdx_verifier_id intel_root_ca_hash=sepolia_intel_root_ca_hash:
+deploy-tdx-verifier risc0_router=sepolia_tdx_risc0_verifier_router tdx_verifier_id=sepolia_tdx_verifier_id intel_root_ca_hash=sepolia_intel_root_ca_hash:
   #!/usr/bin/env bash
   set -euo pipefail
   cd "{{repo_root}}"
   owner="$(cast wallet address --account "{{forge_account}}")"
-  proof_submitter="{{proof_submitter}}"
-  if [[ -z "$proof_submitter" ]]; then
-    proof_submitter="$owner"
-  fi
   echo "Using {{forge_account}} as owner/deployer: $owner"
-  echo "Using proof submitter: $proof_submitter"
   forge script scripts/multiproof/DeployTDXVerifier.s.sol:DeployTDXVerifier \
-    --sig "run(address,address,bytes32,bytes32)" \
-    "$proof_submitter" \
+    --sig "run(address,bytes32,bytes32)" \
     "{{risc0_router}}" \
     "{{tdx_verifier_id}}" \
     "{{intel_root_ca_hash}}" \
