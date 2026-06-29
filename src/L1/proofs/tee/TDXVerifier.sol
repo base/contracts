@@ -78,16 +78,7 @@ contract TDXVerifier is ITDXVerifier, ISemver {
     {
         IRiscZeroVerifier(riscZeroVerifier).verify(proofBytes, verifierId, sha256(output));
         journal = abi.decode(output, (TDXVerifierJournal));
-        _verifyJournal(journal);
-    }
 
-    /// @notice Semantic version.
-    /// @custom:semver 0.3.0
-    function version() public pure virtual returns (string memory) {
-        return "0.3.0";
-    }
-
-    function _verifyJournal(TDXVerifierJournal memory journal) internal view {
         if (!journal.success) revert TDXVerificationFailed();
         if (journal.rootCaHash != rootCaHash) {
             revert RootCaHashMismatch(rootCaHash, journal.rootCaHash);
@@ -108,6 +99,12 @@ contract TDXVerifier is ITDXVerifier, ISemver {
         if (journal.reportDataPrefix != publicKeyHash) {
             revert ReportDataMismatch(publicKeyHash, journal.reportDataPrefix);
         }
+    }
+
+    /// @notice Semantic version.
+    /// @custom:semver 0.3.0
+    function version() public pure virtual returns (string memory) {
+        return "0.3.0";
     }
 
     function _derivePublicKeyHash(bytes memory publicKey) internal pure returns (bytes32 publicKeyHash) {
