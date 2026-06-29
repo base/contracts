@@ -112,9 +112,6 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Thrown when the TDX verifier is not configured.
     error TDXVerifierNotSet();
 
-    /// @notice Thrown when a signer is already registered under another TEE type.
-    error SignerTEETypeMismatch(address signer, TEEType existingTEEType, TEEType newTEEType);
-
     constructor(INitroEnclaveVerifier nitroVerifier, ITDXVerifier tdxVerifier, IDisputeGameFactory factory) {
         if (address(factory) == address(0)) revert DisputeGameFactoryNotSet();
         if (address(tdxVerifier) == address(0)) revert TDXVerifierNotSet();
@@ -271,11 +268,6 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
     /// @dev Registers a signer and stores the image hash enforced by TEEVerifier at proof-submission time.
     function _registerSigner(address signer, bytes32 imageHash, TEEType teeType) internal {
-        TEEType existingTEEType = signerTEEType[signer];
-        if (existingTEEType != TEEType.NONE && existingTEEType != teeType) {
-            revert SignerTEETypeMismatch(signer, existingTEEType, teeType);
-        }
-
         isRegisteredSigner[signer] = true;
         signerImageHash[signer] = imageHash;
         signerTEEType[signer] = teeType;

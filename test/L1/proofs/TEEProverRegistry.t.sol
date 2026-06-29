@@ -218,22 +218,17 @@ contract TEEProverRegistryTest is Test {
         assertEq(uint8(teeProverRegistry.signerTEEType(signer)), uint8(TEEProverRegistry.TEEType.TDX));
     }
 
-    function testRegisteringSameSignerWithDifferentTEETypeFails() public {
+    function testRegisteringSameSignerWithDifferentTEETypeOverwritesTEEType() public {
         address signer = makeAddr("dev-signer");
 
         vm.prank(owner);
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
 
         vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                TEEProverRegistry.SignerTEETypeMismatch.selector,
-                signer,
-                TEEProverRegistry.TEEType.NITRO,
-                TEEProverRegistry.TEEType.TDX
-            )
-        );
         teeProverRegistry.addDevTDXSigner(signer, TEST_IMAGE_HASH);
+
+        assertTrue(teeProverRegistry.isRegisteredSigner(signer));
+        assertEq(uint8(teeProverRegistry.signerTEEType(signer)), uint8(TEEProverRegistry.TEEType.TDX));
     }
 
     function testMaxAgeConstant() public view {
