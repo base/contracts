@@ -516,31 +516,6 @@
     "type": "event"
   },
   {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "signer",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "imageHash",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "reportDataSuffix",
-        "type": "bytes32"
-      }
-    ],
-    "name": "TDXSignerRegistered",
-    "type": "event"
-  },
-  {
     "inputs": [],
     "name": "AttestationTooOld",
     "type": "error"
@@ -568,11 +543,6 @@
   {
     "inputs": [],
     "name": "InvalidPublicKey",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidTEEType",
     "type": "error"
   },
   {

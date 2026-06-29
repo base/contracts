@@ -79,9 +79,6 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Emitted when a signer is registered.
     event SignerRegistered(address indexed signer);
 
-    /// @notice Emitted when a TDX signer is registered.
-    event TDXSignerRegistered(address indexed signer, bytes32 indexed imageHash);
-
     /// @notice Emitted when a signer is deregistered.
     event SignerDeregistered(address indexed signer);
 
@@ -114,9 +111,6 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
     /// @notice Thrown when the TDX verifier is not configured.
     error TDXVerifierNotSet();
-
-    /// @notice Thrown when attempting to register a signer with no TEE type.
-    error InvalidTEEType();
 
     /// @notice Thrown when a signer is already registered under another TEE type.
     error SignerTEETypeMismatch(address signer, TEEType existingTEEType, TEEType newTEEType);
@@ -198,8 +192,6 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         (address signer, bytes32 imageHash) = TDX_VERIFIER.verify(output, proofBytes);
 
         _registerSigner(signer, imageHash, TEEType.TDX);
-
-        emit TDXSignerRegistered(signer, imageHash);
     }
 
     /// @notice Deregisters a signer.
@@ -279,7 +271,6 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
     /// @dev Registers a signer and stores the image hash enforced by TEEVerifier at proof-submission time.
     function _registerSigner(address signer, bytes32 imageHash, TEEType teeType) internal {
-        if (teeType == TEEType.NONE) revert InvalidTEEType();
         TEEType existingTEEType = signerTEEType[signer];
         if (existingTEEType != TEEType.NONE && existingTEEType != teeType) {
             revert SignerTEETypeMismatch(signer, existingTEEType, teeType);
@@ -294,7 +285,6 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
 
     /// @dev Reads a type-specific TEE image hash from the AggregateVerifier registered in the factory for `gameType_`.
     function _getExpectedImageHash(GameType gameType_, TEEType teeType) internal view returns (bytes32) {
-        if (teeType == TEEType.NONE) revert InvalidTEEType();
         address impl = address(DISPUTE_GAME_FACTORY.gameImpls(gameType_));
         bytes memory callData = teeType == TEEType.NITRO
             ? abi.encodeWithSignature("TEE_NITRO_IMAGE_HASH()")
