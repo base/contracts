@@ -36,16 +36,33 @@ abstract contract DeployDevBase is Script {
         cfg.read(Config.deployConfigPath());
     }
 
-    function run() public {
+    function run() public virtual {
         run(cfg.multiproofGenesisOutputRoot(), cfg.multiproofGenesisBlockNumber());
     }
 
-    function run(bytes32 asrStartingOutputRoot, uint256 asrStartingBlockNumber) public {
+    function run(bytes32 asrStartingOutputRoot, uint256 asrStartingBlockNumber) public virtual {
+        _run(asrStartingOutputRoot, asrStartingBlockNumber, address(0), cfg.tdxVerifier(), cfg.finalSystemOwner());
+    }
+
+    function _run(
+        bytes32 asrStartingOutputRoot,
+        uint256 asrStartingBlockNumber,
+        address nitroVerifier,
+        address tdxVerifier,
+        address registrationManager
+    )
+        internal
+    {
         require(asrStartingOutputRoot != bytes32(0), "asrStartingOutputRoot must be non-zero");
+        require(tdxVerifier != address(0), "tdxVerifier must be non-zero");
+        require(registrationManager != address(0), "registrationManager must be non-zero");
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
         string memory key = "deployment";
-
-        _preflight();
+        if (nitroVerifier != address(0)) {
+            vm.serializeAddress(key, "NitroEnclaveVerifier", nitroVerifier);
+            vm.serializeAddress(key, "TDXRegistrationManager", registrationManager);
+        }
+        vm.serializeAddress(key, "TDXVerifier", tdxVerifier);
 
         vm.startBroadcast();
 
@@ -66,19 +83,17 @@ abstract contract DeployDevBase is Script {
         initialProposers[0] = cfg.teeProposer();
         initialProposers[1] = cfg.teeChallenger();
 
-        address nitroVerifier = _nitroEnclaveVerifier();
         Proxy teeProxy = new Proxy(msg.sender);
         teeProxy.upgradeToAndCall(
             address(
                 new DevTEEProverRegistry(
                     INitroEnclaveVerifier(nitroVerifier),
-                    ITDXVerifier(_tdxVerifier()),
+                    ITDXVerifier(tdxVerifier),
                     IDisputeGameFactory(disputeGameFactory)
                 )
             ),
             abi.encodeCall(
-                TEEProverRegistry.initialize,
-                (cfg.finalSystemOwner(), _teeRegistrationManager(), initialProposers, gameType)
+                TEEProverRegistry.initialize, (cfg.finalSystemOwner(), registrationManager, initialProposers, gameType)
             )
         );
         teeProxy.changeAdmin(address(0xdead));
@@ -117,7 +132,6 @@ abstract contract DeployDevBase is Script {
         DisputeGameFactory(disputeGameFactory).setInitBond(gameType, _initBond());
         DisputeGameFactory(disputeGameFactory).transferOwnership(cfg.finalSystemOwner());
 
-        _serializeExtra(key);
         string memory json = vm.serializeAddress(key, "AggregateVerifier", aggregateVerifier);
 
         vm.stopBroadcast();
@@ -132,15 +146,4 @@ abstract contract DeployDevBase is Script {
     }
 
     function _outputSuffix() internal pure virtual returns (string memory);
-    function _tdxVerifier() internal view virtual returns (address);
-    function _preflight() internal view virtual;
-    function _serializeExtra(string memory key) internal virtual;
-
-    function _nitroEnclaveVerifier() internal view virtual returns (address) {
-        return address(0);
-    }
-
-    function _teeRegistrationManager() internal view virtual returns (address) {
-        return cfg.finalSystemOwner();
-    }
 }

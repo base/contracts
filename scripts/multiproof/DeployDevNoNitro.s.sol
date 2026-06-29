@@ -14,16 +14,4 @@ contract DeployDevNoNitro is DeployDevBase {
     function _outputSuffix() internal pure override returns (string memory) {
         return "-dev-no-nitro.json";
     }
-
-    function _preflight() internal view override {
-        require(cfg.tdxVerifier() != address(0), "tdxVerifier must be set in config");
-    }
-
-    function _tdxVerifier() internal view override returns (address) {
-        return cfg.tdxVerifier();
-    }
-
-    function _serializeExtra(string memory key) internal override {
-        vm.serializeAddress(key, "TDXVerifier", cfg.tdxVerifier());
-    }
 }
