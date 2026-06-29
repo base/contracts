@@ -21,7 +21,7 @@ interface ITEEProverRegistry {
     function deregisterSigner(address signer) external;
     function isValidSigner(address signer) external view returns (bool);
     function getRegisteredSigners() external view returns (address[] memory);
-    function getExpectedImageHash() external view returns (bytes32);
+    function getExpectedImageHash(uint8 teeType) external view returns (bytes32);
     function initialize(
         address initialOwner,
         address initialManager,

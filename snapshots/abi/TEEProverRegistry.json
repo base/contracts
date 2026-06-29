@@ -99,21 +99,14 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "getExpectedNitroImageHash",
-    "outputs": [
+    "inputs": [
       {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
+        "internalType": "enum TEEProverRegistry.TEEType",
+        "name": "teeType",
+        "type": "uint8"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getExpectedTDXImageHash",
+    "name": "getExpectedImageHash",
     "outputs": [
       {
         "internalType": "bytes32",

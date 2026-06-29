@@ -222,16 +222,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         return _registeredSigners.values();
     }
 
-    /// @notice Returns the expected Nitro TEE image hash from the current AggregateVerifier.
-    /// @return The TEE_NITRO_IMAGE_HASH from the AggregateVerifier registered in the factory.
-    function getExpectedNitroImageHash() external view returns (bytes32) {
-        return _getExpectedImageHash(gameType, TEEType.NITRO);
-    }
-
-    /// @notice Returns the expected TDX TEE image hash from the current AggregateVerifier.
-    /// @return The TEE_TDX_IMAGE_HASH from the AggregateVerifier registered in the factory.
-    function getExpectedTDXImageHash() external view returns (bytes32) {
-        return _getExpectedImageHash(gameType, TEEType.TDX);
+    /// @notice Returns the expected TEE image hash for the given TEE type from the current AggregateVerifier.
+    function getExpectedImageHash(TEEType teeType) external view returns (bytes32) {
+        return _getExpectedImageHash(gameType, teeType);
     }
 
     /// @notice Initializes the contract with owner, manager, proposers, and game type.
