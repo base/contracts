@@ -19,7 +19,7 @@ contract TDXVerifier is ITDXVerifier, ISemver {
     bytes32 public immutable rootCaHash;
 
     /// @notice RISC Zero verifier router.
-    address public immutable riscZeroVerifier;
+    IRiscZeroVerifier public immutable riscZeroVerifier;
 
     /// @notice RISC Zero image ID for the TDX DCAP verifier guest.
     bytes32 public immutable verifierId;
@@ -60,7 +60,7 @@ contract TDXVerifier is ITDXVerifier, ISemver {
         ) revert ZeroInput();
         maxTimeDiff = initialMaxTimeDiff;
         rootCaHash = initialRootCaHash;
-        riscZeroVerifier = initialRiscZeroVerifier;
+        riscZeroVerifier = IRiscZeroVerifier(initialRiscZeroVerifier);
         verifierId = initialVerifierId;
     }
 
@@ -73,13 +73,11 @@ contract TDXVerifier is ITDXVerifier, ISemver {
         view
         returns (TDXVerifierJournal memory journal)
     {
-        IRiscZeroVerifier(riscZeroVerifier).verify(proofBytes, verifierId, sha256(output));
+        riscZeroVerifier.verify(proofBytes, verifierId, sha256(output));
         journal = abi.decode(output, (TDXVerifierJournal));
 
         if (!journal.success) revert TDXVerificationFailed();
-        if (journal.rootCaHash != rootCaHash) {
-            revert RootCaHashMismatch(rootCaHash, journal.rootCaHash);
-        }
+        if (journal.rootCaHash != rootCaHash) revert RootCaHashMismatch(rootCaHash, journal.rootCaHash);
         if (journal.tcbStatus != TDXTcbStatus.UpToDate && journal.tcbStatus != TDXTcbStatus.SwHardeningNeeded) {
             revert TcbStatusNotAllowed(journal.tcbStatus);
         }
@@ -96,9 +94,8 @@ contract TDXVerifier is ITDXVerifier, ISemver {
         assembly {
             publicKeyHash := keccak256(add(publicKey, 0x21), 64)
         }
-        if (journal.reportDataPrefix != publicKeyHash) {
-            revert ReportDataMismatch(publicKeyHash, journal.reportDataPrefix);
-        }
+        bytes32 reportDataPrefix = journal.reportDataPrefix;
+        if (reportDataPrefix != publicKeyHash) revert ReportDataMismatch(publicKeyHash, reportDataPrefix);
 
         journal.signer = address(uint160(uint256(publicKeyHash)));
     }
