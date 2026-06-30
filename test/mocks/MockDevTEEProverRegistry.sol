@@ -6,7 +6,6 @@ import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.so
 import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
-import { EnumerableSetLib } from "src/vendor/EnumerableSetLib.sol";
 
 /// @title DevTEEProverRegistry
 /// @notice Test/development registry that can register signers without Nitro attestation verification.
