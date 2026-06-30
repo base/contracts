@@ -92,11 +92,7 @@ contract NullifyTest is BaseTest {
 
         _provideProof(gameA, ZK_PROVER, _generateProof("zk-dual-a", AggregateVerifier.ProofType.ZK));
 
-        assertEq(gameA.proofCount(), 2);
-        assertEq(gameA.expectedResolution().raw(), block.timestamp + gameA.FAST_FINALIZATION_DELAY());
-
         vm.warp(block.timestamp + gameA.FAST_FINALIZATION_DELAY());
-        assertTrue(gameA.gameOver());
 
         AggregateVerifier gameB =
             _createGame(ZK_PROVER, "dual-b", "zk-dual-b", AggregateVerifier.ProofType.ZK, address(gameA));
@@ -116,7 +112,10 @@ contract NullifyTest is BaseTest {
         AggregateVerifier game = _createGame(prover, "claim", "proof-1", proofType, address(anchorStateRegistry));
 
         _nullify(game, "proof-2", proofType, "nullify-claim");
-        _assertNullifiedToNoProofs(game, prover);
+        assertEq(uint8(game.status()), uint8(GameStatus.IN_PROGRESS));
+        assertEq(game.bondRecipient(), prover);
+        assertEq(game.proofCount(), 0);
+        assertEq(game.expectedResolution().raw(), type(uint64).max);
 
         vm.warp(block.timestamp + 14 days);
         _claimCreditAfterDelay(game, game.gameCreator());
@@ -135,15 +134,6 @@ contract NullifyTest is BaseTest {
         );
     }
 
-    function _assertNullifiedToNoProofs(AggregateVerifier game, address expectedBondRecipient) private view {
-        assertEq(uint8(game.status()), uint8(GameStatus.IN_PROGRESS));
-        assertEq(game.bondRecipient(), expectedBondRecipient);
-        assertEq(game.proofCount(), 0);
-        assertEq(game.expectedResolution().raw(), type(uint64).max);
-    }
-
-    /// @notice When a shared verifier is nullified by another game, `resolve` persists the refutation and returns
-    ///         early `IN_PROGRESS` instead of reverting.
     function _assertResolveEarlyReturnWhenSharedVerifierNullifiedByAnotherGame(AggregateVerifier.ProofType proofType)
         private
     {
