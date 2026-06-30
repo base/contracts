@@ -39,12 +39,6 @@ contract BaseTest is Test {
     address internal immutable TEE_PROVER = makeAddr("tee-prover");
     address internal immutable ZK_PROVER = makeAddr("zk-prover");
 
-    bytes32 internal constant TEE_NITRO_IMAGE_HASH = keccak256("tee-nitro-image");
-    bytes32 internal constant TEE_TDX_IMAGE_HASH = keccak256("tee-tdx-image");
-    bytes32 internal constant ZK_RANGE_HASH = keccak256("zk-range");
-    bytes32 internal constant ZK_AGGREGATE_HASH = keccak256("zk-aggregate");
-    bytes32 internal constant CONFIG_HASH = keccak256("config");
-
     ProxyAdmin internal proxyAdmin;
     ISystemConfig internal systemConfig;
 
@@ -111,10 +105,10 @@ contract BaseTest is Test {
             IDelayedWETH(payable(address(delayedWETH))),
             IVerifier(address(teeVerifier)),
             IVerifier(address(zkVerifier)),
-            TEE_NITRO_IMAGE_HASH,
-            TEE_TDX_IMAGE_HASH,
-            AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
-            CONFIG_HASH,
+            keccak256("tee-nitro-image"),
+            keccak256("tee-tdx-image"),
+            AggregateVerifier.ZkHashes(keccak256("zk-range"), keccak256("zk-aggregate")),
+            keccak256("config"),
             L2_CHAIN_ID,
             blockInterval,
             intermediateBlockInterval
