@@ -2,15 +2,11 @@
 pragma solidity 0.8.15;
 
 import { BadExtraData, GameNotResolved } from "src/libraries/bridge/Errors.sol";
-import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
-import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { GameStatus, GameTypes, Hash } from "src/libraries/bridge/Types.sol";
 import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
-import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 
 import { BaseTest } from "./BaseTest.t.sol";
 
@@ -18,13 +14,7 @@ contract AggregateVerifierTest is BaseTest {
     function testInitializeWithTEEProof() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
 
-        AggregateVerifier game = _createAggregateVerifierGame(
-            TEE_PROVER,
-            rootClaim,
-            currentL2BlockNumber,
-            address(anchorStateRegistry),
-            _generateProof("tee-proof", AggregateVerifier.ProofType.TEE)
-        );
+        AggregateVerifier game = _createGame(TEE_PROVER, rootClaim, "tee-proof", AggregateVerifier.ProofType.TEE);
 
         assertEq(game.teeProver(), TEE_PROVER);
         assertEq(game.zkProver(), address(0));
@@ -36,13 +26,7 @@ contract AggregateVerifierTest is BaseTest {
     function testInitializeWithZKProof() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
 
-        AggregateVerifier game = _createAggregateVerifierGame(
-            ZK_PROVER,
-            rootClaim,
-            currentL2BlockNumber,
-            address(anchorStateRegistry),
-            _generateProof("zk-proof", AggregateVerifier.ProofType.ZK)
-        );
+        AggregateVerifier game = _createGame(ZK_PROVER, rootClaim, "zk-proof", AggregateVerifier.ProofType.ZK);
 
         assertEq(game.teeProver(), address(0));
         assertEq(game.zkProver(), ZK_PROVER);
@@ -63,13 +47,7 @@ contract AggregateVerifierTest is BaseTest {
 
     function testUpdatingAnchorStateRegistryWithTEEProof() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
-        AggregateVerifier game = _createAggregateVerifierGame(
-            TEE_PROVER,
-            rootClaim,
-            currentL2BlockNumber,
-            address(anchorStateRegistry),
-            _generateProof("tee-proof", AggregateVerifier.ProofType.TEE)
-        );
+        AggregateVerifier game = _createGame(TEE_PROVER, rootClaim, "tee-proof", AggregateVerifier.ProofType.TEE);
 
         vm.expectRevert(GameNotResolved.selector);
         game.claimCredit();
@@ -79,27 +57,17 @@ contract AggregateVerifierTest is BaseTest {
 
     function testUpdatingAnchorStateRegistryWithZKProof() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
-        AggregateVerifier game = _createAggregateVerifierGame(
-            ZK_PROVER,
-            rootClaim,
-            currentL2BlockNumber,
-            address(anchorStateRegistry),
-            _generateProof("zk-proof", AggregateVerifier.ProofType.ZK)
-        );
+        AggregateVerifier game = _createGame(ZK_PROVER, rootClaim, "zk-proof", AggregateVerifier.ProofType.ZK);
 
         _resolveSlowAndClose(game, rootClaim);
     }
 
     function testUpdatingAnchorStateRegistryWithBothProofs() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
-        bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
-        bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
 
-        AggregateVerifier game = _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), teeProof
-        );
+        AggregateVerifier game = _createGame(TEE_PROVER, rootClaim, "tee-proof", AggregateVerifier.ProofType.TEE);
 
-        _provideProof(game, ZK_PROVER, zkProof);
+        _provideProof(game, ZK_PROVER, _generateProof("zk-proof", AggregateVerifier.ProofType.ZK));
         assertEq(game.proofCount(), 2);
 
         vm.warp(block.timestamp + game.FAST_FINALIZATION_DELAY());
@@ -115,12 +83,8 @@ contract AggregateVerifierTest is BaseTest {
 
     function testProofCannotIncreaseExpectedResolution() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
-        bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
-        bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
 
-        AggregateVerifier game = _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), teeProof
-        );
+        AggregateVerifier game = _createGame(TEE_PROVER, rootClaim, "tee-proof", AggregateVerifier.ProofType.TEE);
         uint256 slowDelay = game.SLOW_FINALIZATION_DELAY();
 
         Timestamp originalExpectedResolution = game.expectedResolution();
@@ -130,7 +94,7 @@ contract AggregateVerifierTest is BaseTest {
         vm.expectRevert(AggregateVerifier.GameNotOver.selector);
         game.resolve();
 
-        _provideProof(game, ZK_PROVER, zkProof);
+        _provideProof(game, ZK_PROVER, _generateProof("zk-proof", AggregateVerifier.ProofType.ZK));
         assertEq(game.expectedResolution().raw(), originalExpectedResolution.raw());
 
         vm.warp(block.timestamp + 1);
@@ -140,27 +104,18 @@ contract AggregateVerifierTest is BaseTest {
 
     function testCannotCreateSameProposal() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
-        bytes memory teeProof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
-        bytes memory zkProof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
 
-        AggregateVerifier game = _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), teeProof
-        );
+        AggregateVerifier game = _createGame(TEE_PROVER, rootClaim, "tee-proof", AggregateVerifier.ProofType.TEE);
 
         Hash gameId = factory.getGameUUID(GameTypes.AGGREGATE_VERIFIER, rootClaim, game.extraData());
         vm.expectRevert(abi.encodeWithSelector(IDisputeGameFactory.GameAlreadyExists.selector, gameId));
-        _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), zkProof);
+        _createGame(ZK_PROVER, rootClaim, "zk-proof", AggregateVerifier.ProofType.ZK);
     }
 
     function testInitializeFailsIfParentGameNotFactoryRegistered() public {
         Claim parentRootClaim = _advanceL2BlockAndClaim();
-        AggregateVerifier unregisteredParent = _createAggregateVerifierGame(
-            TEE_PROVER,
-            parentRootClaim,
-            currentL2BlockNumber,
-            address(anchorStateRegistry),
-            _generateProof("parent-tee", AggregateVerifier.ProofType.TEE)
-        );
+        AggregateVerifier unregisteredParent =
+            _createGame(TEE_PROVER, parentRootClaim, "parent-tee", AggregateVerifier.ProofType.TEE);
 
         vm.mockCall(
             address(factory),
@@ -168,7 +123,7 @@ contract AggregateVerifierTest is BaseTest {
                 IDisputeGameFactory.games,
                 (GameTypes.AGGREGATE_VERIFIER, parentRootClaim, unregisteredParent.extraData())
             ),
-            abi.encode(IDisputeGame(address(0)), Timestamp.wrap(0))
+            abi.encode(address(0), Timestamp.wrap(0))
         );
 
         currentL2BlockNumber += BLOCK_INTERVAL;
@@ -271,6 +226,20 @@ contract AggregateVerifierTest is BaseTest {
         _assertAnchorRoot(rootClaim);
     }
 
+    function _createGame(
+        address creator,
+        Claim rootClaim,
+        bytes memory proofSalt,
+        AggregateVerifier.ProofType proofType
+    )
+        private
+        returns (AggregateVerifier)
+    {
+        return _createAggregateVerifierGame(
+            creator, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), _generateProof(proofSalt, proofType)
+        );
+    }
+
     function _createTEEGameWithOrigin(
         Claim rootClaim,
         bytes32 l1OriginHash,
@@ -304,19 +273,6 @@ contract AggregateVerifierTest is BaseTest {
                 AggregateVerifier.InvalidBlockInterval.selector, blockInterval, intermediateBlockInterval
             )
         );
-        new AggregateVerifier(
-            GameTypes.AGGREGATE_VERIFIER,
-            IAnchorStateRegistry(address(anchorStateRegistry)),
-            IDelayedWETH(payable(address(delayedWETH))),
-            IVerifier(address(teeVerifier)),
-            IVerifier(address(zkVerifier)),
-            TEE_NITRO_IMAGE_HASH,
-            TEE_TDX_IMAGE_HASH,
-            AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
-            CONFIG_HASH,
-            L2_CHAIN_ID,
-            blockInterval,
-            intermediateBlockInterval
-        );
+        _newAggregateVerifier(blockInterval, intermediateBlockInterval);
     }
 }

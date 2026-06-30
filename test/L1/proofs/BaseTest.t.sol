@@ -107,7 +107,20 @@ contract BaseTest is Test {
     }
 
     function _deployAndSetAggregateVerifier() internal {
-        AggregateVerifier aggregateVerifierImpl = new AggregateVerifier(
+        AggregateVerifier aggregateVerifierImpl = _newAggregateVerifier(BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
+
+        factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(aggregateVerifierImpl)));
+        factory.setInitBond(GameTypes.AGGREGATE_VERIFIER, INIT_BOND);
+    }
+
+    function _newAggregateVerifier(
+        uint256 blockInterval,
+        uint256 intermediateBlockInterval
+    )
+        internal
+        returns (AggregateVerifier)
+    {
+        return new AggregateVerifier(
             GameTypes.AGGREGATE_VERIFIER,
             IAnchorStateRegistry(address(anchorStateRegistry)),
             IDelayedWETH(payable(address(delayedWETH))),
@@ -118,12 +131,9 @@ contract BaseTest is Test {
             AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
             CONFIG_HASH,
             L2_CHAIN_ID,
-            BLOCK_INTERVAL,
-            INTERMEDIATE_BLOCK_INTERVAL
+            blockInterval,
+            intermediateBlockInterval
         );
-
-        factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(aggregateVerifierImpl)));
-        factory.setInitBond(GameTypes.AGGREGATE_VERIFIER, INIT_BOND);
     }
 
     function _createAggregateVerifierGame(
