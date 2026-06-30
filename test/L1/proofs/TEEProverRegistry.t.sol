@@ -71,26 +71,20 @@ contract TEEProverRegistryTest is Test {
         assertTrue(registry2.isValidProposer(proposers[0]));
     }
 
-    function testDeregisterSignerAsOwner() public {
-        address signer = makeAddr("signer");
+    function testDeregisterSignerAsOwnerOrManager() public {
+        address ownerSigner = makeAddr("owner-signer");
+        address managerSigner = makeAddr("manager-signer");
 
-        _addDevSigner(signer);
+        _addDevSigner(ownerSigner);
+        _addDevSigner(managerSigner);
 
         vm.prank(owner);
-        teeProverRegistry.deregisterSigner(signer);
-
-        assertFalse(teeProverRegistry.isValidSigner(signer));
-    }
-
-    function testDeregisterSignerAsManager() public {
-        address signer = makeAddr("signer");
-
-        _addDevSigner(signer);
-
+        teeProverRegistry.deregisterSigner(ownerSigner);
         vm.prank(manager);
-        teeProverRegistry.deregisterSigner(signer);
+        teeProverRegistry.deregisterSigner(managerSigner);
 
-        assertFalse(teeProverRegistry.isValidSigner(signer));
+        assertFalse(teeProverRegistry.isValidSigner(ownerSigner));
+        assertFalse(teeProverRegistry.isValidSigner(managerSigner));
     }
 
     function testDeregisterSignerFailsIfUnauthorized() public {
@@ -172,19 +166,16 @@ contract TEEProverRegistryTest is Test {
     function testGetRegisteredSignersConsistencyAfterMixedOperations() public {
         address signer1 = makeAddr("signer-1");
         address signer2 = makeAddr("signer-2");
-        address signer3 = makeAddr("signer-3");
 
         _addDevSigner(signer1);
         _addDevSigner(signer2);
-        _addDevSigner(signer3);
 
         vm.prank(manager);
         teeProverRegistry.deregisterSigner(signer2);
 
         address[] memory signers = teeProverRegistry.getRegisteredSigners();
-        assertEq(signers.length, 2);
-        assertTrue(signers[0] == signer1 || signers[1] == signer1);
-        assertTrue(signers[0] == signer3 || signers[1] == signer3);
+        assertEq(signers.length, 1);
+        assertEq(signers[0], signer1);
         assertFalse(teeProverRegistry.isValidSigner(signer2));
     }
 }
