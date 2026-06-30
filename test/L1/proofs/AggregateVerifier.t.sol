@@ -12,9 +12,8 @@ import { BaseTest } from "./BaseTest.t.sol";
 
 contract AggregateVerifierTest is BaseTest {
     function testInitializeWithTEEProof() public {
-        Claim rootClaim = _advanceL2BlockAndClaim();
-
-        AggregateVerifier game = _createGame(TEE_PROVER, rootClaim, "tee-proof", AggregateVerifier.ProofType.TEE);
+        AggregateVerifier game =
+            _createGame(TEE_PROVER, _advanceL2BlockAndClaim(), "tee-proof", AggregateVerifier.ProofType.TEE);
 
         assertEq(game.teeProver(), TEE_PROVER);
         assertEq(game.zkProver(), address(0));
@@ -24,9 +23,8 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function testInitializeWithZKProof() public {
-        Claim rootClaim = _advanceL2BlockAndClaim();
-
-        AggregateVerifier game = _createGame(ZK_PROVER, rootClaim, "zk-proof", AggregateVerifier.ProofType.ZK);
+        AggregateVerifier game =
+            _createGame(ZK_PROVER, _advanceL2BlockAndClaim(), "zk-proof", AggregateVerifier.ProofType.ZK);
 
         assertEq(game.teeProver(), address(0));
         assertEq(game.zkProver(), ZK_PROVER);
@@ -36,13 +34,11 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function testInitializeFailsIfInvalidCallDataSize() public {
-        Claim rootClaim = _advanceL2BlockAndClaim();
-
-        vm.deal(TEE_PROVER, INIT_BOND);
-
-        vm.prank(TEE_PROVER);
+        hoax(TEE_PROVER, INIT_BOND);
         vm.expectRevert(BadExtraData.selector);
-        factory.createWithInitData{ value: INIT_BOND }(GameTypes.AGGREGATE_VERIFIER, rootClaim, hex"", hex"");
+        factory.createWithInitData{ value: INIT_BOND }(
+            GameTypes.AGGREGATE_VERIFIER, _advanceL2BlockAndClaim(), hex"", hex""
+        );
     }
 
     function testUpdatingAnchorStateRegistryWithTEEProof() public {
@@ -82,9 +78,8 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function testProofCannotIncreaseExpectedResolution() public {
-        Claim rootClaim = _advanceL2BlockAndClaim();
-
-        AggregateVerifier game = _createGame(TEE_PROVER, rootClaim, "tee-proof", AggregateVerifier.ProofType.TEE);
+        AggregateVerifier game =
+            _createGame(TEE_PROVER, _advanceL2BlockAndClaim(), "tee-proof", AggregateVerifier.ProofType.TEE);
         uint256 slowDelay = game.SLOW_FINALIZATION_DELAY();
 
         Timestamp originalExpectedResolution = game.expectedResolution();
@@ -127,12 +122,11 @@ contract AggregateVerifierTest is BaseTest {
         );
 
         currentL2BlockNumber += BLOCK_INTERVAL;
-        Claim childRootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "child")));
 
         vm.expectRevert(AggregateVerifier.InvalidParentGame.selector);
         _createAggregateVerifierGame(
             TEE_PROVER,
-            childRootClaim,
+            Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "child"))),
             currentL2BlockNumber,
             address(unregisteredParent),
             _generateProof("child-tee", AggregateVerifier.ProofType.TEE)
@@ -140,59 +134,56 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function testVerifyFailsWithL1OriginInFuture() public {
-        Claim rootClaim = _advanceL2BlockAndClaim();
         uint256 l1OriginNumber = block.number + 1;
 
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.L1OriginInFuture.selector, l1OriginNumber, block.number)
         );
-        _createTEEGameWithOrigin(rootClaim, bytes32(uint256(1)), l1OriginNumber);
+        _createTEEGameWithOrigin(_advanceL2BlockAndClaim(), bytes32(uint256(1)), l1OriginNumber);
     }
 
     function testVerifyFailsWithL1OriginTooOld() public {
-        Claim rootClaim = _advanceL2BlockAndClaim();
-
         vm.roll(block.number + 300);
 
         uint256 l1OriginNumber = 1;
 
         vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginTooOld.selector, l1OriginNumber, block.number));
-        _createTEEGameWithOrigin(rootClaim, bytes32(uint256(1)), l1OriginNumber);
+        _createTEEGameWithOrigin(_advanceL2BlockAndClaim(), bytes32(uint256(1)), l1OriginNumber);
     }
 
     function testVerifyFailsWithL1OriginHashMismatch() public {
-        Claim rootClaim = _advanceL2BlockAndClaim();
         uint256 l1OriginNumber = block.number - 1;
         bytes32 wrongHash = bytes32(uint256(0xdeadbeef));
 
-        bytes32 actualHash = blockhash(l1OriginNumber);
-        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginHashMismatch.selector, wrongHash, actualHash));
-        _createTEEGameWithOrigin(rootClaim, wrongHash, l1OriginNumber);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AggregateVerifier.L1OriginHashMismatch.selector, wrongHash, blockhash(l1OriginNumber)
+            )
+        );
+        _createTEEGameWithOrigin(_advanceL2BlockAndClaim(), wrongHash, l1OriginNumber);
     }
 
     function testVerifyWithBlockhashWindow() public {
-        Claim rootClaim = _advanceL2BlockAndClaim();
-
         vm.roll(block.number + 100);
 
         uint256 l1OriginNumber = block.number - 50;
-        bytes32 l1OriginHash = blockhash(l1OriginNumber);
 
-        _createTEEGameWithOrigin(rootClaim, l1OriginHash, l1OriginNumber);
+        _createTEEGameWithOrigin(_advanceL2BlockAndClaim(), blockhash(l1OriginNumber), l1OriginNumber);
     }
 
     function testVerifyWithEIP2935Window() public {
-        Claim rootClaim = _advanceL2BlockAndClaim();
-
         vm.roll(block.number + 300);
 
         uint256 l1OriginNumber = block.number - 260;
         bytes32 expectedHash = keccak256(abi.encodePacked("mock-blockhash", l1OriginNumber));
-        address eip2935 = AggregateVerifier(address(factory.gameImpls(GameTypes.AGGREGATE_VERIFIER))).EIP2935_CONTRACT();
 
-        vm.mockCall(eip2935, abi.encode(l1OriginNumber), abi.encode(expectedHash));
+        vm.mockCall(
+            AggregateVerifier(address(factory.gameImpls(GameTypes.AGGREGATE_VERIFIER))).EIP2935_CONTRACT(),
+            abi.encode(l1OriginNumber),
+            abi.encode(expectedHash)
+        );
 
-        _createTEEGameWithOrigin(rootClaim, expectedHash, l1OriginNumber);
+        _createTEEGameWithOrigin(_advanceL2BlockAndClaim(), expectedHash, l1OriginNumber);
     }
 
     function testDeployWithInvalidBlockIntervals() public {
@@ -245,15 +236,8 @@ contract AggregateVerifierTest is BaseTest {
         );
     }
 
-    function _createTEEGameWithOrigin(
-        Claim rootClaim,
-        bytes32 l1OriginHash,
-        uint256 l1OriginNumber
-    )
-        private
-        returns (AggregateVerifier)
-    {
-        return _createAggregateVerifierGame(
+    function _createTEEGameWithOrigin(Claim rootClaim, bytes32 l1OriginHash, uint256 l1OriginNumber) private {
+        _createAggregateVerifierGame(
             TEE_PROVER,
             rootClaim,
             currentL2BlockNumber,
