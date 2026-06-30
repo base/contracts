@@ -51,7 +51,7 @@ contract TEEProverRegistryTest is Test {
 
     function _addDevSigner(address signer) internal {
         vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH, TEEProverRegistry.TEEType.NITRO);
     }
 
     function testInitialization() public view {
@@ -111,7 +111,7 @@ contract TEEProverRegistryTest is Test {
         _addDevSigner(signer);
 
         vm.prank(owner);
-        teeProverRegistry.addDevTDXSigner(signer, TEST_IMAGE_HASH);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH, TEEProverRegistry.TEEType.TDX);
 
         assertTrue(teeProverRegistry.signerTEEType(signer) == TEEProverRegistry.TEEType.TDX);
     }
@@ -155,7 +155,7 @@ contract TEEProverRegistryTest is Test {
     function testAddDevSignerFailsIfNotOwner() public {
         vm.prank(manager);
         vm.expectRevert(bytes("OwnableManaged: caller is not the owner"));
-        teeProverRegistry.addDevSigner(makeAddr("dev-signer"), TEST_IMAGE_HASH);
+        teeProverRegistry.addDevSigner(makeAddr("dev-signer"), TEST_IMAGE_HASH, TEEProverRegistry.TEEType.NITRO);
     }
 
     function testGetRegisteredSignersConsistencyAfterMixedOperations() public {
