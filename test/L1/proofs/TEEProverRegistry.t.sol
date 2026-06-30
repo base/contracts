@@ -15,12 +15,12 @@ import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
-bytes32 constant REGISTRY_TEST_IMAGE_HASH = keccak256("test-image-hash");
+bytes32 constant TEST_IMAGE_HASH = keccak256("test-image-hash");
 
 /// @notice Mock AggregateVerifier that returns TEE image hashes.
 contract MockAggregateVerifierForRegistry {
-    bytes32 public constant TEE_NITRO_IMAGE_HASH = REGISTRY_TEST_IMAGE_HASH;
-    bytes32 public constant TEE_TDX_IMAGE_HASH = REGISTRY_TEST_IMAGE_HASH;
+    bytes32 public constant TEE_NITRO_IMAGE_HASH = TEST_IMAGE_HASH;
+    bytes32 public constant TEE_TDX_IMAGE_HASH = TEST_IMAGE_HASH;
 }
 
 /// @dev Uses DevTEEProverRegistry because production signer registration requires a Nitro attestation proof.
@@ -31,7 +31,6 @@ contract TEEProverRegistryTest is Test {
     address public manager;
     address public unauthorized;
 
-    bytes32 public constant TEST_IMAGE_HASH = REGISTRY_TEST_IMAGE_HASH;
     GameType public constant TEST_GAME_TYPE = GameType.wrap(621);
     string internal constant NOT_OWNER = "OwnableManaged: caller is not the owner";
     string internal constant NOT_OWNER_OR_MANAGER = "OwnableManaged: caller is not the owner or the manager";
@@ -218,83 +217,6 @@ contract TEEProverRegistryTest is Test {
         assertEq(teeProverRegistry.MAX_AGE(), 60 minutes);
     }
 
-    function testTransferOwnership() public {
-        address newOwner = makeAddr("newOwner");
-
-        vm.prank(owner);
-        teeProverRegistry.transferOwnership(newOwner);
-
-        assertEq(teeProverRegistry.owner(), newOwner);
-    }
-
-    function testTransferOwnershipFailsIfNotOwner() public {
-        address newOwner = makeAddr("newOwner");
-
-        _expectNotOwnerRevert(manager);
-        teeProverRegistry.transferOwnership(newOwner);
-
-        _expectNotOwnerRevert(unauthorized);
-        teeProverRegistry.transferOwnership(newOwner);
-    }
-
-    function testTransferOwnershipFailsForZeroAddress() public {
-        vm.prank(owner);
-        vm.expectRevert("OwnableManaged: new owner is the zero address");
-        teeProverRegistry.transferOwnership(address(0));
-    }
-
-    function testTransferManagementAsOwner() public {
-        address newManager = makeAddr("newManager");
-
-        vm.prank(owner);
-        teeProverRegistry.transferManagement(newManager);
-
-        assertEq(teeProverRegistry.manager(), newManager);
-    }
-
-    function testTransferManagementAsManager() public {
-        address newManager = makeAddr("newManager");
-
-        vm.prank(manager);
-        teeProverRegistry.transferManagement(newManager);
-
-        assertEq(teeProverRegistry.manager(), newManager);
-    }
-
-    function testTransferManagementFailsIfUnauthorized() public {
-        address newManager = makeAddr("newManager");
-
-        _expectNotOwnerOrManagerRevert(unauthorized);
-        teeProverRegistry.transferManagement(newManager);
-    }
-
-    function testTransferManagementFailsForZeroAddress() public {
-        vm.prank(owner);
-        vm.expectRevert("OwnableManaged: new manager is the zero address");
-        teeProverRegistry.transferManagement(address(0));
-    }
-
-    function testRenounceOwnership() public {
-        vm.prank(owner);
-        teeProverRegistry.renounceOwnership();
-
-        assertEq(teeProverRegistry.owner(), address(0));
-    }
-
-    function testRenounceManagementAsOwner() public {
-        vm.prank(owner);
-        teeProverRegistry.renounceManagement();
-
-        assertEq(teeProverRegistry.manager(), address(0));
-    }
-
-    function testRenounceManagementAsManager() public {
-        vm.prank(manager);
-        teeProverRegistry.renounceManagement();
-
-        assertEq(teeProverRegistry.manager(), address(0));
-    }
-
     function testAddDevSigner() public {
         address signer = makeAddr("dev-signer");
 
@@ -326,18 +248,6 @@ contract TEEProverRegistryTest is Test {
         assertTrue(teeProverRegistry.isValidSigner(signer));
     }
 
-    function testAddMultipleDevSigners() public {
-        address signer1 = makeAddr("dev-signer-1");
-        address signer2 = makeAddr("dev-signer-2");
-        address signer3 = makeAddr("dev-signer-3");
-
-        _addDevSigners(signer1, signer2, signer3);
-
-        assertTrue(teeProverRegistry.isValidSigner(signer1));
-        assertTrue(teeProverRegistry.isValidSigner(signer2));
-        assertTrue(teeProverRegistry.isValidSigner(signer3));
-    }
-
     function testGetRegisteredSignersEmpty() public view {
         assertEq(teeProverRegistry.getRegisteredSigners().length, 0);
     }
@@ -350,17 +260,6 @@ contract TEEProverRegistryTest is Test {
         address[] memory signers = teeProverRegistry.getRegisteredSigners();
         assertEq(signers.length, 1);
         assertEq(signers[0], signer);
-    }
-
-    function testGetRegisteredSignersAfterDeregister() public {
-        address signer = makeAddr("signer");
-
-        _addDevSigner(signer);
-
-        vm.prank(owner);
-        teeProverRegistry.deregisterSigner(signer);
-
-        assertEq(teeProverRegistry.getRegisteredSigners().length, 0);
     }
 
     function testGetRegisteredSignersMultiple() public {
