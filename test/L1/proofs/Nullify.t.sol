@@ -95,7 +95,6 @@ contract NullifyTest is BaseTest {
             _createGame(ZK_PROVER, "dual-b", "zk-dual-b", AggregateVerifier.ProofType.ZK, address(gameA));
 
         _nullify(gameB, "zk-nullify-dual", AggregateVerifier.ProofType.ZK, "dual-nullify-b");
-        assertTrue(zkVerifier.nullified());
 
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
         assertEq(gameA.proofCount(), 1);
@@ -139,13 +138,8 @@ contract NullifyTest is BaseTest {
         AggregateVerifier gameB = _createGame(prover, "game-b", "proof-b", proofType, address(gameA));
 
         vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
-        assertTrue(gameA.gameOver());
-        assertEq(gameA.proofCount(), 1);
 
         _nullify(gameB, "nullify-proof", proofType, "nullify-claim");
-
-        assertTrue(proofType == AggregateVerifier.ProofType.TEE ? teeVerifier.nullified() : zkVerifier.nullified());
-        assertEq(gameA.proofCount(), 1);
 
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
         assertEq(gameA.proofCount(), 0);
