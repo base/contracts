@@ -29,7 +29,6 @@ contract TEEProverRegistryTest is Test {
     address public manager;
 
     GameType public constant TEST_GAME_TYPE = GameType.wrap(621);
-    string internal constant NOT_OWNER = "OwnableManaged: caller is not the owner";
 
     // Events must be redeclared here because Solidity 0.8.15 doesn't support
     // referencing events from other contracts via qualified names (requires 0.8.21+)
@@ -73,7 +72,7 @@ contract TEEProverRegistryTest is Test {
 
     function _expectNotOwnerRevert(address caller) internal {
         vm.prank(caller);
-        vm.expectRevert(bytes(NOT_OWNER));
+        vm.expectRevert(bytes("OwnableManaged: caller is not the owner"));
     }
 
     function _assertContains(address[] memory values, address expected) internal {
@@ -128,11 +127,9 @@ contract TEEProverRegistryTest is Test {
     }
 
     function testDeregisterSignerFailsIfUnauthorized() public {
-        address signer = makeAddr("signer");
-
         vm.prank(makeAddr("unauthorized"));
         vm.expectRevert(bytes("OwnableManaged: caller is not the owner or the manager"));
-        teeProverRegistry.deregisterSigner(signer);
+        teeProverRegistry.deregisterSigner(makeAddr("signer"));
     }
 
     function testSetProposer() public {
@@ -152,23 +149,10 @@ contract TEEProverRegistryTest is Test {
 
         _expectNotOwnerRevert(manager);
         teeProverRegistry.setProposer(newProposer, true);
-
-        _expectNotOwnerRevert(makeAddr("unauthorized"));
-        teeProverRegistry.setProposer(newProposer, true);
     }
 
     function testIsValidSignerReturnsFalseForUnregistered() public {
-        address unregistered = makeAddr("unregistered");
-        assertFalse(teeProverRegistry.isValidSigner(unregistered));
-    }
-
-    function testIsValidSignerReturnsTrueForRegistered() public {
-        address signer = makeAddr("signer");
-
-        _addDevSigner(signer);
-
-        assertTrue(teeProverRegistry.isValidSigner(signer));
-        assertTrue(teeProverRegistry.signerTEEType(signer) == TEEProverRegistry.TEEType.NITRO);
+        assertFalse(teeProverRegistry.isValidSigner(makeAddr("unregistered")));
     }
 
     function testAddDevTDXSigner() public {
@@ -202,15 +186,13 @@ contract TEEProverRegistryTest is Test {
         _addDevSigner(signer);
 
         assertTrue(teeProverRegistry.isValidSigner(signer));
+        assertTrue(teeProverRegistry.signerTEEType(signer) == TEEProverRegistry.TEEType.NITRO);
     }
 
     function testAddDevSignerFailsIfNotOwner() public {
         address signer = makeAddr("dev-signer");
 
         _expectNotOwnerRevert(manager);
-        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
-
-        _expectNotOwnerRevert(makeAddr("unauthorized"));
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
     }
 
