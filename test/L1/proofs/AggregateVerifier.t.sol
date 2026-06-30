@@ -3,8 +3,8 @@ pragma solidity 0.8.15;
 
 import { BadExtraData, GameNotResolved } from "src/libraries/bridge/Errors.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { GameStatus, GameTypes, Hash } from "src/libraries/bridge/Types.sol";
-import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
+import { GameStatus, GameTypes } from "src/libraries/bridge/Types.sol";
+import { Claim, Hash } from "src/libraries/bridge/LibUDT.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 
@@ -82,15 +82,15 @@ contract AggregateVerifierTest is BaseTest {
             _createGame(TEE_PROVER, _advanceL2BlockAndClaim(), "tee-proof", AggregateVerifier.ProofType.TEE);
         uint256 slowDelay = game.SLOW_FINALIZATION_DELAY();
 
-        Timestamp originalExpectedResolution = game.expectedResolution();
-        assertEq(originalExpectedResolution.raw(), block.timestamp + slowDelay);
+        uint256 originalExpectedResolution = game.expectedResolution().raw();
+        assertEq(originalExpectedResolution, block.timestamp + slowDelay);
 
         vm.warp(block.timestamp + slowDelay - 1);
         vm.expectRevert(AggregateVerifier.GameNotOver.selector);
         game.resolve();
 
         _provideProof(game, ZK_PROVER, _generateProof("zk-proof", AggregateVerifier.ProofType.ZK));
-        assertEq(game.expectedResolution().raw(), originalExpectedResolution.raw());
+        assertEq(game.expectedResolution().raw(), originalExpectedResolution);
 
         vm.warp(block.timestamp + 1);
         game.resolve();
@@ -102,8 +102,12 @@ contract AggregateVerifierTest is BaseTest {
 
         AggregateVerifier game = _createGame(TEE_PROVER, rootClaim, "tee-proof", AggregateVerifier.ProofType.TEE);
 
-        Hash gameId = factory.getGameUUID(GameTypes.AGGREGATE_VERIFIER, rootClaim, game.extraData());
-        vm.expectRevert(abi.encodeWithSelector(IDisputeGameFactory.GameAlreadyExists.selector, gameId));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDisputeGameFactory.GameAlreadyExists.selector,
+                factory.getGameUUID(GameTypes.AGGREGATE_VERIFIER, rootClaim, game.extraData())
+            )
+        );
         _createGame(ZK_PROVER, rootClaim, "zk-proof", AggregateVerifier.ProofType.ZK);
     }
 
@@ -118,7 +122,7 @@ contract AggregateVerifierTest is BaseTest {
                 IDisputeGameFactory.games,
                 (GameTypes.AGGREGATE_VERIFIER, parentRootClaim, unregisteredParent.extraData())
             ),
-            abi.encode(address(0), Timestamp.wrap(0))
+            abi.encode(address(0), uint64(0))
         );
 
         currentL2BlockNumber += BLOCK_INTERVAL;
