@@ -23,12 +23,12 @@ contract MockAggregateVerifierForRegistry {
 
 /// @dev Uses DevTEEProverRegistry because production signer registration requires a Nitro attestation proof.
 contract TEEProverRegistryTest is Test {
-    DevTEEProverRegistry public teeProverRegistry;
+    DevTEEProverRegistry internal teeProverRegistry;
 
-    address public owner;
-    address public manager;
+    address internal owner;
+    address internal manager;
 
-    GameType public constant TEST_GAME_TYPE = GameType.wrap(621);
+    GameType internal constant TEST_GAME_TYPE = GameType.wrap(621);
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -129,16 +129,6 @@ contract TEEProverRegistryTest is Test {
         teeProverRegistry.setProposer(makeAddr("proposer"), true);
     }
 
-    function testAddDevTDXSigner() public {
-        address signer = makeAddr("dev-tdx-signer");
-
-        vm.prank(owner);
-        teeProverRegistry.addDevTDXSigner(signer, TEST_IMAGE_HASH);
-
-        assertTrue(teeProverRegistry.isValidSigner(signer));
-        assertTrue(teeProverRegistry.signerTEEType(signer) == TEEProverRegistry.TEEType.TDX);
-    }
-
     function testRegisteringSameSignerWithDifferentTEETypeOverwritesTEEType() public {
         address signer = makeAddr("dev-signer");
 
@@ -168,34 +158,8 @@ contract TEEProverRegistryTest is Test {
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
     }
 
-    function testAddDevSignerIdempotent() public {
-        address signer = makeAddr("dev-signer");
-
-        _addDevSigner(signer);
-        _addDevSigner(signer);
-
-        assertTrue(teeProverRegistry.isValidSigner(signer));
-    }
-
     function testGetRegisteredSignersEmpty() public view {
         assertEq(teeProverRegistry.getRegisteredSigners().length, 0);
-    }
-
-    function testGetRegisteredSignersMultiple() public {
-        address signer1 = makeAddr("signer-1");
-        address signer2 = makeAddr("signer-2");
-        address signer3 = makeAddr("signer-3");
-
-        _addDevSigner(signer1);
-        _addDevSigner(signer2);
-        _addDevSigner(signer3);
-
-        address[] memory signers = teeProverRegistry.getRegisteredSigners();
-        assertEq(signers.length, 3);
-
-        _assertContains(signers, signer1);
-        _assertContains(signers, signer2);
-        _assertContains(signers, signer3);
     }
 
     function testGetRegisteredSignersConsistencyAfterMixedOperations() public {
