@@ -17,10 +17,13 @@ import { BaseTest } from "./BaseTest.t.sol";
 contract AggregateVerifierTest is BaseTest {
     function testInitializeWithTEEProof() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
-        bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
 
         AggregateVerifier game = _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
+            TEE_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _generateProof("tee-proof", AggregateVerifier.ProofType.TEE)
         );
 
         assertEq(game.teeProver(), TEE_PROVER);
@@ -32,10 +35,13 @@ contract AggregateVerifierTest is BaseTest {
 
     function testInitializeWithZKProof() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
-        bytes memory proof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
 
         AggregateVerifier game = _createAggregateVerifierGame(
-            ZK_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
+            ZK_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _generateProof("zk-proof", AggregateVerifier.ProofType.ZK)
         );
 
         assertEq(game.teeProver(), address(0));
@@ -56,8 +62,14 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function testUpdatingAnchorStateRegistryWithTEEProof() public {
-        (AggregateVerifier game, Claim rootClaim) =
-            _createGameForAnchorUpdate(TEE_PROVER, "tee-proof", AggregateVerifier.ProofType.TEE);
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _generateProof("tee-proof", AggregateVerifier.ProofType.TEE)
+        );
 
         vm.expectRevert(GameNotResolved.selector);
         game.claimCredit();
@@ -66,8 +78,14 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function testUpdatingAnchorStateRegistryWithZKProof() public {
-        (AggregateVerifier game, Claim rootClaim) =
-            _createGameForAnchorUpdate(ZK_PROVER, "zk-proof", AggregateVerifier.ProofType.ZK);
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        AggregateVerifier game = _createAggregateVerifierGame(
+            ZK_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _generateProof("zk-proof", AggregateVerifier.ProofType.ZK)
+        );
 
         _resolveSlowAndClose(game, rootClaim);
     }
@@ -134,9 +152,6 @@ contract AggregateVerifierTest is BaseTest {
         _createAggregateVerifierGame(ZK_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), zkProof);
     }
 
-    /// @notice Reverts when the parent is not factory-registered: `_isValidGame` requires
-    ///         `AnchorStateRegistry.isGameRegistered`, which checks `DisputeGameFactory.games(...) == parent`.
-    /// @dev Parent is a real factory game, then the factory lookup is mocked to emulate a missing UUID entry.
     function testInitializeFailsIfParentGameNotFactoryRegistered() public {
         Claim parentRootClaim = _advanceL2BlockAndClaim();
         AggregateVerifier unregisteredParent = _createAggregateVerifierGame(
@@ -177,13 +192,7 @@ contract AggregateVerifierTest is BaseTest {
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.L1OriginInFuture.selector, l1OriginNumber, block.number)
         );
-        _createAggregateVerifierGame(
-            TEE_PROVER,
-            rootClaim,
-            currentL2BlockNumber,
-            address(anchorStateRegistry),
-            _teeProof(l1OriginHash, l1OriginNumber)
-        );
+        _createTEEGameWithOrigin(rootClaim, l1OriginHash, l1OriginNumber);
     }
 
     function testVerifyFailsWithL1OriginTooOld() public {
@@ -195,13 +204,7 @@ contract AggregateVerifierTest is BaseTest {
         bytes32 l1OriginHash = bytes32(uint256(1));
 
         vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginTooOld.selector, l1OriginNumber, block.number));
-        _createAggregateVerifierGame(
-            TEE_PROVER,
-            rootClaim,
-            currentL2BlockNumber,
-            address(anchorStateRegistry),
-            _teeProof(l1OriginHash, l1OriginNumber)
-        );
+        _createTEEGameWithOrigin(rootClaim, l1OriginHash, l1OriginNumber);
     }
 
     function testVerifyFailsWithL1OriginHashMismatch() public {
@@ -211,13 +214,7 @@ contract AggregateVerifierTest is BaseTest {
 
         bytes32 actualHash = blockhash(l1OriginNumber);
         vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginHashMismatch.selector, wrongHash, actualHash));
-        _createAggregateVerifierGame(
-            TEE_PROVER,
-            rootClaim,
-            currentL2BlockNumber,
-            address(anchorStateRegistry),
-            _teeProof(wrongHash, l1OriginNumber)
-        );
+        _createTEEGameWithOrigin(rootClaim, wrongHash, l1OriginNumber);
     }
 
     function testVerifyWithBlockhashWindow() public {
@@ -228,13 +225,7 @@ contract AggregateVerifierTest is BaseTest {
         uint256 l1OriginNumber = block.number - 50;
         bytes32 l1OriginHash = blockhash(l1OriginNumber);
 
-        _createAggregateVerifierGame(
-            TEE_PROVER,
-            rootClaim,
-            currentL2BlockNumber,
-            address(anchorStateRegistry),
-            _teeProof(l1OriginHash, l1OriginNumber)
-        );
+        _createTEEGameWithOrigin(rootClaim, l1OriginHash, l1OriginNumber);
     }
 
     function testVerifyWithEIP2935Window() public {
@@ -248,13 +239,7 @@ contract AggregateVerifierTest is BaseTest {
 
         vm.mockCall(eip2935, abi.encode(l1OriginNumber), abi.encode(expectedHash));
 
-        _createAggregateVerifierGame(
-            TEE_PROVER,
-            rootClaim,
-            currentL2BlockNumber,
-            address(anchorStateRegistry),
-            _teeProof(expectedHash, l1OriginNumber)
-        );
+        _createTEEGameWithOrigin(rootClaim, expectedHash, l1OriginNumber);
     }
 
     function testDeployWithInvalidBlockIntervals() public {
@@ -274,20 +259,6 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(l2SequenceNumber, currentL2BlockNumber);
     }
 
-    function _createGameForAnchorUpdate(
-        address prover,
-        bytes memory proofSalt,
-        AggregateVerifier.ProofType proofType
-    )
-        private
-        returns (AggregateVerifier game, Claim rootClaim)
-    {
-        rootClaim = _advanceL2BlockAndClaim();
-        game = _createAggregateVerifierGame(
-            prover, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), _generateProof(proofSalt, proofType)
-        );
-    }
-
     function _resolveSlowAndClose(AggregateVerifier game, Claim rootClaim) private {
         vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
         game.resolve();
@@ -298,6 +269,23 @@ contract AggregateVerifierTest is BaseTest {
         vm.warp(block.timestamp + 1);
         game.closeGame();
         _assertAnchorRoot(rootClaim);
+    }
+
+    function _createTEEGameWithOrigin(
+        Claim rootClaim,
+        bytes32 l1OriginHash,
+        uint256 l1OriginNumber
+    )
+        private
+        returns (AggregateVerifier)
+    {
+        return _createAggregateVerifierGame(
+            TEE_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _teeProof(l1OriginHash, l1OriginNumber)
+        );
     }
 
     function _teeProof(bytes32 l1OriginHash, uint256 l1OriginNumber) private pure returns (bytes memory) {
