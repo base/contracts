@@ -32,19 +32,17 @@ contract BaseTest is Test {
 
     uint256 internal constant INIT_BOND = 1 ether;
     uint256 internal constant DELAYED_WETH_DELAY = 1 days;
-    // Finality delay handled by the AggregateVerifier
-    uint256 internal constant FINALITY_DELAY = 0 days;
 
     uint256 internal currentL2BlockNumber;
 
     address internal immutable TEE_PROVER = makeAddr("tee-prover");
     address internal immutable ZK_PROVER = makeAddr("zk-prover");
 
-    bytes32 public immutable TEE_NITRO_IMAGE_HASH = keccak256("tee-nitro-image");
-    bytes32 public immutable TEE_TDX_IMAGE_HASH = keccak256("tee-tdx-image");
-    bytes32 public immutable ZK_RANGE_HASH = keccak256("zk-range");
-    bytes32 public immutable ZK_AGGREGATE_HASH = keccak256("zk-aggregate");
-    bytes32 public immutable CONFIG_HASH = keccak256("config");
+    bytes32 internal constant TEE_NITRO_IMAGE_HASH = keccak256("tee-nitro-image");
+    bytes32 internal constant TEE_TDX_IMAGE_HASH = keccak256("tee-tdx-image");
+    bytes32 internal constant ZK_RANGE_HASH = keccak256("zk-range");
+    bytes32 internal constant ZK_AGGREGATE_HASH = keccak256("zk-aggregate");
+    bytes32 internal constant CONFIG_HASH = keccak256("config");
 
     ProxyAdmin internal proxyAdmin;
     ISystemConfig internal systemConfig;
@@ -57,23 +55,11 @@ contract BaseTest is Test {
     MockVerifier internal zkVerifier;
 
     function setUp() public virtual {
-        _deployContractsAndProxies();
-        _initializeProxies();
-
-        _deployAndSetAggregateVerifier();
-
-        anchorStateRegistry.setRespectedGameType(GameTypes.AGGREGATE_VERIFIER);
-
-        // Games created at or before the registry's retirement timestamp are invalid.
-        vm.warp(block.timestamp + 1);
-    }
-
-    function _deployContractsAndProxies() internal {
         systemConfig = ISystemConfig(makeAddr("system-config"));
         vm.mockCall(address(systemConfig), abi.encodeCall(ISystemConfig.guardian, ()), abi.encode(address(this)));
         vm.mockCall(address(systemConfig), abi.encodeCall(ISystemConfig.paused, ()), abi.encode(false));
 
-        AnchorStateRegistry _anchorStateRegistry = new AnchorStateRegistry(FINALITY_DELAY);
+        AnchorStateRegistry _anchorStateRegistry = new AnchorStateRegistry(0);
         DelayedWETH _delayedWETH = new DelayedWETH(DELAYED_WETH_DELAY);
         DisputeGameFactory _factory = new DisputeGameFactory();
 
@@ -85,15 +71,7 @@ contract BaseTest is Test {
 
         teeVerifier = new MockVerifier(IAnchorStateRegistry(address(anchorStateRegistry)));
         zkVerifier = new MockVerifier(IAnchorStateRegistry(address(anchorStateRegistry)));
-    }
 
-    function _deployProxy(address implementation) private returns (address) {
-        Proxy proxy = new Proxy(address(proxyAdmin));
-        proxyAdmin.upgrade(payable(address(proxy)), implementation);
-        return address(proxy);
-    }
-
-    function _initializeProxies() internal {
         anchorStateRegistry.initialize(
             systemConfig,
             IDisputeGameFactory(address(factory)),
@@ -104,13 +82,21 @@ contract BaseTest is Test {
         );
         factory.initialize(address(this));
         delayedWETH.initialize(systemConfig);
-    }
 
-    function _deployAndSetAggregateVerifier() internal {
         AggregateVerifier aggregateVerifierImpl = _newAggregateVerifier(BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
-
         factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(aggregateVerifierImpl)));
         factory.setInitBond(GameTypes.AGGREGATE_VERIFIER, INIT_BOND);
+
+        anchorStateRegistry.setRespectedGameType(GameTypes.AGGREGATE_VERIFIER);
+
+        // Games created at or before the registry's retirement timestamp are invalid.
+        vm.warp(block.timestamp + 1);
+    }
+
+    function _deployProxy(address implementation) private returns (address) {
+        Proxy proxy = new Proxy(address(proxyAdmin));
+        proxyAdmin.upgrade(payable(address(proxy)), implementation);
+        return address(proxy);
     }
 
     function _newAggregateVerifier(
@@ -144,9 +130,10 @@ contract BaseTest is Test {
         bytes memory proof
     )
         internal
-        returns (AggregateVerifier game)
+        returns (AggregateVerifier)
     {
-        bytes memory extraData = _aggregateVerifierExtraData(rootClaim, l2BlockNumber, parentAddress);
+        bytes memory extraData =
+            abi.encodePacked(l2BlockNumber, parentAddress, _generateIntermediateRoots(l2BlockNumber, rootClaim));
 
         vm.deal(creator, INIT_BOND);
         vm.prank(creator);
@@ -211,18 +198,6 @@ contract BaseTest is Test {
             return abi.encodePacked(saltHash, bytes32(0), uint8(27), saltHash, bytes32(uint256(1)), uint8(28));
         }
         return abi.encodePacked(salt, bytes32(0), bytes32(0), uint8(27));
-    }
-
-    function _aggregateVerifierExtraData(
-        Claim rootClaim,
-        uint256 l2BlockNumber,
-        address parentAddress
-    )
-        internal
-        pure
-        returns (bytes memory)
-    {
-        return abi.encodePacked(l2BlockNumber, parentAddress, _generateIntermediateRoots(l2BlockNumber, rootClaim));
     }
 
     function _generateIntermediateRoots(uint256 l2BlockNumber, Claim rootClaim) internal pure returns (bytes memory) {
