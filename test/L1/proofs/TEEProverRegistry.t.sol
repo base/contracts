@@ -15,35 +15,28 @@ import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
 bytes32 constant TEST_IMAGE_HASH = keccak256("test-image-hash");
 
-/// @notice Mock AggregateVerifier that returns TEE image hashes.
-contract MockAggregateVerifierForRegistry {
-    bytes32 public constant TEE_NITRO_IMAGE_HASH = TEST_IMAGE_HASH;
-    bytes32 public constant TEE_TDX_IMAGE_HASH = TEST_IMAGE_HASH;
-}
-
 /// @dev Uses DevTEEProverRegistry because production signer registration requires a Nitro attestation proof.
 contract TEEProverRegistryTest is Test {
     DevTEEProverRegistry internal teeProverRegistry;
 
-    address internal owner;
-    address internal manager;
+    address internal immutable owner = makeAddr("owner");
+    address internal immutable manager = makeAddr("manager");
 
     GameType internal constant TEST_GAME_TYPE = GameType.wrap(621);
 
     function setUp() public {
-        owner = makeAddr("owner");
-        manager = makeAddr("manager");
-
         teeProverRegistry = _deployRegistry(new address[](0));
     }
 
     function _deployRegistry(address[] memory proposers) internal returns (DevTEEProverRegistry) {
-        MockAggregateVerifierForRegistry verifier = new MockAggregateVerifierForRegistry();
+        address verifier = makeAddr("verifier");
+        vm.etch(verifier, hex"00");
+        vm.mockCall(verifier, abi.encodeWithSignature("TEE_NITRO_IMAGE_HASH()"), abi.encode(TEST_IMAGE_HASH));
+        vm.mockCall(verifier, abi.encodeWithSignature("TEE_TDX_IMAGE_HASH()"), abi.encode(TEST_IMAGE_HASH));
+
         address factory = makeAddr("factory");
         vm.etch(factory, hex"00");
-        vm.mockCall(
-            factory, abi.encodeCall(IDisputeGameFactory.gameImpls, (TEST_GAME_TYPE)), abi.encode(address(verifier))
-        );
+        vm.mockCall(factory, abi.encodeCall(IDisputeGameFactory.gameImpls, (TEST_GAME_TYPE)), abi.encode(verifier));
 
         DevTEEProverRegistry impl = new DevTEEProverRegistry(
             INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(factory)
@@ -62,14 +55,6 @@ contract TEEProverRegistryTest is Test {
     function _addDevSigner(address signer) internal {
         vm.prank(owner);
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
-    }
-
-    function _assertContains(address[] memory values, address expected) internal {
-        for (uint256 i = 0; i < values.length; i++) {
-            if (values[i] == expected) return;
-        }
-
-        fail();
     }
 
     function testInitialization() public view {
@@ -176,8 +161,8 @@ contract TEEProverRegistryTest is Test {
 
         address[] memory signers = teeProverRegistry.getRegisteredSigners();
         assertEq(signers.length, 2);
-        _assertContains(signers, signer1);
-        _assertContains(signers, signer3);
+        assertTrue(signers[0] == signer1 || signers[1] == signer1);
+        assertTrue(signers[0] == signer3 || signers[1] == signer3);
         assertFalse(teeProverRegistry.isValidSigner(signer2));
     }
 
