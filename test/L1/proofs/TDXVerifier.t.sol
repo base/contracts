@@ -15,23 +15,21 @@ contract TDXVerifierTest is Test {
     address internal constant MOCK_RISC_ZERO_VERIFIER = address(0x1234);
 
     bytes32 internal constant ROOT_CA_HASH = keccak256("intel-root-ca");
-    bytes32 internal constant VERIFIER_ID = keccak256("tdx-verifier-id");
     bytes32 internal constant IMAGE_HASH = keccak256("tdx-image");
     bytes32 internal constant PUBLIC_KEY_X = hex"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
     bytes32 internal constant PUBLIC_KEY_Y = hex"2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40";
 
     uint64 internal constant MAX_TIME_DIFF = 3600;
-    uint256 internal constant NOW = 1_700_000_000;
 
     function setUp() public {
-        vm.warp(NOW);
+        vm.warp(1_700_000_000);
 
-        verifier = new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, MOCK_RISC_ZERO_VERIFIER, VERIFIER_ID);
+        verifier = new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, MOCK_RISC_ZERO_VERIFIER, keccak256("tdx-verifier-id"));
         vm.mockCall(MOCK_RISC_ZERO_VERIFIER, abi.encodeWithSelector(IRiscZeroVerifier.verify.selector), "");
     }
 
     function testVerifySucceedsWithRiscZeroProofAndAllowedJournal() public view {
-        (address signer, bytes32 imageHash) = _verify(_successJournal());
+        (address signer, bytes32 imageHash) = verifier.verify(abi.encode(_successJournal()), hex"1234");
 
         assertEq(signer, address(uint160(uint256(_publicKeyHash()))));
         assertEq(imageHash, IMAGE_HASH);
@@ -39,7 +37,7 @@ contract TDXVerifierTest is Test {
 
     function testConstructorRevertsIfZeroInput() public {
         vm.expectRevert(TDXVerifier.ZeroInput.selector);
-        new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, address(0), VERIFIER_ID);
+        new TDXVerifier(MAX_TIME_DIFF, ROOT_CA_HASH, address(0), keccak256("tdx-verifier-id"));
     }
 
     function testVerifyRevertsWhenRootCaHashMismatches() public {
@@ -116,10 +114,6 @@ contract TDXVerifierTest is Test {
 
     function _publicKeyHash() internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(PUBLIC_KEY_X, PUBLIC_KEY_Y));
-    }
-
-    function _verify(TDXVerifierJournal memory journal) internal view returns (address signer, bytes32 imageHash) {
-        return verifier.verify(abi.encode(journal), hex"1234");
     }
 
     function _expectVerifyRevert(TDXVerifierJournal memory journal, bytes memory expectedRevert) internal {
