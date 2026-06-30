@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 import { ClaimAlreadyResolved } from "src/libraries/bridge/Errors.sol";
 import { GameStatus } from "src/libraries/bridge/Types.sol";
-import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 
@@ -17,9 +16,7 @@ contract NullifyTest is BaseTest {
             TEE_PROVER, "tee1", "tee-proof-1", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
         );
 
-        Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
-        bytes memory teeProof2 = _generateProposalProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
-        game.nullify(teeProof2, LAST_INTERMEDIATE_ROOT_INDEX, rootClaim2.raw());
+        _nullify(game, "tee-proof-2", AggregateVerifier.ProofType.TEE, "tee2");
         _assertNullifiedToNoProofs(game, TEE_PROVER);
 
         vm.warp(block.timestamp + NO_PROOF_CREDIT_CLAIM_DELAY);
@@ -46,11 +43,9 @@ contract NullifyTest is BaseTest {
 
         assertEq(game.expectedResolution().raw(), block.timestamp + game.FAST_FINALIZATION_DELAY());
 
-        Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
-        bytes memory teeProof2 = _generateProposalProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
-        game.nullify(teeProof2, LAST_INTERMEDIATE_ROOT_INDEX, rootClaim2.raw());
+        _nullify(game, "tee-proof-2", AggregateVerifier.ProofType.TEE, "tee2");
 
-        _assertStatus(game, GameStatus.IN_PROGRESS);
+        assertEq(uint8(game.status()), uint8(GameStatus.IN_PROGRESS));
         assertEq(game.bondRecipient(), TEE_PROVER);
         assertEq(game.proofCount(), 1);
         assertEq(game.expectedResolution().raw(), block.timestamp + game.SLOW_FINALIZATION_DELAY());
@@ -97,38 +92,7 @@ contract NullifyTest is BaseTest {
     }
 
     function testResolveEarlyReturnWhenSharedTeeVerifierNullifiedByAnotherGame() public {
-        currentL2BlockNumber += BLOCK_INTERVAL;
-
-        Claim rootClaimA = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "game-a")));
-        bytes memory teeProofA = _generateProof("tee-proof-a", AggregateVerifier.ProofType.TEE);
-        AggregateVerifier gameA = _createAggregateVerifierGame(
-            TEE_PROVER, rootClaimA, currentL2BlockNumber, address(anchorStateRegistry), teeProofA
-        );
-
-        currentL2BlockNumber += BLOCK_INTERVAL;
-
-        Claim rootClaimB = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "game-b")));
-        bytes memory teeProofB = _generateProof("tee-proof-b", AggregateVerifier.ProofType.TEE);
-        AggregateVerifier gameB =
-            _createAggregateVerifierGame(TEE_PROVER, rootClaimB, currentL2BlockNumber, address(gameA), teeProofB);
-
-        vm.warp(block.timestamp + 7 days);
-        assertTrue(gameA.gameOver());
-        assertEq(gameA.proofCount(), 1);
-
-        Claim rootClaimNullify = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "nullify-b")));
-        bytes memory teeProofNullify = _generateProposalProof("tee-nullify-b", AggregateVerifier.ProofType.TEE);
-        gameB.nullify(teeProofNullify, LAST_INTERMEDIATE_ROOT_INDEX, rootClaimNullify.raw());
-
-        assertTrue(teeVerifier.nullified());
-        assertEq(gameA.proofCount(), 1);
-
-        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
-        assertEq(gameA.proofCount(), 0);
-        assertEq(gameA.expectedResolution().raw(), type(uint64).max);
-
-        vm.expectRevert(AggregateVerifier.GameNotOver.selector);
-        gameA.resolve();
+        _assertResolveEarlyReturnWhenSharedVerifierNullifiedByAnotherGame(TEE_PROVER, AggregateVerifier.ProofType.TEE);
     }
 
     function testResolveEarlyReturnWhenSharedZkVerifierNullifiedByAnotherGame() public {
@@ -163,7 +127,7 @@ contract NullifyTest is BaseTest {
 
         vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.DEFENDER_WINS));
-        _assertStatus(gameA, GameStatus.DEFENDER_WINS);
+        assertEq(uint8(gameA.status()), uint8(GameStatus.DEFENDER_WINS));
     }
 
     function _nullify(
@@ -174,18 +138,16 @@ contract NullifyTest is BaseTest {
     )
         private
     {
-        game.nullify(_generateProof(proofSalt, proofType), LAST_INTERMEDIATE_ROOT_INDEX, _claim(claimSalt).raw());
+        game.nullify(
+            _generateProposalProof(proofSalt, proofType), LAST_INTERMEDIATE_ROOT_INDEX, _claim(claimSalt).raw()
+        );
     }
 
     function _assertNullifiedToNoProofs(AggregateVerifier game, address expectedBondRecipient) private view {
-        _assertStatus(game, GameStatus.IN_PROGRESS);
+        assertEq(uint8(game.status()), uint8(GameStatus.IN_PROGRESS));
         assertEq(game.bondRecipient(), expectedBondRecipient);
         assertEq(game.proofCount(), 0);
         assertEq(game.expectedResolution().raw(), type(uint64).max);
-    }
-
-    function _assertStatus(AggregateVerifier game, GameStatus expectedStatus) private view {
-        assertEq(uint8(game.status()), uint8(expectedStatus));
     }
 
     /// @notice When a shared verifier is nullified by another game, `resolve` persists the refutation and returns
@@ -205,11 +167,7 @@ contract NullifyTest is BaseTest {
 
         _nullify(gameB, "nullify-proof", proofType, "nullify-claim");
 
-        if (proofType == AggregateVerifier.ProofType.TEE) {
-            assertTrue(teeVerifier.nullified());
-        } else {
-            assertTrue(zkVerifier.nullified());
-        }
+        assertTrue(proofType == AggregateVerifier.ProofType.TEE ? teeVerifier.nullified() : zkVerifier.nullified());
         assertEq(gameA.proofCount(), 1);
 
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
