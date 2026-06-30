@@ -52,32 +52,23 @@ deploy-nitro-verifier nitro_root_cert nitro_verifier_id risc0_router=sepolia_nit
     --sender "$owner"
 
 # Deploy the TDX multiproof dev/test stack using the zeronet TDX config.
-deploy-tdx-stack nitro_verifier tdx_verifier tdx_manager="0x44E999A5859c2D12378a349882fAe5805DCE71b9" deploy_config="deploy-config/zeronet-tdx.json" l2_rpc=l2_rpc_url l2_output_root_rpc=l2_output_root_rpc_url:
+deploy-tdx-stack nitro_verifier tdx_verifier tdx_manager="0x44E999A5859c2D12378a349882fAe5805DCE71b9" deploy_config="deploy-config/zeronet-tdx.json":
   #!/usr/bin/env bash
   set -euo pipefail
   owner="$(cast wallet address --account "{{forge_account}}")"
   echo "Using {{forge_account}} as deployer: $owner"
 
-  if [[ -n "${ASR_ANCHOR_BLOCK_NUMBER:-}" || -n "${ASR_ANCHOR_OUTPUT_ROOT:-}" ]]; then
-    if [[ -z "${ASR_ANCHOR_BLOCK_NUMBER:-}" || -z "${ASR_ANCHOR_OUTPUT_ROOT:-}" ]]; then
-      echo "ASR_ANCHOR_BLOCK_NUMBER and ASR_ANCHOR_OUTPUT_ROOT must be set together" >&2
-      exit 1
-    fi
-    asr_anchor_block="$ASR_ANCHOR_BLOCK_NUMBER"
-    asr_anchor_output_root="$ASR_ANCHOR_OUTPUT_ROOT"
-  else
-    lookback="${ASR_ANCHOR_BLOCK_LOOKBACK:-0}"
-    l2_head="$(cast block-number --rpc-url "{{l2_rpc}}")"
-    if (( lookback > l2_head )); then
-      echo "ASR_ANCHOR_BLOCK_LOOKBACK ($lookback) exceeds L2 head ($l2_head)" >&2
-      exit 1
-    fi
-    asr_anchor_block=$((l2_head - lookback))
-    asr_anchor_block_hex="$(printf '0x%x' "$asr_anchor_block")"
-    asr_anchor_output_root="$(cast rpc optimism_outputAtBlock "$asr_anchor_block_hex" --rpc-url "{{l2_output_root_rpc}}" | jq -r '.outputRoot')"
+  lookback="${ASR_ANCHOR_BLOCK_LOOKBACK:-0}"
+  l2_head="$(cast block-number --rpc-url "{{l2_rpc_url}}")"
+  if (( lookback > l2_head )); then
+    echo "ASR_ANCHOR_BLOCK_LOOKBACK ($lookback) exceeds L2 head ($l2_head)" >&2
+    exit 1
   fi
+  asr_anchor_block=$((l2_head - lookback))
+  asr_anchor_block_hex="$(printf '0x%x' "$asr_anchor_block")"
+  asr_anchor_output_root="$(cast rpc optimism_outputAtBlock "$asr_anchor_block_hex" --rpc-url "{{l2_output_root_rpc_url}}" | jq -r '.outputRoot')"
 
-  if [[ -z "$asr_anchor_output_root" || "$asr_anchor_output_root" == "null" || "$asr_anchor_output_root" == "0x0000000000000000000000000000000000000000000000000000000000000000" ]]; then
+  if [[ -z "$asr_anchor_output_root" || "$asr_anchor_output_root" == "null" || "$asr_anchor_output_root" == "{{zero_bytes32}}" ]]; then
     echo "Invalid ASR anchor output root: $asr_anchor_output_root" >&2
     exit 1
   fi
