@@ -20,7 +20,10 @@ contract ChallengeTest is BaseTest {
         assertEq(uint8(game.status()), uint8(GameStatus.IN_PROGRESS));
         assertEq(game.proofCount(), 2);
 
-        _resolveAfterSlowDelayAndClaim(game, GameStatus.CHALLENGER_WINS, ZK_PROVER);
+        vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
+        assertEq(uint8(game.resolve()), uint8(GameStatus.CHALLENGER_WINS));
+        assertEq(game.bondRecipient(), ZK_PROVER);
+        _claimCreditAfterDelay(game, ZK_PROVER);
     }
 
     function testChallengeFailsIfNoTEEProof() public {
@@ -94,7 +97,7 @@ contract ChallengeTest is BaseTest {
         AggregateVerifier game =
             _createGame(ZK_PROVER, "tee", "tee-proof", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry));
 
-        _provideProof(game, ZK_PROVER, _proofOfType(AggregateVerifier.ProofType.ZK));
+        _provideProof(game, ZK_PROVER, abi.encodePacked(uint8(AggregateVerifier.ProofType.ZK), bytes1(0)));
         _nullify(game, AggregateVerifier.ProofType.ZK, "zk2");
         vm.expectRevert(Verifier.Nullified.selector);
         _challenge(game, AggregateVerifier.ProofType.ZK, _claim("zk3").raw());
@@ -119,7 +122,10 @@ contract ChallengeTest is BaseTest {
         assertEq(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
         assertEq(address(gameA.zkProver()), address(0));
 
-        _resolveAfterSlowDelayAndClaim(gameA, GameStatus.DEFENDER_WINS, TEE_PROVER);
+        vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.DEFENDER_WINS));
+        assertEq(gameA.bondRecipient(), TEE_PROVER);
+        _claimCreditAfterDelay(gameA, TEE_PROVER);
     }
 
     function testChallengeWinsWhenSharedTeeVerifierNullifiedByOtherGame() public {
@@ -147,7 +153,10 @@ contract ChallengeTest is BaseTest {
         assertEq(address(gameA.teeProver()), address(0));
         assertEq(gameA.zkProver(), ZK_PROVER);
 
-        _resolveAfterSlowDelayAndClaim(gameA, GameStatus.CHALLENGER_WINS, ZK_PROVER);
+        vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.CHALLENGER_WINS));
+        assertEq(gameA.bondRecipient(), ZK_PROVER);
+        _claimCreditAfterDelay(gameA, ZK_PROVER);
     }
 
     function _createGame(
@@ -167,7 +176,7 @@ contract ChallengeTest is BaseTest {
     }
 
     function _challenge(AggregateVerifier game, AggregateVerifier.ProofType proofType, bytes32 claimRoot) private {
-        game.challenge(_proofOfType(proofType), LAST_INTERMEDIATE_ROOT_INDEX, claimRoot);
+        game.challenge(abi.encodePacked(uint8(proofType), bytes1(0)), LAST_INTERMEDIATE_ROOT_INDEX, claimRoot);
     }
 
     function _challengeWithZk(AggregateVerifier game, bytes memory claimSalt) private {
@@ -181,24 +190,7 @@ contract ChallengeTest is BaseTest {
         );
     }
 
-    function _proofOfType(AggregateVerifier.ProofType proofType) private pure returns (bytes memory) {
-        return abi.encodePacked(uint8(proofType), bytes1(0));
-    }
-
     function _claim(bytes memory salt) private view returns (Claim) {
         return Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, salt)));
-    }
-
-    function _resolveAfterSlowDelayAndClaim(
-        AggregateVerifier game,
-        GameStatus expectedStatus,
-        address recipient
-    )
-        private
-    {
-        vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
-        assertEq(uint8(game.resolve()), uint8(expectedStatus));
-        assertEq(game.bondRecipient(), recipient);
-        _claimCreditAfterDelay(game, recipient);
     }
 }
