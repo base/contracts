@@ -11,7 +11,7 @@ import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 
 contract TEEVerifierTest is Test {
     TEEVerifier internal verifier;
-    address internal teeProverRegistry;
+    address internal immutable teeProverRegistry = makeAddr("tee-prover-registry");
 
     uint256 internal constant NITRO_SIGNER_PRIVATE_KEY =
         0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
@@ -21,7 +21,6 @@ contract TEEVerifierTest is Test {
     address internal immutable PROPOSER = makeAddr("proposer");
 
     function setUp() public {
-        teeProverRegistry = makeAddr("tee-prover-registry");
         vm.mockCall(teeProverRegistry, abi.encodeCall(ITEEProverRegistry.isValidProposer, (PROPOSER)), abi.encode(true));
         _mockSigner(NITRO_SIGNER_PRIVATE_KEY, NITRO_IMAGE_ID, true);
 
