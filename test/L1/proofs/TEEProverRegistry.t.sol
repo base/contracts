@@ -70,8 +70,8 @@ contract TEEProverRegistryTest is Test {
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
     }
 
-    function _expectNotOwnerRevert(address caller) internal {
-        vm.prank(caller);
+    function _expectNotOwnerRevert() internal {
+        vm.prank(manager);
         vm.expectRevert(bytes("OwnableManaged: caller is not the owner"));
     }
 
@@ -106,7 +106,7 @@ contract TEEProverRegistryTest is Test {
 
         _addDevSigner(signer);
 
-        vm.expectEmit(true, false, false, false, address(teeProverRegistry));
+        vm.expectEmit(address(teeProverRegistry));
         emit SignerDeregistered(signer);
 
         vm.prank(owner);
@@ -135,7 +135,7 @@ contract TEEProverRegistryTest is Test {
     function testSetProposer() public {
         address newProposer = makeAddr("proposer");
 
-        vm.expectEmit(true, false, false, false, address(teeProverRegistry));
+        vm.expectEmit(address(teeProverRegistry));
         emit ProposerSet(newProposer, true);
 
         vm.prank(owner);
@@ -145,10 +145,8 @@ contract TEEProverRegistryTest is Test {
     }
 
     function testSetProposerFailsIfNotOwner() public {
-        address newProposer = makeAddr("proposer");
-
-        _expectNotOwnerRevert(manager);
-        teeProverRegistry.setProposer(newProposer, true);
+        _expectNotOwnerRevert();
+        teeProverRegistry.setProposer(makeAddr("proposer"), true);
     }
 
     function testIsValidSignerReturnsFalseForUnregistered() public {
@@ -180,7 +178,7 @@ contract TEEProverRegistryTest is Test {
     function testAddDevSigner() public {
         address signer = makeAddr("dev-signer");
 
-        vm.expectEmit(true, false, false, false, address(teeProverRegistry));
+        vm.expectEmit(address(teeProverRegistry));
         emit SignerRegistered(signer);
 
         _addDevSigner(signer);
@@ -192,7 +190,7 @@ contract TEEProverRegistryTest is Test {
     function testAddDevSignerFailsIfNotOwner() public {
         address signer = makeAddr("dev-signer");
 
-        _expectNotOwnerRevert(manager);
+        _expectNotOwnerRevert();
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
     }
 
