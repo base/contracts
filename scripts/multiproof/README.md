@@ -1,8 +1,7 @@
 # Multiproof Deployment Guide
 
 This guide covers deploying the multiproof contracts and registering a prover on Sepolia.
-
-For forward-traversal testing after deployment, use `scripts/multiproof/generate-roots.sh` and `scripts/multiproof/SeedGames.s.sol`; usage and env docs live in those files.
+Deploy recipes print addresses and write `deployments/<chainId>-*.json`.
 
 ## Dev/Test Scripts Only
 
@@ -17,14 +16,7 @@ Use this when you don't have access to an AWS Nitro enclave and want to quickly 
 
 ### Configure `deploy-config/sepolia.json`
 
-Set `finalSystemOwner` to the deployer address, then set the multiproof and TEE fields for this environment. `finalSystemOwner` becomes the owner of all deployed contracts and must sign later admin calls.
-
-```json
-{
-  "finalSystemOwner": "0xYOUR_DEPLOYER_ADDRESS",
-  ...
-}
-```
+Set `finalSystemOwner` in `deploy-config/sepolia.json` to the deployer address, then set the multiproof and TEE fields for this environment. `finalSystemOwner` becomes the owner of all deployed contracts and must sign later admin calls.
 
 ### Deploy contracts with a fresh anchor
 
@@ -33,8 +25,6 @@ The recipe resolves a recent L2 output root and deploys `DeployDevNoNitro`. Pass
 ```bash
 just --justfile scripts/multiproof/justfile deploy-no-nitro-stack
 ```
-
-On success, deployed addresses are printed to the console and saved to `deployments/<chainId>-dev-no-nitro.json`.
 
 ### Get the enclave signer public key
 
@@ -48,18 +38,21 @@ This returns a raw byte array representing an uncompressed secp256k1 public key 
 
 ### Register the dev signers
 
-Call `addDevSigner(address,bytes32)` for Nitro or `addDevTDXSigner(address,bytes32)` for TDX on the deployed `DevTEEProverRegistry`.
+Register each signer on the deployed `DevTEEProverRegistry`.
 
 > **Note:** PCR0 / TDX image enforcement is handled by `AggregateVerifier` (which bakes
 > `teeNitroImageHash` and `teeTdxImageHash` into the journal the enclaves sign). The registry
 > only tracks which signer addresses are valid.
 
 ```bash
-cast send "$TEE_PROVER_REGISTRY" "$METHOD(address,bytes32)" "$SIGNER" "$IMAGE_HASH" \
+cast send "$TEE_PROVER_REGISTRY" "addDevSigner(address,bytes32)" "$NITRO_SIGNER" "$NITRO_IMAGE_HASH" \
+  --rpc-url "$L1_RPC_URL" --ledger --mnemonic-derivation-path "$LEDGER_PATH"
+
+cast send "$TEE_PROVER_REGISTRY" "addDevTDXSigner(address,bytes32)" "$TDX_SIGNER" "$TDX_IMAGE_HASH" \
   --rpc-url "$L1_RPC_URL" --ledger --mnemonic-derivation-path "$LEDGER_PATH"
 ```
 
-The deployer address (`finalSystemOwner`) is the owner of `DevTEEProverRegistry` and must sign this call.
+The deployer address (`finalSystemOwner`) is the owner of `DevTEEProverRegistry` and must sign these calls.
 
 ## Path 2: TDX (Production-Path PoC)
 
@@ -74,8 +67,6 @@ just --justfile scripts/multiproof/justfile deploy-nitro-verifier $NITRO_ROOT_CE
 just --justfile scripts/multiproof/justfile deploy-tdx-verifier
 ```
 
-These save output to `deployments/<chainId>-nitro-verifier.json` and `deployments/<chainId>-tdx-verifier.json`.
-
 ### Deploy the TDX multiproof test stack
 
 The recipe defaults to `deploy-config/zeronet-tdx.json`, resolves a recent L2 output root, and deploys `DeployDevWithTDX`. Set `L2_OUTPUT_ROOT_RPC_URL` if the output-root RPC differs from `L2_RPC_URL`, or pass an anchor block as the third argument.
@@ -84,18 +75,14 @@ The recipe defaults to `deploy-config/zeronet-tdx.json`, resolves a recent L2 ou
 just --justfile scripts/multiproof/justfile deploy-tdx-stack $NITRO_VERIFIER $TDX_VERIFIER
 ```
 
-The script saves output to `deployments/<chainId>-dev-with-tdx.json`.
-
 ### Register Nitro and TDX signers
 
-Register each signer with its proof output:
-
-| Signer | Method | Output | Proof |
-| --- | --- | --- | --- |
-| Nitro | `registerSigner` | `$NITRO_OUTPUT` | `$NITRO_PROOF_BYTES` |
-| TDX | `registerTDXSigner` | `$TDX_OUTPUT` | `$TDX_PROOF_BYTES` |
+Register each signer with its proof output.
 
 ```bash
-cast send "$TEE_PROVER_REGISTRY" "$METHOD(bytes,bytes)" "$OUTPUT" "$PROOF" \
+cast send "$TEE_PROVER_REGISTRY" "registerSigner(bytes,bytes)" "$NITRO_OUTPUT" "$NITRO_PROOF_BYTES" \
+  --rpc-url "$L1_RPC_URL" --private-key "$PRIVATE_KEY"
+
+cast send "$TEE_PROVER_REGISTRY" "registerTDXSigner(bytes,bytes)" "$TDX_OUTPUT" "$TDX_PROOF_BYTES" \
   --rpc-url "$L1_RPC_URL" --private-key "$PRIVATE_KEY"
 ```
