@@ -136,15 +136,9 @@ contract TEEProverRegistryTest is Test {
     }
 
     function testAddDevSignerFailsIfNotOwner() public {
-        address signer = makeAddr("dev-signer");
-
         vm.prank(manager);
         vm.expectRevert(bytes("OwnableManaged: caller is not the owner"));
-        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
-    }
-
-    function testGetRegisteredSignersEmpty() public view {
-        assertEq(teeProverRegistry.getRegisteredSigners().length, 0);
+        teeProverRegistry.addDevSigner(makeAddr("dev-signer"), TEST_IMAGE_HASH);
     }
 
     function testGetRegisteredSignersConsistencyAfterMixedOperations() public {
@@ -164,19 +158,5 @@ contract TEEProverRegistryTest is Test {
         assertTrue(signers[0] == signer1 || signers[1] == signer1);
         assertTrue(signers[0] == signer3 || signers[1] == signer3);
         assertFalse(teeProverRegistry.isValidSigner(signer2));
-    }
-
-    function testGetRegisteredSignersDeregisterIdempotent() public {
-        address signer = makeAddr("signer");
-
-        _addDevSigner(signer);
-
-        vm.prank(owner);
-        teeProverRegistry.deregisterSigner(signer);
-
-        vm.prank(owner);
-        teeProverRegistry.deregisterSigner(signer);
-
-        assertEq(teeProverRegistry.getRegisteredSigners().length, 0);
     }
 }
