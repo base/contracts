@@ -2,6 +2,8 @@ set dotenv-load
 set working-directory := "../.."
 
 forge_account := "testnet-admin"
+owner := `cast wallet address --account "{{forge_account}}"`
+broadcast_args := "--rpc-url " + quote(l1_rpc_url) + " --broadcast --account " + quote(forge_account) + " --sender " + quote(owner)
 l1_rpc_url := env_var_or_default("L1_RPC_URL", "https://ethereum-full-sepolia-k8s-dev.cbhq.net")
 l2_rpc_url := env_var_or_default("L2_RPC_URL", "https://base-sepolia-reth-proofs-k8s-donotuse.cbhq.net:8545")
 l2_output_root_rpc_url := env_var_or_default("L2_OUTPUT_ROOT_RPC_URL", "https://base-sepolia-reth-internal-rpc-donotuse.cbhq.net:7545")
@@ -14,79 +16,65 @@ sepolia_intel_root_ca_hash := "0xa1acc73eb45794fa1734f14d882e91925b6006f79d3bb24
 zero_bytes32 := "0x0000000000000000000000000000000000000000000000000000000000000000"
 
 default:
-  @just --justfile "{{justfile()}}" --list
 
 # Deploy the TDXVerifier policy contract.
 deploy-tdx-verifier risc0_router=sepolia_tdx_risc0_verifier_router tdx_verifier_id=sepolia_tdx_verifier_id intel_root_ca_hash=sepolia_intel_root_ca_hash:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  owner="$(cast wallet address --account "{{forge_account}}")"
-  echo "Using {{forge_account}} as owner/deployer: $owner"
-  forge script scripts/multiproof/DeployTDXVerifier.s.sol:DeployTDXVerifier \
-    --sig "run(address,bytes32,bytes32)" \
-    "{{risc0_router}}" \
-    "{{tdx_verifier_id}}" \
-    "{{intel_root_ca_hash}}" \
-    --rpc-url "{{l1_rpc_url}}" \
-    --broadcast \
-    --account "{{forge_account}}" \
-    --sender "$owner"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Using {{ forge_account }} as owner/deployer: {{ owner }}"
+    forge script scripts/multiproof/DeployTDXVerifier.s.sol:DeployTDXVerifier \
+      --sig "run(address,bytes32,bytes32)" \
+      "{{ risc0_router }}" \
+      "{{ tdx_verifier_id }}" \
+      "{{ intel_root_ca_hash }}" \
+      {{ broadcast_args }}
 
 # Deploy the NitroEnclaveVerifier policy contract and its local RISC Zero set verifier route.
 deploy-nitro-verifier nitro_root_cert nitro_verifier_id risc0_router=sepolia_nitro_risc0_verifier_router set_builder_image_id=sepolia_risc0_set_builder_image_id nitro_verifier_proof_id=zero_bytes32:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  owner="$(cast wallet address --account "{{forge_account}}")"
-  echo "Using {{forge_account}} as owner/deployer: $owner"
-  forge script scripts/multiproof/DeployNitroVerifier.s.sol:DeployNitroVerifier \
-    --sig "run(address,address,bytes32,bytes32,bytes32,bytes32)" \
-    "$owner" \
-    "{{risc0_router}}" \
-    "{{set_builder_image_id}}" \
-    "{{nitro_root_cert}}" \
-    "{{nitro_verifier_id}}" \
-    "{{nitro_verifier_proof_id}}" \
-    --rpc-url "{{l1_rpc_url}}" \
-    --broadcast \
-    --account "{{forge_account}}" \
-    --sender "$owner"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Using {{ forge_account }} as owner/deployer: {{ owner }}"
+    forge script scripts/multiproof/DeployNitroVerifier.s.sol:DeployNitroVerifier \
+      --sig "run(address,address,bytes32,bytes32,bytes32,bytes32)" \
+      "{{ owner }}" \
+      "{{ risc0_router }}" \
+      "{{ set_builder_image_id }}" \
+      "{{ nitro_root_cert }}" \
+      "{{ nitro_verifier_id }}" \
+      "{{ nitro_verifier_proof_id }}" \
+      {{ broadcast_args }}
 
 # Deploy the TDX multiproof dev/test stack using the zeronet TDX config.
 deploy-tdx-stack nitro_verifier tdx_verifier tdx_manager="0x44E999A5859c2D12378a349882fAe5805DCE71b9" deploy_config="deploy-config/zeronet-tdx.json":
-  #!/usr/bin/env bash
-  set -euo pipefail
-  owner="$(cast wallet address --account "{{forge_account}}")"
-  echo "Using {{forge_account}} as deployer: $owner"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Using {{ forge_account }} as deployer: {{ owner }}"
 
-  lookback="${ASR_ANCHOR_BLOCK_LOOKBACK:-0}"
-  l2_head="$(cast block-number --rpc-url "{{l2_rpc_url}}")"
-  if (( lookback > l2_head )); then
-    echo "ASR_ANCHOR_BLOCK_LOOKBACK ($lookback) exceeds L2 head ($l2_head)" >&2
-    exit 1
-  fi
-  asr_anchor_block=$((l2_head - lookback))
-  asr_anchor_block_hex="$(printf '0x%x' "$asr_anchor_block")"
-  asr_anchor_output_root="$(cast rpc optimism_outputAtBlock "$asr_anchor_block_hex" --rpc-url "{{l2_output_root_rpc_url}}" | jq -r '.outputRoot')"
+    lookback="${ASR_ANCHOR_BLOCK_LOOKBACK:-0}"
+    l2_head="$(cast block-number --rpc-url "{{ l2_rpc_url }}")"
+    if (( lookback > l2_head )); then
+      echo "ASR_ANCHOR_BLOCK_LOOKBACK ($lookback) exceeds L2 head ($l2_head)" >&2
+      exit 1
+    fi
+    asr_anchor_block=$((l2_head - lookback))
+    asr_anchor_output_root="$(cast rpc optimism_outputAtBlock "$(printf '0x%x' "$asr_anchor_block")" --rpc-url "{{ l2_output_root_rpc_url }}" | jq -r '.outputRoot')"
 
-  if [[ -z "$asr_anchor_output_root" || "$asr_anchor_output_root" == "null" || "$asr_anchor_output_root" == "{{zero_bytes32}}" ]]; then
-    echo "Invalid ASR anchor output root: $asr_anchor_output_root" >&2
-    exit 1
-  fi
+    if [[ -z "$asr_anchor_output_root" || "$asr_anchor_output_root" == "null" || "$asr_anchor_output_root" == "{{ zero_bytes32 }}" ]]; then
+      echo "Invalid ASR anchor output root: $asr_anchor_output_root" >&2
+      exit 1
+    fi
 
-  echo "Using NitroEnclaveVerifier: {{nitro_verifier}}"
-  echo "Using TDXVerifier: {{tdx_verifier}}"
-  echo "Using ASR anchor output root: $asr_anchor_output_root"
-  echo "Using ASR anchor L2 block: $asr_anchor_block"
+    echo "Using NitroEnclaveVerifier: {{ nitro_verifier }}"
+    echo "Using TDXVerifier: {{ tdx_verifier }}"
+    echo "Using ASR anchor output root: $asr_anchor_output_root"
+    echo "Using ASR anchor L2 block: $asr_anchor_block"
 
-  DEPLOY_CONFIG_PATH="{{deploy_config}}" \
-  forge script scripts/multiproof/DeployDevWithTDX.s.sol:DeployDevWithTDX \
-    --sig "run(address,address,address,bytes32,uint256)" \
-    "{{nitro_verifier}}" \
-    "{{tdx_verifier}}" \
-    "{{tdx_manager}}" \
-    "$asr_anchor_output_root" \
-    "$asr_anchor_block" \
-    --rpc-url "{{l1_rpc_url}}" \
-    --broadcast \
-    --account "{{forge_account}}" \
-    --sender "$owner"
+    DEPLOY_CONFIG_PATH="{{ deploy_config }}" \
+    forge script scripts/multiproof/DeployDevWithTDX.s.sol:DeployDevWithTDX \
+      --sig "run(address,address,address,bytes32,uint256)" \
+      "{{ nitro_verifier }}" \
+      "{{ tdx_verifier }}" \
+      "{{ tdx_manager }}" \
+      "$asr_anchor_output_root" \
+      "$asr_anchor_block" \
+      {{ broadcast_args }}
