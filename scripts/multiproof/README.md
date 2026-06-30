@@ -239,7 +239,7 @@ The recipe defaults `DEPLOY_CONFIG_PATH` to `deploy-config/zeronet-tdx.json` and
 
 The TDX registry manager is set to `TDX_REGISTRATION_MANAGER`, allowing that address to call `registerTDXSigner(bytes,bytes)`. Register a Nitro signer through `registerSigner(bytes,bytes)` as well before submitting TEE proposal proofs.
 
-The `deploy-tdx-stack` recipe resolves a recent L2 output root before invoking `DeployDevWithTDX`, then injects the verifier addresses, resolved output root, and L2 block through `run(address,address,address,bytes32,uint256)`. Use `L2_OUTPUT_ROOT_RPC_URL` if the `optimism_outputAtBlock` endpoint differs from the L2 execution RPC, and `ASR_ANCHOR_BLOCK_LOOKBACK` to anchor a fixed number of L2 blocks behind head.
+The `deploy-tdx-stack` recipe resolves a recent L2 output root before invoking `DeployDevWithTDX`, then injects the verifier addresses, resolved output root, and L2 block through `run(address,address,address,bytes32,uint256)`. Use `L2_OUTPUT_ROOT_RPC_URL` if the `optimism_outputAtBlock` endpoint differs from the L2 execution RPC, or pass an explicit third argument to anchor a fixed L2 block.
 
 ```bash
 just --justfile scripts/multiproof/justfile deploy-tdx-stack $NITRO_VERIFIER $TDX_VERIFIER

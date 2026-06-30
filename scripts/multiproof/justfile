@@ -14,7 +14,6 @@ sepolia_tdx_risc0_verifier_router := "0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187
 sepolia_risc0_set_builder_image_id := "0x70909b25db0db00f1d4b4016aeb876f53568a3e5a8e6397cb562d79947a02cc9"
 sepolia_tdx_verifier_id := "0xb9681d1f76f5dbf70da84ad06b5b20befa392638060e947965269b6f63ebbf3b"
 sepolia_intel_root_ca_hash := "0xa1acc73eb45794fa1734f14d882e91925b6006f79d3bb2460df9d01b333d7009"
-zero_bytes32 := "0x0000000000000000000000000000000000000000000000000000000000000000"
 
 default:
 
@@ -36,22 +35,17 @@ deploy-nitro-verifier nitro_root_cert nitro_verifier_id:
       "{{ sepolia_risc0_set_builder_image_id }}" \
       "{{ nitro_root_cert }}" \
       "{{ nitro_verifier_id }}" \
-      "{{ zero_bytes32 }}" \
+      "0x0000000000000000000000000000000000000000000000000000000000000000" \
       {{ broadcast_args }}
 
 # Deploy the TDX multiproof dev/test stack using the zeronet TDX config.
 [script]
-deploy-tdx-stack nitro_verifier tdx_verifier:
-    lookback="${ASR_ANCHOR_BLOCK_LOOKBACK:-0}"
-    l2_head="$(cast block-number --rpc-url "{{ l2_rpc_url }}")"
-    if (( lookback > l2_head )); then
-      echo "ASR_ANCHOR_BLOCK_LOOKBACK ($lookback) exceeds L2 head ($l2_head)" >&2
-      exit 1
-    fi
-    asr_anchor_block=$((l2_head - lookback))
-    asr_anchor_output_root="$(cast rpc optimism_outputAtBlock "$(printf '0x%x' "$asr_anchor_block")" --rpc-url "{{ l2_output_root_rpc_url }}" | jq -er '.outputRoot')"
+deploy-tdx-stack nitro_verifier tdx_verifier asr_anchor_block="":
+    asr_anchor_block="{{ asr_anchor_block }}"
+    asr_anchor_block="${asr_anchor_block:-$(cast block-number --rpc-url "{{ l2_rpc_url }}")}"
+    asr_anchor_output_root="$(cast rpc optimism_outputAtBlock "$(cast to-hex "$asr_anchor_block")" --rpc-url "{{ l2_output_root_rpc_url }}" | jq -er '.outputRoot')"
 
-    if [[ "$asr_anchor_output_root" == "{{ zero_bytes32 }}" ]]; then
+    if [[ "$asr_anchor_output_root" == "0x0000000000000000000000000000000000000000000000000000000000000000" ]]; then
       echo "Invalid ASR anchor output root: $asr_anchor_output_root" >&2
       exit 1
     fi
