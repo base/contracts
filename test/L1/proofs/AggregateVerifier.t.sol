@@ -142,12 +142,11 @@ contract AggregateVerifierTest is BaseTest {
     function testVerifyFailsWithL1OriginInFuture() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
         uint256 l1OriginNumber = block.number + 1;
-        bytes32 l1OriginHash = bytes32(uint256(1));
 
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.L1OriginInFuture.selector, l1OriginNumber, block.number)
         );
-        _createTEEGameWithOrigin(rootClaim, l1OriginHash, l1OriginNumber);
+        _createTEEGameWithOrigin(rootClaim, bytes32(uint256(1)), l1OriginNumber);
     }
 
     function testVerifyFailsWithL1OriginTooOld() public {
@@ -156,10 +155,9 @@ contract AggregateVerifierTest is BaseTest {
         vm.roll(block.number + 300);
 
         uint256 l1OriginNumber = 1;
-        bytes32 l1OriginHash = bytes32(uint256(1));
 
         vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginTooOld.selector, l1OriginNumber, block.number));
-        _createTEEGameWithOrigin(rootClaim, l1OriginHash, l1OriginNumber);
+        _createTEEGameWithOrigin(rootClaim, bytes32(uint256(1)), l1OriginNumber);
     }
 
     function testVerifyFailsWithL1OriginHashMismatch() public {
@@ -198,9 +196,16 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function testDeployWithInvalidBlockIntervals() public {
-        _expectDeployWithInvalidBlockIntervalsReverts(0, INTERMEDIATE_BLOCK_INTERVAL);
-        _expectDeployWithInvalidBlockIntervalsReverts(BLOCK_INTERVAL, 0);
-        _expectDeployWithInvalidBlockIntervalsReverts(3, 2);
+        vm.expectRevert(
+            abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, 0, INTERMEDIATE_BLOCK_INTERVAL)
+        );
+        _newAggregateVerifier(0, INTERMEDIATE_BLOCK_INTERVAL);
+
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, BLOCK_INTERVAL, 0));
+        _newAggregateVerifier(BLOCK_INTERVAL, 0);
+
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, 3, 2));
+        _newAggregateVerifier(3, 2);
     }
 
     function _advanceL2BlockAndClaim() private returns (Claim rootClaim) {
@@ -260,19 +265,5 @@ contract AggregateVerifierTest is BaseTest {
                 _generateProofBody("tee-proof", AggregateVerifier.ProofType.TEE)
             )
         );
-    }
-
-    function _expectDeployWithInvalidBlockIntervalsReverts(
-        uint256 blockInterval,
-        uint256 intermediateBlockInterval
-    )
-        private
-    {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                AggregateVerifier.InvalidBlockInterval.selector, blockInterval, intermediateBlockInterval
-            )
-        );
-        _newAggregateVerifier(blockInterval, intermediateBlockInterval);
     }
 }
