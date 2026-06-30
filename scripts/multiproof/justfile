@@ -41,8 +41,7 @@ deploy-nitro-verifier nitro_root_cert nitro_verifier_id:
 # Deploy the TDX multiproof dev/test stack using the zeronet TDX config.
 [script]
 deploy-tdx-stack nitro_verifier tdx_verifier asr_anchor_block="":
-    asr_anchor_block="{{ asr_anchor_block }}"
-    asr_anchor_block="${asr_anchor_block:-$(cast block-number --rpc-url "{{ l2_rpc_url }}")}"
+    asr_anchor_block="$([[ -n "{{ asr_anchor_block }}" ]] && printf '%s' "{{ asr_anchor_block }}" || cast block-number --rpc-url "{{ l2_rpc_url }}")"
     asr_anchor_output_root="$(cast rpc optimism_outputAtBlock "$(cast to-hex "$asr_anchor_block")" --rpc-url "{{ l2_output_root_rpc_url }}" | jq -er '.outputRoot')"
 
     if [[ "$asr_anchor_output_root" == "0x0000000000000000000000000000000000000000000000000000000000000000" ]]; then
