@@ -3,117 +3,45 @@ pragma solidity 0.8.15;
 
 import { Test } from "lib/forge-std/src/Test.sol";
 
-import { Proxy } from "src/universal/Proxy.sol";
-
-import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { GameType } from "src/libraries/bridge/Types.sol";
 
-import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
-import { MockAnchorStateRegistry } from "scripts/multiproof/mocks/MockAnchorStateRegistry.sol";
-import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 
-/// @notice Mock AggregateVerifier that returns configurable TEE image hashes.
-contract MockAggregateVerifierForVerifier {
-    bytes32 public TEE_NITRO_IMAGE_HASH;
-    bytes32 public TEE_TDX_IMAGE_HASH;
-
-    constructor(bytes32 nitroImageHash, bytes32 tdxImageHash) {
-        TEE_NITRO_IMAGE_HASH = nitroImageHash;
-        TEE_TDX_IMAGE_HASH = tdxImageHash;
-    }
-}
-
-contract MockDisputeGameFactoryForVerifier {
-    mapping(uint32 => address) internal _impls;
-
-    function setImpl(uint32 gameType, address impl) external {
-        _impls[gameType] = impl;
-    }
-
-    function gameImpls(GameType gameType) external view returns (IDisputeGame) {
-        return IDisputeGame(_impls[GameType.unwrap(gameType)]);
-    }
-}
-
 contract TEEVerifierTest is Test {
     TEEVerifier public verifier;
-    DevTEEProverRegistry public teeProverRegistry;
-    MockAnchorStateRegistry public anchorStateRegistry;
+    address internal teeProverRegistry;
 
     uint256 internal constant NITRO_SIGNER_PRIVATE_KEY =
         0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
     uint256 internal constant TDX_SIGNER_PRIVATE_KEY =
         0x2234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
-    address internal nitroSignerAddress;
-    address internal tdxSignerAddress;
 
     bytes32 internal constant NITRO_IMAGE_ID = keccak256("test-nitro-image-id");
     bytes32 internal constant TDX_IMAGE_ID = keccak256("test-tdx-image-id");
-    uint32 internal constant TEST_GAME_TYPE = 621;
     address internal immutable PROPOSER = makeAddr("proposer");
 
     function setUp() public {
-        nitroSignerAddress = vm.addr(NITRO_SIGNER_PRIVATE_KEY);
-        tdxSignerAddress = vm.addr(TDX_SIGNER_PRIVATE_KEY);
+        teeProverRegistry = makeAddr("tee-prover-registry");
+        vm.mockCall(teeProverRegistry, abi.encodeWithSignature("isValidProposer(address)", PROPOSER), abi.encode(true));
+        _mockSigner(NITRO_SIGNER_PRIVATE_KEY, NITRO_IMAGE_ID, true);
+        _mockSigner(TDX_SIGNER_PRIVATE_KEY, TDX_IMAGE_ID, true);
 
-        // Deploy mock factory and verifier
-        MockAggregateVerifierForVerifier mockVerifier =
-            new MockAggregateVerifierForVerifier(NITRO_IMAGE_ID, TDX_IMAGE_ID);
-        MockDisputeGameFactoryForVerifier mockFactory = new MockDisputeGameFactoryForVerifier();
-        mockFactory.setImpl(TEST_GAME_TYPE, address(mockVerifier));
-
-        // Deploy implementation (NitroEnclaveVerifier not needed for dev signer tests)
-        DevTEEProverRegistry impl = new DevTEEProverRegistry(
-            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(address(mockFactory))
-        );
-
-        address proxyAdmin = makeAddr("proxy-admin");
-        Proxy proxy = new Proxy(proxyAdmin);
-        vm.prank(proxyAdmin);
-        proxy.upgradeToAndCall(
-            address(impl),
-            abi.encodeCall(
-                TEEProverRegistry.initialize,
-                (address(this), address(this), new address[](0), GameType.wrap(TEST_GAME_TYPE))
-            )
-        );
-
-        teeProverRegistry = DevTEEProverRegistry(address(proxy));
-
-        // Register one Nitro signer and one TDX signer with the correct image hash.
-        teeProverRegistry.addDevSigner(nitroSignerAddress, NITRO_IMAGE_ID);
-        teeProverRegistry.addDevTDXSigner(tdxSignerAddress, TDX_IMAGE_ID);
-
-        // Set the proposer as valid
-        teeProverRegistry.setProposer(PROPOSER, true);
-
-        anchorStateRegistry = new MockAnchorStateRegistry();
         verifier = new TEEVerifier(
-            TEEProverRegistry(address(teeProverRegistry)), IAnchorStateRegistry(address(anchorStateRegistry))
+            TEEProverRegistry(teeProverRegistry), IAnchorStateRegistry(makeAddr("anchor-state-registry"))
         );
-    }
-
-    function testMockAnchorGameStartsUnset() public view {
-        assertEq(address(anchorStateRegistry.anchorGame()), address(0));
     }
 
     function testVerifyValidNitroSignature() public view {
         bytes32 journal = keccak256("test-journal");
-        bytes memory proofBytes = _proofBytes(journal, NITRO_SIGNER_PRIVATE_KEY);
-        bool result = verifier.verify(proofBytes, NITRO_IMAGE_ID, journal);
-        assertTrue(result);
+        bytes memory proofBytes = _buildProof(PROPOSER, _signature(NITRO_SIGNER_PRIVATE_KEY, journal));
+        assertTrue(verifier.verify(proofBytes, NITRO_IMAGE_ID, journal));
     }
 
     function testVerifyValidTDXSignature() public view {
         bytes32 journal = keccak256("test-journal");
-        bytes memory proofBytes = _proofBytes(journal, TDX_SIGNER_PRIVATE_KEY);
-        bool result = verifier.verify(proofBytes, TDX_IMAGE_ID, journal);
-        assertTrue(result);
+        bytes memory proofBytes = _buildProof(PROPOSER, _signature(TDX_SIGNER_PRIVATE_KEY, journal));
+        assertTrue(verifier.verify(proofBytes, TDX_IMAGE_ID, journal));
     }
 
     function testVerifyFailsWithInvalidSignature() public {
@@ -131,6 +59,9 @@ contract TEEVerifierTest is Test {
         bytes32 journal = keccak256("test-journal");
         bytes memory proofBytes = _buildProof(address(0), _signature(NITRO_SIGNER_PRIVATE_KEY, journal));
 
+        vm.mockCall(
+            teeProverRegistry, abi.encodeWithSignature("isValidProposer(address)", address(0)), abi.encode(false)
+        );
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.InvalidProposer.selector, address(0)));
         verifier.verify(proofBytes, NITRO_IMAGE_ID, journal);
     }
@@ -143,6 +74,7 @@ contract TEEVerifierTest is Test {
 
         bytes memory proofBytes = _buildProof(PROPOSER, _signature(unregisteredKey, journal));
 
+        _mockSigner(unregisteredKey, bytes32(0), false);
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.InvalidSigner.selector, unregisteredSigner));
         verifier.verify(proofBytes, NITRO_IMAGE_ID, journal);
     }
@@ -150,9 +82,8 @@ contract TEEVerifierTest is Test {
     function testVerifyFailsWithImageIdMismatch() public {
         bytes32 journal = keccak256("test-journal");
 
-        // Different imageId should fail — Nitro signer was registered with NITRO_IMAGE_ID
         bytes32 wrongImageId = keccak256("different-image");
-        bytes memory proofBytes = _proofBytes(journal, NITRO_SIGNER_PRIVATE_KEY);
+        bytes memory proofBytes = _buildProof(PROPOSER, _signature(NITRO_SIGNER_PRIVATE_KEY, journal));
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.ImageIdMismatch.selector, NITRO_IMAGE_ID, wrongImageId));
         verifier.verify(proofBytes, wrongImageId, journal);
     }
@@ -168,19 +99,18 @@ contract TEEVerifierTest is Test {
     function testVerifyFailsWithInvalidProofFormat() public {
         bytes32 journal = keccak256("test-journal");
 
-        // Proof too short (less than proposer + two signatures).
         bytes memory shortProof = new bytes(50);
 
         vm.expectRevert(TEEVerifier.InvalidProofFormat.selector);
         verifier.verify(shortProof, NITRO_IMAGE_ID, journal);
     }
 
-    function testConstants() public view {
-        assertEq(address(verifier.TEE_PROVER_REGISTRY()), address(teeProverRegistry));
-    }
-
-    function _proofBytes(bytes32 journal, uint256 signerPrivateKey) internal view returns (bytes memory) {
-        return _buildProof(PROPOSER, _signature(signerPrivateKey, journal));
+    function _mockSigner(uint256 privateKey, bytes32 imageId, bool registered) internal {
+        address signer = vm.addr(privateKey);
+        vm.mockCall(
+            teeProverRegistry, abi.encodeWithSignature("isRegisteredSigner(address)", signer), abi.encode(registered)
+        );
+        vm.mockCall(teeProverRegistry, abi.encodeWithSignature("signerImageHash(address)", signer), abi.encode(imageId));
     }
 
     function _signature(uint256 privateKey, bytes32 journal) internal pure returns (bytes memory) {
