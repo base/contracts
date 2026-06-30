@@ -215,7 +215,7 @@ contract BaseTest is Test {
         return abi.encodePacked(l2BlockNumber, parentAddress, _generateIntermediateRoots(l2BlockNumber, rootClaim));
     }
 
-    function _generateIntermediateRoots(uint256 l2BlockNumber, Claim rootClaim) private pure returns (bytes memory) {
+    function _generateIntermediateRoots(uint256 l2BlockNumber, Claim rootClaim) internal pure returns (bytes memory) {
         bytes32[] memory intermediateRoots = new bytes32[](INTERMEDIATE_ROOTS_COUNT);
         uint256 startingL2BlockNumber = l2BlockNumber - BLOCK_INTERVAL;
         for (uint256 i = 1; i < INTERMEDIATE_ROOTS_COUNT; i++) {

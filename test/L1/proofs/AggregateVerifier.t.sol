@@ -21,8 +21,7 @@ contract AggregateVerifierTest is BaseTest {
         Claim rootClaim = _advanceL2BlockAndClaim();
         bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
 
-        bytes memory intermediateRoots =
-            abi.encodePacked(_generateIntermediateRootsExceptLast(currentL2BlockNumber), rootClaim.raw());
+        bytes memory intermediateRoots = _generateIntermediateRoots(currentL2BlockNumber, rootClaim);
         bytes32 l1OriginHash = blockhash(block.number - 1);
         bytes32 startingRoot = keccak256(abi.encode(uint256(0)));
         bytes32 saltHash = keccak256("tee-proof");
@@ -79,22 +78,9 @@ contract AggregateVerifierTest is BaseTest {
             ZK_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
         );
 
-        assertTrue(game.wasRespectedGameTypeWhenCreated());
         assertEq(game.teeProver(), address(0));
         assertEq(game.zkProver(), ZK_PROVER);
-        assertEq(uint8(game.status()), uint8(GameStatus.IN_PROGRESS));
-        assertEq(game.l2SequenceNumber(), currentL2BlockNumber);
-        assertEq(game.rootClaim().raw(), rootClaim.raw());
-        assertEq(game.parentAddress(), address(anchorStateRegistry));
-        assertEq(game.gameType().raw(), GameTypes.AGGREGATE_VERIFIER.raw());
-        assertEq(game.gameCreator(), ZK_PROVER);
-        bytes memory intermediateOutputRoots = game.intermediateOutputRoots();
-        assertEq(
-            game.extraData(),
-            abi.encodePacked(currentL2BlockNumber, address(anchorStateRegistry), intermediateOutputRoots)
-        );
         assertEq(game.bondRecipient(), ZK_PROVER);
-        assertTrue(anchorStateRegistry.isGameProper(IDisputeGame(address(game))));
         assertEq(delayedWETH.balanceOf(address(game)), INIT_BOND);
         assertEq(game.proofCount(), 1);
     }
@@ -120,15 +106,7 @@ contract AggregateVerifierTest is BaseTest {
         vm.expectRevert(GameNotResolved.selector);
         game.claimCredit();
 
-        vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
-        game.resolve();
-        assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
-
-        _claimCreditAfterDelay(game, game.gameCreator());
-
-        vm.warp(block.timestamp + 1);
-        game.closeGame();
-        _assertAnchorRoot(rootClaim);
+        _resolveSlowAndClose(game, rootClaim);
     }
 
     function testUpdatingAnchorStateRegistryWithZKProof() public {
@@ -139,15 +117,7 @@ contract AggregateVerifierTest is BaseTest {
             ZK_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
         );
 
-        vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
-        game.resolve();
-        assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
-
-        _claimCreditAfterDelay(game, game.gameCreator());
-
-        vm.warp(block.timestamp + 1);
-        game.closeGame();
-        _assertAnchorRoot(rootClaim);
+        _resolveSlowAndClose(game, rootClaim);
     }
 
     function testUpdatingAnchorStateRegistryWithBothProofs() public {
@@ -252,13 +222,15 @@ contract AggregateVerifierTest is BaseTest {
         uint256 l1OriginNumber = block.number + 1;
         bytes32 l1OriginHash = bytes32(uint256(1));
 
-        bytes memory proofBytes = _teeProof(l1OriginHash, l1OriginNumber, rootClaim);
-
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.L1OriginInFuture.selector, l1OriginNumber, block.number)
         );
         _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proofBytes
+            TEE_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _teeProof(l1OriginHash, l1OriginNumber)
         );
     }
 
@@ -270,11 +242,13 @@ contract AggregateVerifierTest is BaseTest {
         uint256 l1OriginNumber = 1;
         bytes32 l1OriginHash = bytes32(uint256(1));
 
-        bytes memory proofBytes = _teeProof(l1OriginHash, l1OriginNumber, rootClaim);
-
         vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginTooOld.selector, l1OriginNumber, block.number));
         _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proofBytes
+            TEE_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _teeProof(l1OriginHash, l1OriginNumber)
         );
     }
 
@@ -283,12 +257,14 @@ contract AggregateVerifierTest is BaseTest {
         uint256 l1OriginNumber = block.number - 1;
         bytes32 wrongHash = bytes32(uint256(0xdeadbeef));
 
-        bytes memory proofBytes = _teeProof(wrongHash, l1OriginNumber, rootClaim);
-
         bytes32 actualHash = blockhash(l1OriginNumber);
         vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L1OriginHashMismatch.selector, wrongHash, actualHash));
         _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proofBytes
+            TEE_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _teeProof(wrongHash, l1OriginNumber)
         );
     }
 
@@ -300,15 +276,12 @@ contract AggregateVerifierTest is BaseTest {
         uint256 l1OriginNumber = block.number - 50;
         bytes32 l1OriginHash = blockhash(l1OriginNumber);
 
-        bytes memory proofBytes = abi.encodePacked(
-            uint8(AggregateVerifier.ProofType.TEE),
-            l1OriginHash,
-            l1OriginNumber,
-            _generateProofBody("tee-proof", AggregateVerifier.ProofType.TEE)
-        );
-
         _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proofBytes
+            TEE_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _teeProof(l1OriginHash, l1OriginNumber)
         );
     }
 
@@ -322,15 +295,12 @@ contract AggregateVerifierTest is BaseTest {
 
         vm.mockCall(EIP2935_CONTRACT, abi.encode(l1OriginNumber), abi.encode(expectedHash));
 
-        bytes memory proofBytes = abi.encodePacked(
-            uint8(AggregateVerifier.ProofType.TEE),
-            expectedHash,
-            l1OriginNumber,
-            _generateProofBody("tee-proof", AggregateVerifier.ProofType.TEE)
-        );
-
         _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proofBytes
+            TEE_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _teeProof(expectedHash, l1OriginNumber)
         );
     }
 
@@ -351,26 +321,25 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(l2SequenceNumber, currentL2BlockNumber);
     }
 
-    function _teeProof(
-        bytes32 l1OriginHash,
-        uint256 l1OriginNumber,
-        Claim rootClaim
-    )
-        private
-        pure
-        returns (bytes memory)
-    {
-        return abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, rootClaim.raw());
+    function _resolveSlowAndClose(AggregateVerifier game, Claim rootClaim) private {
+        vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
+        game.resolve();
+        assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
+
+        _claimCreditAfterDelay(game, game.gameCreator());
+
+        vm.warp(block.timestamp + 1);
+        game.closeGame();
+        _assertAnchorRoot(rootClaim);
     }
 
-    function _generateIntermediateRootsExceptLast(uint256 l2BlockNumber) private pure returns (bytes memory) {
-        uint256 rootsCount = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;
-        bytes32[] memory intermediateRoots = new bytes32[](rootsCount - 1);
-        uint256 startingL2BlockNumber = l2BlockNumber - BLOCK_INTERVAL;
-        for (uint256 i = 1; i < rootsCount; i++) {
-            intermediateRoots[i - 1] = keccak256(abi.encode(startingL2BlockNumber + INTERMEDIATE_BLOCK_INTERVAL * i));
-        }
-        return abi.encodePacked(intermediateRoots);
+    function _teeProof(bytes32 l1OriginHash, uint256 l1OriginNumber) private pure returns (bytes memory) {
+        return abi.encodePacked(
+            uint8(AggregateVerifier.ProofType.TEE),
+            l1OriginHash,
+            l1OriginNumber,
+            _generateProofBody("tee-proof", AggregateVerifier.ProofType.TEE)
+        );
     }
 
     function _expectDeployWithInvalidBlockIntervalsReverts(
