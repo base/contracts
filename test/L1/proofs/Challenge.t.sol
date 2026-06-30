@@ -4,7 +4,6 @@ pragma solidity 0.8.15;
 import { ClaimAlreadyResolved } from "src/libraries/bridge/Errors.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { GameStatus } from "src/libraries/bridge/Types.sol";
-import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { Verifier } from "src/L1/proofs/Verifier.sol";
@@ -120,7 +119,7 @@ contract ChallengeTest is BaseTest {
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
         assertEq(gameA.proofCount(), 1);
         assertEq(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
-        assertEq(address(gameA.zkProver()), address(0));
+        assertEq(gameA.zkProver(), address(0));
 
         vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.DEFENDER_WINS));
@@ -150,29 +149,13 @@ contract ChallengeTest is BaseTest {
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
         assertEq(gameA.proofCount(), 1);
         assertGt(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
-        assertEq(address(gameA.teeProver()), address(0));
+        assertEq(gameA.teeProver(), address(0));
         assertEq(gameA.zkProver(), ZK_PROVER);
 
         vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.CHALLENGER_WINS));
         assertEq(gameA.bondRecipient(), ZK_PROVER);
         _claimCreditAfterDelay(gameA, ZK_PROVER);
-    }
-
-    function _createGame(
-        address prover,
-        bytes memory claimSalt,
-        bytes memory proofSalt,
-        AggregateVerifier.ProofType proofType,
-        address parent
-    )
-        private
-        returns (AggregateVerifier)
-    {
-        currentL2BlockNumber += BLOCK_INTERVAL;
-        Claim rootClaim = _claim(claimSalt);
-        bytes memory proof = _generateProof(proofSalt, proofType);
-        return _createAggregateVerifierGame(prover, rootClaim, currentL2BlockNumber, parent, proof);
     }
 
     function _challenge(AggregateVerifier game, AggregateVerifier.ProofType proofType, bytes32 claimRoot) private {
@@ -188,9 +171,5 @@ contract ChallengeTest is BaseTest {
         game.nullify(
             _generateProposalProof(claimSalt, proofType), LAST_INTERMEDIATE_ROOT_INDEX, _claim(claimSalt).raw()
         );
-    }
-
-    function _claim(bytes memory salt) private view returns (Claim) {
-        return Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, salt)));
     }
 }

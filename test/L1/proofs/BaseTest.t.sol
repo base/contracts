@@ -139,6 +139,26 @@ contract BaseTest is Test {
         );
     }
 
+    function _createGame(
+        address prover,
+        bytes memory claimSalt,
+        bytes memory proofSalt,
+        AggregateVerifier.ProofType proofType,
+        address parent
+    )
+        internal
+        returns (AggregateVerifier)
+    {
+        currentL2BlockNumber += BLOCK_INTERVAL;
+        return _createAggregateVerifierGame(
+            prover, _claim(claimSalt), currentL2BlockNumber, parent, _generateProof(proofSalt, proofType)
+        );
+    }
+
+    function _claim(bytes memory salt) internal view returns (Claim) {
+        return Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, salt)));
+    }
+
     function _provideProof(AggregateVerifier game, address prover, bytes memory proofBytes) internal {
         vm.prank(prover);
         game.verifyProposalProof(proofBytes);

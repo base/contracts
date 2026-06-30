@@ -166,26 +166,6 @@ contract NullifyTest is BaseTest {
         _assertStatus(gameA, GameStatus.DEFENDER_WINS);
     }
 
-    function _createGame(
-        address prover,
-        bytes memory claimSalt,
-        bytes memory proofSalt,
-        AggregateVerifier.ProofType proofType,
-        address parent
-    )
-        private
-        returns (AggregateVerifier)
-    {
-        currentL2BlockNumber += BLOCK_INTERVAL;
-        return _createAggregateVerifierGame(
-            prover, _claim(claimSalt), currentL2BlockNumber, parent, _generateProof(proofSalt, proofType)
-        );
-    }
-
-    function _claim(bytes memory salt) private view returns (Claim) {
-        return Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, salt)));
-    }
-
     function _nullify(
         AggregateVerifier game,
         bytes memory proofSalt,
