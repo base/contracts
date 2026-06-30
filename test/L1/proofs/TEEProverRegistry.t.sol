@@ -126,6 +126,34 @@ contract TEEProverRegistryTest is Test {
         assertTrue(teeProverRegistry.signerTEEType(signer) == TEEProverRegistry.TEEType.TDX);
     }
 
+    function testRegisterTDXSignerStoresImageHash() public {
+        address signer = makeAddr("tdx-signer");
+        address tdxVerifier = makeAddr("tdx-verifier");
+
+        vm.etch(tdxVerifier, hex"00");
+        vm.mockCall(
+            tdxVerifier, abi.encodeCall(ITDXVerifier.verify, (bytes(""), bytes(""))), abi.encode(signer, TEST_IMAGE_HASH)
+        );
+
+        TEEProverRegistry registry = new TEEProverRegistry(
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(tdxVerifier), IDisputeGameFactory(makeAddr("factory"))
+        );
+
+        vm.prank(address(0xdEaD));
+        registry.registerTDXSigner("", "");
+
+        assertTrue(registry.isRegisteredSigner(signer));
+        assertEq(registry.signerImageHash(signer), TEST_IMAGE_HASH);
+        assertTrue(registry.signerTEEType(signer) == TEEProverRegistry.TEEType.TDX);
+    }
+
+    function testConstructorRevertsIfTDXVerifierNotSet() public {
+        vm.expectRevert(TEEProverRegistry.TDXVerifierNotSet.selector);
+        new TEEProverRegistry(
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(0)), IDisputeGameFactory(makeAddr("factory"))
+        );
+    }
+
     function testAddDevSigner() public {
         address signer = makeAddr("dev-signer");
 
