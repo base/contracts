@@ -11,11 +11,11 @@ The scripts in this directory are **development and testing tools only**. They a
 
 See `scripts/multiproof/justfile` for defaults, config paths, and optional anchor-block arguments.
 
-| Path | Recipe |
-| --- | --- |
-| NoNitro dev, no attestation | `just --justfile scripts/multiproof/justfile deploy-no-nitro-stack` |
+| Path                           | Recipe                                                                                                                                                                       |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| NoNitro dev, no attestation    | `just --justfile scripts/multiproof/justfile deploy-no-nitro-stack`                                                                                                          |
 | TDX dev/test verifier policies | `just --justfile scripts/multiproof/justfile deploy-nitro-verifier $NITRO_ROOT_CERT $NITRO_VERIFIER_ID`<br>`just --justfile scripts/multiproof/justfile deploy-tdx-verifier` |
-| TDX dev/test stack | `just --justfile scripts/multiproof/justfile deploy-tdx-stack $NITRO_VERIFIER $TDX_VERIFIER` |
+| TDX dev/test stack             | `just --justfile scripts/multiproof/justfile deploy-tdx-stack $NITRO_VERIFIER $TDX_VERIFIER`                                                                                 |
 
 ## Register Signers
 
