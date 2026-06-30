@@ -154,6 +154,15 @@ contract BaseTest is Test {
         game.verifyProposalProof(proofBytes);
     }
 
+    function _claimCreditAfterDelay(AggregateVerifier game, address recipient) internal {
+        uint256 balanceBefore = recipient.balance;
+        game.claimCredit();
+        vm.warp(block.timestamp + DELAYED_WETH_DELAY);
+        game.claimCredit();
+        assertEq(recipient.balance, balanceBefore + INIT_BOND);
+        assertEq(delayedWETH.balanceOf(address(game)), 0);
+    }
+
     /// @dev Encodes proofType || l1OriginHash || l1OriginNumber || mock verifier payload.
     function _generateProof(
         bytes memory salt,

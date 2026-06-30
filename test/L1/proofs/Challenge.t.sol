@@ -142,10 +142,9 @@ contract ChallengeTest is BaseTest {
         AggregateVerifier gameB =
             _createGame(TEE_PROVER, "tee-nullify-b", "tee-proof-b", AggregateVerifier.ProofType.TEE, address(gameA));
 
-        Claim rootNullifyB = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee-nullify-b")));
+        Claim rootNullifyB = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee-nullify-b-root")));
         bytes memory teeNullifyB = _generateProposalProof("tee-nullify-b", AggregateVerifier.ProofType.TEE);
-        uint256 lastIdx = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1;
-        gameB.nullify(teeNullifyB, lastIdx, rootNullifyB.raw());
+        gameB.nullify(teeNullifyB, LAST_INTERMEDIATE_ROOT_INDEX, rootNullifyB.raw());
         assertTrue(teeVerifier.nullified());
 
         _resolveAndAssertStatus(gameA, GameStatus.IN_PROGRESS);
@@ -214,14 +213,5 @@ contract ChallengeTest is BaseTest {
         _resolveAndAssertStatus(game, expectedStatus);
         assertEq(game.bondRecipient(), recipient);
         _claimCreditAfterDelay(game, recipient);
-    }
-
-    function _claimCreditAfterDelay(AggregateVerifier game, address recipient) private {
-        uint256 balanceBefore = recipient.balance;
-        game.claimCredit();
-        vm.warp(block.timestamp + DELAYED_WETH_DELAY);
-        game.claimCredit();
-        assertEq(recipient.balance, balanceBefore + INIT_BOND);
-        assertEq(delayedWETH.balanceOf(address(game)), 0);
     }
 }

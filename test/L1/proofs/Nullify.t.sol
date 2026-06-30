@@ -24,7 +24,7 @@ contract NullifyTest is BaseTest {
         _assertNullifiedToNoProofs(game, TEE_PROVER);
 
         vm.warp(block.timestamp + NO_PROOF_CREDIT_CLAIM_DELAY);
-        _claimCreditAfterDelay(game);
+        _claimCreditAfterDelay(game, game.gameCreator());
     }
 
     function testNullifyWithZKProof() public {
@@ -35,7 +35,7 @@ contract NullifyTest is BaseTest {
         _assertNullifiedToNoProofs(game, ZK_PROVER);
 
         vm.warp(block.timestamp + NO_PROOF_CREDIT_CLAIM_DELAY);
-        _claimCreditAfterDelay(game);
+        _claimCreditAfterDelay(game, game.gameCreator());
     }
 
     function testNullifyWithTEEProofWhenTEEAndZKProofsAreProvided() public {
@@ -94,7 +94,7 @@ contract NullifyTest is BaseTest {
 
         vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
         game.resolve();
-        _claimCreditAfterDelay(game);
+        _claimCreditAfterDelay(game, game.gameCreator());
     }
 
     function testResolveEarlyReturnWhenSharedTeeVerifierNullifiedByAnotherGame() public {
@@ -240,15 +240,5 @@ contract NullifyTest is BaseTest {
 
         vm.expectRevert(AggregateVerifier.GameNotOver.selector);
         gameA.resolve();
-    }
-
-    function _claimCreditAfterDelay(AggregateVerifier game) private {
-        address recipient = game.gameCreator();
-        uint256 balanceBefore = recipient.balance;
-        game.claimCredit();
-        vm.warp(block.timestamp + DELAYED_WETH_DELAY);
-        game.claimCredit();
-        assertEq(recipient.balance, balanceBefore + INIT_BOND);
-        assertEq(delayedWETH.balanceOf(address(game)), 0);
     }
 }
