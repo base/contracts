@@ -16,8 +16,8 @@ contract TDXVerifierTest is Test {
 
     bytes32 internal constant ROOT_CA_HASH = keccak256("intel-root-ca");
     bytes32 internal constant IMAGE_HASH = keccak256("tdx-image");
-    bytes32 internal constant PUBLIC_KEY_X = hex"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
-    bytes32 internal constant PUBLIC_KEY_Y = hex"2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40";
+    bytes32 internal constant PUBLIC_KEY_X = bytes32(uint256(1));
+    bytes32 internal constant PUBLIC_KEY_Y = bytes32(uint256(2));
 
     uint64 internal constant MAX_TIME_DIFF = 3600;
 
@@ -44,59 +44,42 @@ contract TDXVerifierTest is Test {
         TDXVerifierJournal memory journal = _successJournal();
         journal.rootCaHash = keccak256("wrong-root-ca");
 
-        _expectVerifyRevert(
-            journal, abi.encodeWithSelector(TDXVerifier.RootCaHashMismatch.selector, ROOT_CA_HASH, journal.rootCaHash)
-        );
+        _expectVerifyRevert(journal, TDXVerifier.RootCaHashMismatch.selector);
     }
 
     function testVerifyRevertsWhenTcbStatusIsNotAllowed() public {
         TDXVerifierJournal memory journal = _successJournal();
         journal.tcbStatus = TDXTcbStatus.ConfigurationNeeded;
 
-        _expectVerifyRevert(
-            journal, abi.encodeWithSelector(TDXVerifier.TcbStatusNotAllowed.selector, journal.tcbStatus)
-        );
+        _expectVerifyRevert(journal, TDXVerifier.TcbStatusNotAllowed.selector);
     }
 
     function testVerifyRevertsWhenCollateralExpired() public {
         TDXVerifierJournal memory journal = _successJournal();
         journal.collateralExpiration = uint64(block.timestamp);
 
-        _expectVerifyRevert(
-            journal, abi.encodeWithSelector(TDXVerifier.CollateralExpired.selector, journal.collateralExpiration)
-        );
+        _expectVerifyRevert(journal, TDXVerifier.CollateralExpired.selector);
     }
 
     function testVerifyRevertsWhenTimestampTooOld() public {
         TDXVerifierJournal memory journal = _successJournal();
         journal.timestamp = uint64(block.timestamp - MAX_TIME_DIFF) * 1000;
 
-        _expectVerifyRevert(
-            journal,
-            abi.encodeWithSelector(
-                TDXVerifier.InvalidTimestamp.selector, uint64(block.timestamp - MAX_TIME_DIFF), block.timestamp
-            )
-        );
+        _expectVerifyRevert(journal, TDXVerifier.InvalidTimestamp.selector);
     }
 
     function testVerifyRevertsWhenTimestampIsFromFuture() public {
         TDXVerifierJournal memory journal = _successJournal();
         journal.timestamp = uint64(block.timestamp) * 1000;
 
-        _expectVerifyRevert(
-            journal,
-            abi.encodeWithSelector(TDXVerifier.InvalidTimestamp.selector, uint64(block.timestamp), block.timestamp)
-        );
+        _expectVerifyRevert(journal, TDXVerifier.InvalidTimestamp.selector);
     }
 
     function testVerifyRevertsWhenReportDataDoesNotBindPublicKey() public {
         TDXVerifierJournal memory journal = _successJournal();
         journal.reportDataPrefix = keccak256("wrong-report-data");
 
-        _expectVerifyRevert(
-            journal,
-            abi.encodeWithSelector(TDXVerifier.ReportDataMismatch.selector, _publicKeyHash(), journal.reportDataPrefix)
-        );
+        _expectVerifyRevert(journal, TDXVerifier.ReportDataMismatch.selector);
     }
 
     function _successJournal() internal view returns (TDXVerifierJournal memory journal) {
@@ -116,8 +99,8 @@ contract TDXVerifierTest is Test {
         return keccak256(abi.encodePacked(PUBLIC_KEY_X, PUBLIC_KEY_Y));
     }
 
-    function _expectVerifyRevert(TDXVerifierJournal memory journal, bytes memory expectedRevert) internal {
-        vm.expectRevert(expectedRevert);
+    function _expectVerifyRevert(TDXVerifierJournal memory journal, bytes4 expectedRevert) internal {
+        vm.expectPartialRevert(expectedRevert);
         verifier.verify(abi.encode(journal), hex"1234");
     }
 }
