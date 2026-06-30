@@ -21,22 +21,24 @@ contract TEEVerifierTest is Test {
 
     function setUp() public {
         vm.mockCall(teeProverRegistry, abi.encodeCall(ITEEProverRegistry.isValidProposer, (PROPOSER)), abi.encode(true));
-        _mockSigner(NITRO_SIGNER_PRIVATE_KEY, NITRO_IMAGE_ID, true);
+        address signer = vm.addr(NITRO_SIGNER_PRIVATE_KEY);
+        vm.mockCall(
+            teeProverRegistry, abi.encodeCall(ITEEProverRegistry.isRegisteredSigner, (signer)), abi.encode(true)
+        );
+        vm.mockCall(
+            teeProverRegistry, abi.encodeCall(ITEEProverRegistry.signerImageHash, (signer)), abi.encode(NITRO_IMAGE_ID)
+        );
 
         verifier = new TEEVerifier(TEEProverRegistry(teeProverRegistry), IAnchorStateRegistry(address(0)));
     }
 
     function testVerifyValidNitroSignature() public view {
-        assertTrue(
-            verifier.verify(
-                abi.encodePacked(PROPOSER, _signature(NITRO_SIGNER_PRIVATE_KEY)), NITRO_IMAGE_ID, JOURNAL
-            )
-        );
+        assertTrue(verifier.verify(_proof(NITRO_SIGNER_PRIVATE_KEY), NITRO_IMAGE_ID, JOURNAL));
     }
 
     function testVerifyFailsWithInvalidSignature() public {
         vm.expectRevert(TEEVerifier.InvalidSignature.selector);
-        verifier.verify(abi.encodePacked(PROPOSER, bytes32(0), bytes32(0), uint8(27)), NITRO_IMAGE_ID, JOURNAL);
+        verifier.verify(abi.encodePacked(PROPOSER, new bytes(65)), NITRO_IMAGE_ID, JOURNAL);
     }
 
     function testVerifyFailsWithInvalidProposer() public {
@@ -51,17 +53,19 @@ contract TEEVerifierTest is Test {
         uint256 unregisteredKey = 2;
         address unregisteredSigner = vm.addr(unregisteredKey);
 
-        _mockSigner(unregisteredKey, bytes32(0), false);
+        vm.mockCall(
+            teeProverRegistry,
+            abi.encodeCall(ITEEProverRegistry.isRegisteredSigner, (unregisteredSigner)),
+            abi.encode(false)
+        );
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.InvalidSigner.selector, unregisteredSigner));
-        verifier.verify(abi.encodePacked(PROPOSER, _signature(unregisteredKey)), NITRO_IMAGE_ID, JOURNAL);
+        verifier.verify(_proof(unregisteredKey), NITRO_IMAGE_ID, JOURNAL);
     }
 
     function testVerifyFailsWithImageIdMismatch() public {
         bytes32 wrongImageId = keccak256("different-image");
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.ImageIdMismatch.selector, NITRO_IMAGE_ID, wrongImageId));
-        verifier.verify(
-            abi.encodePacked(PROPOSER, _signature(NITRO_SIGNER_PRIVATE_KEY)), wrongImageId, JOURNAL
-        );
+        verifier.verify(_proof(NITRO_SIGNER_PRIVATE_KEY), wrongImageId, JOURNAL);
     }
 
     function testVerifyFailsWhenTEETypeIsIncludedInProof() public {
@@ -69,18 +73,8 @@ contract TEEVerifierTest is Test {
         verifier.verify(new bytes(86), NITRO_IMAGE_ID, JOURNAL);
     }
 
-    function _mockSigner(uint256 privateKey, bytes32 imageId, bool registered) internal {
-        address signer = vm.addr(privateKey);
-        vm.mockCall(
-            teeProverRegistry, abi.encodeCall(ITEEProverRegistry.isRegisteredSigner, (signer)), abi.encode(registered)
-        );
-        vm.mockCall(
-            teeProverRegistry, abi.encodeCall(ITEEProverRegistry.signerImageHash, (signer)), abi.encode(imageId)
-        );
-    }
-
-    function _signature(uint256 privateKey) internal pure returns (bytes memory) {
+    function _proof(uint256 privateKey) internal view returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, JOURNAL);
-        return abi.encodePacked(r, s, v);
+        return abi.encodePacked(PROPOSER, r, s, v);
     }
 }
