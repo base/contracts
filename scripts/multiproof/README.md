@@ -188,16 +188,7 @@ TDX_REGISTRATION_MANAGER=0x44E999A5859c2D12378a349882fAe5805DCE71b9
 constructor also requires a non-zero `tdxVerifier`; for config-driven deployments, set `tdxVerifier` in the deploy
 config to the deployed `TDXVerifier` address.
 
-Deploy both TEE verifier policy contracts with one command:
-
-```bash
-just --justfile scripts/multiproof/justfile deploy-tee-verifiers $NITRO_ROOT_CERT $NITRO_VERIFIER_ID
-```
-
-This saves the individual verifier outputs under `deployments/<chainId>-nitro-verifier.json`
-and `deployments/<chainId>-tdx-verifier.json`.
-
-To deploy Nitro separately:
+Deploy Nitro:
 
 ```bash
 just --justfile scripts/multiproof/justfile deploy-nitro-verifier $NITRO_ROOT_CERT $NITRO_VERIFIER_ID
@@ -205,7 +196,7 @@ just --justfile scripts/multiproof/justfile deploy-nitro-verifier $NITRO_ROOT_CE
 
 This saves output to `deployments/<chainId>-nitro-verifier.json`.
 
-To deploy TDX separately:
+Deploy TDX:
 
 ```bash
 just --justfile scripts/multiproof/justfile deploy-tdx-verifier
@@ -242,11 +233,9 @@ forge script scripts/multiproof/DeployNitroVerifier.s.sol:DeployNitroVerifier \
   --private-key $PRIVATE_KEY
 ```
 
-To override all Nitro and TDX inputs while still deploying both, pass the optional args to `deploy-tee-verifiers`.
-
 ### Step 2: Deploy the TDX multiproof test stack
 
-Set `DEPLOY_CONFIG_PATH` to the Sepolia deploy config and pass the `NitroEnclaveVerifier` and `TDXVerifier` addresses from Step 1. `finalSystemOwner` in the deploy config must be the account broadcasting this transaction because the script updates `NitroEnclaveVerifier.proofSubmitter` to the deployed `TEEProverRegistry`.
+The recipe defaults `DEPLOY_CONFIG_PATH` to `deploy-config/zeronet-tdx.json` and requires the `NitroEnclaveVerifier` and `TDXVerifier` addresses from Step 1. `finalSystemOwner` in the deploy config must be the account broadcasting this transaction because the script updates `NitroEnclaveVerifier.proofSubmitter` to the deployed `TEEProverRegistry`.
 
 The TDX registry manager is set to `TDX_REGISTRATION_MANAGER`, allowing that address to call `registerTDXSigner(bytes,bytes)`. Register a Nitro signer through `registerSigner(bytes,bytes)` as well before submitting TEE proposal proofs.
 
