@@ -6,16 +6,8 @@ This guide covers deploying the multiproof contracts and registering a prover on
 
 The scripts in this directory are **development and testing tools only**. They are not suitable for production deployments. Specifically, the NoNitro path (`DeployDevNoNitro.s.sol`):
 
-- Does **no AWS Nitro attestation checking**. Instead it uses a bypass function for quickly registering provers: [`MockDevTEEProverRegistry.addDevSigner()`](https://github.com/base/contracts/blob/main/test/mocks/MockDevTEEProverRegistry.sol#L22)
-- Uses a simplified mock `AnchorStateRegistry` (with some differences from the real one): [`MockAnchorStateRegistry`](https://github.com/base/contracts/blob/main/scripts/multiproof/mocks/MockAnchorStateRegistry.sol)
-
-## Prerequisites
-
-Install dependencies if you haven't already (required after any `lib/` changes):
-
-```bash
-just deps
-```
+- Does **no AWS Nitro attestation checking**. Instead it uses `MockDevTEEProverRegistry.addDevSigner()` in `test/mocks/MockDevTEEProverRegistry.sol`.
+- Uses the simplified `MockAnchorStateRegistry` in `scripts/multiproof/mocks/MockAnchorStateRegistry.sol`.
 
 ## Path 1: NoNitro (Dev - No Attestation)
 
@@ -34,21 +26,10 @@ Set `finalSystemOwner` to the deployer address, then set the multiproof and TEE 
 
 ### Step 2: Deploy contracts with a fresh anchor
 
-The proving system needs a recent anchor state to catch up to chain tip. Pass it to `DeployDevNoNitro.run(bytes32,uint256)` during deployment.
+The recipe resolves a recent L2 output root and deploys `DeployDevNoNitro`. Pass an anchor block as the first argument if you need a specific one.
 
 ```bash
-BLOCK=$(cast block-number --rpc-url "$L2_RPC_URL")
-OUTPUT_ROOT=$(cast rpc optimism_outputAtBlock "$(cast to-hex "$BLOCK")" --rpc-url "$L2_OUTPUT_ROOT_RPC_URL" | jq -er '.outputRoot')
-
-DEPLOY_CONFIG_PATH=deploy-config/sepolia.json \
-forge script scripts/multiproof/DeployDevNoNitro.s.sol:DeployDevNoNitro \
-  --sig "run(bytes32,uint256)" \
-  "$OUTPUT_ROOT" \
-  "$BLOCK" \
-  --rpc-url "$L1_RPC_URL" \
-  --broadcast \
-  --ledger \
-  --hd-paths "$LEDGER_PATH"
+just --justfile scripts/multiproof/justfile deploy-no-nitro-stack
 ```
 
 On success, deployed addresses are printed to the console and saved to `deployments/<chainId>-dev-no-nitro.json`.
@@ -72,18 +53,13 @@ Call `addDevSigner` for the Nitro signer and `addDevTDXSigner` for the TDX signe
 > only tracks which signer addresses are valid.
 
 ```bash
-cast send "$TEE_PROVER_REGISTRY" \
-  "addDevSigner(address,bytes32)" \
-  "$NITRO_SIGNER_ADDRESS" \
-  "$TEE_NITRO_IMAGE_HASH" \
-  --rpc-url "$L1_RPC_URL" \
-  --ledger \
-  --mnemonic-derivation-path "$LEDGER_PATH"
+METHOD=addDevSigner SIGNER="$NITRO_SIGNER_ADDRESS" IMAGE_HASH="$TEE_NITRO_IMAGE_HASH"
+# METHOD=addDevTDXSigner SIGNER="$TDX_SIGNER_ADDRESS" IMAGE_HASH="$TEE_TDX_IMAGE_HASH"
 
 cast send "$TEE_PROVER_REGISTRY" \
-  "addDevTDXSigner(address,bytes32)" \
-  "$TDX_SIGNER_ADDRESS" \
-  "$TEE_TDX_IMAGE_HASH" \
+  "${METHOD}(address,bytes32)" \
+  "$SIGNER" \
+  "$IMAGE_HASH" \
   --rpc-url "$L1_RPC_URL" \
   --ledger \
   --mnemonic-derivation-path "$LEDGER_PATH"
@@ -97,9 +73,7 @@ TDX registration requires both Nitro and TDX signers. `TDXVerifier` verifies `TD
 
 ### Step 1: Deploy verifier policy contracts
 
-`NitroEnclaveVerifier` and `TDXVerifier` are deployed separately from the main multiproof stack because they depend on verifier interfaces that require Solidity `^0.8.20`, while the rest of the multiproof deployment stack is pinned to Solidity `0.8.15`.
-
-Sepolia defaults live in `scripts/multiproof/justfile`.
+Deploy the verifier policy contracts separately. Sepolia defaults live in `scripts/multiproof/justfile`.
 
 ```bash
 just --justfile scripts/multiproof/justfile deploy-nitro-verifier $NITRO_ROOT_CERT $NITRO_VERIFIER_ID
@@ -120,24 +94,21 @@ The script saves output to `deployments/<chainId>-dev-with-tdx.json`.
 
 ### Step 3: Register Nitro and TDX signers
 
-Register a Nitro signer with a ZK-proven Nitro attestation:
+Register each signer with its proof output:
+
+| Signer | Method | Output | Proof |
+| --- | --- | --- | --- |
+| Nitro | `registerSigner` | `$NITRO_OUTPUT` | `$NITRO_PROOF_BYTES` |
+| TDX | `registerTDXSigner` | `$TDX_OUTPUT` | `$TDX_PROOF_BYTES` |
 
 ```bash
-cast send "$TEE_PROVER_REGISTRY" \
-  "registerSigner(bytes,bytes)" \
-  "$NITRO_OUTPUT" \
-  "$NITRO_PROOF_BYTES" \
-  --rpc-url "$L1_RPC_URL" \
-  --private-key "$PRIVATE_KEY"
-```
+METHOD=registerSigner OUTPUT="$NITRO_OUTPUT" PROOF="$NITRO_PROOF_BYTES"
+# METHOD=registerTDXSigner OUTPUT="$TDX_OUTPUT" PROOF="$TDX_PROOF_BYTES"
 
-Once you have the ABI-encoded `TDXVerifierJournal` output and matching RISC Zero proof bytes from the TDX DCAP guest, register the signer through the TDX-aware registry:
-
-```bash
 cast send "$TEE_PROVER_REGISTRY" \
-  "registerTDXSigner(bytes,bytes)" \
-  "$TDX_OUTPUT" \
-  "$PROOF_BYTES" \
+  "${METHOD}(bytes,bytes)" \
+  "$OUTPUT" \
+  "$PROOF" \
   --rpc-url "$L1_RPC_URL" \
   --private-key "$PRIVATE_KEY"
 ```

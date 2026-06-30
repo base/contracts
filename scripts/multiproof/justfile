@@ -38,6 +38,27 @@ deploy-nitro-verifier nitro_root_cert nitro_verifier_id:
       "0x0000000000000000000000000000000000000000000000000000000000000000" \
       {{ broadcast_args }}
 
+# Deploy the NoNitro multiproof dev/test stack using the Sepolia config.
+[script]
+deploy-no-nitro-stack asr_anchor_block="":
+    asr_anchor_block="$([[ -n "{{ asr_anchor_block }}" ]] && printf '%s' "{{ asr_anchor_block }}" || cast block-number --rpc-url "{{ l2_rpc_url }}")"
+    asr_anchor_output_root="$(cast rpc optimism_outputAtBlock "$(cast to-hex "$asr_anchor_block")" --rpc-url "{{ l2_output_root_rpc_url }}" | jq -er '.outputRoot')"
+
+    if [[ "$asr_anchor_output_root" == "0x0000000000000000000000000000000000000000000000000000000000000000" ]]; then
+      echo "Invalid ASR anchor output root: $asr_anchor_output_root" >&2
+      exit 1
+    fi
+
+    echo "Using ASR anchor output root: $asr_anchor_output_root"
+    echo "Using ASR anchor L2 block: $asr_anchor_block"
+
+    DEPLOY_CONFIG_PATH="deploy-config/sepolia.json" \
+    forge script scripts/multiproof/DeployDevNoNitro.s.sol:DeployDevNoNitro \
+      --sig "run(bytes32,uint256)" \
+      "$asr_anchor_output_root" \
+      "$asr_anchor_block" \
+      {{ broadcast_args }}
+
 # Deploy the TDX multiproof dev/test stack using the zeronet TDX config.
 [script]
 deploy-tdx-stack nitro_verifier tdx_verifier asr_anchor_block="":
