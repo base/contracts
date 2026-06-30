@@ -19,9 +19,7 @@ zero_bytes32 := "0x0000000000000000000000000000000000000000000000000000000000000
 default:
 
 # Deploy the TDXVerifier policy contract.
-[script]
 deploy-tdx-verifier:
-    echo "Using {{ forge_account }} as owner/deployer: {{ owner }}"
     forge script scripts/multiproof/DeployTDXVerifier.s.sol:DeployTDXVerifier \
       --sig "run(address,bytes32,bytes32)" \
       "{{ sepolia_tdx_risc0_verifier_router }}" \
@@ -30,9 +28,7 @@ deploy-tdx-verifier:
       {{ broadcast_args }}
 
 # Deploy the NitroEnclaveVerifier policy contract and its local RISC Zero set verifier route.
-[script]
 deploy-nitro-verifier nitro_root_cert nitro_verifier_id:
-    echo "Using {{ forge_account }} as owner/deployer: {{ owner }}"
     forge script scripts/multiproof/DeployNitroVerifier.s.sol:DeployNitroVerifier \
       --sig "run(address,address,bytes32,bytes32,bytes32,bytes32)" \
       "{{ owner }}" \
@@ -46,8 +42,6 @@ deploy-nitro-verifier nitro_root_cert nitro_verifier_id:
 # Deploy the TDX multiproof dev/test stack using the zeronet TDX config.
 [script]
 deploy-tdx-stack nitro_verifier tdx_verifier:
-    echo "Using {{ forge_account }} as deployer: {{ owner }}"
-
     lookback="${ASR_ANCHOR_BLOCK_LOOKBACK:-0}"
     l2_head="$(cast block-number --rpc-url "{{ l2_rpc_url }}")"
     if (( lookback > l2_head )); then
@@ -55,9 +49,9 @@ deploy-tdx-stack nitro_verifier tdx_verifier:
       exit 1
     fi
     asr_anchor_block=$((l2_head - lookback))
-    asr_anchor_output_root="$(cast rpc optimism_outputAtBlock "$(printf '0x%x' "$asr_anchor_block")" --rpc-url "{{ l2_output_root_rpc_url }}" | jq -r '.outputRoot')"
+    asr_anchor_output_root="$(cast rpc optimism_outputAtBlock "$(printf '0x%x' "$asr_anchor_block")" --rpc-url "{{ l2_output_root_rpc_url }}" | jq -er '.outputRoot')"
 
-    if [[ -z "$asr_anchor_output_root" || "$asr_anchor_output_root" == "null" || "$asr_anchor_output_root" == "{{ zero_bytes32 }}" ]]; then
+    if [[ "$asr_anchor_output_root" == "{{ zero_bytes32 }}" ]]; then
       echo "Invalid ASR anchor output root: $asr_anchor_output_root" >&2
       exit 1
     fi
