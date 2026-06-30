@@ -12,13 +12,9 @@ import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 
-import { LibClone } from "lib/solady/src/utils/LibClone.sol";
-
 import { BaseTest } from "./BaseTest.t.sol";
 
 contract AggregateVerifierTest is BaseTest {
-    using LibClone for address;
-
     AggregateVerifier private aggregateVerifierImpl;
 
     function setUp() public override {
@@ -82,19 +78,24 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function testInitializeWithZKProof() public {
-        _createAndAssertInitializedGame("zk-proof", AggregateVerifier.ProofType.ZK, ZK_PROVER, address(0), ZK_PROVER);
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        bytes memory proof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
+
+        AggregateVerifier game = _createAggregateVerifierGame(
+            ZK_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
+        );
+
+        _assertInitializedGame(game, rootClaim, ZK_PROVER, address(0), ZK_PROVER);
     }
 
     function testInitializeFailsIfInvalidCallDataSize() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
 
         vm.deal(TEE_PROVER, INIT_BOND);
-        bytes memory extraData = "";
-        bytes memory initData = "";
 
         vm.prank(TEE_PROVER);
         vm.expectRevert(BadExtraData.selector);
-        factory.createWithInitData{ value: INIT_BOND }(GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, initData);
+        factory.createWithInitData{ value: INIT_BOND }(GameTypes.AGGREGATE_VERIFIER, rootClaim, hex"", hex"");
     }
 
     function testUpdatingAnchorStateRegistryWithTEEProof() public {
@@ -202,18 +203,24 @@ contract AggregateVerifierTest is BaseTest {
 
     /// @notice Reverts when the parent is not factory-registered: `_isValidGame` requires
     ///         `AnchorStateRegistry.isGameRegistered`, which checks `DisputeGameFactory.games(...) == parent`.
-    /// @dev Parent is a real `AggregateVerifier` clone initialized like a factory game, but deployed without
-    ///      `_finalizeGameCreation`, so the factory UUID mapping has no entry.
+    /// @dev Parent is a real factory game, then the factory lookup is mocked to emulate a missing UUID entry.
     function testInitializeFailsIfParentGameNotFactoryRegistered() public {
-        currentL2BlockNumber += BLOCK_INTERVAL;
-
-        Claim parentRootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "parent")));
-        AggregateVerifier unregisteredParent = _deployAggregateVerifierCloneWithoutFactoryRegistration(
+        Claim parentRootClaim = _advanceL2BlockAndClaim();
+        AggregateVerifier unregisteredParent = _createAggregateVerifierGame(
             TEE_PROVER,
             parentRootClaim,
             currentL2BlockNumber,
             address(anchorStateRegistry),
             _generateProof("parent-tee", AggregateVerifier.ProofType.TEE)
+        );
+
+        vm.mockCall(
+            address(factory),
+            abi.encodeCall(
+                IDisputeGameFactory.games,
+                (GameTypes.AGGREGATE_VERIFIER, parentRootClaim, unregisteredParent.extraData())
+            ),
+            abi.encode(IDisputeGame(address(0)), Timestamp.wrap(0))
         );
 
         currentL2BlockNumber += BLOCK_INTERVAL;
@@ -234,8 +241,7 @@ contract AggregateVerifierTest is BaseTest {
         uint256 l1OriginNumber = block.number + 1;
         bytes32 l1OriginHash = bytes32(uint256(1));
 
-        bytes memory proofBytes =
-            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(130));
+        bytes memory proofBytes = _teeProof(l1OriginHash, l1OriginNumber, rootClaim);
 
         _expectCreateGameRevertsForTeeProof(
             rootClaim,
@@ -252,8 +258,7 @@ contract AggregateVerifierTest is BaseTest {
         uint256 l1OriginNumber = 1;
         bytes32 l1OriginHash = bytes32(uint256(1));
 
-        bytes memory proofBytes =
-            abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, new bytes(130));
+        bytes memory proofBytes = _teeProof(l1OriginHash, l1OriginNumber, rootClaim);
 
         _expectCreateGameRevertsForTeeProof(
             rootClaim,
@@ -328,25 +333,6 @@ contract AggregateVerifierTest is BaseTest {
     function _advanceL2BlockAndClaim() private returns (Claim rootClaim) {
         currentL2BlockNumber += BLOCK_INTERVAL;
         return Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
-    }
-
-    function _createAndAssertInitializedGame(
-        bytes memory proofSalt,
-        AggregateVerifier.ProofType proofType,
-        address prover,
-        address expectedTeeProver,
-        address expectedZkProver
-    )
-        private
-    {
-        Claim rootClaim = _advanceL2BlockAndClaim();
-        bytes memory proof = _generateProof(proofSalt, proofType);
-
-        AggregateVerifier game = _createAggregateVerifierGame(
-            prover, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
-        );
-
-        _assertInitializedGame(game, rootClaim, prover, expectedTeeProver, expectedZkProver);
     }
 
     function _assertInitializedGame(
@@ -433,30 +419,6 @@ contract AggregateVerifierTest is BaseTest {
         return abi.encodePacked(intermediateRoots);
     }
 
-    function _deployAggregateVerifierCloneWithoutFactoryRegistration(
-        address creator,
-        Claim rootClaim,
-        uint256 l2BlockNumber,
-        address parentAddress,
-        bytes memory proof
-    )
-        private
-        returns (AggregateVerifier)
-    {
-        bytes memory extraData = _aggregateVerifierExtraData(rootClaim, l2BlockNumber, parentAddress);
-        Hash uuid = factory.getGameUUID(GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData);
-        address clone = address(aggregateVerifierImpl)
-            .cloneDeterministic(
-                abi.encodePacked(creator, rootClaim, blockhash(block.number - 1), extraData), Hash.unwrap(uuid)
-            );
-
-        vm.deal(creator, INIT_BOND);
-        vm.prank(creator);
-        AggregateVerifier(payable(clone)).initializeWithInitData{ value: INIT_BOND }(proof);
-
-        return AggregateVerifier(payable(clone));
-    }
-
     function _expectDeployWithInvalidBlockIntervalsReverts(
         uint256 blockInterval,
         uint256 intermediateBlockInterval
@@ -468,17 +430,7 @@ contract AggregateVerifierTest is BaseTest {
                 AggregateVerifier.InvalidBlockInterval.selector, blockInterval, intermediateBlockInterval
             )
         );
-        _deployAggregateVerifierWithIntervals(blockInterval, intermediateBlockInterval);
-    }
-
-    function _deployAggregateVerifierWithIntervals(
-        uint256 blockInterval,
-        uint256 intermediateBlockInterval
-    )
-        private
-        returns (AggregateVerifier)
-    {
-        return new AggregateVerifier(
+        new AggregateVerifier(
             GameTypes.AGGREGATE_VERIFIER,
             IAnchorStateRegistry(address(anchorStateRegistry)),
             IDelayedWETH(payable(address(delayedWETH))),
