@@ -29,6 +29,7 @@ contract BaseTest is Test {
     uint256 internal constant BLOCK_INTERVAL = 100;
     uint256 internal constant INTERMEDIATE_BLOCK_INTERVAL = 10;
     uint256 private constant INTERMEDIATE_ROOTS_COUNT = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;
+    uint256 internal constant LAST_INTERMEDIATE_ROOT_INDEX = INTERMEDIATE_ROOTS_COUNT - 1;
 
     uint256 internal constant INIT_BOND = 1 ether;
     uint256 internal constant DELAYED_WETH_DELAY = 1 days;
@@ -59,15 +60,11 @@ contract BaseTest is Test {
         vm.mockCall(address(systemConfig), abi.encodeCall(ISystemConfig.guardian, ()), abi.encode(address(this)));
         vm.mockCall(address(systemConfig), abi.encodeCall(ISystemConfig.paused, ()), abi.encode(false));
 
-        AnchorStateRegistry _anchorStateRegistry = new AnchorStateRegistry(0);
-        DelayedWETH _delayedWETH = new DelayedWETH(DELAYED_WETH_DELAY);
-        DisputeGameFactory _factory = new DisputeGameFactory();
-
         proxyAdmin = new ProxyAdmin(address(this));
 
-        anchorStateRegistry = AnchorStateRegistry(_deployProxy(address(_anchorStateRegistry)));
-        factory = DisputeGameFactory(_deployProxy(address(_factory)));
-        delayedWETH = DelayedWETH(payable(_deployProxy(address(_delayedWETH))));
+        anchorStateRegistry = AnchorStateRegistry(_deployProxy(address(new AnchorStateRegistry(0))));
+        factory = DisputeGameFactory(_deployProxy(address(new DisputeGameFactory())));
+        delayedWETH = DelayedWETH(payable(_deployProxy(address(new DelayedWETH(DELAYED_WETH_DELAY)))));
 
         teeVerifier = new MockVerifier(IAnchorStateRegistry(address(anchorStateRegistry)));
         zkVerifier = new MockVerifier(IAnchorStateRegistry(address(anchorStateRegistry)));
@@ -83,8 +80,10 @@ contract BaseTest is Test {
         factory.initialize(address(this));
         delayedWETH.initialize(systemConfig);
 
-        AggregateVerifier aggregateVerifierImpl = _newAggregateVerifier(BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
-        factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(aggregateVerifierImpl)));
+        factory.setImplementation(
+            GameTypes.AGGREGATE_VERIFIER,
+            IDisputeGame(address(_newAggregateVerifier(BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL)))
+        );
         factory.setInitBond(GameTypes.AGGREGATE_VERIFIER, INIT_BOND);
 
         anchorStateRegistry.setRespectedGameType(GameTypes.AGGREGATE_VERIFIER);
@@ -170,8 +169,9 @@ contract BaseTest is Test {
         returns (bytes memory)
     {
         uint256 l1OriginNumber = block.number - 1;
-        bytes32 l1OriginHash = blockhash(l1OriginNumber);
-        return abi.encodePacked(uint8(proofType), l1OriginHash, l1OriginNumber, _generateProofBody(salt, proofType));
+        return abi.encodePacked(
+            uint8(proofType), blockhash(l1OriginNumber), l1OriginNumber, _generateProofBody(salt, proofType)
+        );
     }
 
     function _generateProposalProof(
@@ -206,7 +206,7 @@ contract BaseTest is Test {
         for (uint256 i = 1; i < INTERMEDIATE_ROOTS_COUNT; i++) {
             intermediateRoots[i - 1] = keccak256(abi.encode(startingL2BlockNumber + INTERMEDIATE_BLOCK_INTERVAL * i));
         }
-        intermediateRoots[INTERMEDIATE_ROOTS_COUNT - 1] = rootClaim.raw();
+        intermediateRoots[LAST_INTERMEDIATE_ROOT_INDEX] = rootClaim.raw();
 
         return abi.encodePacked(intermediateRoots);
     }

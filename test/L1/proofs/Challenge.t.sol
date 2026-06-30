@@ -12,8 +12,6 @@ import { Verifier } from "src/L1/proofs/Verifier.sol";
 import { BaseTest } from "./BaseTest.t.sol";
 
 contract ChallengeTest is BaseTest {
-    uint256 private constant LAST_INTERMEDIATE_ROOT_INDEX = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1;
-
     function testChallengeTEEProofWithZKProof() public {
         AggregateVerifier game =
             _createGame(TEE_PROVER, "tee", "tee-proof", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry));
@@ -87,7 +85,7 @@ contract ChallengeTest is BaseTest {
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
         bytes memory teeProof2 = _generateProposalProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
 
-        game.nullify(teeProof2, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
+        game.nullify(teeProof2, LAST_INTERMEDIATE_ROOT_INDEX, rootClaim2.raw());
 
         // challenge game: TEE proof was nullified, so MissingProof(TEE) is expected
         vm.expectRevert(

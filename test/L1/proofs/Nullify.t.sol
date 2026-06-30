@@ -10,7 +10,6 @@ import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { BaseTest } from "./BaseTest.t.sol";
 
 contract NullifyTest is BaseTest {
-    uint256 private constant LAST_INTERMEDIATE_ROOT_INDEX = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1;
     uint256 private constant NO_PROOF_CREDIT_CLAIM_DELAY = 14 days;
 
     function testNullifyWithTEEProof() public {
@@ -49,7 +48,7 @@ contract NullifyTest is BaseTest {
 
         Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
         bytes memory teeProof2 = _generateProposalProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
-        game.nullify(teeProof2, BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1, rootClaim2.raw());
+        game.nullify(teeProof2, LAST_INTERMEDIATE_ROOT_INDEX, rootClaim2.raw());
 
         _assertStatus(game, GameStatus.IN_PROGRESS);
         assertEq(game.bondRecipient(), TEE_PROVER);
@@ -119,8 +118,7 @@ contract NullifyTest is BaseTest {
 
         Claim rootClaimNullify = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "nullify-b")));
         bytes memory teeProofNullify = _generateProposalProof("tee-nullify-b", AggregateVerifier.ProofType.TEE);
-        uint256 lastIntermediateIdx = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1;
-        gameB.nullify(teeProofNullify, lastIntermediateIdx, rootClaimNullify.raw());
+        gameB.nullify(teeProofNullify, LAST_INTERMEDIATE_ROOT_INDEX, rootClaimNullify.raw());
 
         assertTrue(teeVerifier.nullified());
         assertEq(gameA.proofCount(), 1);
