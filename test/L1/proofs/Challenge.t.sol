@@ -28,7 +28,7 @@ contract ChallengeTest is BaseTest {
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE)
         );
-        _challengeWithEmptyZk(game);
+        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
     function testChallengeFailsIfNotZKProof() public {
@@ -45,7 +45,7 @@ contract ChallengeTest is BaseTest {
         game.resolve();
 
         vm.expectRevert(ClaimAlreadyResolved.selector);
-        _challengeWithEmptyZk(game);
+        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
     function testChallengeFailsIfParentGameStatusIsChallenged() public {
@@ -57,7 +57,7 @@ contract ChallengeTest is BaseTest {
         anchorStateRegistry.blacklistDisputeGame(IDisputeGame(address(parentGame)));
 
         vm.expectRevert(AggregateVerifier.InvalidParentGame.selector);
-        _challengeWithEmptyZk(childGame);
+        _challenge(childGame, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
     function testChallengeFailsIfGameItselfIsBlacklisted() public {
@@ -66,7 +66,7 @@ contract ChallengeTest is BaseTest {
         anchorStateRegistry.blacklistDisputeGame(IDisputeGame(address(game)));
 
         vm.expectRevert(AggregateVerifier.InvalidGame.selector);
-        _challengeWithEmptyZk(game);
+        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
     function testChallengeFailsAfterTEENullification() public {
@@ -77,7 +77,7 @@ contract ChallengeTest is BaseTest {
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE)
         );
-        _challengeWithEmptyZk(game);
+        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
     function testChallengeFailsAfterZKNullification() public {
@@ -144,10 +144,6 @@ contract ChallengeTest is BaseTest {
 
     function _challenge(AggregateVerifier game, AggregateVerifier.ProofType proofType, bytes32 claimRoot) private {
         game.challenge(abi.encodePacked(uint8(proofType), bytes1(0)), LAST_INTERMEDIATE_ROOT_INDEX, claimRoot);
-    }
-
-    function _challengeWithEmptyZk(AggregateVerifier game) private {
-        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
     function _challengeWithZk(AggregateVerifier game, bytes memory claimSalt) private {
