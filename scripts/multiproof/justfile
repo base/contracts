@@ -1,5 +1,6 @@
 set dotenv-load
 set working-directory := "../.."
+set shell := ["bash", "-euo", "pipefail", "-c"]
 
 forge_account := "testnet-admin"
 owner := `cast wallet address --account "{{forge_account}}"`
@@ -18,36 +19,33 @@ zero_bytes32 := "0x0000000000000000000000000000000000000000000000000000000000000
 default:
 
 # Deploy the TDXVerifier policy contract.
-deploy-tdx-verifier risc0_router=sepolia_tdx_risc0_verifier_router tdx_verifier_id=sepolia_tdx_verifier_id intel_root_ca_hash=sepolia_intel_root_ca_hash:
-    #!/usr/bin/env bash
-    set -euo pipefail
+[script]
+deploy-tdx-verifier:
     echo "Using {{ forge_account }} as owner/deployer: {{ owner }}"
     forge script scripts/multiproof/DeployTDXVerifier.s.sol:DeployTDXVerifier \
       --sig "run(address,bytes32,bytes32)" \
-      "{{ risc0_router }}" \
-      "{{ tdx_verifier_id }}" \
-      "{{ intel_root_ca_hash }}" \
+      "{{ sepolia_tdx_risc0_verifier_router }}" \
+      "{{ sepolia_tdx_verifier_id }}" \
+      "{{ sepolia_intel_root_ca_hash }}" \
       {{ broadcast_args }}
 
 # Deploy the NitroEnclaveVerifier policy contract and its local RISC Zero set verifier route.
-deploy-nitro-verifier nitro_root_cert nitro_verifier_id risc0_router=sepolia_nitro_risc0_verifier_router set_builder_image_id=sepolia_risc0_set_builder_image_id nitro_verifier_proof_id=zero_bytes32:
-    #!/usr/bin/env bash
-    set -euo pipefail
+[script]
+deploy-nitro-verifier nitro_root_cert nitro_verifier_id:
     echo "Using {{ forge_account }} as owner/deployer: {{ owner }}"
     forge script scripts/multiproof/DeployNitroVerifier.s.sol:DeployNitroVerifier \
       --sig "run(address,address,bytes32,bytes32,bytes32,bytes32)" \
       "{{ owner }}" \
-      "{{ risc0_router }}" \
-      "{{ set_builder_image_id }}" \
+      "{{ sepolia_nitro_risc0_verifier_router }}" \
+      "{{ sepolia_risc0_set_builder_image_id }}" \
       "{{ nitro_root_cert }}" \
       "{{ nitro_verifier_id }}" \
-      "{{ nitro_verifier_proof_id }}" \
+      "{{ zero_bytes32 }}" \
       {{ broadcast_args }}
 
 # Deploy the TDX multiproof dev/test stack using the zeronet TDX config.
-deploy-tdx-stack nitro_verifier tdx_verifier tdx_manager="0x44E999A5859c2D12378a349882fAe5805DCE71b9" deploy_config="deploy-config/zeronet-tdx.json":
-    #!/usr/bin/env bash
-    set -euo pipefail
+[script]
+deploy-tdx-stack nitro_verifier tdx_verifier:
     echo "Using {{ forge_account }} as deployer: {{ owner }}"
 
     lookback="${ASR_ANCHOR_BLOCK_LOOKBACK:-0}"
@@ -69,12 +67,12 @@ deploy-tdx-stack nitro_verifier tdx_verifier tdx_manager="0x44E999A5859c2D12378a
     echo "Using ASR anchor output root: $asr_anchor_output_root"
     echo "Using ASR anchor L2 block: $asr_anchor_block"
 
-    DEPLOY_CONFIG_PATH="{{ deploy_config }}" \
+    DEPLOY_CONFIG_PATH="deploy-config/zeronet-tdx.json" \
     forge script scripts/multiproof/DeployDevWithTDX.s.sol:DeployDevWithTDX \
       --sig "run(address,address,address,bytes32,uint256)" \
       "{{ nitro_verifier }}" \
       "{{ tdx_verifier }}" \
-      "{{ tdx_manager }}" \
+      "0x44E999A5859c2D12378a349882fAe5805DCE71b9" \
       "$asr_anchor_output_root" \
       "$asr_anchor_block" \
       {{ broadcast_args }}
