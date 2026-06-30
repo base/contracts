@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 import { Test } from "forge-std/Test.sol";
 
-import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
@@ -11,57 +10,32 @@ import { GameType } from "src/libraries/bridge/Types.sol";
 
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
-/// @notice Mock AggregateVerifier that returns configurable TEE image hashes.
-contract MockAggregateVerifierForTDXRegistry {
-    bytes32 public TEE_NITRO_IMAGE_HASH;
-    bytes32 public TEE_TDX_IMAGE_HASH;
-
-    constructor(bytes32 imageHash) {
-        TEE_NITRO_IMAGE_HASH = imageHash;
-        TEE_TDX_IMAGE_HASH = imageHash;
-    }
-}
-
-/// @notice Mock DisputeGameFactory that returns a fixed game implementation.
-contract MockDisputeGameFactoryForTDXRegistry {
-    mapping(uint32 => address) internal _impls;
-
-    function setImpl(uint32 gameType, address impl) external {
-        _impls[gameType] = impl;
-    }
-
-    function gameImpls(GameType gameType) external view returns (IDisputeGame) {
-        return IDisputeGame(_impls[GameType.unwrap(gameType)]);
-    }
-}
-
-contract MockTDXVerifierForRegistry is ITDXVerifier {
-    address internal _signer;
-    bytes32 internal _imageHash;
-
-    function setResult(address signer, bytes32 imageHash) external {
-        _signer = signer;
-        _imageHash = imageHash;
-    }
-
-    function verify(bytes calldata, bytes calldata) external view returns (address, bytes32) {
-        return (_signer, _imageHash);
-    }
-}
-
 contract TEEProverRegistryTDXTest is Test {
     bytes32 internal constant IMAGE_HASH = keccak256("tdx-image");
+    GameType internal constant TEST_GAME_TYPE = GameType.wrap(0);
 
     function testRegisterTDXSignerStoresImageHash() public {
-        address signer = address(0x1234);
-        MockTDXVerifierForRegistry verifier = new MockTDXVerifierForRegistry();
-        verifier.setResult(signer, IMAGE_HASH);
+        address signer = makeAddr("signer");
+        address tdxVerifier = makeAddr("tdx-verifier");
+        address aggregateVerifier = makeAddr("aggregate-verifier");
+        address factory = makeAddr("factory");
 
-        MockDisputeGameFactoryForTDXRegistry factory = new MockDisputeGameFactoryForTDXRegistry();
-        factory.setImpl(0, address(new MockAggregateVerifierForTDXRegistry(IMAGE_HASH)));
+        vm.etch(tdxVerifier, hex"00");
+        vm.mockCall(
+            tdxVerifier, abi.encodeCall(ITDXVerifier.verify, (bytes(""), bytes(""))), abi.encode(signer, IMAGE_HASH)
+        );
+
+        vm.etch(aggregateVerifier, hex"00");
+        vm.mockCall(aggregateVerifier, abi.encodeWithSignature("TEE_NITRO_IMAGE_HASH()"), abi.encode(IMAGE_HASH));
+        vm.mockCall(aggregateVerifier, abi.encodeWithSignature("TEE_TDX_IMAGE_HASH()"), abi.encode(IMAGE_HASH));
+
+        vm.etch(factory, hex"00");
+        vm.mockCall(
+            factory, abi.encodeCall(IDisputeGameFactory.gameImpls, (TEST_GAME_TYPE)), abi.encode(aggregateVerifier)
+        );
 
         TEEProverRegistry registry = new TEEProverRegistry(
-            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(verifier)), IDisputeGameFactory(address(factory))
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(tdxVerifier), IDisputeGameFactory(factory)
         );
 
         vm.prank(address(0xdEaD));
@@ -74,12 +48,9 @@ contract TEEProverRegistryTDXTest is Test {
     }
 
     function testConstructorRevertsIfTDXVerifierNotSet() public {
-        MockDisputeGameFactoryForTDXRegistry factory = new MockDisputeGameFactoryForTDXRegistry();
-        factory.setImpl(0, address(new MockAggregateVerifierForTDXRegistry(IMAGE_HASH)));
-
         vm.expectRevert(TEEProverRegistry.TDXVerifierNotSet.selector);
         new TEEProverRegistry(
-            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(0)), IDisputeGameFactory(address(factory))
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(0)), IDisputeGameFactory(makeAddr("factory"))
         );
     }
 }
