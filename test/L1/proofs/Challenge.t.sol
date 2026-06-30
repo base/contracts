@@ -12,17 +12,13 @@ import { BaseTest } from "./BaseTest.t.sol";
 
 contract ChallengeTest is BaseTest {
     function testChallengeTEEProofWithZKProof() public {
-        AggregateVerifier game =
-            _createGame(TEE_PROVER, "tee", "tee-proof", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry));
+        AggregateVerifier game = _rootTee(TEE_PROVER, "tee", "tee-proof");
 
         _challengeWithZk(game, "zk");
         assertEq(uint8(game.status()), uint8(GameStatus.IN_PROGRESS));
         assertEq(game.proofCount(), 2);
 
-        vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
-        assertEq(uint8(game.resolve()), uint8(GameStatus.CHALLENGER_WINS));
-        assertEq(game.bondRecipient(), ZK_PROVER);
-        _claimCreditAfterDelay(game, ZK_PROVER);
+        _resolveSlow(game, GameStatus.CHALLENGER_WINS, ZK_PROVER);
     }
 
     function testChallengeFailsIfNoTEEProof() public {
@@ -32,33 +28,28 @@ contract ChallengeTest is BaseTest {
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE)
         );
-        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
+        _challengeWithEmptyZk(game);
     }
 
     function testChallengeFailsIfNotZKProof() public {
-        AggregateVerifier game = _createGame(
-            TEE_PROVER, "tee1", "tee-proof-1", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
-        );
+        AggregateVerifier game = _rootTee(TEE_PROVER, "tee1", "tee-proof-1");
 
         vm.expectRevert(AggregateVerifier.InvalidProofType.selector);
         _challenge(game, AggregateVerifier.ProofType.TEE, bytes32(0));
     }
 
     function testChallengeFailsIfGameAlreadyResolved() public {
-        AggregateVerifier game =
-            _createGame(TEE_PROVER, "tee", "tee-proof", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry));
+        AggregateVerifier game = _rootTee(TEE_PROVER, "tee", "tee-proof");
 
         vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY() + 1);
         game.resolve();
 
         vm.expectRevert(ClaimAlreadyResolved.selector);
-        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
+        _challengeWithEmptyZk(game);
     }
 
     function testChallengeFailsIfParentGameStatusIsChallenged() public {
-        AggregateVerifier parentGame = _createGame(
-            TEE_PROVER, "tee", "parent-proof", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
-        );
+        AggregateVerifier parentGame = _rootTee(TEE_PROVER, "tee", "parent-proof");
 
         AggregateVerifier childGame =
             _createGame(TEE_PROVER, "tee2", "child-proof", AggregateVerifier.ProofType.TEE, address(parentGame));
@@ -66,35 +57,31 @@ contract ChallengeTest is BaseTest {
         anchorStateRegistry.blacklistDisputeGame(IDisputeGame(address(parentGame)));
 
         vm.expectRevert(AggregateVerifier.InvalidParentGame.selector);
-        _challenge(childGame, AggregateVerifier.ProofType.ZK, bytes32(0));
+        _challengeWithEmptyZk(childGame);
     }
 
     function testChallengeFailsIfGameItselfIsBlacklisted() public {
-        AggregateVerifier game =
-            _createGame(TEE_PROVER, "tee", "tee-proof", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry));
+        AggregateVerifier game = _rootTee(TEE_PROVER, "tee", "tee-proof");
 
         anchorStateRegistry.blacklistDisputeGame(IDisputeGame(address(game)));
 
         vm.expectRevert(AggregateVerifier.InvalidGame.selector);
-        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
+        _challengeWithEmptyZk(game);
     }
 
     function testChallengeFailsAfterTEENullification() public {
-        AggregateVerifier game = _createGame(
-            TEE_PROVER, "tee1", "tee-proof-1", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
-        );
+        AggregateVerifier game = _rootTee(TEE_PROVER, "tee1", "tee-proof-1");
 
         _nullify(game, AggregateVerifier.ProofType.TEE, "tee2");
 
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE)
         );
-        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
+        _challengeWithEmptyZk(game);
     }
 
     function testChallengeFailsAfterZKNullification() public {
-        AggregateVerifier game =
-            _createGame(ZK_PROVER, "tee", "tee-proof", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry));
+        AggregateVerifier game = _rootTee(ZK_PROVER, "tee", "tee-proof");
 
         _provideProof(game, ZK_PROVER, abi.encodePacked(uint8(AggregateVerifier.ProofType.ZK), bytes1(0)));
         _nullify(game, AggregateVerifier.ProofType.ZK, "zk2");
@@ -103,9 +90,7 @@ contract ChallengeTest is BaseTest {
     }
 
     function testChallengeRemovedWhenZkVerifierNullifiedByOtherGame() public {
-        AggregateVerifier gameA = _createGame(
-            TEE_PROVER, "tee-challenge", "tee-ch-a", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
-        );
+        AggregateVerifier gameA = _rootTee(TEE_PROVER, "tee-challenge", "tee-ch-a");
 
         _challengeWithZk(gameA, "zk-challenge");
         assertEq(gameA.proofCount(), 2);
@@ -121,20 +106,11 @@ contract ChallengeTest is BaseTest {
         assertEq(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
         assertEq(gameA.zkProver(), address(0));
 
-        vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
-        assertEq(uint8(gameA.resolve()), uint8(GameStatus.DEFENDER_WINS));
-        assertEq(gameA.bondRecipient(), TEE_PROVER);
-        _claimCreditAfterDelay(gameA, TEE_PROVER);
+        _resolveSlow(gameA, GameStatus.DEFENDER_WINS, TEE_PROVER);
     }
 
     function testChallengeWinsWhenSharedTeeVerifierNullifiedByOtherGame() public {
-        AggregateVerifier gameA = _createGame(
-            TEE_PROVER,
-            "tee-challenge-tee-null",
-            "tee-proof-a",
-            AggregateVerifier.ProofType.TEE,
-            address(anchorStateRegistry)
-        );
+        AggregateVerifier gameA = _rootTee(TEE_PROVER, "tee-challenge-tee-null", "tee-proof-a");
 
         _challengeWithZk(gameA, "zk-challenge");
         assertEq(gameA.proofCount(), 2);
@@ -152,14 +128,26 @@ contract ChallengeTest is BaseTest {
         assertEq(gameA.teeProver(), address(0));
         assertEq(gameA.zkProver(), ZK_PROVER);
 
-        vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
-        assertEq(uint8(gameA.resolve()), uint8(GameStatus.CHALLENGER_WINS));
-        assertEq(gameA.bondRecipient(), ZK_PROVER);
-        _claimCreditAfterDelay(gameA, ZK_PROVER);
+        _resolveSlow(gameA, GameStatus.CHALLENGER_WINS, ZK_PROVER);
+    }
+
+    function _rootTee(
+        address prover,
+        bytes memory claimSalt,
+        bytes memory proofSalt
+    )
+        private
+        returns (AggregateVerifier)
+    {
+        return _createGame(prover, claimSalt, proofSalt, AggregateVerifier.ProofType.TEE, address(anchorStateRegistry));
     }
 
     function _challenge(AggregateVerifier game, AggregateVerifier.ProofType proofType, bytes32 claimRoot) private {
         game.challenge(abi.encodePacked(uint8(proofType), bytes1(0)), LAST_INTERMEDIATE_ROOT_INDEX, claimRoot);
+    }
+
+    function _challengeWithEmptyZk(AggregateVerifier game) private {
+        _challenge(game, AggregateVerifier.ProofType.ZK, bytes32(0));
     }
 
     function _challengeWithZk(AggregateVerifier game, bytes memory claimSalt) private {
@@ -171,5 +159,12 @@ contract ChallengeTest is BaseTest {
         game.nullify(
             _generateProposalProof(claimSalt, proofType), LAST_INTERMEDIATE_ROOT_INDEX, _claim(claimSalt).raw()
         );
+    }
+
+    function _resolveSlow(AggregateVerifier game, GameStatus expectedStatus, address expectedBondRecipient) private {
+        vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
+        assertEq(uint8(game.resolve()), uint8(expectedStatus));
+        assertEq(game.bondRecipient(), expectedBondRecipient);
+        _claimCreditAfterDelay(game, expectedBondRecipient);
     }
 }
