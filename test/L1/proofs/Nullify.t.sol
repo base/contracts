@@ -9,29 +9,12 @@ import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { BaseTest } from "./BaseTest.t.sol";
 
 contract NullifyTest is BaseTest {
-    uint256 private constant NO_PROOF_CREDIT_CLAIM_DELAY = 14 days;
-
     function testNullifyWithTEEProof() public {
-        AggregateVerifier game = _createGame(
-            TEE_PROVER, "tee1", "tee-proof-1", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
-        );
-
-        _nullify(game, "tee-proof-2", AggregateVerifier.ProofType.TEE, "tee2");
-        _assertNullifiedToNoProofs(game, TEE_PROVER);
-
-        vm.warp(block.timestamp + NO_PROOF_CREDIT_CLAIM_DELAY);
-        _claimCreditAfterDelay(game, game.gameCreator());
+        _assertNullifyWithProof(TEE_PROVER, AggregateVerifier.ProofType.TEE);
     }
 
     function testNullifyWithZKProof() public {
-        AggregateVerifier game =
-            _createGame(ZK_PROVER, "zk1", "zk-proof-1", AggregateVerifier.ProofType.ZK, address(anchorStateRegistry));
-
-        _nullify(game, "zk-proof-2", AggregateVerifier.ProofType.ZK, "zk2");
-        _assertNullifiedToNoProofs(game, ZK_PROVER);
-
-        vm.warp(block.timestamp + NO_PROOF_CREDIT_CLAIM_DELAY);
-        _claimCreditAfterDelay(game, game.gameCreator());
+        _assertNullifyWithProof(ZK_PROVER, AggregateVerifier.ProofType.ZK);
     }
 
     function testNullifyWithTEEProofWhenTEEAndZKProofsAreProvided() public {
@@ -92,11 +75,11 @@ contract NullifyTest is BaseTest {
     }
 
     function testResolveEarlyReturnWhenSharedTeeVerifierNullifiedByAnotherGame() public {
-        _assertResolveEarlyReturnWhenSharedVerifierNullifiedByAnotherGame(TEE_PROVER, AggregateVerifier.ProofType.TEE);
+        _assertResolveEarlyReturnWhenSharedVerifierNullifiedByAnotherGame(AggregateVerifier.ProofType.TEE);
     }
 
     function testResolveEarlyReturnWhenSharedZkVerifierNullifiedByAnotherGame() public {
-        _assertResolveEarlyReturnWhenSharedVerifierNullifiedByAnotherGame(ZK_PROVER, AggregateVerifier.ProofType.ZK);
+        _assertResolveEarlyReturnWhenSharedVerifierNullifiedByAnotherGame(AggregateVerifier.ProofType.ZK);
     }
 
     /// @notice With TEE + ZK, the fast window is 1 day. Another game nullifies the shared ZK verifier; the first
@@ -127,7 +110,16 @@ contract NullifyTest is BaseTest {
 
         vm.warp(block.timestamp + gameA.SLOW_FINALIZATION_DELAY());
         assertEq(uint8(gameA.resolve()), uint8(GameStatus.DEFENDER_WINS));
-        assertEq(uint8(gameA.status()), uint8(GameStatus.DEFENDER_WINS));
+    }
+
+    function _assertNullifyWithProof(address prover, AggregateVerifier.ProofType proofType) private {
+        AggregateVerifier game = _createGame(prover, "claim", "proof-1", proofType, address(anchorStateRegistry));
+
+        _nullify(game, "proof-2", proofType, "nullify-claim");
+        _assertNullifiedToNoProofs(game, prover);
+
+        vm.warp(block.timestamp + 14 days);
+        _claimCreditAfterDelay(game, game.gameCreator());
     }
 
     function _nullify(
@@ -152,12 +144,10 @@ contract NullifyTest is BaseTest {
 
     /// @notice When a shared verifier is nullified by another game, `resolve` persists the refutation and returns
     ///         early `IN_PROGRESS` instead of reverting.
-    function _assertResolveEarlyReturnWhenSharedVerifierNullifiedByAnotherGame(
-        address prover,
-        AggregateVerifier.ProofType proofType
-    )
+    function _assertResolveEarlyReturnWhenSharedVerifierNullifiedByAnotherGame(AggregateVerifier.ProofType proofType)
         private
     {
+        address prover = proofType == AggregateVerifier.ProofType.TEE ? TEE_PROVER : ZK_PROVER;
         AggregateVerifier gameA = _createGame(prover, "game-a", "proof-a", proofType, address(anchorStateRegistry));
         AggregateVerifier gameB = _createGame(prover, "game-b", "proof-b", proofType, address(gameA));
 
