@@ -284,16 +284,12 @@ contract AggregateVerifierTest is BaseTest {
             rootClaim,
             currentL2BlockNumber,
             address(anchorStateRegistry),
-            _teeProof(l1OriginHash, l1OriginNumber)
-        );
-    }
-
-    function _teeProof(bytes32 l1OriginHash, uint256 l1OriginNumber) private pure returns (bytes memory) {
-        return abi.encodePacked(
-            uint8(AggregateVerifier.ProofType.TEE),
-            l1OriginHash,
-            l1OriginNumber,
-            _generateProofBody("tee-proof", AggregateVerifier.ProofType.TEE)
+            abi.encodePacked(
+                uint8(AggregateVerifier.ProofType.TEE),
+                l1OriginHash,
+                l1OriginNumber,
+                _generateProofBody("tee-proof", AggregateVerifier.ProofType.TEE)
+            )
         );
     }
 
