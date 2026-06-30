@@ -4,7 +4,6 @@ pragma solidity 0.8.15;
 import { Test } from "lib/forge-std/src/Test.sol";
 
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.sol";
 
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
@@ -15,16 +14,17 @@ contract TEEVerifierTest is Test {
 
     bytes32 internal constant NITRO_IMAGE_ID = keccak256("test-nitro-image-id");
     bytes32 internal constant JOURNAL = keccak256("test-journal");
-    address internal constant SIGNER = 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf;
     address internal immutable PROPOSER = makeAddr("proposer");
 
     function setUp() public {
-        vm.mockCall(teeProverRegistry, abi.encodeCall(ITEEProverRegistry.isValidProposer, (PROPOSER)), abi.encode(true));
+        vm.mockCall(teeProverRegistry, abi.encodeWithSignature("isValidProposer(address)", PROPOSER), abi.encode(true));
         vm.mockCall(
-            teeProverRegistry, abi.encodeCall(ITEEProverRegistry.isRegisteredSigner, (SIGNER)), abi.encode(true)
+            teeProverRegistry, abi.encodeWithSignature("isRegisteredSigner(address)", vm.addr(1)), abi.encode(true)
         );
         vm.mockCall(
-            teeProverRegistry, abi.encodeCall(ITEEProverRegistry.signerImageHash, (SIGNER)), abi.encode(NITRO_IMAGE_ID)
+            teeProverRegistry,
+            abi.encodeWithSignature("signerImageHash(address)", vm.addr(1)),
+            abi.encode(NITRO_IMAGE_ID)
         );
 
         verifier = new TEEVerifier(TEEProverRegistry(teeProverRegistry), IAnchorStateRegistry(address(0)));
@@ -41,7 +41,7 @@ contract TEEVerifierTest is Test {
 
     function testVerifyFailsWithInvalidProposer() public {
         vm.mockCall(
-            teeProverRegistry, abi.encodeCall(ITEEProverRegistry.isValidProposer, (address(0))), abi.encode(false)
+            teeProverRegistry, abi.encodeWithSignature("isValidProposer(address)", address(0)), abi.encode(false)
         );
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.InvalidProposer.selector, address(0)));
         verifier.verify(abi.encodePacked(address(0), new bytes(65)), NITRO_IMAGE_ID, JOURNAL);
@@ -52,7 +52,7 @@ contract TEEVerifierTest is Test {
 
         vm.mockCall(
             teeProverRegistry,
-            abi.encodeCall(ITEEProverRegistry.isRegisteredSigner, (unregisteredSigner)),
+            abi.encodeWithSignature("isRegisteredSigner(address)", unregisteredSigner),
             abi.encode(false)
         );
         vm.expectRevert(abi.encodeWithSelector(TEEVerifier.InvalidSigner.selector, unregisteredSigner));
