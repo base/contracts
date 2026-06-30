@@ -30,7 +30,6 @@ contract TEEProverRegistryTest is Test {
 
     GameType public constant TEST_GAME_TYPE = GameType.wrap(621);
     string internal constant NOT_OWNER = "OwnableManaged: caller is not the owner";
-    string internal constant NOT_OWNER_OR_MANAGER = "OwnableManaged: caller is not the owner or the manager";
 
     // Events must be redeclared here because Solidity 0.8.15 doesn't support
     // referencing events from other contracts via qualified names (requires 0.8.21+)
@@ -72,22 +71,9 @@ contract TEEProverRegistryTest is Test {
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
     }
 
-    function _addDevSigners(address signer1, address signer2, address signer3) internal {
-        vm.startPrank(owner);
-        teeProverRegistry.addDevSigner(signer1, TEST_IMAGE_HASH);
-        teeProverRegistry.addDevSigner(signer2, TEST_IMAGE_HASH);
-        teeProverRegistry.addDevSigner(signer3, TEST_IMAGE_HASH);
-        vm.stopPrank();
-    }
-
     function _expectNotOwnerRevert(address caller) internal {
         vm.prank(caller);
         vm.expectRevert(bytes(NOT_OWNER));
-    }
-
-    function _expectNotOwnerOrManagerRevert(address caller) internal {
-        vm.prank(caller);
-        vm.expectRevert(bytes(NOT_OWNER_OR_MANAGER));
     }
 
     function _assertContains(address[] memory values, address expected) internal {
@@ -144,7 +130,8 @@ contract TEEProverRegistryTest is Test {
     function testDeregisterSignerFailsIfUnauthorized() public {
         address signer = makeAddr("signer");
 
-        _expectNotOwnerOrManagerRevert(makeAddr("unauthorized"));
+        vm.prank(makeAddr("unauthorized"));
+        vm.expectRevert(bytes("OwnableManaged: caller is not the owner or the manager"));
         teeProverRegistry.deregisterSigner(signer);
     }
 
@@ -197,8 +184,7 @@ contract TEEProverRegistryTest is Test {
     function testRegisteringSameSignerWithDifferentTEETypeOverwritesTEEType() public {
         address signer = makeAddr("dev-signer");
 
-        vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
+        _addDevSigner(signer);
 
         vm.prank(owner);
         teeProverRegistry.addDevTDXSigner(signer, TEST_IMAGE_HASH);
@@ -213,8 +199,7 @@ contract TEEProverRegistryTest is Test {
         vm.expectEmit(true, false, false, false, address(teeProverRegistry));
         emit SignerRegistered(signer);
 
-        vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
+        _addDevSigner(signer);
 
         assertTrue(teeProverRegistry.isValidSigner(signer));
     }
@@ -242,22 +227,14 @@ contract TEEProverRegistryTest is Test {
         assertEq(teeProverRegistry.getRegisteredSigners().length, 0);
     }
 
-    function testGetRegisteredSignersAfterRegister() public {
-        address signer = makeAddr("signer");
-
-        _addDevSigner(signer);
-
-        address[] memory signers = teeProverRegistry.getRegisteredSigners();
-        assertEq(signers.length, 1);
-        assertEq(signers[0], signer);
-    }
-
     function testGetRegisteredSignersMultiple() public {
         address signer1 = makeAddr("signer-1");
         address signer2 = makeAddr("signer-2");
         address signer3 = makeAddr("signer-3");
 
-        _addDevSigners(signer1, signer2, signer3);
+        _addDevSigner(signer1);
+        _addDevSigner(signer2);
+        _addDevSigner(signer3);
 
         address[] memory signers = teeProverRegistry.getRegisteredSigners();
         assertEq(signers.length, 3);
@@ -272,7 +249,9 @@ contract TEEProverRegistryTest is Test {
         address signer2 = makeAddr("signer-2");
         address signer3 = makeAddr("signer-3");
 
-        _addDevSigners(signer1, signer2, signer3);
+        _addDevSigner(signer1);
+        _addDevSigner(signer2);
+        _addDevSigner(signer3);
 
         vm.prank(manager);
         teeProverRegistry.deregisterSigner(signer2);
