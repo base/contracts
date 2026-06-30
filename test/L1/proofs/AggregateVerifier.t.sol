@@ -15,59 +15,19 @@ import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { BaseTest } from "./BaseTest.t.sol";
 
 contract AggregateVerifierTest is BaseTest {
-    address private constant EIP2935_CONTRACT = 0x0000F90827F1C53a10cb7A02335B175320002935;
-
     function testInitializeWithTEEProof() public {
         Claim rootClaim = _advanceL2BlockAndClaim();
         bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
 
-        bytes memory intermediateRoots = _generateIntermediateRoots(currentL2BlockNumber, rootClaim);
-        bytes32 l1OriginHash = blockhash(block.number - 1);
-        bytes32 startingRoot = keccak256(abi.encode(uint256(0)));
-        bytes32 saltHash = keccak256("tee-proof");
-        bytes memory nitroSignature = abi.encodePacked(saltHash, bytes32(0), uint8(27));
-        bytes memory tdxSignature = abi.encodePacked(saltHash, bytes32(uint256(1)), uint8(28));
-        bytes32 nitroJournal = keccak256(
-            abi.encodePacked(
-                TEE_PROVER,
-                l1OriginHash,
-                startingRoot,
-                uint64(0),
-                rootClaim.raw(),
-                uint64(currentL2BlockNumber),
-                intermediateRoots,
-                CONFIG_HASH,
-                TEE_NITRO_IMAGE_HASH
-            )
-        );
-        bytes32 tdxJournal = keccak256(
-            abi.encodePacked(
-                TEE_PROVER,
-                l1OriginHash,
-                startingRoot,
-                uint64(0),
-                rootClaim.raw(),
-                uint64(currentL2BlockNumber),
-                intermediateRoots,
-                CONFIG_HASH,
-                TEE_TDX_IMAGE_HASH
-            )
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
         );
 
-        vm.expectCall(
-            address(teeVerifier),
-            abi.encodeCall(
-                IVerifier.verify, (abi.encodePacked(TEE_PROVER, nitroSignature), TEE_NITRO_IMAGE_HASH, nitroJournal)
-            )
-        );
-        vm.expectCall(
-            address(teeVerifier),
-            abi.encodeCall(
-                IVerifier.verify, (abi.encodePacked(TEE_PROVER, tdxSignature), TEE_TDX_IMAGE_HASH, tdxJournal)
-            )
-        );
-
-        _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof);
+        assertEq(game.teeProver(), TEE_PROVER);
+        assertEq(game.zkProver(), address(0));
+        assertEq(game.bondRecipient(), TEE_PROVER);
+        assertEq(delayedWETH.balanceOf(address(game)), INIT_BOND);
+        assertEq(game.proofCount(), 1);
     }
 
     function testInitializeWithZKProof() public {
@@ -96,12 +56,8 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function testUpdatingAnchorStateRegistryWithTEEProof() public {
-        Claim rootClaim = _advanceL2BlockAndClaim();
-        bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
-
-        AggregateVerifier game = _createAggregateVerifierGame(
-            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
-        );
+        (AggregateVerifier game, Claim rootClaim) =
+            _createGameForAnchorUpdate(TEE_PROVER, "tee-proof", AggregateVerifier.ProofType.TEE);
 
         vm.expectRevert(GameNotResolved.selector);
         game.claimCredit();
@@ -110,12 +66,8 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function testUpdatingAnchorStateRegistryWithZKProof() public {
-        Claim rootClaim = _advanceL2BlockAndClaim();
-        bytes memory proof = _generateProof("zk-proof", AggregateVerifier.ProofType.ZK);
-
-        AggregateVerifier game = _createAggregateVerifierGame(
-            ZK_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
-        );
+        (AggregateVerifier game, Claim rootClaim) =
+            _createGameForAnchorUpdate(ZK_PROVER, "zk-proof", AggregateVerifier.ProofType.ZK);
 
         _resolveSlowAndClose(game, rootClaim);
     }
@@ -292,8 +244,9 @@ contract AggregateVerifierTest is BaseTest {
 
         uint256 l1OriginNumber = block.number - 260;
         bytes32 expectedHash = keccak256(abi.encodePacked("mock-blockhash", l1OriginNumber));
+        address eip2935 = AggregateVerifier(address(factory.gameImpls(GameTypes.AGGREGATE_VERIFIER))).EIP2935_CONTRACT();
 
-        vm.mockCall(EIP2935_CONTRACT, abi.encode(l1OriginNumber), abi.encode(expectedHash));
+        vm.mockCall(eip2935, abi.encode(l1OriginNumber), abi.encode(expectedHash));
 
         _createAggregateVerifierGame(
             TEE_PROVER,
@@ -319,6 +272,20 @@ contract AggregateVerifierTest is BaseTest {
         (Hash root, uint256 l2SequenceNumber) = anchorStateRegistry.getAnchorRoot();
         assertEq(root.raw(), rootClaim.raw());
         assertEq(l2SequenceNumber, currentL2BlockNumber);
+    }
+
+    function _createGameForAnchorUpdate(
+        address prover,
+        bytes memory proofSalt,
+        AggregateVerifier.ProofType proofType
+    )
+        private
+        returns (AggregateVerifier game, Claim rootClaim)
+    {
+        rootClaim = _advanceL2BlockAndClaim();
+        game = _createAggregateVerifierGame(
+            prover, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), _generateProof(proofSalt, proofType)
+        );
     }
 
     function _resolveSlowAndClose(AggregateVerifier game, Claim rootClaim) private {
