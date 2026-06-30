@@ -67,8 +67,7 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(game.proofCount(), 2);
 
         vm.warp(block.timestamp + game.FAST_FINALIZATION_DELAY());
-        game.resolve();
-        assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
+        assertEq(uint8(game.resolve()), uint8(GameStatus.DEFENDER_WINS));
 
         vm.warp(block.timestamp + 1);
         game.closeGame();
@@ -93,8 +92,7 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(game.expectedResolution().raw(), originalExpectedResolution);
 
         vm.warp(block.timestamp + 1);
-        game.resolve();
-        assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
+        assertEq(uint8(game.resolve()), uint8(GameStatus.DEFENDER_WINS));
     }
 
     function testCannotCreateSameProposal() public {
@@ -216,8 +214,7 @@ contract AggregateVerifierTest is BaseTest {
 
     function _resolveSlowAndClose(AggregateVerifier game, Claim rootClaim) private {
         vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
-        game.resolve();
-        assertEq(uint8(game.status()), uint8(GameStatus.DEFENDER_WINS));
+        assertEq(uint8(game.resolve()), uint8(GameStatus.DEFENDER_WINS));
 
         _claimCreditAfterDelay(game, game.gameCreator());
 
