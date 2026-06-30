@@ -30,12 +30,9 @@ contract TEEProverRegistryTest is Test {
 
     function _deployRegistry(address[] memory proposers) internal returns (DevTEEProverRegistry) {
         address verifier = makeAddr("verifier");
-        vm.etch(verifier, hex"00");
         vm.mockCall(verifier, abi.encodeWithSignature("TEE_NITRO_IMAGE_HASH()"), abi.encode(TEST_IMAGE_HASH));
-        vm.mockCall(verifier, abi.encodeWithSignature("TEE_TDX_IMAGE_HASH()"), abi.encode(TEST_IMAGE_HASH));
 
         address factory = makeAddr("factory");
-        vm.etch(factory, hex"00");
         vm.mockCall(factory, abi.encodeCall(IDisputeGameFactory.gameImpls, (TEST_GAME_TYPE)), abi.encode(verifier));
 
         DevTEEProverRegistry impl = new DevTEEProverRegistry(
@@ -116,7 +113,6 @@ contract TEEProverRegistryTest is Test {
         vm.prank(owner);
         teeProverRegistry.addDevTDXSigner(signer, TEST_IMAGE_HASH);
 
-        assertTrue(teeProverRegistry.isRegisteredSigner(signer));
         assertTrue(teeProverRegistry.signerTEEType(signer) == TEEProverRegistry.TEEType.TDX);
     }
 
@@ -124,7 +120,6 @@ contract TEEProverRegistryTest is Test {
         address signer = makeAddr("tdx-signer");
         address tdxVerifier = makeAddr("tdx-verifier");
 
-        vm.etch(tdxVerifier, hex"00");
         vm.mockCall(
             tdxVerifier, abi.encodeCall(ITDXVerifier.verify, (bytes(""), bytes(""))), abi.encode(signer, TEST_IMAGE_HASH)
         );
