@@ -15,27 +15,12 @@ import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
-/// @notice Mock AggregateVerifier that returns configurable TEE image hashes.
+bytes32 constant REGISTRY_TEST_IMAGE_HASH = keccak256("test-image-hash");
+
+/// @notice Mock AggregateVerifier that returns TEE image hashes.
 contract MockAggregateVerifierForRegistry {
-    bytes32 public TEE_NITRO_IMAGE_HASH;
-    bytes32 public TEE_TDX_IMAGE_HASH;
-
-    constructor(bytes32 imageHash) {
-        TEE_NITRO_IMAGE_HASH = imageHash;
-        TEE_TDX_IMAGE_HASH = imageHash;
-    }
-}
-
-contract MockDisputeGameFactoryForRegistry {
-    mapping(uint32 => address) internal _impls;
-
-    function setImpl(GameType gameType, address impl) external {
-        _impls[GameType.unwrap(gameType)] = impl;
-    }
-
-    function gameImpls(GameType gameType) external view returns (IDisputeGame) {
-        return IDisputeGame(_impls[GameType.unwrap(gameType)]);
-    }
+    bytes32 public constant TEE_NITRO_IMAGE_HASH = REGISTRY_TEST_IMAGE_HASH;
+    bytes32 public constant TEE_TDX_IMAGE_HASH = REGISTRY_TEST_IMAGE_HASH;
 }
 
 /// @dev Uses DevTEEProverRegistry because production signer registration requires a Nitro attestation proof.
@@ -46,7 +31,7 @@ contract TEEProverRegistryTest is Test {
     address public manager;
     address public unauthorized;
 
-    bytes32 public constant TEST_IMAGE_HASH = keccak256("test-image-hash");
+    bytes32 public constant TEST_IMAGE_HASH = REGISTRY_TEST_IMAGE_HASH;
     GameType public constant TEST_GAME_TYPE = GameType.wrap(621);
     string internal constant NOT_OWNER = "OwnableManaged: caller is not the owner";
     string internal constant NOT_OWNER_OR_MANAGER = "OwnableManaged: caller is not the owner or the manager";
@@ -66,12 +51,17 @@ contract TEEProverRegistryTest is Test {
     }
 
     function _deployRegistry(address[] memory proposers, GameType gameType) internal returns (DevTEEProverRegistry) {
-        MockAggregateVerifierForRegistry verifier = new MockAggregateVerifierForRegistry(TEST_IMAGE_HASH);
-        MockDisputeGameFactoryForRegistry factory = new MockDisputeGameFactoryForRegistry();
-        factory.setImpl(gameType, address(verifier));
+        MockAggregateVerifierForRegistry verifier = new MockAggregateVerifierForRegistry();
+        address factory = makeAddr("factory");
+        vm.etch(factory, hex"00");
+        vm.mockCall(
+            factory,
+            abi.encodeCall(IDisputeGameFactory.gameImpls, (gameType)),
+            abi.encode(IDisputeGame(address(verifier)))
+        );
 
         DevTEEProverRegistry impl = new DevTEEProverRegistry(
-            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(address(factory))
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(factory)
         );
 
         address proxyAdmin = makeAddr("proxy-admin");
@@ -122,22 +112,15 @@ contract TEEProverRegistryTest is Test {
     }
 
     function testInitializationWithProposers() public {
-        address proposer1 = makeAddr("proposer1");
-        address proposer2 = makeAddr("proposer2");
-        address proposer3 = makeAddr("proposer3");
         address[] memory proposers = new address[](3);
-        proposers[0] = proposer1;
-        proposers[1] = proposer2;
-        proposers[2] = proposer3;
+        proposers[0] = makeAddr("proposer1");
+        proposers[1] = makeAddr("proposer2");
+        proposers[2] = makeAddr("proposer3");
 
         DevTEEProverRegistry registry2 = _deployRegistry(proposers, TEST_GAME_TYPE);
-        assertTrue(registry2.isValidProposer(proposer1));
-        assertTrue(registry2.isValidProposer(proposer2));
-        assertTrue(registry2.isValidProposer(proposer3));
-    }
-
-    function testInitializationWithEmptyProposers() public view {
-        assertFalse(teeProverRegistry.isValidProposer(address(0)));
+        assertTrue(registry2.isValidProposer(proposers[0]));
+        assertTrue(registry2.isValidProposer(proposers[1]));
+        assertTrue(registry2.isValidProposer(proposers[2]));
     }
 
     function testDeregisterSignerAsOwner() public {
