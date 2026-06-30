@@ -3,7 +3,7 @@ set working-directory := "../.."
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 forge_account := "testnet-admin"
-owner := `cast wallet address --account "{{forge_account}}"`
+owner := `cast wallet address --account testnet-admin`
 broadcast_args := "--rpc-url " + quote(l1_rpc_url) + " --broadcast --account " + quote(forge_account) + " --sender " + quote(owner)
 l1_rpc_url := env_var_or_default("L1_RPC_URL", "https://ethereum-full-sepolia-k8s-dev.cbhq.net")
 l2_rpc_url := env_var_or_default("L2_RPC_URL", "https://base-sepolia-reth-proofs-k8s-donotuse.cbhq.net:8545")
@@ -84,3 +84,14 @@ deploy-tdx-stack nitro_verifier tdx_verifier asr_anchor_block="":
       "$asr_anchor_output_root" \
       "$asr_anchor_block" \
       {{ broadcast_args }}
+
+# Deploy the TDX multiproof dev/test stack on Sepolia.
+[script]
+deploy-sepolia-tdx-dev asr_anchor_block="":
+    nitro_verifier="$(jq -er '.nitroEnclaveVerifier' deploy-config/zeronet-tdx.json)"
+    tdx_verifier="$(jq -er '.tdxVerifier' deploy-config/zeronet-tdx.json)"
+
+    just --justfile scripts/multiproof/justfile deploy-tdx-stack \
+      "$nitro_verifier" \
+      "$tdx_verifier" \
+      "{{ asr_anchor_block }}"

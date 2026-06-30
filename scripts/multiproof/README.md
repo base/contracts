@@ -26,10 +26,10 @@ Register each signer on the deployed `DevTEEProverRegistry`.
 The registry stores signer image hashes; `AggregateVerifier` enforces the expected Nitro and TDX image hashes.
 
 ```bash
-cast send "$TEE_PROVER_REGISTRY" "addDevSigner(address,bytes32)" "$NITRO_SIGNER" "$NITRO_IMAGE_HASH" \
+cast send "$TEE_PROVER_REGISTRY" "addDevSigner(address,bytes32,uint8)" "$NITRO_SIGNER" "$NITRO_IMAGE_HASH" 1 \
   --rpc-url "$L1_RPC_URL" --ledger --mnemonic-derivation-path "$LEDGER_PATH"
 
-cast send "$TEE_PROVER_REGISTRY" "addDevTDXSigner(address,bytes32)" "$TDX_SIGNER" "$TDX_IMAGE_HASH" \
+cast send "$TEE_PROVER_REGISTRY" "addDevSigner(address,bytes32,uint8)" "$TDX_SIGNER" "$TDX_IMAGE_HASH" 2 \
   --rpc-url "$L1_RPC_URL" --ledger --mnemonic-derivation-path "$LEDGER_PATH"
 ```
 
