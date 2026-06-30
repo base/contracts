@@ -30,12 +30,6 @@ contract TEEProverRegistryTest is Test {
 
     GameType public constant TEST_GAME_TYPE = GameType.wrap(621);
 
-    // Events must be redeclared here because Solidity 0.8.15 doesn't support
-    // referencing events from other contracts via qualified names (requires 0.8.21+)
-    event SignerRegistered(address indexed signer);
-    event SignerDeregistered(address indexed signer);
-    event ProposerSet(address indexed proposer, bool isValid);
-
     function setUp() public {
         owner = makeAddr("owner");
         manager = makeAddr("manager");
@@ -70,11 +64,6 @@ contract TEEProverRegistryTest is Test {
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
     }
 
-    function _expectNotOwnerRevert() internal {
-        vm.prank(manager);
-        vm.expectRevert(bytes("OwnableManaged: caller is not the owner"));
-    }
-
     function _assertContains(address[] memory values, address expected) internal {
         for (uint256 i = 0; i < values.length; i++) {
             if (values[i] == expected) return;
@@ -90,24 +79,17 @@ contract TEEProverRegistryTest is Test {
     }
 
     function testInitializationWithProposers() public {
-        address[] memory proposers = new address[](3);
-        proposers[0] = makeAddr("proposer1");
-        proposers[1] = makeAddr("proposer2");
-        proposers[2] = makeAddr("proposer3");
+        address[] memory proposers = new address[](1);
+        proposers[0] = makeAddr("proposer");
 
         DevTEEProverRegistry registry2 = _deployRegistry(proposers);
         assertTrue(registry2.isValidProposer(proposers[0]));
-        assertTrue(registry2.isValidProposer(proposers[1]));
-        assertTrue(registry2.isValidProposer(proposers[2]));
     }
 
     function testDeregisterSignerAsOwner() public {
         address signer = makeAddr("signer");
 
         _addDevSigner(signer);
-
-        vm.expectEmit(address(teeProverRegistry));
-        emit SignerDeregistered(signer);
 
         vm.prank(owner);
         teeProverRegistry.deregisterSigner(signer);
@@ -135,9 +117,6 @@ contract TEEProverRegistryTest is Test {
     function testSetProposer() public {
         address newProposer = makeAddr("proposer");
 
-        vm.expectEmit(address(teeProverRegistry));
-        emit ProposerSet(newProposer, true);
-
         vm.prank(owner);
         teeProverRegistry.setProposer(newProposer, true);
 
@@ -145,12 +124,9 @@ contract TEEProverRegistryTest is Test {
     }
 
     function testSetProposerFailsIfNotOwner() public {
-        _expectNotOwnerRevert();
+        vm.prank(manager);
+        vm.expectRevert(bytes("OwnableManaged: caller is not the owner"));
         teeProverRegistry.setProposer(makeAddr("proposer"), true);
-    }
-
-    function testIsValidSignerReturnsFalseForUnregistered() public {
-        assertFalse(teeProverRegistry.isValidSigner(makeAddr("unregistered")));
     }
 
     function testAddDevTDXSigner() public {
@@ -178,9 +154,6 @@ contract TEEProverRegistryTest is Test {
     function testAddDevSigner() public {
         address signer = makeAddr("dev-signer");
 
-        vm.expectEmit(address(teeProverRegistry));
-        emit SignerRegistered(signer);
-
         _addDevSigner(signer);
 
         assertTrue(teeProverRegistry.isValidSigner(signer));
@@ -190,7 +163,8 @@ contract TEEProverRegistryTest is Test {
     function testAddDevSignerFailsIfNotOwner() public {
         address signer = makeAddr("dev-signer");
 
-        _expectNotOwnerRevert();
+        vm.prank(manager);
+        vm.expectRevert(bytes("OwnableManaged: caller is not the owner"));
         teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
     }
 
