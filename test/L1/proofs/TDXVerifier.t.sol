@@ -32,8 +32,7 @@ contract TDXVerifierTest is Test {
     }
 
     function testVerifySucceedsWithRiscZeroProofAndAllowedJournal() public {
-        TDXVerifierJournal memory journal = _successJournal();
-        (bytes memory output, bytes memory proofBytes) = _mockProof(journal);
+        (bytes memory output, bytes memory proofBytes) = _mockProof(_successJournal());
 
         (address signer, bytes32 imageHash) = verifier.verify(output, proofBytes);
 
@@ -101,12 +100,11 @@ contract TDXVerifierTest is Test {
 
     function testVerifyRevertsWhenReportDataDoesNotBindPublicKey() public {
         TDXVerifierJournal memory journal = _successJournal();
-        bytes32 expected = journal.reportDataPrefix;
         journal.reportDataPrefix = keccak256("wrong-report-data");
         (bytes memory output, bytes memory proofBytes) = _mockProof(journal);
 
         vm.expectRevert(
-            abi.encodeWithSelector(TDXVerifier.ReportDataMismatch.selector, expected, journal.reportDataPrefix)
+            abi.encodeWithSelector(TDXVerifier.ReportDataMismatch.selector, _publicKeyHash(), journal.reportDataPrefix)
         );
         verifier.verify(output, proofBytes);
     }
@@ -134,12 +132,8 @@ contract TDXVerifierTest is Test {
     {
         output = abi.encode(journal);
         proofBytes = hex"1234";
-        _mockRiscZeroVerify(VERIFIER_ID, output, proofBytes);
-    }
-
-    function _mockRiscZeroVerify(bytes32 programId, bytes memory output, bytes memory proofBytes) internal {
         vm.mockCall(
-            mockRiscZeroVerifier, abi.encodeCall(IRiscZeroVerifier.verify, (proofBytes, programId, sha256(output))), ""
+            mockRiscZeroVerifier, abi.encodeCall(IRiscZeroVerifier.verify, (proofBytes, VERIFIER_ID, sha256(output))), ""
         );
     }
 }
