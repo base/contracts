@@ -82,12 +82,8 @@ contract ChallengeTest is BaseTest {
             TEE_PROVER, "tee1", "tee-proof-1", AggregateVerifier.ProofType.TEE, address(anchorStateRegistry)
         );
 
-        Claim rootClaim2 = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee2")));
-        bytes memory teeProof2 = _generateProposalProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
+        _nullify(game, AggregateVerifier.ProofType.TEE, "tee2");
 
-        game.nullify(teeProof2, LAST_INTERMEDIATE_ROOT_INDEX, rootClaim2.raw());
-
-        // challenge game: TEE proof was nullified, so MissingProof(TEE) is expected
         vm.expectRevert(
             abi.encodeWithSelector(AggregateVerifier.MissingProof.selector, AggregateVerifier.ProofType.TEE)
         );
@@ -110,14 +106,15 @@ contract ChallengeTest is BaseTest {
         );
 
         _challengeWithZk(gameA, "zk-challenge");
-        _assertChallengeRecorded(gameA);
+        assertEq(gameA.proofCount(), 2);
+        assertGt(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
 
         AggregateVerifier gameB =
             _createGame(ZK_PROVER, "zk-only-b", "zk-init-b", AggregateVerifier.ProofType.ZK, address(gameA));
         _nullify(gameB, AggregateVerifier.ProofType.ZK, "zk-nullify-b");
         assertTrue(zkVerifier.nullified());
 
-        _resolveAndAssertStatus(gameA, GameStatus.IN_PROGRESS);
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
         assertEq(gameA.proofCount(), 1);
         assertEq(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
         assertEq(address(gameA.zkProver()), address(0));
@@ -135,17 +132,16 @@ contract ChallengeTest is BaseTest {
         );
 
         _challengeWithZk(gameA, "zk-challenge");
-        _assertChallengeRecorded(gameA);
+        assertEq(gameA.proofCount(), 2);
+        assertGt(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
 
         AggregateVerifier gameB =
             _createGame(TEE_PROVER, "tee-nullify-b", "tee-proof-b", AggregateVerifier.ProofType.TEE, address(gameA));
 
-        Claim rootNullifyB = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "tee-nullify-b-root")));
-        bytes memory teeNullifyB = _generateProposalProof("tee-nullify-b", AggregateVerifier.ProofType.TEE);
-        gameB.nullify(teeNullifyB, LAST_INTERMEDIATE_ROOT_INDEX, rootNullifyB.raw());
+        _nullify(gameB, AggregateVerifier.ProofType.TEE, "tee-nullify-b-root");
         assertTrue(teeVerifier.nullified());
 
-        _resolveAndAssertStatus(gameA, GameStatus.IN_PROGRESS);
+        assertEq(uint8(gameA.resolve()), uint8(GameStatus.IN_PROGRESS));
         assertEq(gameA.proofCount(), 1);
         assertGt(gameA.counteredByIntermediateRootIndexPlusOne(), 0);
         assertEq(address(gameA.teeProver()), address(0));
@@ -180,7 +176,9 @@ contract ChallengeTest is BaseTest {
     }
 
     function _nullify(AggregateVerifier game, AggregateVerifier.ProofType proofType, bytes memory claimSalt) private {
-        game.nullify(_proofOfType(proofType), LAST_INTERMEDIATE_ROOT_INDEX, _claim(claimSalt).raw());
+        game.nullify(
+            _generateProposalProof(claimSalt, proofType), LAST_INTERMEDIATE_ROOT_INDEX, _claim(claimSalt).raw()
+        );
     }
 
     function _proofOfType(AggregateVerifier.ProofType proofType) private pure returns (bytes memory) {
@@ -191,15 +189,6 @@ contract ChallengeTest is BaseTest {
         return Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, salt)));
     }
 
-    function _assertChallengeRecorded(AggregateVerifier game) private view {
-        assertEq(game.proofCount(), 2);
-        assertGt(game.counteredByIntermediateRootIndexPlusOne(), 0);
-    }
-
-    function _resolveAndAssertStatus(AggregateVerifier game, GameStatus expectedStatus) private {
-        assertEq(uint8(game.resolve()), uint8(expectedStatus));
-    }
-
     function _resolveAfterSlowDelayAndClaim(
         AggregateVerifier game,
         GameStatus expectedStatus,
@@ -208,7 +197,7 @@ contract ChallengeTest is BaseTest {
         private
     {
         vm.warp(block.timestamp + game.SLOW_FINALIZATION_DELAY());
-        _resolveAndAssertStatus(game, expectedStatus);
+        assertEq(uint8(game.resolve()), uint8(expectedStatus));
         assertEq(game.bondRecipient(), recipient);
         _claimCreditAfterDelay(game, recipient);
     }
