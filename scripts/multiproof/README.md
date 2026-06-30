@@ -194,7 +194,8 @@ Deploy both TEE verifier policy contracts with one command:
 just --justfile scripts/multiproof/justfile deploy-tee-verifiers $NITRO_ROOT_CERT $NITRO_VERIFIER_ID
 ```
 
-This saves output to `deployments/<chainId>-tee-verifiers.json`.
+This saves the individual verifier outputs under `deployments/<chainId>-nitro-verifier.json`
+and `deployments/<chainId>-tdx-verifier.json`.
 
 To deploy Nitro separately:
 

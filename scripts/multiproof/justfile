@@ -1,7 +1,6 @@
 set dotenv-load
+set working-directory := "../.."
 
-repo_root := justfile_directory() + "/../.."
-justfile_path := justfile_directory() + "/justfile"
 zeronet_tdx_deploy_config := "deploy-config/zeronet-tdx.json"
 forge_account := "testnet-admin"
 l1_rpc_url := env_var_or_default("L1_RPC_URL", "https://ethereum-full-sepolia-k8s-dev.cbhq.net")
@@ -17,13 +16,12 @@ sepolia_tdx_registration_manager := "0x44E999A5859c2D12378a349882fAe5805DCE71b9"
 zero_bytes32 := "0x0000000000000000000000000000000000000000000000000000000000000000"
 
 default:
-  @just --justfile "{{justfile_path}}" --list
+  @just --justfile "{{justfile()}}" --list
 
 # Deploy the TDXVerifier policy contract.
 deploy-tdx-verifier risc0_router=sepolia_tdx_risc0_verifier_router tdx_verifier_id=sepolia_tdx_verifier_id intel_root_ca_hash=sepolia_intel_root_ca_hash:
   #!/usr/bin/env bash
   set -euo pipefail
-  cd "{{repo_root}}"
   owner="$(cast wallet address --account "{{forge_account}}")"
   echo "Using {{forge_account}} as owner/deployer: $owner"
   forge script scripts/multiproof/DeployTDXVerifier.s.sol:DeployTDXVerifier \
@@ -40,7 +38,6 @@ deploy-tdx-verifier risc0_router=sepolia_tdx_risc0_verifier_router tdx_verifier_
 deploy-nitro-verifier nitro_root_cert nitro_verifier_id risc0_router=sepolia_nitro_risc0_verifier_router set_builder_image_id=sepolia_risc0_set_builder_image_id nitro_verifier_proof_id=zero_bytes32:
   #!/usr/bin/env bash
   set -euo pipefail
-  cd "{{repo_root}}"
   owner="$(cast wallet address --account "{{forge_account}}")"
   echo "Using {{forge_account}} as owner/deployer: $owner"
   forge script scripts/multiproof/DeployNitroVerifier.s.sol:DeployNitroVerifier \
@@ -56,33 +53,13 @@ deploy-nitro-verifier nitro_root_cert nitro_verifier_id risc0_router=sepolia_nit
     --account "{{forge_account}}" \
     --sender "$owner"
 
-# Deploy both TEE verifier policy contracts and write combined deployment output.
+# Deploy both TEE verifier policy contracts.
 deploy-tee-verifiers nitro_root_cert nitro_verifier_id nitro_risc0_router=sepolia_nitro_risc0_verifier_router tdx_risc0_router=sepolia_tdx_risc0_verifier_router set_builder_image_id=sepolia_risc0_set_builder_image_id nitro_verifier_proof_id=zero_bytes32 tdx_verifier_id=sepolia_tdx_verifier_id intel_root_ca_hash=sepolia_intel_root_ca_hash: (deploy-nitro-verifier nitro_root_cert nitro_verifier_id nitro_risc0_router set_builder_image_id nitro_verifier_proof_id) (deploy-tdx-verifier tdx_risc0_router tdx_verifier_id intel_root_ca_hash)
-  #!/usr/bin/env bash
-  set -euo pipefail
-  cd "{{repo_root}}"
-
-  chain_id="$(cast chain-id --rpc-url "{{l1_rpc_url}}")"
-  nitro_path="deployments/${chain_id}-nitro-verifier.json"
-  tdx_path="deployments/${chain_id}-tdx-verifier.json"
-  out_path="deployments/${chain_id}-tee-verifiers.json"
-  nitro_verifier="$(jq -r '.NitroEnclaveVerifier // empty' "$nitro_path")"
-  tdx_verifier="$(jq -r '.TDXVerifier // empty' "$tdx_path")"
-
-  if [[ -z "$nitro_verifier" || -z "$tdx_verifier" ]]; then
-    echo "Missing verifier address in $nitro_path or $tdx_path" >&2
-    exit 1
-  fi
-
-  jq -n --arg nitro "$nitro_verifier" --arg tdx "$tdx_verifier" \
-    '{NitroEnclaveVerifier: $nitro, TDXVerifier: $tdx}' > "$out_path"
-  echo "Deployment saved to: $out_path"
 
 # Deploy the TDX multiproof dev/test stack using the zeronet TDX config.
 deploy-tdx-stack nitro_verifier="" tdx_verifier="" tdx_manager=sepolia_tdx_registration_manager deploy_config=zeronet_tdx_deploy_config l2_rpc=l2_rpc_url l2_output_root_rpc=l2_output_root_rpc_url:
   #!/usr/bin/env bash
   set -euo pipefail
-  cd "{{repo_root}}"
   owner="$(cast wallet address --account "{{forge_account}}")"
   echo "Using {{forge_account}} as deployer: $owner"
 
