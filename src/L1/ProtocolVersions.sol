@@ -2,7 +2,7 @@
 pragma solidity 0.8.15;
 
 // Contracts
-import { Ownable } from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 
 // Interfaces
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
@@ -26,7 +26,7 @@ import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 ///      An `upgradeId` is a human-readable string (e.g. "canyon"); each is packed into a
 ///      bytes32 storage `key`. The registry starts empty; all upgrades are added via
 ///      `registerUpgrade` owner calls.
-contract ProtocolVersions is Ownable, IProtocolVersions {
+contract ProtocolVersions is ProxyAdminOwnedBase, IProtocolVersions {
     /// @notice Semantic version.
     /// @custom:semver 1.0.0
     string public constant version = "1.0.0";
@@ -34,18 +34,9 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
     /// @notice Minimum notice period required when scheduling or modifying an activation timestamp.
     uint64 public constant MIN_NOTICE = 1 hours;
 
-    /// @notice The L2 chain ID whose schedule this contract commits to.
-    uint256 public immutable l2ChainId;
-
     /// @notice Hash chain seed: keccak256(abi.encode(l2ChainId, address(this))). Cached to avoid
     ///         recomputing on every _refreshScheduleId call.
     bytes32 internal immutable _seed;
-
-    /// @notice The latest block number in which `scheduleId` changed.
-    uint256 public lastUpdatedAtBlock;
-
-    /// @notice The current schedule commitment hash, extended on every timestamp change.
-    bytes32 internal _scheduleId;
 
     /// @notice Ordered list of registered upgrade keys.
     bytes32[] internal _upgradeKeys;
@@ -59,10 +50,11 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
     /// @notice Activation timestamp for each registered upgrade key (0 = not scheduled).
     mapping(bytes32 => uint64) internal _timestamps;
 
-    /// @notice Protocol version for each upgrade, chosen by the owner and set at registration via
-    ///         `registerUpgrade`. Immutable once registered. Non-zero for registered upgrades;
-    ///         zero for unregistered keys (serves as the existence sentinel).
-    mapping(bytes32 => uint256) internal _protocolVersions;
+    /// @notice Registration sentinel for each upgrade key.
+    mapping(bytes32 => bool) internal _registered;
+
+    /// @notice The protocol version set at the most recent `registerUpgrade` call.
+    uint256 public latestProtocolVersion;
 
     /// @notice Address allowed to delay (push out) already-scheduled activation timestamps.
     /// @dev Appointed and revocable by the owner. This is a restricted secondary role: it can
@@ -71,51 +63,24 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
     ///      earlier, or schedule a brand-new activation. Unset (zero) by default.
     address public chainTeam;
 
-    /// @notice Deploys the contract, sets the owner and chain ID, and emits the initial scheduleId.
-    /// @param _owner     Initial Security Council owner.
+    /// @notice Deploys the contract and sets the chain ID.
     /// @param _l2ChainId L2 chain ID whose schedule is being committed.
-    constructor(address _owner, uint256 _l2ChainId) Ownable() {
-        if (_owner == address(0)) revert ProtocolVersions_ZeroOwner();
+    constructor(uint256 _l2ChainId) {
         if (_l2ChainId == 0) revert ProtocolVersions_InvalidL2ChainId();
-
-        _transferOwnership(_owner);
-        l2ChainId = _l2ChainId;
         _seed = keccak256(abi.encode(_l2ChainId, address(this)));
-
-        _scheduleId = _seed;
-        lastUpdatedAtBlock = block.number;
-        emit ScheduleIdUpdated(bytes32(0), _scheduleId, block.number);
     }
 
-    /// @notice Restricts a call to the appointed chainTeam role.
-    modifier onlyChainTeam() {
-        if (msg.sender != chainTeam) revert ProtocolVersions_NotChainTeam();
+    /// @notice Restricts a call to the ProxyAdmin owner.
+    modifier onlyProxyAdminOwner() {
+        _assertOnlyProxyAdminOwner();
         _;
     }
 
     /// @notice Returns the canonical schedule commitment.
     /// @return The current scheduleId hash.
     function scheduleId() external view returns (bytes32) {
-        return _scheduleId;
-    }
-
-    /// @notice Returns the number of registered upgrades.
-    /// @return The length of the upgrade registry.
-    function upgradeCount() external view returns (uint256) {
-        return _upgradeKeys.length;
-    }
-
-    /// @notice Returns the registered upgrade key at `index` (registration order).
-    /// @param index 0-based position in the registry.
-    /// @return The bytes32 key at that position.
-    function upgradeIdAt(uint256 index) external view returns (bytes32) {
-        return _upgradeKeys[index];
-    }
-
-    /// @notice Returns the full ordered list of registered upgrade keys.
-    /// @return Ordered array of bytes32 keys in registration order.
-    function upgradeIds() external view returns (bytes32[] memory) {
-        return _upgradeKeys;
+        uint256 n = _upgradeKeys.length;
+        return n == 0 ? _seed : _upgradeScheduleId[_upgradeKeys[n - 1]];
     }
 
     /// @notice Returns the activation timestamp for `upgradeId` (0 = not scheduled).
@@ -125,15 +90,8 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
         return _timestamps[_registeredKey(upgradeId)];
     }
 
-    /// @notice Returns the owner-assigned protocol version for `upgradeId`. Reverts if not registered.
-    /// @param upgradeId The human-readable upgrade identifier string.
-    /// @return The protocol version assigned at registration time.
-    function getProtocolVersion(string calldata upgradeId) external view returns (uint256) {
-        return _protocolVersions[_registeredKey(upgradeId)];
-    }
-
     /// @notice Returns the full ordered schedule: every registered upgrade with its current
-    ///         activation timestamp, protocol version, and cumulative schedule hash.
+    ///         activation timestamp and cumulative schedule hash.
     /// @dev Calling via eth_call is gas-free; no transaction is submitted.
     /// @return schedule_ Ordered array of Upgrade structs, one per registered upgrade.
     function getSchedule() external view returns (Upgrade[] memory schedule_) {
@@ -144,19 +102,27 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
             schedule_[i] = Upgrade({
                 name: _nameFromKey(key),
                 timestamp: _timestamps[key],
-                protocolVersion: _protocolVersions[key],
                 scheduleId: _upgradeScheduleId[key]
             });
         }
     }
 
     /// @notice Registers a new upgrade by upgradeId with its protocol version. Owner only.
-    /// @dev The upgradeId is packed into a bytes32 key and `protocolVersion` is recorded for it.
+    /// @dev The upgradeId is packed into a bytes32 key and `latestProtocolVersion` is updated.
     ///      Registration extends the scheduleId chain with the new (key, timestamp=0) link.
     /// @param upgradeId       Human-readable upgrade name (1–32 bytes, e.g. "canyon").
-    /// @param protocolVersion Owner-assigned protocol version number for this upgrade (must be non-zero).
-    function registerUpgrade(string calldata upgradeId, uint256 protocolVersion) external onlyOwner {
-        _registerUpgrade(upgradeId, protocolVersion);
+    /// @param protocolVersion Packed semver uint256 for this upgrade (must be non-zero).
+    function registerUpgrade(string calldata upgradeId, uint256 protocolVersion) external onlyProxyAdminOwner {
+        if (protocolVersion == 0) revert ProtocolVersions_InvalidProtocolVersion();
+        bytes32 key = _keyFromUpgradeId(upgradeId);
+        if (_registered[key]) revert ProtocolVersions_UpgradeAlreadyRegistered(key);
+
+        uint256 index = _upgradeKeys.length;
+        _upgradeKeys.push(key);
+        _registered[key] = true;
+        latestProtocolVersion = protocolVersion;
+        emit UpgradeRegistered(key, index, upgradeId, protocolVersion);
+        _refreshScheduleId(key);
     }
 
     /// @notice Sets the activation timestamp for one upgrade by upgradeId. Pass 0 to clear.
@@ -166,16 +132,26 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
     /// @param upgradeId  The upgrade to schedule.
     /// @param timestamp  Future Unix timestamp for L2 activation (must be >= block.timestamp + MIN_NOTICE), or 0 to
     /// clear.
-    function setTimestamp(string calldata upgradeId, uint64 timestamp) external onlyOwner {
+    function setTimestamp(string calldata upgradeId, uint64 timestamp) external onlyProxyAdminOwner {
         bytes32 key = _registeredKey(upgradeId);
-        if (_applyTimestamp(key, timestamp)) {
-            _refreshScheduleId(key);
+        uint64 current = _timestamps[key];
+        // Cannot modify a timestamp that has already activated.
+        if (current != 0 && uint64(block.timestamp) >= current) {
+            revert ProtocolVersions_ActivationAlreadyPassed(key, current);
         }
+        // Non-zero timestamps must be at least MIN_NOTICE seconds in the future.
+        if (timestamp != 0 && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
+            revert ProtocolVersions_DelayMustBeLater(current, timestamp);
+        }
+        if (current == timestamp) return;
+        _timestamps[key] = timestamp;
+        emit TimestampSet(key, timestamp);
+        _refreshScheduleId(key);
     }
 
     /// @notice Appoints, replaces, or clears (set to zero) the chainTeam role. Owner only.
     /// @param newChainTeam New chainTeam address, or address(0) to revoke the role.
-    function setChainTeam(address newChainTeam) external onlyOwner {
+    function setChainTeam(address newChainTeam) external onlyProxyAdminOwner {
         emit ChainTeamUpdated(chainTeam, newChainTeam);
         chainTeam = newChainTeam;
     }
@@ -189,7 +165,8 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
     ///      is later still, the new value is always in the future.
     /// @param upgradeId     The upgrade whose activation to delay.
     /// @param newTimestamp  New activation timestamp, must be strictly later than the current one.
-    function delayTimestamp(string calldata upgradeId, uint64 newTimestamp) external onlyChainTeam {
+    function delayTimestamp(string calldata upgradeId, uint64 newTimestamp) external {
+        if (msg.sender != chainTeam) revert ProtocolVersions_NotChainTeam();
         bytes32 key = _registeredKey(upgradeId);
         uint64 current = _timestamps[key];
 
@@ -199,45 +176,11 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
         if (uint64(block.timestamp) >= current) {
             revert ProtocolVersions_ActivationAlreadyPassed(key, current);
         }
-        // The role can only push the activation later, never earlier or to the same time.
-        if (newTimestamp <= current) revert ProtocolVersions_DelayMustBeLater(current, newTimestamp);
+        // The role can only push the activation later and must be greater than the MIN_NOTICE buffer, never earlier or to the same time.
+        if (newTimestamp <= current || newTimestamp < uint64(block.timestamp) + MIN_NOTICE) revert ProtocolVersions_DelayMustBeLater(current, newTimestamp);
 
         _timestamps[key] = newTimestamp;
         emit TimestampSet(key, newTimestamp);
-        _refreshScheduleId(key);
-    }
-
-    /// @dev Validates and applies a timestamp update for a registered upgrade key.
-    ///      Returns true if the timestamp changed (caller should then call _refreshScheduleId),
-    ///      false if unchanged (no-op, scheduleId must not be extended).
-    function _applyTimestamp(bytes32 key, uint64 timestamp) internal returns (bool) {
-        uint64 current = _timestamps[key];
-        // Cannot modify a timestamp that has already activated.
-        if (current != 0 && uint64(block.timestamp) >= current) {
-            revert ProtocolVersions_ActivationAlreadyPassed(key, current);
-        }
-        // Non-zero timestamps must be at least MIN_NOTICE seconds in the future.
-        if (timestamp != 0 && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
-            revert ProtocolVersions_ActivationTimestampInPast(timestamp);
-        }
-        if (current == timestamp) return false;
-        _timestamps[key] = timestamp;
-        emit TimestampSet(key, timestamp);
-        return true;
-    }
-
-    /// @dev Validates and appends a new upgrade to the registry, then extends the scheduleId chain.
-    ///      `_protocolVersions[key] != 0` serves as the existence sentinel, so protocolVersion must
-    ///      be non-zero. The new upgrade is always the last entry, so _refreshScheduleId is O(1).
-    function _registerUpgrade(string calldata upgradeId, uint256 protocolVersion) internal {
-        if (protocolVersion == 0) revert ProtocolVersions_InvalidProtocolVersion();
-        bytes32 key = _keyFromUpgradeId(upgradeId);
-        if (_protocolVersions[key] != 0) revert ProtocolVersions_UpgradeAlreadyRegistered(key);
-
-        uint256 index = _upgradeKeys.length;
-        _upgradeKeys.push(key);
-        _protocolVersions[key] = protocolVersion;
-        emit UpgradeRegistered(key, index, upgradeId, protocolVersion);
         _refreshScheduleId(key);
     }
 
@@ -253,26 +196,18 @@ contract ProtocolVersions is Ownable, IProtocolVersions {
             if (_upgradeKeys[startIndex] == changedKey) break;
         }
         bytes32 prev = startIndex == 0 ? _seed : _upgradeScheduleId[_upgradeKeys[startIndex - 1]];
-
         // Recompute from startIndex onward, storing each link.
         for (uint256 i = startIndex; i < n; i++) {
             bytes32 k = _upgradeKeys[i];
             prev = keccak256(abi.encode(prev, k, _timestamps[k]));
             _upgradeScheduleId[k] = prev;
         }
-
-        bytes32 oldScheduleId = _scheduleId;
-        if (prev != oldScheduleId) {
-            _scheduleId = prev;
-            lastUpdatedAtBlock = block.number;
-            emit ScheduleIdUpdated(oldScheduleId, prev, block.number);
-        }
     }
 
     /// @dev Resolves an upgradeId string to its storage key, reverting if not registered.
     function _registeredKey(string calldata upgradeId) internal view returns (bytes32 key) {
         key = _keyFromUpgradeId(upgradeId);
-        if (_protocolVersions[key] == 0) revert ProtocolVersions_UnknownUpgradeName(upgradeId);
+        if (!_registered[key]) revert ProtocolVersions_UnknownUpgradeName(upgradeId);
     }
 
     /// @dev Packs a UTF-8 upgradeId string (1–32 bytes) into a bytes32 key. Shorter strings are

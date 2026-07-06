@@ -6,9 +6,13 @@ import { Test } from "lib/forge-std/src/Test.sol";
 
 // Contracts
 import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
+import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 
 // Interfaces
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
+
+// Mocks
+import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 
 /// @title ProtocolVersions_TestInit
 /// @notice Reusable test initialization for ProtocolVersions tests.
@@ -16,7 +20,7 @@ abstract contract ProtocolVersions_TestInit is Test {
     event UpgradeRegistered(bytes32 indexed key, uint256 indexed index, string upgradeId, uint256 protocolVersion);
     event ChainTeamUpdated(address indexed previousChainTeam, address indexed newChainTeam);
     event TimestampSet(bytes32 indexed key, uint256 timestamp);
-    event ScheduleIdUpdated(bytes32 indexed oldScheduleId, bytes32 indexed newScheduleId, uint256 indexed blockNumber);
+
 
     address internal _owner = makeAddr("owner");
     address internal _nonOwner = makeAddr("non-owner");
@@ -24,7 +28,10 @@ abstract contract ProtocolVersions_TestInit is Test {
     ProtocolVersions internal protocolVersions;
 
     function setUp() public virtual {
-        protocolVersions = new ProtocolVersions(_owner, 8453);
+        protocolVersions = new ProtocolVersions(8453);
+        address mockProxyAdmin = makeAddr("proxy-admin");
+        vm.mockCall(mockProxyAdmin, abi.encodeWithSignature("owner()"), abi.encode(_owner));
+        EIP1967Helper.setAdmin(address(protocolVersions), mockProxyAdmin);
     }
 
     /// @dev Registers `canyon` and schedules it for block.timestamp + MIN_NOTICE + delay.
@@ -42,22 +49,14 @@ abstract contract ProtocolVersions_TestInit is Test {
 contract ProtocolVersions_Constructor_Test is ProtocolVersions_TestInit {
     /// @notice Tests that the constructor sets the correct initial state.
     function test_constructor_setsInitialState_succeeds() external view {
-        assertEq(protocolVersions.owner(), _owner);
-        assertEq(protocolVersions.l2ChainId(), 8453);
-        assertEq(protocolVersions.lastUpdatedAtBlock(), block.number);
+        assertEq(protocolVersions.proxyAdminOwner(), _owner);
         assertNotEq(protocolVersions.scheduleId(), bytes32(0));
-    }
-
-    /// @notice Tests that the constructor reverts when the owner is address(0).
-    function test_constructor_zeroOwner_reverts() external {
-        vm.expectRevert(IProtocolVersions.ProtocolVersions_ZeroOwner.selector);
-        new ProtocolVersions(address(0), 8453);
     }
 
     /// @notice Tests that the constructor reverts when the chain ID is zero.
     function test_constructor_zeroChainId_reverts() external {
         vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidL2ChainId.selector);
-        new ProtocolVersions(_owner, 0);
+        new ProtocolVersions(0);
     }
 }
 
@@ -73,7 +72,7 @@ contract ProtocolVersions_Version_Test is ProtocolVersions_TestInit {
 /// @title ProtocolVersions_RegisterUpgrade_Test
 /// @notice Test contract for the `registerUpgrade` function.
 contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
-    /// @notice Tests that registering an upgrade extends the scheduleId chain and updates lastUpdatedAtBlock.
+    /// @notice Tests that registering an upgrade extends the scheduleId chain.
     function test_registerUpgrade_changesScheduleId_succeeds() external {
         bytes32 idBefore = protocolVersions.scheduleId();
 
@@ -82,34 +81,6 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         protocolVersions.registerUpgrade("canyon", 1);
 
         assertNotEq(protocolVersions.scheduleId(), idBefore);
-        assertEq(protocolVersions.lastUpdatedAtBlock(), block.number);
-    }
-
-    /// @notice Tests that registering an upgrade adds it to the ordered registry.
-    function test_registerUpgrade_extendsRegistry_succeeds() external {
-        assertEq(protocolVersions.upgradeCount(), 0);
-
-        vm.prank(_owner);
-        protocolVersions.registerUpgrade("antares", 1);
-
-        assertEq(protocolVersions.upgradeCount(), 1);
-        assertEq(protocolVersions.upgradeIdAt(0), bytes32("antares"));
-    }
-
-    /// @notice Tests that registering multiple upgrades preserves registration order.
-    function test_registerUpgrade_preservesOrder_succeeds() external {
-        vm.prank(_owner);
-        protocolVersions.registerUpgrade("canyon", 1);
-        vm.prank(_owner);
-        protocolVersions.registerUpgrade("ecotone", 2);
-        vm.prank(_owner);
-        protocolVersions.registerUpgrade("fjord", 3);
-
-        bytes32[] memory ids = protocolVersions.upgradeIds();
-        assertEq(ids.length, 3);
-        assertEq(ids[0], bytes32("canyon"));
-        assertEq(ids[1], bytes32("ecotone"));
-        assertEq(ids[2], bytes32("fjord"));
     }
 
     /// @notice Tests that `registerUpgrade` emits the `UpgradeRegistered` event with correct fields.
@@ -125,15 +96,15 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         protocolVersions.registerUpgrade("ecotone", 2);
     }
 
-    /// @notice Tests that registering an upgrade stores the owner-assigned protocol version.
-    function test_registerUpgrade_storesProtocolVersion_succeeds() external {
+    /// @notice Tests that registering upgrades updates latestProtocolVersion to the most recent.
+    function test_registerUpgrade_updatesLatestProtocolVersion_succeeds() external {
         vm.prank(_owner);
         protocolVersions.registerUpgrade("canyon", 5);
+        assertEq(protocolVersions.latestProtocolVersion(), 5);
+
         vm.prank(_owner);
         protocolVersions.registerUpgrade("ecotone", 9);
-
-        assertEq(protocolVersions.getProtocolVersion("canyon"), 5);
-        assertEq(protocolVersions.getProtocolVersion("ecotone"), 9);
+        assertEq(protocolVersions.latestProtocolVersion(), 9);
     }
 
     /// @notice Tests that registering a 32-byte name (the maximum) succeeds.
@@ -141,8 +112,7 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         string memory name32 = "exactly-32-bytes-upgrade-name!!!";
         vm.prank(_owner);
         protocolVersions.registerUpgrade(name32, 7);
-        assertEq(protocolVersions.upgradeCount(), 1);
-        assertEq(protocolVersions.getProtocolVersion(name32), 7);
+        assertEq(protocolVersions.latestProtocolVersion(), 7);
     }
 
     /// @notice Tests that registering the same upgrade twice reverts.
@@ -159,7 +129,7 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         protocolVersions.registerUpgrade("canyon", 1);
     }
 
-    /// @notice Tests that registering an upgrade with protocolVersion zero reverts.
+    /// @notice Tests that registering an upgrade with a zero protocolVersion reverts.
     function test_registerUpgrade_zeroProtocolVersion_reverts() external {
         vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
         vm.prank(_owner);
@@ -182,7 +152,7 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
 
     /// @notice Tests that only the owner can call `registerUpgrade`.
     function test_registerUpgrade_callerNotOwner_reverts() external {
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
         vm.prank(_nonOwner);
         protocolVersions.registerUpgrade("antares", 1);
     }
@@ -204,7 +174,6 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         protocolVersions.setTimestamp("canyon", ts);
 
         assertEq(protocolVersions.getTimestamp("canyon"), ts);
-        assertEq(protocolVersions.lastUpdatedAtBlock(), block.number);
         assertNotEq(protocolVersions.scheduleId(), initialScheduleId);
     }
 
@@ -220,7 +189,6 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         protocolVersions.setTimestamp("canyon", ts);
 
         bytes32 scheduleIdAfterSet = protocolVersions.scheduleId();
-        uint256 updateBlockAfterSet = protocolVersions.lastUpdatedAtBlock();
 
         vm.roll(block.number + 1);
         vm.prank(_owner);
@@ -228,7 +196,6 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
 
         assertEq(protocolVersions.getTimestamp("canyon"), ts);
         assertEq(protocolVersions.scheduleId(), scheduleIdAfterSet);
-        assertEq(protocolVersions.lastUpdatedAtBlock(), updateBlockAfterSet);
     }
 
     /// @notice Tests that passing 0 clears a scheduled timestamp, changes the scheduleId, and
@@ -273,7 +240,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         protocolVersions.registerUpgrade("canyon", 1);
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
         vm.prank(_nonOwner);
         protocolVersions.setTimestamp("canyon", ts);
     }
@@ -285,7 +252,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
 
         vm.warp(1000);
         vm.expectRevert(
-            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_ActivationTimestampInPast.selector, uint64(500))
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_DelayMustBeLater.selector, uint64(0), uint64(500))
         );
         vm.prank(_owner);
         protocolVersions.setTimestamp("canyon", 500);
@@ -298,7 +265,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() - 1;
         vm.expectRevert(
-            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_ActivationTimestampInPast.selector, ts)
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_DelayMustBeLater.selector, uint64(0), ts)
         );
         vm.prank(_owner);
         protocolVersions.setTimestamp("canyon", ts);
@@ -351,7 +318,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         protocolVersions.setTimestamp("ecotone", ts2);
 
         // Reproduce the chain from scratch.
-        bytes32 seed = keccak256(abi.encode(protocolVersions.l2ChainId(), address(protocolVersions)));
+        bytes32 seed = keccak256(abi.encode(uint256(8453), address(protocolVersions)));
         bytes32 link0 = keccak256(abi.encode(seed, bytes32("canyon"), ts1));
         bytes32 link1 = keccak256(abi.encode(link0, bytes32("ecotone"), ts2));
 
@@ -385,7 +352,6 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
 
         assertEq(protocolVersions.getTimestamp("canyon"), later);
         assertNotEq(protocolVersions.scheduleId(), scheduleIdBefore);
-        assertEq(protocolVersions.lastUpdatedAtBlock(), block.number);
     }
 
     /// @notice Tests that only the chainTeam can call `delayTimestamp`.
@@ -489,7 +455,7 @@ contract ProtocolVersions_ChainTeam_Test is ProtocolVersions_TestInit {
 
     /// @notice Tests that only the owner can call `setChainTeam`.
     function test_setChainTeam_callerNotOwner_reverts() external {
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(ProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
         vm.prank(_nonOwner);
         protocolVersions.setChainTeam(_chainTeam);
     }
@@ -521,16 +487,7 @@ contract ProtocolVersions_ChainTeam_Test is ProtocolVersions_TestInit {
 contract ProtocolVersions_GetView_Test is ProtocolVersions_TestInit {
     /// @notice Tests that the registry starts empty.
     function test_registry_startsEmpty_succeeds() external view {
-        assertEq(protocolVersions.upgradeCount(), 0);
-        assertEq(protocolVersions.upgradeIds().length, 0);
-    }
-
-    /// @notice Tests that `getProtocolVersion` reverts for an unknown upgrade name.
-    function test_getProtocolVersion_unknownUpgrade_reverts() external {
-        vm.expectRevert(
-            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_UnknownUpgradeName.selector, "unknown")
-        );
-        protocolVersions.getProtocolVersion("unknown");
+        assertEq(protocolVersions.getSchedule().length, 0);
     }
 
     /// @notice Tests that `getSchedule` returns an empty array when no upgrades are registered.
@@ -555,11 +512,9 @@ contract ProtocolVersions_GetView_Test is ProtocolVersions_TestInit {
 
         assertEq(s[0].name, "canyon");
         assertEq(s[0].timestamp, ts);
-        assertEq(s[0].protocolVersion, 1);
 
         assertEq(s[1].name, "ecotone");
         assertEq(s[1].timestamp, 0);
-        assertEq(s[1].protocolVersion, 2);
 
         // The last entry's scheduleId is the contract's current scheduleId.
         assertEq(s[1].scheduleId, protocolVersions.scheduleId());
