@@ -29,6 +29,7 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     event TimestampSet(uint256 indexed id, uint256 timestamp);
     event ScheduleIdUpdated(bytes32 indexed newScheduleId, uint256 indexed blockNumber);
     event ChainTeamUpdated(address indexed previousChainTeam, address indexed newChainTeam);
+    event Initialized(uint8 version);
 
     function MIN_NOTICE() external view returns (uint64);
 
@@ -36,7 +37,7 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     function scheduleId() external view returns (bytes32);
     function minimumProtocolVersion() external view returns (uint256);
 
-    function getSchedule() external view returns (Upgrade[] memory);
+    function getSchedule() external view returns (Upgrade[] memory schedule_);
 
     function initialize(uint256 _l2ChainId) external;
     function registerUpgrade() external returns (uint256 id);
