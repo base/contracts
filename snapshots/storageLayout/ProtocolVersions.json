@@ -36,7 +36,7 @@
   },
   {
     "bytes": "32",
-    "label": "latestProtocolVersion",
+    "label": "minimumProtocolVersion",
     "offset": 0,
     "slot": "4",
     "type": "uint256"

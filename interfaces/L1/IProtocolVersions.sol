@@ -24,8 +24,8 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     error ProtocolVersions_NotInitialized();
     error ProtocolVersions_InsufficientNotice(uint64 timestamp);
 
-    event UpgradeRegistered(uint256 indexed id, uint256 protocolVersion);
-    event LatestProtocolVersionUpdated(uint256 indexed protocolVersion);
+    event UpgradeRegistered(uint256 indexed id);
+    event MinimumProtocolVersionUpdated(uint256 indexed protocolVersion);
     event TimestampSet(uint256 indexed id, uint256 timestamp);
     event ScheduleIdUpdated(bytes32 indexed newScheduleId, uint256 indexed blockNumber);
     event ChainTeamUpdated(address indexed previousChainTeam, address indexed newChainTeam);
@@ -34,13 +34,13 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
 
     function chainTeam() external view returns (address);
     function scheduleId() external view returns (bytes32);
-    function latestProtocolVersion() external view returns (uint256);
+    function minimumProtocolVersion() external view returns (uint256);
 
     function getSchedule() external view returns (Upgrade[] memory);
 
     function initialize(uint256 _l2ChainId) external;
-    function registerUpgrade(uint256 protocolVersion) external returns (uint256 id);
-    function setLatestProtocolVersion(uint256 protocolVersion) external;
+    function registerUpgrade() external returns (uint256 id);
+    function setMinimumProtocolVersion(uint256 protocolVersion) external;
     function setTimestamp(uint256 id, uint64 timestamp) external;
     function setChainTeam(address newChainTeam) external;
     function delayTimestamp(uint256 id, uint64 newTimestamp) external;

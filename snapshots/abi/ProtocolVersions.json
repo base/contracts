@@ -106,7 +106,7 @@
   },
   {
     "inputs": [],
-    "name": "latestProtocolVersion",
+    "name": "minimumProtocolVersion",
     "outputs": [
       {
         "internalType": "uint256",
@@ -144,13 +144,7 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "protocolVersion",
-        "type": "uint256"
-      }
-    ],
+    "inputs": [],
     "name": "registerUpgrade",
     "outputs": [
       {
@@ -196,7 +190,7 @@
         "type": "uint256"
       }
     ],
-    "name": "setLatestProtocolVersion",
+    "name": "setMinimumProtocolVersion",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -274,7 +268,7 @@
         "type": "uint256"
       }
     ],
-    "name": "LatestProtocolVersionUpdated",
+    "name": "MinimumProtocolVersionUpdated",
     "type": "event"
   },
   {
@@ -323,12 +317,6 @@
         "internalType": "uint256",
         "name": "id",
         "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "protocolVersion",
-        "type": "uint256"
       }
     ],
     "name": "UpgradeRegistered",
@@ -367,6 +355,17 @@
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "timestamp",
+        "type": "uint64"
+      }
+    ],
+    "name": "ProtocolVersions_InsufficientNotice",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "ProtocolVersions_InvalidL2ChainId",
     "type": "error"
@@ -379,6 +378,11 @@
   {
     "inputs": [],
     "name": "ProtocolVersions_NotChainTeam",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ProtocolVersions_NotInitialized",
     "type": "error"
   },
   {

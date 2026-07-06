@@ -63,9 +63,9 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     error ProtocolVersions_InsufficientNotice(uint64 timestamp);
 
     /// @notice Emitted when a new upgrade is registered.
-    event UpgradeRegistered(uint256 indexed id, uint256 protocolVersion);
-    /// @notice Emitted when the latest protocol version clients should run is updated.
-    event LatestProtocolVersionUpdated(uint256 indexed protocolVersion);
+    event UpgradeRegistered(uint256 indexed id);
+    /// @notice Emitted when the minimum protocol version clients must run is updated.
+    event MinimumProtocolVersionUpdated(uint256 indexed protocolVersion);
     /// @notice Emitted when an upgrade's activation timestamp is set, cleared, or delayed.
     event TimestampSet(uint256 indexed id, uint256 timestamp);
     /// @notice Emitted when the schedule commitment changes.
@@ -95,10 +95,10 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     ///         j..n-1 links rather than the entire chain.
     bytes32[] internal _upgradeScheduleId;
 
-    /// @notice The latest protocol version clients should run. Updated on each `registerUpgrade`
-    ///         call and settable directly by the owner via `setLatestProtocolVersion`. Informational
-    ///         only — read off-chain by clients; not part of the scheduleId commitment.
-    uint256 public latestProtocolVersion;
+    /// @notice The minimum protocol version clients must run. Settable by the owner via
+    ///         `setMinimumProtocolVersion`. Informational only — read off-chain by clients;
+    ///         not part of the scheduleId commitment.
+    uint256 public minimumProtocolVersion;
 
     /// @notice Address allowed to delay (push out) already-scheduled activation timestamps.
     /// @dev Appointed and revocable by the owner. This is a restricted secondary role: it can
@@ -154,31 +154,27 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     }
 
     /// @notice Registers a new upgrade, assigning it the next ascending id. Owner only.
-    /// @dev The upgrade starts unscheduled (timestamp 0) and `latestProtocolVersion` is updated.
-    ///      Registration extends the scheduleId chain with the new (id, timestamp=0) link.
-    /// @param protocolVersion Packed semver uint256 for this upgrade (must be non-zero).
+    /// @dev The upgrade starts unscheduled (timestamp 0). Registration extends the scheduleId
+    ///      chain with the new (id, timestamp=0) link.
     /// @return id The ascending id assigned to the newly registered upgrade.
-    function registerUpgrade(uint256 protocolVersion) external onlyProxyAdminOwner returns (uint256 id) {
-        if (protocolVersion == 0) revert ProtocolVersions_InvalidProtocolVersion();
-
+    function registerUpgrade() external onlyProxyAdminOwner returns (uint256 id) {
+        if (_seed == 0) revert ProtocolVersions_NotInitialized();
         id = _timestamps.length;
         _timestamps.push(0);
         _upgradeScheduleId.push();
-        latestProtocolVersion = protocolVersion;
-        emit UpgradeRegistered(id, protocolVersion);
-        emit LatestProtocolVersionUpdated(protocolVersion);
+        emit UpgradeRegistered(id);
         _refreshScheduleId(id);
     }
 
-    /// @notice Sets the latest protocol version clients should run. Owner (Security Council) only.
+    /// @notice Sets the minimum protocol version clients must run. Owner (Security Council) only.
     /// @dev Informational signal for off-chain clients; independent of the upgrade schedule and NOT
     ///      part of the scheduleId commitment, so it can be updated at any time without shifting any
-    ///      proof binding. `registerUpgrade` also updates this value.
+    ///      proof binding.
     /// @param protocolVersion Packed semver uint256 (must be non-zero).
-    function setLatestProtocolVersion(uint256 protocolVersion) external onlyProxyAdminOwner {
+    function setMinimumProtocolVersion(uint256 protocolVersion) external onlyProxyAdminOwner {
         if (protocolVersion == 0) revert ProtocolVersions_InvalidProtocolVersion();
-        latestProtocolVersion = protocolVersion;
-        emit LatestProtocolVersionUpdated(protocolVersion);
+        minimumProtocolVersion = protocolVersion;
+        emit MinimumProtocolVersionUpdated(protocolVersion);
     }
 
     /// @notice Sets the activation timestamp for one upgrade by id. Pass 0 to clear.
@@ -189,11 +185,16 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @param timestamp  Future Unix timestamp for L2 activation (must be >= block.timestamp + MIN_NOTICE), or 0 to
     /// clear.
     function setTimestamp(uint256 id, uint64 timestamp) external onlyProxyAdminOwner {
-        // Non-zero timestamps must provide at least MIN_NOTICE seconds of notice.
+        _assertRegistered(id);
+        uint64 current = _timestamps[id];
+        if (current != 0 && uint64(block.timestamp) >= current) {
+            revert ProtocolVersions_ActivationAlreadyPassed(id, current);
+        }
         if (timestamp != 0 && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
             revert ProtocolVersions_InsufficientNotice(timestamp);
         }
-        _setTimestamp(id, timestamp);
+        if (current == timestamp) return;
+        _writeTimestamp(id, timestamp);
     }
 
     /// @notice Appoints, replaces, or clears (set to zero) the chainTeam role. Owner only.
@@ -226,19 +227,12 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         // The new timestamp must also provide at least MIN_NOTICE seconds of notice from now.
         uint64 minFloor = uint64(block.timestamp) + MIN_NOTICE;
         if (newTimestamp < minFloor) revert ProtocolVersions_DelayMustBeLater(minFloor, newTimestamp);
-        _setTimestamp(id, newTimestamp);
+        _writeTimestamp(id, newTimestamp);
     }
 
-    /// @dev Shared write path: validates activation hasn't passed, skips no-ops, then writes newTs,
-    ///      emits TimestampSet, and refreshes the hash chain. Callers handle access control,
-    ///      ordering constraints, and MIN_NOTICE checks before invoking.
-    function _setTimestamp(uint256 id, uint64 newTs) internal {
-        _assertRegistered(id);
-        uint64 current = _timestamps[id];
-        if (current != 0 && uint64(block.timestamp) >= current) {
-            revert ProtocolVersions_ActivationAlreadyPassed(id, current);
-        }
-        if (current == newTs) return;
+    /// @dev Writes newTs, emits TimestampSet, and refreshes the hash chain. All validation is
+    ///      the caller's responsibility.
+    function _writeTimestamp(uint256 id, uint64 newTs) internal {
         _timestamps[id] = newTs;
         emit TimestampSet(id, newTs);
         _refreshScheduleId(id);

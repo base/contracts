@@ -16,8 +16,8 @@ import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 /// @title ProtocolVersions_TestInit
 /// @notice Reusable test initialization for ProtocolVersions tests.
 abstract contract ProtocolVersions_TestInit is Test {
-    event UpgradeRegistered(uint256 indexed id, uint256 protocolVersion);
-    event LatestProtocolVersionUpdated(uint256 indexed protocolVersion);
+    event UpgradeRegistered(uint256 indexed id);
+    event MinimumProtocolVersionUpdated(uint256 indexed protocolVersion);
     event ChainTeamUpdated(address indexed previousChainTeam, address indexed newChainTeam);
     event TimestampSet(uint256 indexed id, uint256 timestamp);
 
@@ -59,7 +59,7 @@ abstract contract ProtocolVersions_TestInit is Test {
     /// @dev Registers the first upgrade (id CANYON) and schedules it for block.timestamp + MIN_NOTICE + delay.
     function _scheduleCanyon(uint64 _delay) internal returns (uint64 ts_) {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
         ts_ = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + _delay;
         vm.prank(_owner);
         protocolVersions.setTimestamp(CANYON, ts_);
@@ -130,7 +130,7 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
 
         vm.roll(block.number + 1);
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
 
         assertNotEq(protocolVersions.scheduleId(), idBefore);
     }
@@ -138,90 +138,72 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `registerUpgrade` assigns ascending ids and returns them.
     function test_registerUpgrade_returnsAscendingIds_succeeds() external {
         vm.prank(_owner);
-        assertEq(protocolVersions.registerUpgrade(1), 0);
+        assertEq(protocolVersions.registerUpgrade(), 0);
         vm.prank(_owner);
-        assertEq(protocolVersions.registerUpgrade(2), 1);
+        assertEq(protocolVersions.registerUpgrade(), 1);
         vm.prank(_owner);
-        assertEq(protocolVersions.registerUpgrade(3), 2);
+        assertEq(protocolVersions.registerUpgrade(), 2);
     }
 
-    /// @notice Tests that `registerUpgrade` emits the `UpgradeRegistered` event with correct fields.
+    /// @notice Tests that `registerUpgrade` emits the `UpgradeRegistered` event with the assigned id.
     function test_registerUpgrade_emitsEvent_succeeds() external {
-        vm.expectEmit(true, false, false, true, address(protocolVersions));
-        emit UpgradeRegistered(0, 1);
+        vm.expectEmit(true, false, false, false, address(protocolVersions));
+        emit UpgradeRegistered(0);
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
 
-        vm.expectEmit(true, false, false, true, address(protocolVersions));
-        emit UpgradeRegistered(1, 2);
+        vm.expectEmit(true, false, false, false, address(protocolVersions));
+        emit UpgradeRegistered(1);
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(2);
-    }
-
-    /// @notice Tests that registering upgrades updates latestProtocolVersion to the most recent.
-    function test_registerUpgrade_updatesLatestProtocolVersion_succeeds() external {
-        vm.prank(_owner);
-        protocolVersions.registerUpgrade(5);
-        assertEq(protocolVersions.latestProtocolVersion(), 5);
-
-        vm.prank(_owner);
-        protocolVersions.registerUpgrade(9);
-        assertEq(protocolVersions.latestProtocolVersion(), 9);
-    }
-
-    /// @notice Tests that registering an upgrade with a zero protocolVersion reverts.
-    function test_registerUpgrade_zeroProtocolVersion_reverts() external {
-        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
-        vm.prank(_owner);
-        protocolVersions.registerUpgrade(0);
+        protocolVersions.registerUpgrade();
     }
 
     /// @notice Tests that only the owner can call `registerUpgrade`.
     function test_registerUpgrade_callerNotOwner_reverts() external {
         vm.expectRevert(ProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
         vm.prank(_nonOwner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
     }
 }
 
-/// @title ProtocolVersions_SetLatestProtocolVersion_Test
-/// @notice Test contract for the `setLatestProtocolVersion` function.
-contract ProtocolVersions_SetLatestProtocolVersion_Test is ProtocolVersions_TestInit {
-    /// @notice Tests that the owner can set the latest protocol version directly.
-    function test_setLatestProtocolVersion_updates_succeeds() external {
+/// @title ProtocolVersions_SetMinimumProtocolVersion_Test
+/// @notice Test contract for the `setMinimumProtocolVersion` function.
+contract ProtocolVersions_SetMinimumProtocolVersion_Test is ProtocolVersions_TestInit {
+    /// @notice Tests that the owner can set the minimum protocol version.
+    function test_setMinimumProtocolVersion_updates_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.setLatestProtocolVersion(42);
-        assertEq(protocolVersions.latestProtocolVersion(), 42);
+        protocolVersions.setMinimumProtocolVersion(42);
+        assertEq(protocolVersions.minimumProtocolVersion(), 42);
     }
 
-    /// @notice Tests that setting the latest protocol version does not change the scheduleId.
-    function test_setLatestProtocolVersion_doesNotChangeScheduleId_succeeds() external {
+    /// @notice Tests that setting the minimum protocol version does not change the scheduleId.
+    function test_setMinimumProtocolVersion_doesNotChangeScheduleId_succeeds() external {
         bytes32 scheduleIdBefore = protocolVersions.scheduleId();
         vm.prank(_owner);
-        protocolVersions.setLatestProtocolVersion(42);
+        protocolVersions.setMinimumProtocolVersion(42);
         assertEq(protocolVersions.scheduleId(), scheduleIdBefore);
     }
 
-    /// @notice Tests that `setLatestProtocolVersion` emits the `LatestProtocolVersionUpdated` event.
-    function test_setLatestProtocolVersion_emitsEvent_succeeds() external {
+    /// @notice Tests that `setMinimumProtocolVersion` emits the `MinimumProtocolVersionUpdated` event.
+    function test_setMinimumProtocolVersion_emitsEvent_succeeds() external {
         vm.expectEmit(true, false, false, true, address(protocolVersions));
-        emit LatestProtocolVersionUpdated(42);
+        emit MinimumProtocolVersionUpdated(42);
         vm.prank(_owner);
-        protocolVersions.setLatestProtocolVersion(42);
+        protocolVersions.setMinimumProtocolVersion(42);
     }
 
     /// @notice Tests that setting a zero protocol version reverts.
-    function test_setLatestProtocolVersion_zero_reverts() external {
+    function test_setMinimumProtocolVersion_zero_reverts() external {
         vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
         vm.prank(_owner);
-        protocolVersions.setLatestProtocolVersion(0);
+        protocolVersions.setMinimumProtocolVersion(0);
     }
 
-    /// @notice Tests that only the owner can call `setLatestProtocolVersion`.
-    function test_setLatestProtocolVersion_callerNotOwner_reverts() external {
+    /// @notice Tests that only the owner can call `setMinimumProtocolVersion`.
+    function test_setMinimumProtocolVersion_callerNotOwner_reverts() external {
         vm.expectRevert(ProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
         vm.prank(_nonOwner);
-        protocolVersions.setLatestProtocolVersion(42);
+        protocolVersions.setMinimumProtocolVersion(42);
     }
 }
 
@@ -232,7 +214,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     function test_setTimestamp_updatesTimestampAndScheduleId_succeeds() external {
         bytes32 initialScheduleId = protocolVersions.scheduleId();
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
 
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
@@ -245,9 +227,9 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     }
 
     /// @notice Tests that calling `setTimestamp` with the same value is a no-op for scheduleId.
-    function test_setTimestamp_sameTimestamp_noScheduleIdChange_succeeds() external {
+    function test_setTimestamp_sameTimestamp_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
 
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
@@ -269,7 +251,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     ///         restores it to the value it held immediately after registration (ts=0 link).
     function test_setTimestamp_clearTimestamp_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
         bytes32 scheduleIdAfterRegister = protocolVersions.scheduleId();
 
         vm.roll(block.number + 1);
@@ -292,7 +274,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `setTimestamp` emits a `TimestampSet` event.
     function test_setTimestamp_emitsEvent_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         vm.expectEmit(true, false, false, true, address(protocolVersions));
@@ -304,7 +286,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that only the owner can call `setTimestamp`.
     function test_setTimestamp_callerNotOwner_reverts() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         vm.expectRevert(ProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
@@ -315,7 +297,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `setTimestamp` reverts when the timestamp is in the past.
     function test_setTimestamp_timestampInPast_reverts() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
 
         vm.warp(1000);
         vm.expectRevert(
@@ -328,12 +310,10 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `setTimestamp` reverts when the timestamp is within MIN_NOTICE of now.
     function test_setTimestamp_insufficientNotice_reverts() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() - 1;
-        vm.expectRevert(
-            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, ts)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, ts));
         vm.prank(_owner);
         protocolVersions.setTimestamp(CANYON, ts);
     }
@@ -341,7 +321,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `setTimestamp` reverts when the upgrade has already activated.
     function test_setTimestamp_afterActivation_reverts() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
 
         vm.warp(100);
         uint64 activationTs = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
@@ -370,9 +350,9 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that scheduleId is reproducible from (chainId, address, ascending ids, timestamps).
     function test_setTimestamp_scheduleIdReproducible_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(2);
+        protocolVersions.registerUpgrade();
 
         uint64 ts1 = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         uint64 ts2 = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 200;
@@ -452,7 +432,7 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `delayTimestamp` reverts when the upgrade has no scheduled timestamp.
     function test_delayTimestamp_notScheduled_reverts() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
         vm.prank(_owner);
         protocolVersions.setChainTeam(_chainTeam);
 
@@ -532,9 +512,9 @@ contract ProtocolVersions_ChainTeam_Test is ProtocolVersions_TestInit {
     }
 }
 
-/// @title ProtocolVersions_GetView_Test
+/// @title ProtocolVersions_Uncategorized_Test
 /// @notice Test contract for view functions and the upgrade registry.
-contract ProtocolVersions_GetView_Test is ProtocolVersions_TestInit {
+contract ProtocolVersions_Uncategorized_Test is ProtocolVersions_TestInit {
     /// @notice Tests that the registry starts empty.
     function test_registry_startsEmpty_succeeds() external view {
         assertEq(protocolVersions.getSchedule().length, 0);
@@ -548,9 +528,9 @@ contract ProtocolVersions_GetView_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `getSchedule` returns all upgrades in registration order with correct fields.
     function test_getSchedule_returnsFullSchedule_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(1);
+        protocolVersions.registerUpgrade();
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(2);
+        protocolVersions.registerUpgrade();
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         vm.prank(_owner);
