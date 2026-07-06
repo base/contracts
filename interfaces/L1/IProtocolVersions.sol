@@ -2,30 +2,30 @@
 pragma solidity ^0.8.0;
 
 import { ISemver } from "interfaces/universal/ISemver.sol";
+import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
+import { IReinitializableBase } from "interfaces/universal/IReinitializableBase.sol";
 
 /// @title IProtocolVersions
 /// @notice Interface for the ProtocolVersions upgrade schedule contract.
-interface IProtocolVersions is ISemver {
+interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBase {
     struct Upgrade {
-        string name;
+        uint256 id;
         uint64 timestamp;
         bytes32 scheduleId;
     }
 
     error ProtocolVersions_InvalidL2ChainId();
-    error ProtocolVersions_UnknownUpgradeName(string upgradeId);
-    error ProtocolVersions_UpgradeAlreadyRegistered(bytes32 key);
-    error ProtocolVersions_InvalidUpgradeId();
+    error ProtocolVersions_UnknownUpgrade(uint256 id);
     error ProtocolVersions_InvalidProtocolVersion();
-    error ProtocolVersions_ActivationAlreadyPassed(bytes32 key, uint64 activationTimestamp);
-    error ProtocolVersions_ActivationTimestampInPast(uint64 timestamp);
+    error ProtocolVersions_ActivationAlreadyPassed(uint256 id, uint64 activationTimestamp);
     error ProtocolVersions_NotChainTeam();
-    error ProtocolVersions_NotScheduled(bytes32 key);
+    error ProtocolVersions_NotScheduled(uint256 id);
     error ProtocolVersions_DelayMustBeLater(uint64 currentTimestamp, uint64 newTimestamp);
 
-    event UpgradeRegistered(bytes32 indexed key, uint256 indexed index, string upgradeId, uint256 protocolVersion);
-    event TimestampSet(bytes32 indexed key, uint256 timestamp);
-
+    event UpgradeRegistered(uint256 indexed id, uint256 protocolVersion);
+    event LatestProtocolVersionUpdated(uint256 indexed protocolVersion);
+    event TimestampSet(uint256 indexed id, uint256 timestamp);
+    event ScheduleIdUpdated(bytes32 indexed newScheduleId, uint256 indexed blockNumber);
     event ChainTeamUpdated(address indexed previousChainTeam, address indexed newChainTeam);
 
     function MIN_NOTICE() external view returns (uint64);
@@ -34,12 +34,14 @@ interface IProtocolVersions is ISemver {
     function scheduleId() external view returns (bytes32);
     function latestProtocolVersion() external view returns (uint256);
 
-    function getTimestamp(string calldata upgradeId) external view returns (uint256);
-
     function getSchedule() external view returns (Upgrade[] memory);
 
-    function registerUpgrade(string calldata upgradeId, uint256 protocolVersion) external;
-    function setTimestamp(string calldata upgradeId, uint64 timestamp) external;
+    function initialize(uint256 _l2ChainId) external;
+    function registerUpgrade(uint256 protocolVersion) external returns (uint256 id);
+    function setLatestProtocolVersion(uint256 protocolVersion) external;
+    function setTimestamp(uint256 id, uint64 timestamp) external;
     function setChainTeam(address newChainTeam) external;
-    function delayTimestamp(string calldata upgradeId, uint64 newTimestamp) external;
+    function delayTimestamp(uint256 id, uint64 newTimestamp) external;
+
+    function __constructor__() external;
 }
