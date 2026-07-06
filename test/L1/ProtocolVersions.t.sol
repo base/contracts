@@ -319,7 +319,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
 
         vm.warp(1000);
         vm.expectRevert(
-            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_DelayMustBeLater.selector, uint64(0), uint64(500))
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, uint64(500))
         );
         vm.prank(_owner);
         protocolVersions.setTimestamp(CANYON, 500);
@@ -332,7 +332,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() - 1;
         vm.expectRevert(
-            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_DelayMustBeLater.selector, uint64(0), ts)
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, ts)
         );
         vm.prank(_owner);
         protocolVersions.setTimestamp(CANYON, ts);

@@ -21,6 +21,8 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     error ProtocolVersions_NotChainTeam();
     error ProtocolVersions_NotScheduled(uint256 id);
     error ProtocolVersions_DelayMustBeLater(uint64 currentTimestamp, uint64 newTimestamp);
+    error ProtocolVersions_NotInitialized();
+    error ProtocolVersions_InsufficientNotice(uint64 timestamp);
 
     event UpgradeRegistered(uint256 indexed id, uint256 protocolVersion);
     event LatestProtocolVersionUpdated(uint256 indexed protocolVersion);

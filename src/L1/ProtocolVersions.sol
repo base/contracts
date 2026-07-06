@@ -57,6 +57,10 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     error ProtocolVersions_NotScheduled(uint256 id);
     /// @notice Thrown when a new timestamp is not sufficiently later than the current one.
     error ProtocolVersions_DelayMustBeLater(uint64 currentTimestamp, uint64 newTimestamp);
+    /// @notice Thrown when scheduleId is read before initialize has been called.
+    error ProtocolVersions_NotInitialized();
+    /// @notice Thrown when a non-zero timestamp does not provide at least MIN_NOTICE seconds of notice.
+    error ProtocolVersions_InsufficientNotice(uint64 timestamp);
 
     /// @notice Emitted when a new upgrade is registered.
     event UpgradeRegistered(uint256 indexed id, uint256 protocolVersion);
@@ -131,6 +135,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @notice Returns the canonical schedule commitment.
     /// @return The current scheduleId hash.
     function scheduleId() external view returns (bytes32) {
+        if (_seed == 0) revert ProtocolVersions_NotInitialized();
         uint256 n = _upgradeScheduleId.length;
         return n == 0 ? _seed : _upgradeScheduleId[n - 1];
     }
@@ -158,9 +163,10 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
 
         id = _timestamps.length;
         _timestamps.push(0);
-        _upgradeScheduleId.push(bytes32(0));
+        _upgradeScheduleId.push();
         latestProtocolVersion = protocolVersion;
         emit UpgradeRegistered(id, protocolVersion);
+        emit LatestProtocolVersionUpdated(protocolVersion);
         _refreshScheduleId(id);
     }
 
@@ -183,20 +189,11 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @param timestamp  Future Unix timestamp for L2 activation (must be >= block.timestamp + MIN_NOTICE), or 0 to
     /// clear.
     function setTimestamp(uint256 id, uint64 timestamp) external onlyProxyAdminOwner {
-        _assertRegistered(id);
-        uint64 current = _timestamps[id];
-        // Cannot modify a timestamp that has already activated.
-        if (current != 0 && uint64(block.timestamp) >= current) {
-            revert ProtocolVersions_ActivationAlreadyPassed(id, current);
-        }
-        // Non-zero timestamps must be at least MIN_NOTICE seconds in the future.
+        // Non-zero timestamps must provide at least MIN_NOTICE seconds of notice.
         if (timestamp != 0 && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
-            revert ProtocolVersions_DelayMustBeLater(current, timestamp);
+            revert ProtocolVersions_InsufficientNotice(timestamp);
         }
-        if (current == timestamp) return;
-        _timestamps[id] = timestamp;
-        emit TimestampSet(id, timestamp);
-        _refreshScheduleId(id);
+        _setTimestamp(id, timestamp);
     }
 
     /// @notice Appoints, replaces, or clears (set to zero) the chainTeam role. Owner only.
@@ -222,18 +219,28 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
 
         // The upgrade must already have a scheduled activation to delay.
         if (current == 0) revert ProtocolVersions_NotScheduled(id);
-        // Cannot modify an activation that has already passed.
-        if (uint64(block.timestamp) >= current) {
+        // Cannot delay an activation that has already passed.
+        if (uint64(block.timestamp) >= current) revert ProtocolVersions_ActivationAlreadyPassed(id, current);
+        // The role can only push the activation later, never to the same time or earlier.
+        if (newTimestamp <= current) revert ProtocolVersions_DelayMustBeLater(current, newTimestamp);
+        // The new timestamp must also provide at least MIN_NOTICE seconds of notice from now.
+        uint64 minFloor = uint64(block.timestamp) + MIN_NOTICE;
+        if (newTimestamp < minFloor) revert ProtocolVersions_DelayMustBeLater(minFloor, newTimestamp);
+        _setTimestamp(id, newTimestamp);
+    }
+
+    /// @dev Shared write path: validates activation hasn't passed, skips no-ops, then writes newTs,
+    ///      emits TimestampSet, and refreshes the hash chain. Callers handle access control,
+    ///      ordering constraints, and MIN_NOTICE checks before invoking.
+    function _setTimestamp(uint256 id, uint64 newTs) internal {
+        _assertRegistered(id);
+        uint64 current = _timestamps[id];
+        if (current != 0 && uint64(block.timestamp) >= current) {
             revert ProtocolVersions_ActivationAlreadyPassed(id, current);
         }
-        // The role can only push the activation later and must be greater than the MIN_NOTICE buffer, never earlier or
-        // to the same time.
-        if (newTimestamp <= current || newTimestamp < uint64(block.timestamp) + MIN_NOTICE) {
-            revert ProtocolVersions_DelayMustBeLater(current, newTimestamp);
-        }
-
-        _timestamps[id] = newTimestamp;
-        emit TimestampSet(id, newTimestamp);
+        if (current == newTs) return;
+        _timestamps[id] = newTs;
+        emit TimestampSet(id, newTs);
         _refreshScheduleId(id);
     }
 
