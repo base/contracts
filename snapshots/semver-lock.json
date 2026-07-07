@@ -21,7 +21,7 @@
   },
   "src/L1/ProtocolVersions.sol:ProtocolVersions": {
     "initCodeHash": "0x4e5d3a8c5cc76c5a09e3b8f0f24e394c79eb1afedb5695ff7310ad83717636e7",
-    "sourceCodeHash": "0x5d6a495bcd6ca3989aa50054a0d0f37d4ad5f101619b6dfa1d6b669b1ba9ab7c"
+    "sourceCodeHash": "0x6e5f0cd213d3bf954dd7c305be0fa6771dae4744d7220ced042ce351464efaee"
   },
   "src/L1/SuperchainConfig.sol:SuperchainConfig": {
     "initCodeHash": "0x9b1f3555b499709485d51d5d9665002c0eb1e5eb893be1fb978a30749e894858",

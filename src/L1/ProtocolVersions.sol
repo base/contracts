@@ -9,6 +9,7 @@ import { Initializable } from "lib/openzeppelin-contracts/contracts/proxy/utils/
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
 
+/// @custom:proxied true
 /// @title ProtocolVersions
 /// @notice Security Council-controlled upgrade activation schedule contract.
 /// @dev Maintains an ordered registry of upgrades and their L2 activation timestamps.
