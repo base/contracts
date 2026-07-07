@@ -92,13 +92,7 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_l2ChainId",
-        "type": "uint256"
-      }
-    ],
+    "inputs": [],
     "name": "initialize",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -363,11 +357,6 @@
       }
     ],
     "name": "ProtocolVersions_InsufficientNotice",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ProtocolVersions_InvalidL2ChainId",
     "type": "error"
   },
   {

@@ -24,7 +24,6 @@ abstract contract ProtocolVersions_TestInit is Test {
     /// @dev Ascending ids assigned by registration order in these tests.
     uint256 internal constant CANYON = 0;
     uint256 internal constant ECOTONE = 1;
-    uint256 internal constant L2_CHAIN_ID = 8453;
 
     address internal _owner = makeAddr("owner");
     address internal _nonOwner = makeAddr("non-owner");
@@ -37,14 +36,14 @@ abstract contract ProtocolVersions_TestInit is Test {
         // proxyAdminOwner() resolves by calling owner() on the ProxyAdmin stored in the proxy slot.
         vm.mockCall(_proxyAdmin, abi.encodeWithSignature("owner()"), abi.encode(_owner));
         _impl = new ProtocolVersions();
-        protocolVersions = ProtocolVersions(_deployInitializedProxy(L2_CHAIN_ID));
+        protocolVersions = ProtocolVersions(_deployInitializedProxy());
     }
 
     /// @dev Deploys a proxy (admin = _proxyAdmin) over the shared impl and initializes it via the proxy.
-    function _deployInitializedProxy(uint256 _l2ChainId) internal returns (address proxy_) {
+    function _deployInitializedProxy() internal returns (address proxy_) {
         Proxy proxy = new Proxy(_proxyAdmin);
         vm.prank(_proxyAdmin);
-        proxy.upgradeToAndCall(address(_impl), abi.encodeCall(IProtocolVersions.initialize, (_l2ChainId)));
+        proxy.upgradeToAndCall(address(_impl), abi.encodeCall(IProtocolVersions.initialize, ()));
         proxy_ = address(proxy);
     }
 
@@ -69,24 +68,11 @@ abstract contract ProtocolVersions_TestInit is Test {
 /// @title ProtocolVersions_Initialize_Test
 /// @notice Test contract for the ProtocolVersions initializer.
 contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
-    /// @notice Tests that initialization sets the correct initial state.
+    /// @notice Tests that initialization sets the correct initial state. The seed is bytes32(0), so
+    ///         the initial scheduleId is bytes32(0) until the first upgrade is registered.
     function test_initialize_setsInitialState_succeeds() external view {
         assertEq(protocolVersions.proxyAdminOwner(), _owner);
-        assertNotEq(protocolVersions.scheduleId(), bytes32(0));
-    }
-
-    /// @notice Tests that the scheduleId seed binds to the proxy address, not the implementation.
-    function test_initialize_seedBindsToProxyAddress_succeeds() external view {
-        bytes32 expectedSeed = keccak256(abi.encode(L2_CHAIN_ID, address(protocolVersions)));
-        assertEq(protocolVersions.scheduleId(), expectedSeed);
-    }
-
-    /// @notice Tests that initializing with a zero chain ID reverts.
-    function test_initialize_zeroChainId_reverts() external {
-        ProtocolVersions uninitialized = _deployUninitializedProxy();
-        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidL2ChainId.selector);
-        vm.prank(_proxyAdmin);
-        uninitialized.initialize(0);
+        assertEq(protocolVersions.scheduleId(), bytes32(0));
     }
 
     /// @notice Tests that only the ProxyAdmin or its owner can initialize.
@@ -94,21 +80,21 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         ProtocolVersions uninitialized = _deployUninitializedProxy();
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
         vm.prank(_nonOwner);
-        uninitialized.initialize(L2_CHAIN_ID);
+        uninitialized.initialize();
     }
 
     /// @notice Tests that the contract cannot be initialized twice.
     function test_initialize_alreadyInitialized_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
         vm.prank(_proxyAdmin);
-        protocolVersions.initialize(L2_CHAIN_ID);
+        protocolVersions.initialize();
     }
 
     /// @notice Tests that the implementation itself cannot be initialized (initializers disabled).
     function test_initialize_implementationDisabled_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
         vm.prank(_proxyAdmin);
-        _impl.initialize(L2_CHAIN_ID);
+        _impl.initialize();
     }
 }
 
@@ -347,7 +333,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         protocolVersions.setTimestamp(0, ts);
     }
 
-    /// @notice Tests that scheduleId is reproducible from (chainId, address, ascending ids, timestamps).
+    /// @notice Tests that scheduleId is reproducible from (ascending ids, timestamps).
     function test_setTimestamp_scheduleIdReproducible_succeeds() external {
         vm.prank(_owner);
         protocolVersions.registerUpgrade();
@@ -361,8 +347,8 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         vm.prank(_owner);
         protocolVersions.setTimestamp(ECOTONE, ts2);
 
-        // Reproduce the chain from scratch.
-        bytes32 seed = keccak256(abi.encode(uint256(8453), address(protocolVersions)));
+        // Reproduce the chain from scratch, starting from the bytes32(0) seed.
+        bytes32 seed = bytes32(0);
         bytes32 link0 = keccak256(abi.encode(seed, uint256(0), ts1));
         bytes32 link1 = keccak256(abi.encode(link0, uint256(1), ts2));
 

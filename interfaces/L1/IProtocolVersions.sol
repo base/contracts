@@ -14,7 +14,6 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
         bytes32 scheduleId;
     }
 
-    error ProtocolVersions_InvalidL2ChainId();
     error ProtocolVersions_UnknownUpgrade(uint256 id);
     error ProtocolVersions_InvalidProtocolVersion();
     error ProtocolVersions_ActivationAlreadyPassed(uint256 id, uint64 activationTimestamp);
@@ -39,7 +38,7 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
 
     function getSchedule() external view returns (Upgrade[] memory schedule_);
 
-    function initialize(uint256 _l2ChainId) external;
+    function initialize() external;
     function registerUpgrade() external returns (uint256 id);
     function setMinimumProtocolVersion(uint256 protocolVersion) external;
     function setTimestamp(uint256 id, uint64 timestamp) external;

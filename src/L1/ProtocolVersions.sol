@@ -19,23 +19,24 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 ///      append-only (upgrades are never removed or reordered), an `id` permanently refers to the
 ///      same upgrade.
 ///
-///      The canonical schedule commitment (`scheduleId`) is the tail of a per-upgrade hash chain:
+///      The canonical schedule commitment (`scheduleId`) is the tail of a hash chain that is
+///      seeded at index 0 and extended by one link per registered upgrade:
 ///
-///        seed                 = keccak256(abi.encode(l2ChainId, address(this)))
-///        upgradeScheduleId[0] = keccak256(abi.encode(seed,                 0, timestamp_0))
-///        upgradeScheduleId[i] = keccak256(abi.encode(upgradeScheduleId[i-1], i, timestamp_i))
-///        scheduleId           = upgradeScheduleId[n-1]  (or seed when n == 0)
+///        _upgradeScheduleId[0]   = bytes32(0)                                              (seed)
+///        _upgradeScheduleId[i+1] = keccak256(abi.encode(_upgradeScheduleId[i], i, timestamp_i))
+///        scheduleId              = _upgradeScheduleId[last]
 ///
-///      where timestamp_i is the upgrade's current activation timestamp (0 = not yet scheduled).
+///      where timestamp_i is upgrade i's current activation timestamp (0 = not yet scheduled).
 ///      Changing any upgrade's timestamp recomputes its link and all subsequent links, making
-///      scheduleId fully reproducible from (l2ChainId, address, upgrade count, current timestamps).
-///      Proof journals bind to `scheduleId`, pinning every proof in a dispute game to the schedule
-///      that was in effect at the game's L1 origin block.
+///      scheduleId fully reproducible from (upgrade count, current timestamps). Keeping the seed as
+///      the array's first element lets both `scheduleId` and the refresh loop avoid an
+///      empty-registry special case. Proof journals bind to `scheduleId`, pinning every proof in a
+///      dispute game to the schedule in effect at the game's L1 origin block; cross-chain domain
+///      separation is provided by the journal itself, which commits the L2 chain id and registry
+///      address alongside `scheduleId`.
 ///
 ///      The contract is deployed behind an OP proxy: the implementation constructor disables
-///      initializers, and `initialize` (run through the proxy) computes and stores `_seed` from the
-///      proxy's own `address(this)`, so the schedule commitment is bound to the proxy address that
-///      callers and off-chain consumers treat as the registry.
+///      initializers, and `initialize` (run through the proxy) seeds the hash chain.
 contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, ReinitializableBase, ISemver {
     /// @notice A registered upgrade's id, current activation timestamp, and cumulative schedule hash.
     struct Upgrade {
@@ -44,8 +45,6 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         bytes32 scheduleId;
     }
 
-    /// @notice Thrown when the L2 chain ID is zero.
-    error ProtocolVersions_InvalidL2ChainId();
     /// @notice Thrown when an upgrade id is not registered.
     error ProtocolVersions_UnknownUpgrade(uint256 id);
     /// @notice Thrown when a protocol version is zero.
@@ -81,19 +80,15 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @notice Minimum notice period required when scheduling or modifying an activation timestamp.
     uint64 public constant MIN_NOTICE = 1 hours;
 
-    /// @notice Hash chain seed: keccak256(abi.encode(l2ChainId, address(this))). Set once in
-    ///         `initialize` (run through the proxy, so `address(this)` is the proxy address) and
-    ///         cached in storage to avoid recomputing on every _refreshScheduleId call.
-    bytes32 internal _seed;
-
     /// @notice Activation timestamp for each registered upgrade, indexed by upgrade id (0 = not scheduled).
     ///         An upgrade id is registered iff it is a valid index into this array.
     uint64[] internal _timestamps;
 
-    /// @notice Cumulative schedule hash up to and including each registered upgrade, indexed by upgrade id.
-    ///         _upgradeScheduleId[i] = keccak256(abi.encode(_upgradeScheduleId[i-1], i, _timestamps[i])).
-    ///         Stored per-upgrade so that changing upgrade j's timestamp requires recomputing only
-    ///         j..n-1 links rather than the entire chain.
+    /// @notice Hash chain links. Element 0 is the seed (`bytes32(0)`), pushed in `initialize`;
+    ///         element `i + 1` is the cumulative hash through upgrade `i`:
+    ///         _upgradeScheduleId[i + 1] = keccak256(abi.encode(_upgradeScheduleId[i], i, _timestamps[i])).
+    ///         Stored per-link so that changing upgrade j's timestamp recomputes only j..n-1 links
+    ///         rather than the entire chain. Non-empty iff the contract has been initialized.
     bytes32[] internal _upgradeScheduleId;
 
     /// @notice The minimum protocol version clients must run. Settable by the owner via
@@ -113,18 +108,18 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         _disableInitializers();
     }
 
-    /// @notice Initializes the registry, computing the hash chain seed from the proxy context and
-    ///         emitting the initial scheduleId. Callable only by the ProxyAdmin or its owner.
-    /// @param _l2ChainId L2 chain ID whose schedule is being committed.
-    function initialize(uint256 _l2ChainId) external reinitializer(initVersion()) {
+    /// @notice Initializes the registry by seeding the hash chain. Callable only by the ProxyAdmin
+    ///         or its owner.
+    function initialize() external reinitializer(initVersion()) {
         // Initialization transactions must come from the ProxyAdmin or its owner.
         _assertOnlyProxyAdminOrProxyAdminOwner();
-        if (_l2ChainId == 0) revert ProtocolVersions_InvalidL2ChainId();
 
-        // address(this) is the proxy address, so the seed binds the schedule to the proxy registry.
-        _seed = keccak256(abi.encode(_l2ChainId, address(this)));
+        // Seed the hash chain at index 0. Keeping the seed as the first array element lets
+        // `scheduleId` and `_refreshScheduleId` avoid an empty-registry special case, and makes a
+        // non-empty array double as the "initialized" flag.
+        _upgradeScheduleId.push(bytes32(0));
 
-        emit ScheduleIdUpdated(_seed, block.number);
+        emit ScheduleIdUpdated(bytes32(0), block.number);
     }
 
     /// @notice Restricts a call to the ProxyAdmin owner.
@@ -136,9 +131,9 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @notice Returns the canonical schedule commitment.
     /// @return The current scheduleId hash.
     function scheduleId() external view returns (bytes32) {
-        if (_seed == 0) revert ProtocolVersions_NotInitialized();
         uint256 n = _upgradeScheduleId.length;
-        return n == 0 ? _seed : _upgradeScheduleId[n - 1];
+        if (n == 0) revert ProtocolVersions_NotInitialized();
+        return _upgradeScheduleId[n - 1];
     }
 
     /// @notice Returns the full ordered schedule: every registered upgrade with its current
@@ -150,7 +145,8 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         uint256 n = _timestamps.length;
         schedule_ = new Upgrade[](n);
         for (uint256 i = 0; i < n; i++) {
-            schedule_[i] = Upgrade({ id: i, timestamp: _timestamps[i], scheduleId: _upgradeScheduleId[i] });
+            // Upgrade i's cumulative hash lives at index i + 1 (index 0 is the seed).
+            schedule_[i] = Upgrade({ id: i, timestamp: _timestamps[i], scheduleId: _upgradeScheduleId[i + 1] });
         }
     }
 
@@ -159,9 +155,10 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     ///      chain with the new (id, timestamp=0) link.
     /// @return id The ascending id assigned to the newly registered upgrade.
     function registerUpgrade() external onlyProxyAdminOwner returns (uint256 id) {
-        if (_seed == 0) revert ProtocolVersions_NotInitialized();
+        if (_upgradeScheduleId.length == 0) revert ProtocolVersions_NotInitialized();
         id = _timestamps.length;
         _timestamps.push(0);
+        // Reserve the link slot for this upgrade at index id + 1; _refreshScheduleId fills it.
         _upgradeScheduleId.push();
         emit UpgradeRegistered(id);
         _refreshScheduleId(id);
@@ -246,12 +243,12 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     function _refreshScheduleId(uint256 startIndex) internal {
         uint256 n = _timestamps.length;
 
-        // Initialise prev to the hash of the preceding link (or seed), then recompute from
-        // startIndex onward, storing each link.
-        bytes32 prev = startIndex == 0 ? _seed : _upgradeScheduleId[startIndex - 1];
+        // _upgradeScheduleId[startIndex] is the link preceding upgrade `startIndex` (the seed when
+        // startIndex == 0). Recompute from startIndex onward, storing each link at index i + 1.
+        bytes32 prev = _upgradeScheduleId[startIndex];
         for (uint256 i = startIndex; i < n; i++) {
             prev = keccak256(abi.encode(prev, i, _timestamps[i]));
-            _upgradeScheduleId[i] = prev;
+            _upgradeScheduleId[i + 1] = prev;
         }
 
         emit ScheduleIdUpdated(prev, block.number);

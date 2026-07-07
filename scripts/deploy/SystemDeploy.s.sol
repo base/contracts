@@ -629,7 +629,7 @@ contract SystemDeploy is Script {
             _output.opChainProxyAdmin,
             address(_output.protocolVersionsProxy),
             _impls.protocolVersionsImpl,
-            abi.encodeCall(IProtocolVersions.initialize, (_input.l2ChainId))
+            abi.encodeCall(IProtocolVersions.initialize, ())
         );
     }
 
