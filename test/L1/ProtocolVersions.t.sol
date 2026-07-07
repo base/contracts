@@ -59,7 +59,7 @@ abstract contract ProtocolVersions_TestInit is Test {
     /// @dev Registers the first upgrade (id CANYON) and schedules it for block.timestamp + MIN_NOTICE + delay.
     function _scheduleCanyon(uint64 _delay) internal returns (uint64 ts_) {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
         ts_ = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + _delay;
         vm.prank(_owner);
         protocolVersions.setTimestamp(CANYON, ts_);
@@ -127,7 +127,7 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
 
         vm.roll(block.number + 1);
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
 
         assertNotEq(protocolVersions.scheduleId(), idBefore);
     }
@@ -135,11 +135,11 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `registerUpgrade` assigns ascending ids and returns them.
     function test_registerUpgrade_returnsAscendingIds_succeeds() external {
         vm.prank(_owner);
-        assertEq(protocolVersions.registerUpgrade(), 0);
+        assertEq(protocolVersions.registerUpgrade(0, 0), 0);
         vm.prank(_owner);
-        assertEq(protocolVersions.registerUpgrade(), 1);
+        assertEq(protocolVersions.registerUpgrade(0, 0), 1);
         vm.prank(_owner);
-        assertEq(protocolVersions.registerUpgrade(), 2);
+        assertEq(protocolVersions.registerUpgrade(0, 0), 2);
     }
 
     /// @notice Tests that `registerUpgrade` emits the `UpgradeRegistered` event with the assigned id.
@@ -147,19 +147,64 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         vm.expectEmit(true, false, false, false, address(protocolVersions));
         emit UpgradeRegistered(0);
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
 
         vm.expectEmit(true, false, false, false, address(protocolVersions));
         emit UpgradeRegistered(1);
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
     }
 
     /// @notice Tests that only the owner can call `registerUpgrade`.
     function test_registerUpgrade_callerNotOwner_reverts() external {
         vm.expectRevert(ProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
         vm.prank(_nonOwner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
+    }
+
+    /// @notice Tests that registering with a future timestamp schedules the upgrade in one call.
+    function test_registerUpgrade_withTimestamp_succeeds() external {
+        uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+
+        vm.expectEmit(true, false, false, false, address(protocolVersions));
+        emit UpgradeRegistered(CANYON);
+        vm.expectEmit(true, false, false, true, address(protocolVersions));
+        emit TimestampSet(CANYON, ts);
+        vm.prank(_owner);
+        uint256 id = protocolVersions.registerUpgrade(ts, 0);
+
+        assertEq(id, CANYON);
+        assertEq(protocolVersions.getSchedule()[CANYON], ts);
+        assertNotEq(protocolVersions.scheduleId(), bytes32(0));
+    }
+
+    /// @notice Tests that registering with a timestamp inside the notice window reverts.
+    function test_registerUpgrade_insufficientNotice_reverts() external {
+        uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() - 1;
+        vm.expectRevert(abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, ts));
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(ts, 0);
+    }
+
+    /// @notice Tests that a non-zero minProtocolVersion bumps the minimum during registration.
+    function test_registerUpgrade_setsMinProtocolVersion_succeeds() external {
+        vm.expectEmit(true, false, false, false, address(protocolVersions));
+        emit MinimumProtocolVersionUpdated(42);
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(0, 42);
+
+        assertEq(protocolVersions.minimumProtocolVersion(), 42);
+    }
+
+    /// @notice Tests that a zero minProtocolVersion leaves the current minimum unchanged.
+    function test_registerUpgrade_zeroMinProtocolVersion_leavesUnchanged_succeeds() external {
+        vm.prank(_owner);
+        protocolVersions.setMinimumProtocolVersion(7);
+
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
+
+        assertEq(protocolVersions.minimumProtocolVersion(), 7);
     }
 }
 
@@ -211,7 +256,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     function test_setTimestamp_updatesTimestampAndScheduleId_succeeds() external {
         bytes32 initialScheduleId = protocolVersions.scheduleId();
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
 
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
@@ -219,14 +264,14 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         vm.prank(_owner);
         protocolVersions.setTimestamp(CANYON, ts);
 
-        assertEq(protocolVersions.getSchedule()[CANYON].timestamp, ts);
+        assertEq(protocolVersions.getSchedule()[CANYON], ts);
         assertNotEq(protocolVersions.scheduleId(), initialScheduleId);
     }
 
     /// @notice Tests that calling `setTimestamp` with the same value is a no-op for scheduleId.
     function test_setTimestamp_sameTimestamp_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
 
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
@@ -240,7 +285,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         vm.prank(_owner);
         protocolVersions.setTimestamp(CANYON, ts);
 
-        assertEq(protocolVersions.getSchedule()[CANYON].timestamp, ts);
+        assertEq(protocolVersions.getSchedule()[CANYON], ts);
         assertEq(protocolVersions.scheduleId(), scheduleIdAfterSet);
     }
 
@@ -248,7 +293,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     ///         restores it to the value it held immediately after registration (ts=0 link).
     function test_setTimestamp_clearTimestamp_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
         bytes32 scheduleIdAfterRegister = protocolVersions.scheduleId();
 
         vm.roll(block.number + 1);
@@ -264,14 +309,14 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         vm.prank(_owner);
         protocolVersions.setTimestamp(CANYON, 0);
 
-        assertEq(protocolVersions.getSchedule()[CANYON].timestamp, 0);
+        assertEq(protocolVersions.getSchedule()[CANYON], 0);
         assertEq(protocolVersions.scheduleId(), scheduleIdAfterRegister);
     }
 
     /// @notice Tests that `setTimestamp` emits a `TimestampSet` event.
     function test_setTimestamp_emitsEvent_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         vm.expectEmit(true, false, false, true, address(protocolVersions));
@@ -283,7 +328,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that only the owner can call `setTimestamp`.
     function test_setTimestamp_callerNotOwner_reverts() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         vm.expectRevert(ProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
@@ -294,7 +339,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `setTimestamp` reverts when the timestamp is in the past.
     function test_setTimestamp_timestampInPast_reverts() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
 
         vm.warp(1000);
         vm.expectRevert(
@@ -307,7 +352,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `setTimestamp` reverts when the timestamp is within MIN_NOTICE of now.
     function test_setTimestamp_insufficientNotice_reverts() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() - 1;
         vm.expectRevert(abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, ts));
@@ -318,7 +363,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `setTimestamp` reverts when the upgrade has already activated.
     function test_setTimestamp_afterActivation_reverts() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
 
         vm.warp(100);
         uint64 activationTs = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
@@ -347,9 +392,9 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that scheduleId is reproducible from (ascending ids, timestamps).
     function test_setTimestamp_scheduleIdReproducible_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
 
         uint64 ts1 = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         uint64 ts2 = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 200;
@@ -383,7 +428,7 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
         vm.prank(_chainTeam);
         protocolVersions.delayTimestamp(CANYON, later);
 
-        assertEq(protocolVersions.getSchedule()[CANYON].timestamp, later);
+        assertEq(protocolVersions.getSchedule()[CANYON], later);
         assertNotEq(protocolVersions.scheduleId(), scheduleIdBefore);
     }
 
@@ -429,7 +474,7 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `delayTimestamp` reverts when the upgrade has no scheduled timestamp.
     function test_delayTimestamp_notScheduled_reverts() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
         vm.prank(_owner);
         protocolVersions.setChainTeam(_chainTeam);
 
@@ -512,11 +557,6 @@ contract ProtocolVersions_ChainTeam_Test is ProtocolVersions_TestInit {
 /// @title ProtocolVersions_Uncategorized_Test
 /// @notice Test contract for view functions and the upgrade registry.
 contract ProtocolVersions_Uncategorized_Test is ProtocolVersions_TestInit {
-    /// @notice Tests that the registry starts empty.
-    function test_registry_startsEmpty_succeeds() external view {
-        assertEq(protocolVersions.getSchedule().length, 0);
-    }
-
     /// @notice Tests that `getSchedule` returns an empty array when no upgrades are registered.
     function test_getSchedule_empty_succeeds() external view {
         assertEq(protocolVersions.getSchedule().length, 0);
@@ -525,39 +565,30 @@ contract ProtocolVersions_Uncategorized_Test is ProtocolVersions_TestInit {
     /// @notice Tests that `getSchedule` returns all upgrades in registration order with correct fields.
     function test_getSchedule_returnsFullSchedule_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         vm.prank(_owner);
         protocolVersions.setTimestamp(CANYON, ts);
 
-        ProtocolVersions.Upgrade[] memory s = protocolVersions.getSchedule();
+        uint64[] memory s = protocolVersions.getSchedule();
 
         assertEq(s.length, 2);
-
-        assertEq(s[0].id, CANYON);
-        assertEq(s[0].timestamp, ts);
-
-        assertEq(s[1].id, ECOTONE);
-        assertEq(s[1].timestamp, 0);
-
-        // The last entry's scheduleId is the contract's current scheduleId.
-        assertEq(s[1].scheduleId, protocolVersions.scheduleId());
+        assertEq(s[CANYON], ts);
+        assertEq(s[ECOTONE], 0);
     }
 
-    /// @notice Tests that `scheduleId(id)` returns each upgrade's cumulative commitment, matching
-    ///         `getSchedule`, and that the last upgrade's commitment equals the current scheduleId.
+    /// @notice Tests that `scheduleId(id)` returns each upgrade's cumulative commitment, and that
+    ///         the last upgrade's commitment equals the current scheduleId.
     function test_scheduleId_byId_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
         vm.prank(_owner);
-        protocolVersions.registerUpgrade();
+        protocolVersions.registerUpgrade(0, 0);
 
-        ProtocolVersions.Upgrade[] memory s = protocolVersions.getSchedule();
-        assertEq(protocolVersions.scheduleId(CANYON), s[CANYON].scheduleId);
-        assertEq(protocolVersions.scheduleId(ECOTONE), s[ECOTONE].scheduleId);
+        assertNotEq(protocolVersions.scheduleId(CANYON), protocolVersions.scheduleId(ECOTONE));
         assertEq(protocolVersions.scheduleId(ECOTONE), protocolVersions.scheduleId());
     }
 

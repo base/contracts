@@ -8,12 +8,6 @@ import { IReinitializableBase } from "interfaces/universal/IReinitializableBase.
 /// @title IProtocolVersions
 /// @notice Interface for the ProtocolVersions upgrade schedule contract.
 interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBase {
-    struct Upgrade {
-        uint256 id;
-        uint64 timestamp;
-        bytes32 scheduleId;
-    }
-
     error ProtocolVersions_UnknownUpgrade(uint256 id);
     error ProtocolVersions_InvalidProtocolVersion();
     error ProtocolVersions_ActivationAlreadyPassed(uint256 id, uint64 activationTimestamp);
@@ -26,7 +20,7 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     event UpgradeRegistered(uint256 indexed id);
     event MinimumProtocolVersionUpdated(uint256 indexed protocolVersion);
     event TimestampSet(uint256 indexed id, uint256 timestamp);
-    event ScheduleIdUpdated(bytes32 indexed newScheduleId, uint256 indexed blockNumber);
+    event ScheduleIdUpdated(bytes32 indexed newScheduleId);
     event ChainTeamUpdated(address indexed previousChainTeam, address indexed newChainTeam);
     event Initialized(uint8 version);
 
@@ -37,10 +31,10 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     function scheduleId(uint256 id) external view returns (bytes32);
     function minimumProtocolVersion() external view returns (uint256);
 
-    function getSchedule() external view returns (Upgrade[] memory);
+    function getSchedule() external view returns (uint64[] memory);
 
     function initialize(address _chainTeam) external;
-    function registerUpgrade() external returns (uint256);
+    function registerUpgrade(uint64 timestamp, uint256 minProtocolVersion) external returns (uint256);
     function setMinimumProtocolVersion(uint256 protocolVersion) external;
     function setTimestamp(uint256 id, uint64 timestamp) external;
     function setChainTeam(address newChainTeam) external;

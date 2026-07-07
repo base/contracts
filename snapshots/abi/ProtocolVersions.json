@@ -53,26 +53,9 @@
     "name": "getSchedule",
     "outputs": [
       {
-        "components": [
-          {
-            "internalType": "uint256",
-            "name": "id",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint64",
-            "name": "timestamp",
-            "type": "uint64"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "scheduleId",
-            "type": "bytes32"
-          }
-        ],
-        "internalType": "struct ProtocolVersions.Upgrade[]",
+        "internalType": "uint64[]",
         "name": "",
-        "type": "tuple[]"
+        "type": "uint64[]"
       }
     ],
     "stateMutability": "view",
@@ -144,7 +127,18 @@
     "type": "function"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "timestamp",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint256",
+        "name": "minProtocolVersion",
+        "type": "uint256"
+      }
+    ],
     "name": "registerUpgrade",
     "outputs": [
       {
@@ -298,12 +292,6 @@
         "internalType": "bytes32",
         "name": "newScheduleId",
         "type": "bytes32"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "blockNumber",
-        "type": "uint256"
       }
     ],
     "name": "ScheduleIdUpdated",
