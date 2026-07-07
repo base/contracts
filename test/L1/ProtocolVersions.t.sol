@@ -36,14 +36,15 @@ abstract contract ProtocolVersions_TestInit is Test {
         // proxyAdminOwner() resolves by calling owner() on the ProxyAdmin stored in the proxy slot.
         vm.mockCall(_proxyAdmin, abi.encodeWithSignature("owner()"), abi.encode(_owner));
         _impl = new ProtocolVersions();
-        protocolVersions = ProtocolVersions(_deployInitializedProxy());
+        protocolVersions = ProtocolVersions(_deployInitializedProxy(address(0)));
     }
 
-    /// @dev Deploys a proxy (admin = _proxyAdmin) over the shared impl and initializes it via the proxy.
-    function _deployInitializedProxy() internal returns (address proxy_) {
+    /// @dev Deploys a proxy (admin = _proxyAdmin) over the shared impl and initializes it via the
+    ///      proxy, appointing `_team` as the chainTeam.
+    function _deployInitializedProxy(address _team) internal returns (address proxy_) {
         Proxy proxy = new Proxy(_proxyAdmin);
         vm.prank(_proxyAdmin);
-        proxy.upgradeToAndCall(address(_impl), abi.encodeCall(IProtocolVersions.initialize, ()));
+        proxy.upgradeToAndCall(address(_impl), abi.encodeCall(IProtocolVersions.initialize, (_team)));
         proxy_ = address(proxy);
     }
 
@@ -75,26 +76,36 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         assertEq(protocolVersions.scheduleId(), bytes32(0));
     }
 
+    /// @notice Tests that initialization appoints the provided chainTeam and emits the event.
+    function test_initialize_setsChainTeam_succeeds() external {
+        ProtocolVersions uninitialized = _deployUninitializedProxy();
+        vm.expectEmit(true, true, false, false, address(uninitialized));
+        emit ChainTeamUpdated(address(0), _chainTeam);
+        vm.prank(_proxyAdmin);
+        uninitialized.initialize(_chainTeam);
+        assertEq(uninitialized.chainTeam(), _chainTeam);
+    }
+
     /// @notice Tests that only the ProxyAdmin or its owner can initialize.
     function test_initialize_notProxyAdminOrOwner_reverts() external {
         ProtocolVersions uninitialized = _deployUninitializedProxy();
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
         vm.prank(_nonOwner);
-        uninitialized.initialize();
+        uninitialized.initialize(_chainTeam);
     }
 
     /// @notice Tests that the contract cannot be initialized twice.
     function test_initialize_alreadyInitialized_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
         vm.prank(_proxyAdmin);
-        protocolVersions.initialize();
+        protocolVersions.initialize(address(0));
     }
 
     /// @notice Tests that the implementation itself cannot be initialized (initializers disabled).
     function test_initialize_implementationDisabled_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
         vm.prank(_proxyAdmin);
-        _impl.initialize();
+        _impl.initialize(address(0));
     }
 }
 
@@ -534,5 +545,25 @@ contract ProtocolVersions_Uncategorized_Test is ProtocolVersions_TestInit {
 
         // The last entry's scheduleId is the contract's current scheduleId.
         assertEq(s[1].scheduleId, protocolVersions.scheduleId());
+    }
+
+    /// @notice Tests that `scheduleId(id)` returns each upgrade's cumulative commitment, matching
+    ///         `getSchedule`, and that the last upgrade's commitment equals the current scheduleId.
+    function test_scheduleId_byId_succeeds() external {
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade();
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade();
+
+        ProtocolVersions.Upgrade[] memory s = protocolVersions.getSchedule();
+        assertEq(protocolVersions.scheduleId(CANYON), s[CANYON].scheduleId);
+        assertEq(protocolVersions.scheduleId(ECOTONE), s[ECOTONE].scheduleId);
+        assertEq(protocolVersions.scheduleId(ECOTONE), protocolVersions.scheduleId());
+    }
+
+    /// @notice Tests that `scheduleId(id)` reverts for an unregistered upgrade.
+    function test_scheduleId_byId_unregistered_reverts() external {
+        vm.expectRevert(abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_UnknownUpgrade.selector, uint256(0)));
+        protocolVersions.scheduleId(0);
     }
 }

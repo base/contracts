@@ -34,12 +34,13 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
 
     function chainTeam() external view returns (address);
     function scheduleId() external view returns (bytes32);
+    function scheduleId(uint256 id) external view returns (bytes32);
     function minimumProtocolVersion() external view returns (uint256);
 
-    function getSchedule() external view returns (Upgrade[] memory schedule_);
+    function getSchedule() external view returns (Upgrade[] memory);
 
-    function initialize() external;
-    function registerUpgrade() external returns (uint256 id);
+    function initialize(address _chainTeam) external;
+    function registerUpgrade() external returns (uint256);
     function setMinimumProtocolVersion(uint256 protocolVersion) external;
     function setTimestamp(uint256 id, uint64 timestamp) external;
     function setChainTeam(address newChainTeam) external;

@@ -214,7 +214,7 @@ contract Initializer_Test is CommonTest {
         // ProtocolVersions is deployed by the standard deployment script but is absent on older
         // forked chains, so only track it when the proxy is present.
         if (address(protocolVersions) != address(0)) {
-            initCalldata = abi.encodeCall(protocolVersions.initialize, ());
+            initCalldata = abi.encodeCall(protocolVersions.initialize, (address(0)));
             contracts.push(
                 InitializeableContract({
                     name: "ProtocolVersionsImpl",

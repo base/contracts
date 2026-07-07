@@ -14,7 +14,7 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 /// @notice Security Council-controlled upgrade activation schedule contract.
 /// @dev Maintains an ordered registry of upgrades and their L2 activation timestamps.
 ///      Each upgrade is identified by an ascending numeric `id` equal to its registration
-///      index (0, 1, 2, ...). Human-readable names are intentionally kept off-chain: a client
+///      index (0, 1, 2, ...). Human-readable names are intentionally kept offchain: a client
 ///      maps `id` => name via its own static configuration. Because the registry is strictly
 ///      append-only (upgrades are never removed or reordered), an `id` permanently refers to the
 ///      same upgrade.
@@ -73,10 +73,6 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @notice Emitted when the chainTeam role changes.
     event ChainTeamUpdated(address indexed previousChainTeam, address indexed newChainTeam);
 
-    /// @notice Semantic version.
-    /// @custom:semver 1.0.0
-    string public constant version = "1.0.0";
-
     /// @notice Minimum notice period required when scheduling or modifying an activation timestamp.
     uint64 public constant MIN_NOTICE = 1 hours;
 
@@ -92,7 +88,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     bytes32[] internal _upgradeScheduleId;
 
     /// @notice The minimum protocol version clients must run. Settable by the owner via
-    ///         `setMinimumProtocolVersion`. Informational only — read off-chain by clients;
+    ///         `setMinimumProtocolVersion`. Informational only — read offchain by clients;
     ///         not part of the scheduleId commitment.
     uint256 public minimumProtocolVersion;
 
@@ -103,14 +99,21 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     ///      earlier, or schedule a brand-new activation. Unset (zero) by default.
     address public chainTeam;
 
+    /// @notice Semantic version.
+    /// @custom:semver 1.0.0
+    function version() public pure virtual returns (string memory) {
+        return "1.0.0";
+    }
+
     /// @notice Disables initializers on the implementation so it can only be used behind a proxy.
     constructor() ReinitializableBase(1) {
         _disableInitializers();
     }
 
-    /// @notice Initializes the registry by seeding the hash chain. Callable only by the ProxyAdmin
-    ///         or its owner.
-    function initialize() external reinitializer(initVersion()) {
+    /// @notice Initializes the registry by seeding the hash chain and appointing the initial
+    ///         chainTeam. Callable only by the ProxyAdmin or its owner.
+    /// @param _chainTeam Initial chainTeam allowed to delay activations, or address(0) to leave unset.
+    function initialize(address _chainTeam) external reinitializer(initVersion()) {
         // Initialization transactions must come from the ProxyAdmin or its owner.
         _assertOnlyProxyAdminOrProxyAdminOwner();
 
@@ -118,8 +121,10 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         // `scheduleId` and `_refreshScheduleId` avoid an empty-registry special case, and makes a
         // non-empty array double as the "initialized" flag.
         _upgradeScheduleId.push(bytes32(0));
-
         emit ScheduleIdUpdated(bytes32(0), block.number);
+
+        chainTeam = _chainTeam;
+        emit ChainTeamUpdated(address(0), _chainTeam);
     }
 
     /// @notice Restricts a call to the ProxyAdmin owner.
@@ -136,36 +141,47 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         return _upgradeScheduleId[n - 1];
     }
 
+    /// @notice Returns the schedule commitment as of a specific registered upgrade.
+    /// @param id The upgrade id to query.
+    /// @return The scheduleId hash committing to upgrades 0 through `id`.
+    function scheduleId(uint256 id) external view returns (bytes32) {
+        _assertRegistered(id);
+        // Upgrade `id`'s cumulative hash lives at index id + 1 (index 0 is the seed).
+        return _upgradeScheduleId[id + 1];
+    }
+
     /// @notice Returns the full ordered schedule: every registered upgrade with its current
     ///         activation timestamp and cumulative schedule hash. The array index equals the
-    ///         upgrade `id`; names are resolved off-chain.
+    ///         upgrade `id`; names are resolved offchain.
     /// @dev Calling via eth_call is gas-free; no transaction is submitted.
-    /// @return schedule_ Ordered array of Upgrade structs, one per registered upgrade.
-    function getSchedule() external view returns (Upgrade[] memory schedule_) {
+    /// @return Ordered array of Upgrade structs, one per registered upgrade.
+    function getSchedule() external view returns (Upgrade[] memory) {
         uint256 n = _timestamps.length;
-        schedule_ = new Upgrade[](n);
+        Upgrade[] memory schedule = new Upgrade[](n);
         for (uint256 i = 0; i < n; i++) {
             // Upgrade i's cumulative hash lives at index i + 1 (index 0 is the seed).
-            schedule_[i] = Upgrade({ id: i, timestamp: _timestamps[i], scheduleId: _upgradeScheduleId[i + 1] });
+            schedule[i] = Upgrade({ id: i, timestamp: _timestamps[i], scheduleId: _upgradeScheduleId[i + 1] });
         }
+        return schedule;
     }
 
     /// @notice Registers a new upgrade, assigning it the next ascending id. Owner only.
     /// @dev The upgrade starts unscheduled (timestamp 0). Registration extends the scheduleId
     ///      chain with the new (id, timestamp=0) link.
-    /// @return id The ascending id assigned to the newly registered upgrade.
-    function registerUpgrade() external onlyProxyAdminOwner returns (uint256 id) {
+    /// @return The ascending id assigned to the newly registered upgrade.
+    function registerUpgrade() external onlyProxyAdminOwner returns (uint256) {
         if (_upgradeScheduleId.length == 0) revert ProtocolVersions_NotInitialized();
-        id = _timestamps.length;
+        uint256 id = _timestamps.length;
         _timestamps.push(0);
         // Reserve the link slot for this upgrade at index id + 1; _refreshScheduleId fills it.
         _upgradeScheduleId.push();
         emit UpgradeRegistered(id);
         _refreshScheduleId(id);
+        return id;
     }
 
     /// @notice Sets the minimum protocol version clients must run. Owner (Security Council) only.
-    /// @dev Informational signal for off-chain clients; independent of the upgrade schedule and NOT
+    /// @dev Informational signal for offchain clients; independent of the upgrade schedule and NOT
     ///      part of the scheduleId commitment, so it can be updated at any time without shifting any
     ///      proof binding.
     /// @param protocolVersion Packed semver uint256 (must be non-zero).

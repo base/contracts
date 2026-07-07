@@ -281,7 +281,8 @@ contract SystemDeploy is Script {
                 opChainProxyAdminOwner: cfg.finalSystemOwner(),
                 systemConfigOwner: cfg.finalSystemOwner(),
                 batcher: cfg.batchSenderAddress(),
-                unsafeBlockSigner: cfg.p2pSequencerAddress()
+                unsafeBlockSigner: cfg.p2pSequencerAddress(),
+                chainTeam: cfg.chainTeam()
             }),
             basefeeScalar: cfg.basefeeScalar(),
             blobBasefeeScalar: cfg.blobbasefeeScalar(),
@@ -629,7 +630,7 @@ contract SystemDeploy is Script {
             _output.opChainProxyAdmin,
             address(_output.protocolVersionsProxy),
             _impls.protocolVersionsImpl,
-            abi.encodeCall(IProtocolVersions.initialize, ())
+            abi.encodeCall(IProtocolVersions.initialize, (_input.roles.chainTeam))
         );
     }
 

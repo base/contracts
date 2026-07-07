@@ -39,6 +39,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     address internal unsafeBlockSigner = makeAddr("unsafeBlockSigner");
     address internal proposer = makeAddr("proposer");
     address internal challenger = makeAddr("challenger");
+    address internal chainTeam = makeAddr("chainTeam");
     MockNitroEnclaveVerifier internal nitroEnclaveVerifier;
     MockSP1Verifier internal sp1Verifier;
 
@@ -119,6 +120,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertNotEq(address(output.opChain.optimismPortalProxy), address(0), "portal");
         assertNotEq(address(output.opChain.ethLockboxProxy), address(0), "lockbox");
         assertNotEq(address(output.opChain.delayedWETHProxy), address(0), "delayed weth");
+        assertNotEq(address(output.opChain.protocolVersionsProxy), address(0), "protocol versions");
+        assertEq(output.opChain.protocolVersionsProxy.chainTeam(), chainTeam, "protocol versions chain team");
 
         assertEq(output.opChain.opChainProxyAdmin.owner(), owner, "op chain proxy admin owner");
         assertEq(output.opChain.systemConfigProxy.batchInbox(), Types.chainIdToBatchInboxAddress(l2ChainId), "inbox");
@@ -203,7 +206,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
                 opChainProxyAdminOwner: owner,
                 systemConfigOwner: owner,
                 batcher: batcher,
-                unsafeBlockSigner: unsafeBlockSigner
+                unsafeBlockSigner: unsafeBlockSigner,
+                chainTeam: chainTeam
             }),
             basefeeScalar: 100,
             blobBasefeeScalar: 200,
