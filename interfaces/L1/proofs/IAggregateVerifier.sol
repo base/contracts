@@ -5,6 +5,7 @@ import { IDisputeGame } from "./IDisputeGame.sol";
 import { IDisputeGameFactory } from "./IDisputeGameFactory.sol";
 import { IDelayedWETH } from "./IDelayedWETH.sol";
 import { IVerifier } from "./IVerifier.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { Proposal, Hash } from "src/libraries/bridge/Types.sol";
 import { Timestamp } from "src/libraries/bridge/LibUDT.sol";
 
@@ -23,6 +24,7 @@ interface IAggregateVerifier is IDisputeGame {
     function ZK_RANGE_HASH() external view returns (bytes32);
     function ZK_AGGREGATE_HASH() external view returns (bytes32);
     function CONFIG_HASH() external view returns (bytes32);
+    function PROTOCOL_VERSIONS() external view returns (IProtocolVersions);
     function L2_CHAIN_ID() external view returns (uint256);
     function BLOCK_INTERVAL() external view returns (uint256);
     function INTERMEDIATE_BLOCK_INTERVAL() external view returns (uint256);
@@ -35,6 +37,7 @@ interface IAggregateVerifier is IDisputeGame {
     function counteredByIntermediateRootIndexPlusOne() external view returns (uint256);
     function expectedResolution() external view returns (Timestamp);
     function proofCount() external view returns (uint8);
+    function scheduleId() external view returns (bytes32);
 
     function initializeWithInitData(bytes calldata proof) external payable;
     function verifyProposalProof(bytes calldata proofBytes) external;

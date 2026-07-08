@@ -67,6 +67,11 @@
         "internalType": "uint256",
         "name": "intermediateBlockInterval",
         "type": "uint256"
+      },
+      {
+        "internalType": "contract IProtocolVersions",
+        "name": "protocolVersions",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
@@ -210,6 +215,19 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "PROTOCOL_VERSIONS",
+    "outputs": [
+      {
+        "internalType": "contract IProtocolVersions",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -679,6 +697,19 @@
       }
     ],
     "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "scheduleId",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {

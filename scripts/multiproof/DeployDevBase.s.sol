@@ -16,6 +16,8 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
@@ -104,6 +106,12 @@ abstract contract DeployDevBase is Script {
         AggregateVerifier.ZkHashes memory zkHashes =
             AggregateVerifier.ZkHashes({ rangeHash: cfg.zkRangeHash(), aggregateHash: cfg.zkAggregationHash() });
 
+        Proxy protocolVersionsProxy = new Proxy(msg.sender);
+        protocolVersionsProxy.upgradeToAndCall(
+            address(new ProtocolVersions()), abi.encodeCall(IProtocolVersions.initialize, (address(0)))
+        );
+        protocolVersionsProxy.changeAdmin(address(0xdead));
+
         aggregateVerifier = address(
             new AggregateVerifier(
                 gameType,
@@ -116,7 +124,8 @@ abstract contract DeployDevBase is Script {
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainId(),
                 _blockInterval(),
-                _intermediateBlockInterval()
+                _intermediateBlockInterval(),
+                IProtocolVersions(address(protocolVersionsProxy))
             )
         );
 

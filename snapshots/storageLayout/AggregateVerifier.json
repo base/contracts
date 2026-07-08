@@ -96,5 +96,12 @@
     "offset": 8,
     "slot": "7",
     "type": "uint8"
+  },
+  {
+    "bytes": "32",
+    "label": "scheduleId",
+    "offset": 0,
+    "slot": "8",
+    "type": "bytes32"
   }
 ]
