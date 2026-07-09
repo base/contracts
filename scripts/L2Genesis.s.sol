@@ -393,8 +393,10 @@ contract L2Genesis is Script {
         // Initialize the predeploy
         IFeeVault(payable(_vaultAddr))
             .initialize({
-            _recipient: _recipient, _minWithdrawalAmount: _minWithdrawalAmount, _withdrawalNetwork: _withdrawalNetwork
-        });
+                _recipient: _recipient,
+                _minWithdrawalAmount: _minWithdrawalAmount,
+                _withdrawalNetwork: _withdrawalNetwork
+            });
         vm.stopPrank();
     }
 
