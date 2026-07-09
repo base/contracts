@@ -74,6 +74,7 @@ abstract contract ResourceMetering_TestInit is Test {
 contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
     /// @dev Gas overhead from the metering logic and `measuredUse` wrapper, excluding the burn loop.
     uint256 internal constant METERING_GAS_OVERHEAD = 1000;
+
     /// @notice Tests that updating the resource params to the same values works correctly.
     function test_metered_updateParamsNoChange_succeeds() external {
         meter.use(0); // equivalent to just updating the base fee and block number
