@@ -18,19 +18,6 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "chainTeam",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -63,6 +50,19 @@
   },
   {
     "inputs": [],
+    "name": "incidentResponder",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "initVersion",
     "outputs": [
       {
@@ -78,7 +78,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_chainTeam",
+        "name": "_incidentResponder",
         "type": "address"
       }
     ],
@@ -186,11 +186,11 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "newChainTeam",
+        "name": "newIncidentResponder",
         "type": "address"
       }
     ],
-    "name": "setChainTeam",
+    "name": "setIncidentResponder",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -245,17 +245,17 @@
       {
         "indexed": true,
         "internalType": "address",
-        "name": "previousChainTeam",
+        "name": "previousIncidentResponder",
         "type": "address"
       },
       {
         "indexed": true,
         "internalType": "address",
-        "name": "newChainTeam",
+        "name": "newIncidentResponder",
         "type": "address"
       }
     ],
-    "name": "ChainTeamUpdated",
+    "name": "IncidentResponderUpdated",
     "type": "event"
   },
   {
@@ -379,7 +379,7 @@
   },
   {
     "inputs": [],
-    "name": "ProtocolVersions_NotChainTeam",
+    "name": "ProtocolVersions_NotIncidentResponder",
     "type": "error"
   },
   {

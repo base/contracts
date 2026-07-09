@@ -29,7 +29,7 @@ library Types {
         address systemConfigOwner;
         address batcher;
         address unsafeBlockSigner;
-        address chainTeam;
+        address incidentResponder;
     }
 
     /// @notice The full set of inputs to deploy a new OP Stack chain.

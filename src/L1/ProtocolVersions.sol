@@ -44,8 +44,8 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     error ProtocolVersions_InvalidProtocolVersion();
     /// @notice Thrown when modifying a timestamp whose activation has already passed.
     error ProtocolVersions_ActivationAlreadyPassed(uint256 id, uint64 activationTimestamp);
-    /// @notice Thrown when the caller is not the chainTeam.
-    error ProtocolVersions_NotChainTeam();
+    /// @notice Thrown when the caller is not the incidentResponder.
+    error ProtocolVersions_NotIncidentResponder();
     /// @notice Thrown when delaying an upgrade that has no scheduled activation.
     error ProtocolVersions_NotScheduled(uint256 id);
     /// @notice Thrown when a new timestamp is not sufficiently later than the current one.
@@ -63,8 +63,8 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     event TimestampSet(uint256 indexed id, uint256 timestamp);
     /// @notice Emitted when the schedule commitment changes.
     event ScheduleIdUpdated(bytes32 indexed newScheduleId);
-    /// @notice Emitted when the chainTeam role changes.
-    event ChainTeamUpdated(address indexed previousChainTeam, address indexed newChainTeam);
+    /// @notice Emitted when the incidentResponder role changes.
+    event IncidentResponderUpdated(address indexed previousIncidentResponder, address indexed newIncidentResponder);
 
     /// @notice Minimum notice period required when scheduling or modifying an activation timestamp.
     uint64 public constant MIN_NOTICE = 1 hours;
@@ -90,7 +90,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     ///      only move an already-scheduled, not-yet-activated upgrade further into the future via
     ///      `delayTimestamp`. It cannot register upgrades, clear timestamps, pull an activation
     ///      earlier, or schedule a brand-new activation. Unset (zero) by default.
-    address public chainTeam;
+    address public incidentResponder;
 
     /// @notice Semantic version.
     /// @custom:semver 1.0.0
@@ -104,9 +104,9 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     }
 
     /// @notice Initializes the registry by seeding the hash chain and appointing the initial
-    ///         chainTeam. Callable only by the ProxyAdmin or its owner.
-    /// @param _chainTeam Initial chainTeam allowed to delay activations, or address(0) to leave unset.
-    function initialize(address _chainTeam) external reinitializer(initVersion()) {
+    ///         incidentResponder. Callable only by the ProxyAdmin or its owner.
+    /// @param _incidentResponder Initial incidentResponder allowed to delay activations, or address(0) to leave unset.
+    function initialize(address _incidentResponder) external reinitializer(initVersion()) {
         // Initialization transactions must come from the ProxyAdmin or its owner.
         _assertOnlyProxyAdminOrProxyAdminOwner();
 
@@ -116,8 +116,8 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         _upgradeScheduleId.push(bytes32(0));
         emit ScheduleIdUpdated(bytes32(0));
 
-        chainTeam = _chainTeam;
-        emit ChainTeamUpdated(address(0), _chainTeam);
+        incidentResponder = _incidentResponder;
+        emit IncidentResponderUpdated(address(0), _incidentResponder);
     }
 
     /// @notice Returns the canonical schedule commitment.
@@ -202,26 +202,26 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         _assertOnlyProxyAdminOwner();
         _assertRegistered(id);
         uint64 current = _timestamps[id];
+        if (current == timestamp) return;
         if (current != 0 && uint64(block.timestamp) >= current) {
             revert ProtocolVersions_ActivationAlreadyPassed(id, current);
         }
         if (timestamp != 0 && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
             revert ProtocolVersions_InsufficientNotice(timestamp);
         }
-        if (current == timestamp) return;
         _writeTimestamp(id, timestamp);
     }
 
-    /// @notice Appoints, replaces, or clears (set to zero) the chainTeam role. Owner only.
-    /// @param newChainTeam New chainTeam address, or address(0) to revoke the role.
-    function setChainTeam(address newChainTeam) external {
+    /// @notice Appoints, replaces, or clears (set to zero) the incidentResponder role. Owner only.
+    /// @param newIncidentResponder New incidentResponder address, or address(0) to revoke the role.
+    function setIncidentResponder(address newIncidentResponder) external {
         _assertOnlyProxyAdminOwner();
-        emit ChainTeamUpdated(chainTeam, newChainTeam);
-        chainTeam = newChainTeam;
+        emit IncidentResponderUpdated(incidentResponder, newIncidentResponder);
+        incidentResponder = newIncidentResponder;
     }
 
     /// @notice Pushes an already-scheduled upgrade's activation timestamp further into the future.
-    ///         Can only be called by the chainTeam.
+    ///         Can only be called by the incidentResponder.
     /// @dev The upgrade must already have a non-zero activation timestamp that has not yet passed,
     ///      and `newTimestamp` must be strictly later than the current value. This role can only
     ///      delay an activation; it cannot pull one earlier, clear it, or schedule a new one — use
@@ -230,7 +230,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @param id            The upgrade whose activation to delay.
     /// @param newTimestamp  New activation timestamp, must be strictly later than the current one.
     function delayTimestamp(uint256 id, uint64 newTimestamp) external {
-        if (msg.sender != chainTeam) revert ProtocolVersions_NotChainTeam();
+        if (msg.sender != incidentResponder) revert ProtocolVersions_NotIncidentResponder();
         _assertRegistered(id);
         uint64 current = _timestamps[id];
 

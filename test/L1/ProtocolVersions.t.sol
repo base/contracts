@@ -18,7 +18,7 @@ import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 abstract contract ProtocolVersions_TestInit is Test {
     event UpgradeRegistered(uint256 indexed id);
     event MinimumProtocolVersionUpdated(uint256 indexed protocolVersion);
-    event ChainTeamUpdated(address indexed previousChainTeam, address indexed newChainTeam);
+    event IncidentResponderUpdated(address indexed previousIncidentResponder, address indexed newIncidentResponder);
     event TimestampSet(uint256 indexed id, uint256 timestamp);
 
     /// @dev Ascending ids assigned by registration order in these tests.
@@ -27,7 +27,7 @@ abstract contract ProtocolVersions_TestInit is Test {
 
     address internal _owner = makeAddr("owner");
     address internal _nonOwner = makeAddr("non-owner");
-    address internal _chainTeam = makeAddr("chain-team");
+    address internal _incidentResponder = makeAddr("incident-responder");
     address internal _proxyAdmin = makeAddr("proxy-admin");
     ProtocolVersions internal _impl;
     ProtocolVersions internal protocolVersions;
@@ -40,7 +40,7 @@ abstract contract ProtocolVersions_TestInit is Test {
     }
 
     /// @dev Deploys a proxy (admin = _proxyAdmin) over the shared impl and initializes it via the
-    ///      proxy, appointing `_team` as the chainTeam.
+    ///      proxy, appointing `_team` as the incidentResponder.
     function _deployInitializedProxy(address _team) internal returns (address proxy_) {
         Proxy proxy = new Proxy(_proxyAdmin);
         vm.prank(_proxyAdmin);
@@ -76,14 +76,14 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         assertEq(protocolVersions.scheduleId(), bytes32(0));
     }
 
-    /// @notice Tests that initialization appoints the provided chainTeam and emits the event.
-    function test_initialize_setsChainTeam_succeeds() external {
+    /// @notice Tests that initialization appoints the provided incidentResponder and emits the event.
+    function test_initialize_setsIncidentResponder_succeeds() external {
         ProtocolVersions uninitialized = _deployUninitializedProxy();
         vm.expectEmit(true, true, false, false, address(uninitialized));
-        emit ChainTeamUpdated(address(0), _chainTeam);
+        emit IncidentResponderUpdated(address(0), _incidentResponder);
         vm.prank(_proxyAdmin);
-        uninitialized.initialize(_chainTeam);
-        assertEq(uninitialized.chainTeam(), _chainTeam);
+        uninitialized.initialize(_incidentResponder);
+        assertEq(uninitialized.incidentResponder(), _incidentResponder);
     }
 
     /// @notice Tests that only the ProxyAdmin or its owner can initialize.
@@ -91,7 +91,7 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         ProtocolVersions uninitialized = _deployUninitializedProxy();
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
         vm.prank(_nonOwner);
-        uninitialized.initialize(_chainTeam);
+        uninitialized.initialize(_incidentResponder);
     }
 
     /// @notice Tests that the contract cannot be initialized twice.
@@ -419,30 +419,30 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
     function test_delayTimestamp_pushesTimestampLater_succeeds() external {
         uint64 ts = _scheduleCanyon(100);
         vm.prank(_owner);
-        protocolVersions.setChainTeam(_chainTeam);
+        protocolVersions.setIncidentResponder(_incidentResponder);
 
         bytes32 scheduleIdBefore = protocolVersions.scheduleId();
         vm.roll(block.number + 1);
 
         uint64 later = ts + 50;
-        vm.prank(_chainTeam);
+        vm.prank(_incidentResponder);
         protocolVersions.delayTimestamp(CANYON, later);
 
         assertEq(protocolVersions.getSchedule()[CANYON], later);
         assertNotEq(protocolVersions.scheduleId(), scheduleIdBefore);
     }
 
-    /// @notice Tests that only the chainTeam can call `delayTimestamp`.
-    function test_delayTimestamp_callerNotChainTeam_reverts() external {
+    /// @notice Tests that only the incidentResponder can call `delayTimestamp`.
+    function test_delayTimestamp_callerNotIncidentResponder_reverts() external {
         uint64 ts = _scheduleCanyon(100);
         vm.prank(_owner);
-        protocolVersions.setChainTeam(_chainTeam);
+        protocolVersions.setIncidentResponder(_incidentResponder);
 
-        vm.expectRevert(IProtocolVersions.ProtocolVersions_NotChainTeam.selector);
+        vm.expectRevert(IProtocolVersions.ProtocolVersions_NotIncidentResponder.selector);
         vm.prank(_owner);
         protocolVersions.delayTimestamp(CANYON, ts + 50);
 
-        vm.expectRevert(IProtocolVersions.ProtocolVersions_NotChainTeam.selector);
+        vm.expectRevert(IProtocolVersions.ProtocolVersions_NotIncidentResponder.selector);
         vm.prank(_nonOwner);
         protocolVersions.delayTimestamp(CANYON, ts + 50);
     }
@@ -451,12 +451,12 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
     function test_delayTimestamp_earlierTimestamp_reverts() external {
         uint64 ts = _scheduleCanyon(100);
         vm.prank(_owner);
-        protocolVersions.setChainTeam(_chainTeam);
+        protocolVersions.setIncidentResponder(_incidentResponder);
 
         vm.expectRevert(
             abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_DelayMustBeLater.selector, ts, ts - 10)
         );
-        vm.prank(_chainTeam);
+        vm.prank(_incidentResponder);
         protocolVersions.delayTimestamp(CANYON, ts - 10);
     }
 
@@ -464,10 +464,10 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
     function test_delayTimestamp_equalTimestamp_reverts() external {
         uint64 ts = _scheduleCanyon(100);
         vm.prank(_owner);
-        protocolVersions.setChainTeam(_chainTeam);
+        protocolVersions.setIncidentResponder(_incidentResponder);
 
         vm.expectRevert(abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_DelayMustBeLater.selector, ts, ts));
-        vm.prank(_chainTeam);
+        vm.prank(_incidentResponder);
         protocolVersions.delayTimestamp(CANYON, ts);
     }
 
@@ -476,11 +476,11 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
         vm.prank(_owner);
         protocolVersions.registerUpgrade(0, 0);
         vm.prank(_owner);
-        protocolVersions.setChainTeam(_chainTeam);
+        protocolVersions.setIncidentResponder(_incidentResponder);
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         vm.expectRevert(abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_NotScheduled.selector, CANYON));
-        vm.prank(_chainTeam);
+        vm.prank(_incidentResponder);
         protocolVersions.delayTimestamp(CANYON, ts);
     }
 
@@ -488,69 +488,69 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
     function test_delayTimestamp_afterActivation_reverts() external {
         uint64 ts = _scheduleCanyon(100);
         vm.prank(_owner);
-        protocolVersions.setChainTeam(_chainTeam);
+        protocolVersions.setIncidentResponder(_incidentResponder);
 
         vm.warp(ts + 1);
         vm.expectRevert(
             abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_ActivationAlreadyPassed.selector, CANYON, ts)
         );
-        vm.prank(_chainTeam);
+        vm.prank(_incidentResponder);
         protocolVersions.delayTimestamp(CANYON, ts + 100);
     }
 
     /// @notice Tests that `delayTimestamp` reverts for an unregistered upgrade.
     function test_delayTimestamp_unregisteredUpgrade_reverts() external {
         vm.prank(_owner);
-        protocolVersions.setChainTeam(_chainTeam);
+        protocolVersions.setIncidentResponder(_incidentResponder);
 
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         vm.expectRevert(abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_UnknownUpgrade.selector, uint256(0)));
-        vm.prank(_chainTeam);
+        vm.prank(_incidentResponder);
         protocolVersions.delayTimestamp(0, ts);
     }
 }
 
-/// @title ProtocolVersions_ChainTeam_Test
-/// @notice Test contract for the `setChainTeam` function and chainTeam role.
-contract ProtocolVersions_ChainTeam_Test is ProtocolVersions_TestInit {
-    /// @notice Tests that `chainTeam` starts as address(0).
-    function test_chainTeam_startsUnset_succeeds() external view {
-        assertEq(protocolVersions.chainTeam(), address(0));
+/// @title ProtocolVersions_IncidentResponder_Test
+/// @notice Test contract for the `setIncidentResponder` function and incidentResponder role.
+contract ProtocolVersions_IncidentResponder_Test is ProtocolVersions_TestInit {
+    /// @notice Tests that `incidentResponder` starts as address(0).
+    function test_incidentResponder_startsUnset_succeeds() external view {
+        assertEq(protocolVersions.incidentResponder(), address(0));
     }
 
-    /// @notice Tests that the owner can appoint a chainTeam address.
-    function test_setChainTeam_setsAddress_succeeds() external {
+    /// @notice Tests that the owner can appoint a incidentResponder address.
+    function test_setIncidentResponder_setsAddress_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.setChainTeam(_chainTeam);
-        assertEq(protocolVersions.chainTeam(), _chainTeam);
+        protocolVersions.setIncidentResponder(_incidentResponder);
+        assertEq(protocolVersions.incidentResponder(), _incidentResponder);
     }
 
-    /// @notice Tests that only the owner can call `setChainTeam`.
-    function test_setChainTeam_callerNotOwner_reverts() external {
+    /// @notice Tests that only the owner can call `setIncidentResponder`.
+    function test_setIncidentResponder_callerNotOwner_reverts() external {
         vm.expectRevert(ProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOwner.selector);
         vm.prank(_nonOwner);
-        protocolVersions.setChainTeam(_chainTeam);
+        protocolVersions.setIncidentResponder(_incidentResponder);
     }
 
-    /// @notice Tests that `setChainTeam` emits a `ChainTeamUpdated` event.
-    function test_setChainTeam_emitsEvent_succeeds() external {
+    /// @notice Tests that `setIncidentResponder` emits a `IncidentResponderUpdated` event.
+    function test_setIncidentResponder_emitsEvent_succeeds() external {
         vm.expectEmit(true, true, false, false, address(protocolVersions));
-        emit ChainTeamUpdated(address(0), _chainTeam);
+        emit IncidentResponderUpdated(address(0), _incidentResponder);
         vm.prank(_owner);
-        protocolVersions.setChainTeam(_chainTeam);
+        protocolVersions.setIncidentResponder(_incidentResponder);
     }
 
-    /// @notice Tests that the owner can clear the chainTeam role by setting it to address(0).
-    function test_setChainTeam_clear_succeeds() external {
+    /// @notice Tests that the owner can clear the incidentResponder role by setting it to address(0).
+    function test_setIncidentResponder_clear_succeeds() external {
         vm.prank(_owner);
-        protocolVersions.setChainTeam(_chainTeam);
+        protocolVersions.setIncidentResponder(_incidentResponder);
 
         vm.expectEmit(true, true, false, false, address(protocolVersions));
-        emit ChainTeamUpdated(_chainTeam, address(0));
+        emit IncidentResponderUpdated(_incidentResponder, address(0));
         vm.prank(_owner);
-        protocolVersions.setChainTeam(address(0));
+        protocolVersions.setIncidentResponder(address(0));
 
-        assertEq(protocolVersions.chainTeam(), address(0));
+        assertEq(protocolVersions.incidentResponder(), address(0));
     }
 }
 

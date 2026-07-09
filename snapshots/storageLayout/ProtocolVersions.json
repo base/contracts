@@ -36,7 +36,7 @@
   },
   {
     "bytes": "20",
-    "label": "chainTeam",
+    "label": "incidentResponder",
     "offset": 0,
     "slot": "4",
     "type": "address"
