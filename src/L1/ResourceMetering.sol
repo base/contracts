@@ -135,11 +135,11 @@ abstract contract ResourceMetering is Initializable {
         uint256 resourceCost = uint256(_amount) * uint256(params.prevBaseFee);
 
         // We currently charge for this ETH amount as an L1 gas burn, so we convert the ETH amount
-        // into gas by dividing by the L1 base fee. We assume a minimum base fee of 1 gwei to avoid
-        // division by zero for L1s that don't support 1559 or to avoid excessive gas burns during
-        // periods of extremely low L1 demand. One-day average gas fee hasn't dipped below 1 gwei
-        // during any 1 day period in the last 5 years, so should be fine.
-        uint256 gasCost = resourceCost / Math.max(block.basefee, 1 gwei);
+        // into gas by dividing by the L1 base fee. We clamp to a minimum of 0.01 gwei to avoid
+        // division by zero on L1s without EIP-1559 and to cap gas-burn requirements when L1 demand
+        // is extremely low. A higher floor reduces the gas burned per deposit but undercharges
+        // relative to the deposit fee market when L1 base fee is below that floor.
+        uint256 gasCost = resourceCost / Math.max(block.basefee, 0.01 gwei);
 
         // Give the user a refund based on the amount of gas they used to do all of the work up to
         // this point. Since we're at the end of the modifier, this should be pretty accurate. Acts
