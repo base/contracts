@@ -78,7 +78,8 @@ contract FeeDisburser is ProxyAdminOwnedBase, ISemver {
     /// @param systemAddress The system address being funded.
     /// @param success       A boolean denoting whether a fund send occurred and its success or failure.
     /// @param balanceNeeded The amount of funds the given system address needs to reach its target balance.
-    /// @param balanceSent   The amount of funds sent to the system address.
+    /// @param balanceSent   The amount of funds attempted to be sent. When success is false, the
+    ///                      recipient rejected the transfer and no funds were actually received.
     event ProcessedFunds(
         address indexed systemAddress, bool indexed success, uint256 balanceNeeded, uint256 balanceSent
     );
@@ -110,9 +111,6 @@ contract FeeDisburser is ProxyAdminOwnedBase, ISemver {
     /// @notice Thrown when system address and target balance array lengths do not match.
     error ArrayLengthMismatch();
 
-    /// @notice Thrown when system address configuration is empty.
-    error EmptySystemAddresses();
-
     /// @notice Thrown when system address configuration exceeds the maximum length.
     error TooManySystemAddresses();
 
@@ -127,11 +125,13 @@ contract FeeDisburser is ProxyAdminOwnedBase, ISemver {
     ////////////////////////////////////////////////////////////////
 
     /// @notice Prevents reentrancy into disburseFees while preserving the existing storage layout.
+    ///         Uses 1/2 sentinel values so the slot stays nonzero after first use, keeping
+    ///         subsequent SSTOREs warm. Uninitialized (0) is treated as not-entered.
     modifier nonReentrantDisbursement() {
-        if (_disburseFeesEntered != 0) revert ReentrantCall();
-        _disburseFeesEntered = 1;
+        if (_disburseFeesEntered == 2) revert ReentrantCall();
+        _disburseFeesEntered = 2;
         _;
-        _disburseFeesEntered = 0;
+        _disburseFeesEntered = 1;
     }
 
     ////////////////////////////////////////////////////////////////
@@ -199,8 +199,9 @@ contract FeeDisburser is ProxyAdminOwnedBase, ISemver {
     }
 
     /// @notice Configures the L2 system addresses to refund and their target balances.
+    ///         Passing empty arrays clears the configuration and disables refunding.
     ///
-    /// @dev Callable only by the ProxyAdmin owner.
+    /// @dev Callable only by the ProxyAdmin.
     ///
     /// @param systemAddresses_ The system addresses being funded.
     /// @param targetBalances_  The target balances for system addresses.
@@ -214,7 +215,6 @@ contract FeeDisburser is ProxyAdminOwnedBase, ISemver {
         _assertOnlyProxyAdmin();
 
         uint256 systemAddressesLength = systemAddresses_.length;
-        if (systemAddressesLength == 0) revert EmptySystemAddresses();
         if (systemAddressesLength > MAX_SYSTEM_ADDRESS_COUNT) revert TooManySystemAddresses();
         if (systemAddressesLength != targetBalances_.length) revert ArrayLengthMismatch();
 
@@ -250,7 +250,7 @@ contract FeeDisburser is ProxyAdminOwnedBase, ISemver {
     ///
     /// @param systemAddress The system address being funded.
     /// @param targetBalance The target balance for the system address being funded.
-    function _refillBalanceIfNeeded(address systemAddress, uint256 targetBalance) internal virtual {
+    function _refillBalanceIfNeeded(address systemAddress, uint256 targetBalance) internal {
         uint256 systemAddressBalance = systemAddress.balance;
         if (systemAddressBalance >= targetBalance) {
             emit ProcessedFunds({ systemAddress: systemAddress, success: false, balanceNeeded: 0, balanceSent: 0 });

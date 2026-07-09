@@ -22,6 +22,12 @@ contract ReentrantReceiver {
     }
 }
 
+contract RevertingReceiver {
+    receive() external payable {
+        revert();
+    }
+}
+
 /// @title FeeDisburserTest
 /// @notice Comprehensive unit and fuzz tests for the FeeDisburser contract
 contract FeeDisburserTest is Test {
@@ -856,12 +862,21 @@ contract FeeDisburserTest is Test {
         feeDisburser.setSystemAddresses(addrs, balances);
     }
 
-    function test_setSystemAddresses_revert_emptySystemAddresses() public {
-        _setProxyAdmin();
+    function test_setSystemAddresses_success_clearConfig() public {
+        // First set some addresses
+        (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, 1 ether);
+        _setSystemAddresses(addrs, balances);
+        assertEq(feeDisburser.systemAddresses(0), SYSTEM_ADDR);
 
-        vm.expectRevert(FeeDisburser.EmptySystemAddresses.selector);
+        // Clear config with empty arrays
+        vm.expectEmit(address(feeDisburser));
+        emit SystemAddressesUpdated(0);
+
         vm.prank(PROXY_ADMIN);
         feeDisburser.setSystemAddresses(new address payable[](0), new uint256[](0));
+
+        vm.expectRevert();
+        feeDisburser.systemAddresses(0);
     }
 
     function test_setSystemAddresses_revert_tooManySystemAddresses() public {
@@ -1016,6 +1031,67 @@ contract FeeDisburserTest is Test {
 
         assertEq(SYSTEM_ADDR.balance, systemAddrStartBal + valueSent);
         assertEq(address(feeDisburser).balance, 0);
+    }
+
+    function test_disburseFees_success_multipleSystemAddresses() public {
+        address payable addr1 = payable(address(0x6001));
+        address payable addr2 = payable(address(0x6002));
+        uint256 target1 = 3 ether;
+        uint256 target2 = 2 ether;
+
+        address payable[] memory addrs = new address payable[](2);
+        addrs[0] = addr1;
+        addrs[1] = addr2;
+        uint256[] memory bals = new uint256[](2);
+        bals[0] = target1;
+        bals[1] = target2;
+        _setSystemAddresses(addrs, bals);
+
+        uint256 feeAmount = 10 ether;
+        _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
+        vm.deal(Predeploys.BASE_FEE_VAULT, 0);
+        vm.deal(Predeploys.L1_FEE_VAULT, 0);
+
+        uint256 bridgeAmount = feeAmount - target1 - target2;
+        _expectBridgeETH(bridgeAmount);
+
+        vm.expectEmit(address(feeDisburser));
+        emit ProcessedFunds(addr1, true, target1, target1);
+        vm.expectEmit(address(feeDisburser));
+        emit ProcessedFunds(addr2, true, target2, target2);
+
+        _expectFeesDisbursed(bridgeAmount);
+
+        feeDisburser.disburseFees();
+
+        assertEq(addr1.balance, target1);
+        assertEq(addr2.balance, target2);
+        assertEq(address(feeDisburser).balance, 0);
+    }
+
+    function test_disburseFees_success_revertingRecipient() public {
+        RevertingReceiver bad = new RevertingReceiver();
+
+        (address payable[] memory addrs, uint256[] memory balances) =
+            _makeSingleConfig(payable(address(bad)), 1 ether);
+        _setSystemAddresses(addrs, balances);
+
+        uint256 feeAmount = 2 ether;
+        _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
+        vm.deal(Predeploys.BASE_FEE_VAULT, 0);
+        vm.deal(Predeploys.L1_FEE_VAULT, 0);
+
+        // SafeCall.send catches the revert; full fee amount still bridges
+        _expectBridgeETH(feeAmount);
+
+        vm.expectEmit(address(feeDisburser));
+        emit ProcessedFunds(address(bad), false, 1 ether, 1 ether);
+
+        _expectFeesDisbursed(feeAmount);
+
+        feeDisburser.disburseFees();
+
+        assertEq(address(bad).balance, 0);
     }
 
     // ============================================================
