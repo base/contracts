@@ -6,7 +6,21 @@ import { Test } from "lib/forge-std/src/Test.sol";
 import { FeeDisburser } from "src/L2/FeeDisburser.sol";
 import { IFeeVault, Types } from "interfaces/L2/IFeeVault.sol";
 import { IStandardBridge } from "interfaces/universal/IStandardBridge.sol";
+import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
+import { Constants } from "src/libraries/Constants.sol";
+
+contract ReentrantReceiver {
+    FeeDisburser public target;
+
+    constructor(FeeDisburser _target) {
+        target = _target;
+    }
+
+    receive() external payable {
+        target.disburseFees();
+    }
+}
 
 /// @title FeeDisburserTest
 /// @notice Comprehensive unit and fuzz tests for the FeeDisburser contract
@@ -15,6 +29,8 @@ contract FeeDisburserTest is Test {
     event FeesDisbursed(uint256 disbursementTime, uint256 deprecated, uint256 totalFeesDisbursed);
     event FeesReceived(address indexed sender, uint256 amount);
     event NoFeesCollected();
+    event ProcessedFunds(address indexed systemAddress, bool indexed success, uint256 balanceNeeded, uint256 balanceSent);
+    event SystemAddressesUpdated(uint256 systemAddressCount);
 
     // Constants
     uint32 constant WITHDRAWAL_MIN_GAS = 35_000;
@@ -26,6 +42,8 @@ contract FeeDisburserTest is Test {
     address payable constant L1_WALLET = payable(address(0x1001));
     address constant ALICE = address(0xA11CE);
     address constant BOB = address(0xB0B);
+    address constant PROXY_ADMIN = address(0xAD1);
+    address payable constant SYSTEM_ADDR = payable(address(0x5001));
 
     // Contract instances
     FeeDisburser feeDisburser;
@@ -95,6 +113,16 @@ contract FeeDisburserTest is Test {
     function _expectNoFeesCollected() internal {
         vm.expectEmit(address(feeDisburser));
         emit NoFeesCollected();
+    }
+
+    function _setProxyAdmin() internal {
+        vm.store(address(feeDisburser), Constants.PROXY_OWNER_ADDRESS, bytes32(uint256(uint160(PROXY_ADMIN))));
+    }
+
+    function _setSystemAddresses(address payable[] memory addrs, uint256[] memory balances) internal {
+        _setProxyAdmin();
+        vm.prank(PROXY_ADMIN);
+        feeDisburser.setSystemAddresses(addrs, balances);
     }
 
     // ============================================================
@@ -767,5 +795,275 @@ contract FeeDisburserTest is Test {
         uint256 gasUsed = gasBefore - gasleft();
 
         assertTrue(gasUsed < 200_000, "Gas usage too high for all-vault case");
+    }
+
+    // ============================================================
+    //                 setSystemAddresses Tests
+    // ============================================================
+
+    function test_setSystemAddresses_success() public {
+        address payable[] memory addrs = new address payable[](1);
+        addrs[0] = SYSTEM_ADDR;
+        uint256[] memory balances = new uint256[](1);
+        balances[0] = 1 ether;
+
+        _setProxyAdmin();
+
+        vm.expectEmit(address(feeDisburser));
+        emit SystemAddressesUpdated(1);
+
+        vm.prank(PROXY_ADMIN);
+        feeDisburser.setSystemAddresses(addrs, balances);
+
+        assertEq(feeDisburser.systemAddresses(0), SYSTEM_ADDR);
+        assertEq(feeDisburser.targetBalances(0), 1 ether);
+    }
+
+    function test_setSystemAddresses_success_overwrites() public {
+        address payable[] memory addrs1 = new address payable[](1);
+        addrs1[0] = SYSTEM_ADDR;
+        uint256[] memory balances1 = new uint256[](1);
+        balances1[0] = 1 ether;
+        _setSystemAddresses(addrs1, balances1);
+
+        address payable[] memory addrs2 = new address payable[](1);
+        addrs2[0] = payable(ALICE);
+        uint256[] memory balances2 = new uint256[](1);
+        balances2[0] = 2 ether;
+
+        vm.expectEmit(address(feeDisburser));
+        emit SystemAddressesUpdated(1);
+
+        vm.prank(PROXY_ADMIN);
+        feeDisburser.setSystemAddresses(addrs2, balances2);
+
+        assertEq(feeDisburser.systemAddresses(0), ALICE);
+        assertEq(feeDisburser.targetBalances(0), 2 ether);
+    }
+
+    function test_setSystemAddresses_revert_notProxyAdmin() public {
+        address payable[] memory addrs = new address payable[](1);
+        addrs[0] = SYSTEM_ADDR;
+        uint256[] memory balances = new uint256[](1);
+        balances[0] = 1 ether;
+
+        _setProxyAdmin();
+
+        vm.expectRevert(ProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdmin.selector);
+        vm.prank(ALICE);
+        feeDisburser.setSystemAddresses(addrs, balances);
+    }
+
+    function test_setSystemAddresses_revert_emptySystemAddresses() public {
+        _setProxyAdmin();
+
+        vm.expectRevert(FeeDisburser.EmptySystemAddresses.selector);
+        vm.prank(PROXY_ADMIN);
+        feeDisburser.setSystemAddresses(new address payable[](0), new uint256[](0));
+    }
+
+    function test_setSystemAddresses_revert_tooManySystemAddresses() public {
+        uint256 n = feeDisburser.MAX_SYSTEM_ADDRESS_COUNT() + 1;
+        address payable[] memory addrs = new address payable[](n);
+        uint256[] memory balances = new uint256[](n);
+        for (uint256 i; i < n; i++) {
+            addrs[i] = payable(address(uint160(0x6000 + i)));
+            balances[i] = 1 ether;
+        }
+
+        _setProxyAdmin();
+
+        vm.expectRevert(FeeDisburser.TooManySystemAddresses.selector);
+        vm.prank(PROXY_ADMIN);
+        feeDisburser.setSystemAddresses(addrs, balances);
+    }
+
+    function test_setSystemAddresses_revert_arrayLengthMismatch() public {
+        address payable[] memory addrs = new address payable[](2);
+        addrs[0] = SYSTEM_ADDR;
+        addrs[1] = payable(ALICE);
+        uint256[] memory balances = new uint256[](1);
+        balances[0] = 1 ether;
+
+        _setProxyAdmin();
+
+        vm.expectRevert(FeeDisburser.ArrayLengthMismatch.selector);
+        vm.prank(PROXY_ADMIN);
+        feeDisburser.setSystemAddresses(addrs, balances);
+    }
+
+    function test_setSystemAddresses_revert_zeroAddress() public {
+        address payable[] memory addrs = new address payable[](1);
+        addrs[0] = payable(address(0));
+        uint256[] memory balances = new uint256[](1);
+        balances[0] = 1 ether;
+
+        _setProxyAdmin();
+
+        vm.expectRevert(FeeDisburser.ZeroAddress.selector);
+        vm.prank(PROXY_ADMIN);
+        feeDisburser.setSystemAddresses(addrs, balances);
+    }
+
+    function test_setSystemAddresses_revert_zeroTargetBalance() public {
+        address payable[] memory addrs = new address payable[](1);
+        addrs[0] = SYSTEM_ADDR;
+        uint256[] memory balances = new uint256[](1);
+        balances[0] = 0;
+
+        _setProxyAdmin();
+
+        vm.expectRevert(FeeDisburser.ZeroTargetBalance.selector);
+        vm.prank(PROXY_ADMIN);
+        feeDisburser.setSystemAddresses(addrs, balances);
+    }
+
+    // ============================================================
+    //          disburseFees with System Address Refunds
+    // ============================================================
+
+    function test_disburseFees_success_systemAddressRefunded() public {
+        uint256 feeAmount = 10 ether;
+        uint256 targetBal = 2 ether;
+
+        vm.deal(SYSTEM_ADDR, 0);
+
+        address payable[] memory addrs = new address payable[](1);
+        addrs[0] = SYSTEM_ADDR;
+        uint256[] memory balances = new uint256[](1);
+        balances[0] = targetBal;
+        _setSystemAddresses(addrs, balances);
+
+        _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
+        vm.deal(Predeploys.BASE_FEE_VAULT, 0);
+        vm.deal(Predeploys.L1_FEE_VAULT, 0);
+
+        uint256 bridgeAmount = feeAmount - targetBal;
+        _expectBridgeETH(bridgeAmount);
+
+        vm.expectEmit(address(feeDisburser));
+        emit ProcessedFunds(SYSTEM_ADDR, true, targetBal, targetBal);
+
+        _expectFeesDisbursed(bridgeAmount);
+
+        feeDisburser.disburseFees();
+
+        assertEq(SYSTEM_ADDR.balance, targetBal);
+    }
+
+    function test_disburseFees_success_systemAddressAlreadyFunded() public {
+        uint256 feeAmount = 10 ether;
+        uint256 targetBal = 2 ether;
+
+        vm.deal(SYSTEM_ADDR, targetBal);
+
+        address payable[] memory addrs = new address payable[](1);
+        addrs[0] = SYSTEM_ADDR;
+        uint256[] memory balances = new uint256[](1);
+        balances[0] = targetBal;
+        _setSystemAddresses(addrs, balances);
+
+        _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
+        vm.deal(Predeploys.BASE_FEE_VAULT, 0);
+        vm.deal(Predeploys.L1_FEE_VAULT, 0);
+
+        _expectBridgeETH(feeAmount);
+
+        vm.expectEmit(address(feeDisburser));
+        emit ProcessedFunds(SYSTEM_ADDR, false, 0, 0);
+
+        _expectFeesDisbursed(feeAmount);
+
+        feeDisburser.disburseFees();
+
+        assertEq(SYSTEM_ADDR.balance, targetBal);
+    }
+
+    function test_disburseFees_success_allFundsConsumedByRefund() public {
+        uint256 feeAmount = 5 ether;
+        uint256 targetBal = 10 ether;
+
+        vm.deal(SYSTEM_ADDR, 0);
+
+        address payable[] memory addrs = new address payable[](1);
+        addrs[0] = SYSTEM_ADDR;
+        uint256[] memory balances = new uint256[](1);
+        balances[0] = targetBal;
+        _setSystemAddresses(addrs, balances);
+
+        _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
+        vm.deal(Predeploys.BASE_FEE_VAULT, 0);
+        vm.deal(Predeploys.L1_FEE_VAULT, 0);
+
+        // No bridge call — balanceSent capped at available feeAmount
+        vm.expectEmit(address(feeDisburser));
+        emit ProcessedFunds(SYSTEM_ADDR, true, targetBal, feeAmount);
+
+        _expectFeesDisbursed(0);
+
+        feeDisburser.disburseFees();
+
+        assertEq(SYSTEM_ADDR.balance, feeAmount);
+        assertEq(address(feeDisburser).balance, 0);
+    }
+
+    function test_disburseFees_success_partialRefundDueToLowBalance() public {
+        uint256 targetBal = 5 ether;
+        uint256 systemAddrStartBal = 1 ether;
+        uint256 feeAmount = 2 ether; // not enough to fully top up (needs 4 ether, has 2)
+
+        vm.deal(SYSTEM_ADDR, systemAddrStartBal);
+
+        address payable[] memory addrs = new address payable[](1);
+        addrs[0] = SYSTEM_ADDR;
+        uint256[] memory balances = new uint256[](1);
+        balances[0] = targetBal;
+        _setSystemAddresses(addrs, balances);
+
+        _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
+        vm.deal(Predeploys.BASE_FEE_VAULT, 0);
+        vm.deal(Predeploys.L1_FEE_VAULT, 0);
+
+        uint256 valueNeeded = targetBal - systemAddrStartBal; // 4 ether
+        uint256 valueSent = feeAmount; // only 2 ether available
+
+        vm.expectEmit(address(feeDisburser));
+        emit ProcessedFunds(SYSTEM_ADDR, true, valueNeeded, valueSent);
+
+        _expectFeesDisbursed(0);
+
+        feeDisburser.disburseFees();
+
+        assertEq(SYSTEM_ADDR.balance, systemAddrStartBal + valueSent);
+        assertEq(address(feeDisburser).balance, 0);
+    }
+
+    // ============================================================
+    //                     Reentrancy Test
+    // ============================================================
+
+    function test_disburseFees_reentrancy_innerCallBlocked() public {
+        ReentrantReceiver attacker = new ReentrantReceiver(feeDisburser);
+
+        address payable[] memory addrs = new address payable[](1);
+        addrs[0] = payable(address(attacker));
+        uint256[] memory balances = new uint256[](1);
+        balances[0] = 1 ether;
+        _setSystemAddresses(addrs, balances);
+
+        uint256 feeAmount = 2 ether;
+        _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
+        vm.deal(Predeploys.BASE_FEE_VAULT, 0);
+        vm.deal(Predeploys.L1_FEE_VAULT, 0);
+
+        // Inner disburseFees reverts (reentrancy), so SafeCall returns success=false and ETH is not sent
+        _expectBridgeETH(feeAmount);
+
+        vm.expectEmit(address(feeDisburser));
+        emit ProcessedFunds(address(attacker), false, 1 ether, 1 ether);
+
+        feeDisburser.disburseFees();
+
+        assertEq(address(attacker).balance, 0);
     }
 }

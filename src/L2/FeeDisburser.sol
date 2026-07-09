@@ -205,7 +205,7 @@ contract FeeDisburser is ProxyAdminOwnedBase, ISemver {
         external
         virtual
     {
-        _assertOnlyProxyAdminOwner();
+        _assertOnlyProxyAdmin();
         _validateSystemAddressConfig(systemAddresses_, targetBalances_);
 
         systemAddresses = systemAddresses_;
