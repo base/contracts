@@ -2,10 +2,10 @@
 pragma solidity 0.8.15;
 
 // Testing
-import { Test } from "lib/forge-std/src/Test.sol";
+import { CommonTest } from "test/setup/CommonTest.sol";
+import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 
 // Contracts
-import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
 import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 import { Proxy } from "src/universal/Proxy.sol";
 
@@ -14,8 +14,9 @@ import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
 /// @title ProtocolVersions_TestInit
-/// @notice Reusable test initialization for ProtocolVersions tests.
-abstract contract ProtocolVersions_TestInit is Test {
+/// @notice Reusable test initialization for ProtocolVersions tests. Runs against the
+///         `protocolVersions` instance deployed by the standard SystemDeploy script.
+abstract contract ProtocolVersions_TestInit is CommonTest {
     event UpgradeRegistered(uint256 indexed id);
     event MinimumProtocolVersionUpdated(uint256 indexed protocolVersion);
     event IncidentResponderUpdated(address indexed previousIncidentResponder, address indexed newIncidentResponder);
@@ -25,35 +26,14 @@ abstract contract ProtocolVersions_TestInit is Test {
     uint256 internal constant CANYON = 0;
     uint256 internal constant ECOTONE = 1;
 
-    address internal _owner = makeAddr("owner");
+    address internal _owner;
     address internal _nonOwner = makeAddr("non-owner");
     address internal _incidentResponder = makeAddr("incident-responder");
-    address internal _proxyAdmin = makeAddr("proxy-admin");
-    ProtocolVersions internal _impl;
-    ProtocolVersions internal protocolVersions;
 
-    function setUp() public virtual {
-        // proxyAdminOwner() resolves by calling owner() on the ProxyAdmin stored in the proxy slot.
-        vm.mockCall(_proxyAdmin, abi.encodeWithSignature("owner()"), abi.encode(_owner));
-        _impl = new ProtocolVersions();
-        protocolVersions = ProtocolVersions(_deployInitializedProxy(address(0)));
-    }
-
-    /// @dev Deploys a proxy (admin = _proxyAdmin) over the shared impl and initializes it via the
-    ///      proxy, appointing `_team` as the incidentResponder.
-    function _deployInitializedProxy(address _team) internal returns (address proxy_) {
-        Proxy proxy = new Proxy(_proxyAdmin);
-        vm.prank(_proxyAdmin);
-        proxy.upgradeToAndCall(address(_impl), abi.encodeCall(IProtocolVersions.initialize, (_team)));
-        proxy_ = address(proxy);
-    }
-
-    /// @dev Deploys an uninitialized proxy over the shared impl (for initializer tests).
-    function _deployUninitializedProxy() internal returns (ProtocolVersions) {
-        Proxy proxy = new Proxy(_proxyAdmin);
-        vm.prank(_proxyAdmin);
-        proxy.upgradeTo(address(_impl));
-        return ProtocolVersions(address(proxy));
+    function setUp() public virtual override {
+        super.setUp();
+        skipIfForkTest("ProtocolVersions_TestInit: cannot test on forked network");
+        _owner = proxyAdminOwner;
     }
 
     /// @dev Registers the first upgrade (id CANYON) and schedules it for block.timestamp + MIN_NOTICE + delay.
@@ -72,23 +52,28 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
     /// @notice Tests that initialization sets the correct initial state. The seed is bytes32(0), so
     ///         the initial scheduleId is bytes32(0) until the first upgrade is registered.
     function test_initialize_setsInitialState_succeeds() external view {
-        assertEq(protocolVersions.proxyAdminOwner(), _owner);
+        // The owner is inherited from the shared ProxyAdmin; initialize records the incident
+        // responder from config and seeds the hash chain (scheduleId == the bytes32(0) seed).
+        assertEq(protocolVersions.proxyAdminOwner(), proxyAdminOwner);
+        assertEq(protocolVersions.incidentResponder(), deploy.cfg().superchainConfigIncidentResponder());
         assertEq(protocolVersions.scheduleId(), bytes32(0));
     }
 
     /// @notice Tests that initialization appoints the provided incidentResponder and emits the event.
+    /// @dev Requires a fresh uninitialized proxy rather than the already-initialized shared instance.
     function test_initialize_setsIncidentResponder_succeeds() external {
-        ProtocolVersions uninitialized = _deployUninitializedProxy();
+        IProtocolVersions uninitialized = _deployUninitializedProxy();
         vm.expectEmit(true, true, false, false, address(uninitialized));
         emit IncidentResponderUpdated(address(0), _incidentResponder);
-        vm.prank(_proxyAdmin);
+        vm.prank(EIP1967Helper.getAdmin(address(uninitialized)));
         uninitialized.initialize(_incidentResponder);
         assertEq(uninitialized.incidentResponder(), _incidentResponder);
     }
 
     /// @notice Tests that only the ProxyAdmin or its owner can initialize.
+    /// @dev Requires a fresh uninitialized proxy rather than the already-initialized shared instance.
     function test_initialize_notProxyAdminOrOwner_reverts() external {
-        ProtocolVersions uninitialized = _deployUninitializedProxy();
+        IProtocolVersions uninitialized = _deployUninitializedProxy();
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
         vm.prank(_nonOwner);
         uninitialized.initialize(_incidentResponder);
@@ -97,15 +82,28 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
     /// @notice Tests that the contract cannot be initialized twice.
     function test_initialize_alreadyInitialized_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
-        vm.prank(_proxyAdmin);
+        vm.prank(EIP1967Helper.getAdmin(address(protocolVersions)));
         protocolVersions.initialize(address(0));
     }
 
     /// @notice Tests that the implementation itself cannot be initialized (initializers disabled).
     function test_initialize_implementationDisabled_reverts() external {
+        IProtocolVersions impl = IProtocolVersions(EIP1967Helper.getImplementation(address(protocolVersions)));
         vm.expectRevert("Initializable: contract is already initialized");
-        vm.prank(_proxyAdmin);
-        _impl.initialize(address(0));
+        impl.initialize(address(0));
+    }
+
+    /// @dev Deploys a fresh uninitialized proxy over the impl produced by SystemDeploy for the two
+    ///      initializer tests that genuinely need one. proxyAdminOwner() resolves by calling owner()
+    ///      on the ProxyAdmin stored in the proxy slot, so the mock provides one.
+    function _deployUninitializedProxy() internal returns (IProtocolVersions) {
+        address proxyAdmin = makeAddr("proxy-admin");
+        vm.mockCall(proxyAdmin, abi.encodeWithSignature("owner()"), abi.encode(_owner));
+        Proxy proxy = new Proxy(proxyAdmin);
+        address impl = EIP1967Helper.getImplementation(address(protocolVersions));
+        vm.prank(proxyAdmin);
+        proxy.upgradeTo(impl);
+        return IProtocolVersions(address(proxy));
     }
 }
 

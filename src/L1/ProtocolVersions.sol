@@ -38,6 +38,43 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 ///      The contract is deployed behind an OP proxy: the implementation constructor disables
 ///      initializers, and `initialize` (run through the proxy) seeds the hash chain.
 contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, ReinitializableBase, ISemver {
+    /// @notice Minimum notice period required when scheduling or modifying an activation timestamp.
+    uint64 public constant MIN_NOTICE = 1 hours;
+
+    /// @notice Activation timestamp for each registered upgrade, indexed by upgrade id (0 = not scheduled).
+    ///         An upgrade id is registered iff it is a valid index into this array.
+    uint64[] private _timestamps;
+
+    /// @notice Hash chain links. Element 0 is the seed (`bytes32(0)`), pushed in `initialize`;
+    ///         element `i + 1` is the cumulative hash through upgrade `i`:
+    ///         _upgradeScheduleId[i + 1] = keccak256(abi.encode(_upgradeScheduleId[i], i, _timestamps[i])).
+    ///         Stored per-link so that changing upgrade j's timestamp recomputes only j..n-1 links
+    ///         rather than the entire chain. Non-empty iff the contract has been initialized.
+    bytes32[] private _upgradeScheduleId;
+
+    /// @notice The minimum protocol version clients must run. Settable by the owner via
+    ///         `setMinimumProtocolVersion`. Informational only — read offchain by clients;
+    ///         not part of the scheduleId commitment.
+    uint256 public minimumProtocolVersion;
+
+    /// @notice Address allowed to delay (push out) already-scheduled activation timestamps.
+    /// @dev Appointed and revocable by the owner. This is a restricted secondary role: it can
+    ///      only move an already-scheduled, not-yet-activated upgrade further into the future via
+    ///      `delayTimestamp`. It cannot register upgrades, clear timestamps, pull an activation
+    ///      earlier, or schedule a brand-new activation. Unset (zero) by default.
+    address public incidentResponder;
+
+    /// @notice Emitted when a new upgrade is registered.
+    event UpgradeRegistered(uint256 indexed id);
+    /// @notice Emitted when the minimum protocol version clients must run is updated.
+    event MinimumProtocolVersionUpdated(uint256 indexed protocolVersion);
+    /// @notice Emitted when an upgrade's activation timestamp is set, cleared, or delayed.
+    event TimestampSet(uint256 indexed id, uint256 timestamp);
+    /// @notice Emitted when the schedule commitment changes.
+    event ScheduleIdUpdated(bytes32 indexed newScheduleId);
+    /// @notice Emitted when the incidentResponder role changes.
+    event IncidentResponderUpdated(address indexed previousIncidentResponder, address indexed newIncidentResponder);
+
     /// @notice Thrown when an upgrade id is not registered.
     error ProtocolVersions_UnknownUpgrade(uint256 id);
     /// @notice Thrown when a protocol version is zero.
@@ -54,49 +91,6 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     error ProtocolVersions_NotInitialized();
     /// @notice Thrown when a non-zero timestamp does not provide at least MIN_NOTICE seconds of notice.
     error ProtocolVersions_InsufficientNotice(uint64 timestamp);
-
-    /// @notice Emitted when a new upgrade is registered.
-    event UpgradeRegistered(uint256 indexed id);
-    /// @notice Emitted when the minimum protocol version clients must run is updated.
-    event MinimumProtocolVersionUpdated(uint256 indexed protocolVersion);
-    /// @notice Emitted when an upgrade's activation timestamp is set, cleared, or delayed.
-    event TimestampSet(uint256 indexed id, uint256 timestamp);
-    /// @notice Emitted when the schedule commitment changes.
-    event ScheduleIdUpdated(bytes32 indexed newScheduleId);
-    /// @notice Emitted when the incidentResponder role changes.
-    event IncidentResponderUpdated(address indexed previousIncidentResponder, address indexed newIncidentResponder);
-
-    /// @notice Minimum notice period required when scheduling or modifying an activation timestamp.
-    uint64 public constant MIN_NOTICE = 1 hours;
-
-    /// @notice Activation timestamp for each registered upgrade, indexed by upgrade id (0 = not scheduled).
-    ///         An upgrade id is registered iff it is a valid index into this array.
-    uint64[] internal _timestamps;
-
-    /// @notice Hash chain links. Element 0 is the seed (`bytes32(0)`), pushed in `initialize`;
-    ///         element `i + 1` is the cumulative hash through upgrade `i`:
-    ///         _upgradeScheduleId[i + 1] = keccak256(abi.encode(_upgradeScheduleId[i], i, _timestamps[i])).
-    ///         Stored per-link so that changing upgrade j's timestamp recomputes only j..n-1 links
-    ///         rather than the entire chain. Non-empty iff the contract has been initialized.
-    bytes32[] internal _upgradeScheduleId;
-
-    /// @notice The minimum protocol version clients must run. Settable by the owner via
-    ///         `setMinimumProtocolVersion`. Informational only — read offchain by clients;
-    ///         not part of the scheduleId commitment.
-    uint256 public minimumProtocolVersion;
-
-    /// @notice Address allowed to delay (push out) already-scheduled activation timestamps.
-    /// @dev Appointed and revocable by the owner. This is a restricted secondary role: it can
-    ///      only move an already-scheduled, not-yet-activated upgrade further into the future via
-    ///      `delayTimestamp`. It cannot register upgrades, clear timestamps, pull an activation
-    ///      earlier, or schedule a brand-new activation. Unset (zero) by default.
-    address public incidentResponder;
-
-    /// @notice Semantic version.
-    /// @custom:semver 1.0.0
-    function version() public pure virtual returns (string memory) {
-        return "1.0.0";
-    }
 
     /// @notice Disables initializers on the implementation so it can only be used behind a proxy.
     constructor() ReinitializableBase(1) {
@@ -118,33 +112,6 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
 
         incidentResponder = _incidentResponder;
         emit IncidentResponderUpdated(address(0), _incidentResponder);
-    }
-
-    /// @notice Returns the canonical schedule commitment.
-    /// @return The current scheduleId hash.
-    function scheduleId() external view returns (bytes32) {
-        uint256 n = _upgradeScheduleId.length;
-        if (n == 0) revert ProtocolVersions_NotInitialized();
-        return _upgradeScheduleId[n - 1];
-    }
-
-    /// @notice Returns the schedule commitment as of a specific registered upgrade.
-    /// @param id The upgrade id to query.
-    /// @return The scheduleId hash committing to upgrades 0 through `id`.
-    function scheduleId(uint256 id) external view returns (bytes32) {
-        _assertRegistered(id);
-        // Upgrade `id`'s cumulative hash lives at index id + 1 (index 0 is the seed).
-        return _upgradeScheduleId[id + 1];
-    }
-
-    /// @notice Returns the activation timestamp for every registered upgrade, ordered by upgrade id
-    ///         (0 = not scheduled). The array index equals the upgrade `id`; names are resolved
-    ///         offchain, and per-upgrade schedule hashes can be reproduced from these timestamps and
-    ///         the seed or read via `scheduleId(id)`.
-    /// @dev Calling via eth_call is gas-free; no transaction is submitted.
-    /// @return Ordered activation timestamps, one per registered upgrade.
-    function getSchedule() external view returns (uint64[] memory) {
-        return _timestamps;
     }
 
     /// @notice Registers a new upgrade, assigning it the next ascending id, optionally scheduling its
@@ -246,9 +213,42 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         _writeTimestamp(id, newTimestamp);
     }
 
+    /// @notice Returns the canonical schedule commitment.
+    /// @return The current scheduleId hash.
+    function scheduleId() external view returns (bytes32) {
+        uint256 n = _upgradeScheduleId.length;
+        if (n == 0) revert ProtocolVersions_NotInitialized();
+        return _upgradeScheduleId[n - 1];
+    }
+
+    /// @notice Returns the schedule commitment as of a specific registered upgrade.
+    /// @param id The upgrade id to query.
+    /// @return The scheduleId hash committing to upgrades 0 through `id`.
+    function scheduleId(uint256 id) external view returns (bytes32) {
+        _assertRegistered(id);
+        // Upgrade `id`'s cumulative hash lives at index id + 1 (index 0 is the seed).
+        return _upgradeScheduleId[id + 1];
+    }
+
+    /// @notice Returns the activation timestamp for every registered upgrade, ordered by upgrade id
+    ///         (0 = not scheduled). The array index equals the upgrade `id`; names are resolved
+    ///         offchain, and per-upgrade schedule hashes can be reproduced from these timestamps and
+    ///         the seed or read via `scheduleId(id)`.
+    /// @dev Calling via eth_call is gas-free; no transaction is submitted.
+    /// @return Ordered activation timestamps, one per registered upgrade.
+    function getSchedule() external view returns (uint64[] memory) {
+        return _timestamps;
+    }
+
+    /// @notice Semantic version.
+    /// @custom:semver 1.0.0
+    function version() public pure virtual returns (string memory) {
+        return "1.0.0";
+    }
+
     /// @dev Writes newTs, emits TimestampSet, and refreshes the hash chain. All validation is
     ///      the caller's responsibility.
-    function _writeTimestamp(uint256 id, uint64 newTs) internal {
+    function _writeTimestamp(uint256 id, uint64 newTs) private {
         _timestamps[id] = newTs;
         emit TimestampSet(id, newTs);
         _refreshScheduleId(id);
@@ -256,7 +256,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
 
     /// @dev Writes the minimum protocol version and emits the update. Validation is the caller's
     ///      responsibility.
-    function _writeMinimumProtocolVersion(uint256 protocolVersion) internal {
+    function _writeMinimumProtocolVersion(uint256 protocolVersion) private {
         minimumProtocolVersion = protocolVersion;
         emit MinimumProtocolVersionUpdated(protocolVersion);
     }
@@ -265,7 +265,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     ///      bubbles the result through all subsequent registered upgrades. Cost is O(n-startIndex).
     ///      Only ever called after a state change (registration, or a timestamp that actually moved),
     ///      so the resulting tail is always a new scheduleId.
-    function _refreshScheduleId(uint256 startIndex) internal {
+    function _refreshScheduleId(uint256 startIndex) private {
         uint256 n = _timestamps.length;
 
         // _upgradeScheduleId[startIndex] is the link preceding upgrade `startIndex` (the seed when
@@ -280,7 +280,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     }
 
     /// @dev Reverts if `id` is not a registered upgrade.
-    function _assertRegistered(uint256 id) internal view {
+    function _assertRegistered(uint256 id) private view {
         if (id >= _timestamps.length) revert ProtocolVersions_UnknownUpgrade(id);
     }
 }
