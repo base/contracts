@@ -176,7 +176,13 @@ contract FeeDisburser is ProxyAdminOwnedBase, ISemver {
         uint256 disbursementTime = block.timestamp;
         lastDisbursementTime = disbursementTime;
 
-        _processSystemAddressRefunds();
+        uint256 systemAddressesLength = systemAddresses.length;
+        for (uint256 i; i < systemAddressesLength;) {
+            _refillBalanceIfNeeded({ systemAddress: systemAddresses[i], targetBalance: targetBalances[i] });
+            unchecked {
+                i++;
+            }
+        }
 
         uint256 bridgeBalance = address(this).balance;
         if (bridgeBalance == 0) {
@@ -206,12 +212,24 @@ contract FeeDisburser is ProxyAdminOwnedBase, ISemver {
         virtual
     {
         _assertOnlyProxyAdmin();
-        _validateSystemAddressConfig(systemAddresses_, targetBalances_);
+
+        uint256 systemAddressesLength = systemAddresses_.length;
+        if (systemAddressesLength == 0) revert EmptySystemAddresses();
+        if (systemAddressesLength > MAX_SYSTEM_ADDRESS_COUNT) revert TooManySystemAddresses();
+        if (systemAddressesLength != targetBalances_.length) revert ArrayLengthMismatch();
+
+        for (uint256 i; i < systemAddressesLength;) {
+            if (systemAddresses_[i] == address(0)) revert ZeroAddress();
+            if (targetBalances_[i] == 0) revert ZeroTargetBalance();
+            unchecked {
+                i++;
+            }
+        }
 
         systemAddresses = systemAddresses_;
         targetBalances = targetBalances_;
 
-        emit SystemAddressesUpdated(systemAddresses_.length);
+        emit SystemAddressesUpdated(systemAddressesLength);
     }
 
     /// @notice Receives ETH fees withdrawn from L2 FeeVaults.
@@ -268,39 +286,4 @@ contract FeeDisburser is ProxyAdminOwnedBase, ISemver {
         }
     }
 
-    /// @notice Refills configured system addresses up to their target balances.
-    function _processSystemAddressRefunds() private {
-        uint256 systemAddressesLength = systemAddresses.length;
-        for (uint256 i; i < systemAddressesLength;) {
-            _refillBalanceIfNeeded({ systemAddress: systemAddresses[i], targetBalance: targetBalances[i] });
-            unchecked {
-                i++;
-            }
-        }
-    }
-
-    /// @notice Validates system address refund configuration.
-    ///
-    /// @param systemAddresses_ The system addresses being funded.
-    /// @param targetBalances_  The target balances for system addresses.
-    function _validateSystemAddressConfig(
-        address payable[] memory systemAddresses_,
-        uint256[] memory targetBalances_
-    )
-        private
-        pure
-    {
-        uint256 systemAddressesLength = systemAddresses_.length;
-        if (systemAddressesLength == 0) revert EmptySystemAddresses();
-        if (systemAddressesLength > MAX_SYSTEM_ADDRESS_COUNT) revert TooManySystemAddresses();
-        if (systemAddressesLength != targetBalances_.length) revert ArrayLengthMismatch();
-
-        for (uint256 i; i < systemAddressesLength;) {
-            if (systemAddresses_[i] == address(0)) revert ZeroAddress();
-            if (targetBalances_[i] == 0) revert ZeroTargetBalance();
-            unchecked {
-                i++;
-            }
-        }
-    }
 }

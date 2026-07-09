@@ -125,6 +125,20 @@ contract FeeDisburserTest is Test {
         feeDisburser.setSystemAddresses(addrs, balances);
     }
 
+    function _makeSingleConfig(
+        address payable addr,
+        uint256 balance
+    )
+        internal
+        pure
+        returns (address payable[] memory addrs, uint256[] memory balances)
+    {
+        addrs = new address payable[](1);
+        addrs[0] = addr;
+        balances = new uint256[](1);
+        balances[0] = balance;
+    }
+
     // ============================================================
     //                    Constructor Tests
     // ============================================================
@@ -802,10 +816,7 @@ contract FeeDisburserTest is Test {
     // ============================================================
 
     function test_setSystemAddresses_success() public {
-        address payable[] memory addrs = new address payable[](1);
-        addrs[0] = SYSTEM_ADDR;
-        uint256[] memory balances = new uint256[](1);
-        balances[0] = 1 ether;
+        (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, 1 ether);
 
         _setProxyAdmin();
 
@@ -820,16 +831,10 @@ contract FeeDisburserTest is Test {
     }
 
     function test_setSystemAddresses_success_overwrites() public {
-        address payable[] memory addrs1 = new address payable[](1);
-        addrs1[0] = SYSTEM_ADDR;
-        uint256[] memory balances1 = new uint256[](1);
-        balances1[0] = 1 ether;
+        (address payable[] memory addrs1, uint256[] memory balances1) = _makeSingleConfig(SYSTEM_ADDR, 1 ether);
         _setSystemAddresses(addrs1, balances1);
 
-        address payable[] memory addrs2 = new address payable[](1);
-        addrs2[0] = payable(ALICE);
-        uint256[] memory balances2 = new uint256[](1);
-        balances2[0] = 2 ether;
+        (address payable[] memory addrs2, uint256[] memory balances2) = _makeSingleConfig(payable(ALICE), 2 ether);
 
         vm.expectEmit(address(feeDisburser));
         emit SystemAddressesUpdated(1);
@@ -842,10 +847,7 @@ contract FeeDisburserTest is Test {
     }
 
     function test_setSystemAddresses_revert_notProxyAdmin() public {
-        address payable[] memory addrs = new address payable[](1);
-        addrs[0] = SYSTEM_ADDR;
-        uint256[] memory balances = new uint256[](1);
-        balances[0] = 1 ether;
+        (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, 1 ether);
 
         _setProxyAdmin();
 
@@ -893,10 +895,7 @@ contract FeeDisburserTest is Test {
     }
 
     function test_setSystemAddresses_revert_zeroAddress() public {
-        address payable[] memory addrs = new address payable[](1);
-        addrs[0] = payable(address(0));
-        uint256[] memory balances = new uint256[](1);
-        balances[0] = 1 ether;
+        (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(payable(address(0)), 1 ether);
 
         _setProxyAdmin();
 
@@ -906,10 +905,7 @@ contract FeeDisburserTest is Test {
     }
 
     function test_setSystemAddresses_revert_zeroTargetBalance() public {
-        address payable[] memory addrs = new address payable[](1);
-        addrs[0] = SYSTEM_ADDR;
-        uint256[] memory balances = new uint256[](1);
-        balances[0] = 0;
+        (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, 0);
 
         _setProxyAdmin();
 
@@ -926,12 +922,7 @@ contract FeeDisburserTest is Test {
         uint256 feeAmount = 10 ether;
         uint256 targetBal = 2 ether;
 
-        vm.deal(SYSTEM_ADDR, 0);
-
-        address payable[] memory addrs = new address payable[](1);
-        addrs[0] = SYSTEM_ADDR;
-        uint256[] memory balances = new uint256[](1);
-        balances[0] = targetBal;
+        (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, targetBal);
         _setSystemAddresses(addrs, balances);
 
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
@@ -957,10 +948,7 @@ contract FeeDisburserTest is Test {
 
         vm.deal(SYSTEM_ADDR, targetBal);
 
-        address payable[] memory addrs = new address payable[](1);
-        addrs[0] = SYSTEM_ADDR;
-        uint256[] memory balances = new uint256[](1);
-        balances[0] = targetBal;
+        (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, targetBal);
         _setSystemAddresses(addrs, balances);
 
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
@@ -983,12 +971,7 @@ contract FeeDisburserTest is Test {
         uint256 feeAmount = 5 ether;
         uint256 targetBal = 10 ether;
 
-        vm.deal(SYSTEM_ADDR, 0);
-
-        address payable[] memory addrs = new address payable[](1);
-        addrs[0] = SYSTEM_ADDR;
-        uint256[] memory balances = new uint256[](1);
-        balances[0] = targetBal;
+        (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, targetBal);
         _setSystemAddresses(addrs, balances);
 
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
@@ -1014,10 +997,7 @@ contract FeeDisburserTest is Test {
 
         vm.deal(SYSTEM_ADDR, systemAddrStartBal);
 
-        address payable[] memory addrs = new address payable[](1);
-        addrs[0] = SYSTEM_ADDR;
-        uint256[] memory balances = new uint256[](1);
-        balances[0] = targetBal;
+        (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, targetBal);
         _setSystemAddresses(addrs, balances);
 
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
@@ -1045,10 +1025,8 @@ contract FeeDisburserTest is Test {
     function test_disburseFees_reentrancy_innerCallBlocked() public {
         ReentrantReceiver attacker = new ReentrantReceiver(feeDisburser);
 
-        address payable[] memory addrs = new address payable[](1);
-        addrs[0] = payable(address(attacker));
-        uint256[] memory balances = new uint256[](1);
-        balances[0] = 1 ether;
+        (address payable[] memory addrs, uint256[] memory balances) =
+            _makeSingleConfig(payable(address(attacker)), 1 ether);
         _setSystemAddresses(addrs, balances);
 
         uint256 feeAmount = 2 ether;
