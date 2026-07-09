@@ -785,17 +785,17 @@ abstract contract MultisigScript is Script {
     function _encodeTransactionData(address safe, Call memory call) internal view returns (bytes memory) {
         return IGnosisSafe(safe)
             .encodeTransactionData({
-                to: call.target,
-                value: call.value,
-                data: call.data,
-                operation: call.operation,
-                safeTxGas: 0,
-                baseGas: 0,
-                gasPrice: 0,
-                gasToken: address(0),
-                refundReceiver: address(0),
-                _nonce: _getNonce(safe)
-            });
+            to: call.target,
+            value: call.value,
+            data: call.data,
+            operation: call.operation,
+            safeTxGas: 0,
+            baseGas: 0,
+            gasPrice: 0,
+            gasToken: address(0),
+            refundReceiver: address(0),
+            _nonce: _getNonce(safe)
+        });
     }
 
     /// @notice Encodes the transaction as EIP-712 structured JSON for hardware wallet signing.
@@ -850,11 +850,11 @@ abstract contract MultisigScript is Script {
 
         IGnosisSafe(safe)
             .checkSignatures({
-                dataHash: hash,
-                data: _encodeTransactionData({ safe: safe, call: call }), // NOTE: This field is the data preimage but
-                // not strictly required as `checkSignatures` ignores it.
-                signatures: signatures
-            });
+            dataHash: hash,
+            data: _encodeTransactionData({ safe: safe, call: call }), // NOTE: This field is the data preimage but
+            // not strictly required as `checkSignatures` ignores it.
+            signatures: signatures
+        });
     }
 
     /// @notice Gets the transaction hash for the given safe and call.
@@ -928,17 +928,17 @@ abstract contract MultisigScript is Script {
 
         return IGnosisSafe(safe)
             .execTransaction({
-                to: call.target,
-                value: call.value,
-                data: call.data,
-                operation: call.operation,
-                safeTxGas: 0,
-                baseGas: 0,
-                gasPrice: 0,
-                gasToken: address(0),
-                refundReceiver: payable(address(0)),
-                signatures: signatures
-            });
+            to: call.target,
+            value: call.value,
+            data: call.data,
+            operation: call.operation,
+            safeTxGas: 0,
+            baseGas: 0,
+            gasPrice: 0,
+            gasToken: address(0),
+            refundReceiver: payable(address(0)),
+            signatures: signatures
+        });
     }
 
     /// @notice Gets the type for the given call.

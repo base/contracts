@@ -35,7 +35,9 @@ contract FeeDisburserTest is Test {
     event FeesDisbursed(uint256 disbursementTime, uint256 deprecated, uint256 totalFeesDisbursed);
     event FeesReceived(address indexed sender, uint256 amount);
     event NoFeesCollected();
-    event ProcessedFunds(address indexed systemAddress, bool indexed success, uint256 balanceNeeded, uint256 balanceSent);
+    event ProcessedFunds(
+        address indexed systemAddress, bool indexed success, uint256 balanceNeeded, uint256 balanceSent
+    );
     event SystemAddressesUpdated(uint256 systemAddressCount);
 
     // Constants
@@ -1072,8 +1074,7 @@ contract FeeDisburserTest is Test {
     function test_disburseFees_success_revertingRecipient() public {
         RevertingReceiver bad = new RevertingReceiver();
 
-        (address payable[] memory addrs, uint256[] memory balances) =
-            _makeSingleConfig(payable(address(bad)), 1 ether);
+        (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(payable(address(bad)), 1 ether);
         _setSystemAddresses(addrs, balances);
 
         uint256 feeAmount = 2 ether;
