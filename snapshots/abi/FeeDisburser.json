@@ -304,7 +304,7 @@
   },
   {
     "inputs": [],
-    "name": "Reentrancy",
+    "name": "ReentrantCall",
     "type": "error"
   },
   {

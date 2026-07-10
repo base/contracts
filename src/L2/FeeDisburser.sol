@@ -7,12 +7,11 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { SafeCall } from "src/libraries/SafeCall.sol";
 import { Initializable } from "src/vendor/Initializable.sol";
-import { ReentrancyGuard } from "lib/solady/src/utils/ReentrancyGuard.sol";
 
 /// @custom:proxied true
 /// @title FeeDisburser
 /// @notice Withdraws funds from system FeeVault contracts and bridges to L1.
-contract FeeDisburser is Initializable, ReentrancyGuard, ISemver {
+contract FeeDisburser is Initializable, ISemver {
     ////////////////////////////////////////////////////////////////
     ///                     Constants
     ////////////////////////////////////////////////////////////////
@@ -44,6 +43,9 @@ contract FeeDisburser is Initializable, ReentrancyGuard, ISemver {
     /// @notice Previously tracked the aggregate net fee revenue (sum of sequencer and base fees).
     ///         This variable is deprecated and its value should not be relied upon.
     uint256 public netFeeRevenue;
+
+    /// @notice Reentrancy guard status for disburseFees.
+    uint256 private _disburseFeesEntered;
 
     /// @notice The L2 system addresses being funded.
     address payable[] public systemAddresses;
@@ -110,6 +112,23 @@ contract FeeDisburser is Initializable, ReentrancyGuard, ISemver {
     /// @notice Thrown when a system address target balance is zero.
     error ZeroTargetBalance();
 
+    /// @notice Thrown when disburseFees is reentered.
+    error ReentrantCall();
+
+    ////////////////////////////////////////////////////////////////
+    ///                       Modifiers
+    ////////////////////////////////////////////////////////////////
+
+    /// @notice Prevents reentrancy into disburseFees while preserving the existing storage layout.
+    ///         Uses 1/2 sentinel values so the slot stays nonzero after first use, keeping
+    ///         subsequent SSTOREs warm. Uninitialized (0) is treated as not-entered.
+    modifier nonReentrantDisbursement() {
+        if (_disburseFeesEntered == 2) revert ReentrantCall();
+        _disburseFeesEntered = 2;
+        _;
+        _disburseFeesEntered = 1;
+    }
+
     ////////////////////////////////////////////////////////////////
     ///                     Constructor
     ////////////////////////////////////////////////////////////////
@@ -131,7 +150,7 @@ contract FeeDisburser is Initializable, ReentrancyGuard, ISemver {
     ////////////////////////////////////////////////////////////////
 
     /// @notice Withdraws funds from FeeVaults and bridges to L1.
-    function disburseFees() external virtual nonReentrant {
+    function disburseFees() external virtual nonReentrantDisbursement {
         if (block.timestamp < lastDisbursementTime + FEE_DISBURSEMENT_INTERVAL) revert IntervalNotReached();
 
         // Sequencer, base, and L1 FeeVaults will withdraw fees to the FeeDisburser contract.
