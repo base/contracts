@@ -1,0 +1,5 @@
+# Pins the Foundry version to match CI. Install mise (https://mise.jdx.dev) then run:
+#   mise install   — installs pinned tools
+#   mise use       — activates them in your shell
+[tools]
+foundry = "stable"
