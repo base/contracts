@@ -6,12 +6,13 @@ import { IFeeVault, Types } from "interfaces/L2/IFeeVault.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { SafeCall } from "src/libraries/SafeCall.sol";
+import { Initializable } from "src/vendor/Initializable.sol";
 import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 
 /// @custom:proxied true
 /// @title FeeDisburser
 /// @notice Withdraws funds from system FeeVault contracts and bridges to L1.
-contract FeeDisburser is ProxyAdminOwnedBase, ISemver {
+contract FeeDisburser is Initializable, ProxyAdminOwnedBase, ISemver {
     ////////////////////////////////////////////////////////////////
     ///                     Constants
     ////////////////////////////////////////////////////////////////
@@ -199,21 +200,17 @@ contract FeeDisburser is ProxyAdminOwnedBase, ISemver {
     }
 
     /// @notice Configures the L2 system addresses to refund and their target balances.
-    ///         Passing empty arrays clears the configuration and disables refunding.
-    ///
-    /// @dev Callable only by the ProxyAdmin.
+    ///         Called via upgradeAndCall when upgrading to this version.
     ///
     /// @param systemAddresses_ The system addresses being funded.
     /// @param targetBalances_  The target balances for system addresses.
-    function setSystemAddresses(
+    function initialize(
         address payable[] memory systemAddresses_,
         uint256[] memory targetBalances_
     )
         external
-        virtual
+        reinitializer(2)
     {
-        _assertOnlyProxyAdmin();
-
         uint256 systemAddressesLength = systemAddresses_.length;
         if (systemAddressesLength > MAX_SYSTEM_ADDRESS_COUNT) revert TooManySystemAddresses();
         if (systemAddressesLength != targetBalances_.length) revert ArrayLengthMismatch();
