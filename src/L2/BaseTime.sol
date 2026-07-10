@@ -27,10 +27,9 @@ contract BaseTime is IBaseTime {
     /// @inheritdoc IBaseTime
     function setTimestampMillisPart(uint16 _timestampMillisPart) external {
         if (msg.sender != Constants.DEPOSITOR_ACCOUNT) revert BaseTime_NotDepositor();
-        if (
-            _timestampMillisPart != 0 && _timestampMillisPart != 200 && _timestampMillisPart != 400
-                && _timestampMillisPart != 600 && _timestampMillisPart != 800
-        ) revert BaseTime_InvalidTimestampMillisPart();
+        if (_timestampMillisPart > 800 || _timestampMillisPart % 200 != 0) {
+            revert BaseTime_InvalidTimestampMillisPart();
+        }
 
         timestampMillisPart = _timestampMillisPart;
     }

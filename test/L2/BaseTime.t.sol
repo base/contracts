@@ -28,9 +28,9 @@ abstract contract BaseTime_TestInit is Test {
     }
 }
 
-/// @title BaseTime_InitialValue_Test
+/// @title BaseTime_TimestampMillisPart_Test
 /// @notice Tests BaseTime's initial value.
-contract BaseTime_InitialValue_Test is BaseTime_TestInit {
+contract BaseTime_TimestampMillisPart_Test is BaseTime_TestInit {
     /// @notice Tests that the millisecond component initially equals zero.
     function test_initialValue_succeeds() external view {
         assertEq(baseTime.timestampMillisPart(), 0);
@@ -52,10 +52,7 @@ contract BaseTime_SetTimestampMillisPart_Test is BaseTime_TestInit {
 
     /// @notice Tests that an invalid millisecond component is rejected.
     function testFuzz_setTimestampMillisPart_invalidValue_reverts(uint16 _timestampMillisPart) external {
-        vm.assume(
-            _timestampMillisPart != 0 && _timestampMillisPart != 200 && _timestampMillisPart != 400
-                && _timestampMillisPart != 600 && _timestampMillisPart != 800
-        );
+        vm.assume(_timestampMillisPart > 800 || _timestampMillisPart % 200 != 0);
         vm.expectRevert(IBaseTime.BaseTime_InvalidTimestampMillisPart.selector);
         vm.prank(Constants.DEPOSITOR_ACCOUNT);
         baseTime.setTimestampMillisPart(_timestampMillisPart);
