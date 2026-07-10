@@ -64,8 +64,8 @@
     "sourceCodeHash": "0xcb329746df0baddd3dc03c6c88da5d6bdc0f0a96d30e6dc78d0891bb1e935032"
   },
   "src/L2/FeeDisburser.sol:FeeDisburser": {
-    "initCodeHash": "0xf62b41a2d35184a77e9993b953959ff9297d31114ee7f16b773001ecb94a9f69",
-    "sourceCodeHash": "0x538d5f4be6edc07bdcd8af451590381dc69afceacd7e7e0c21d44137b8a2f5e8"
+    "initCodeHash": "0x46c25925d76d6a6e617f29a4c1d3b1d5239353cd43b27b11a291a5c20b6817bc",
+    "sourceCodeHash": "0x94f559aa6bd8d4c49329b948b17a418dd72abdd6c3cfdb48657664b0146f7968"
   },
   "src/L2/GasPriceOracle.sol:GasPriceOracle": {
     "initCodeHash": "0xf72c23d9c3775afd7b645fde429d09800622d329116feb5ff9829634655123ca",

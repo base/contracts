@@ -24,7 +24,6 @@ contract FeeDisburserTest is Test {
     event ProcessedFunds(
         address indexed systemAddress, bool indexed success, uint256 balanceNeeded, uint256 balanceSent
     );
-    event SystemAddressesUpdated(uint256 systemAddressCount);
 
     // Constants
     uint32 constant WITHDRAWAL_MIN_GAS = 35_000;
@@ -106,10 +105,6 @@ contract FeeDisburserTest is Test {
     function _expectNoFeesCollected() internal {
         vm.expectEmit(address(feeDisburser));
         emit NoFeesCollected();
-    }
-
-    function _initialize(address payable[] memory addrs, uint256[] memory balances) internal {
-        feeDisburser.initialize(addrs, balances);
     }
 
     function _makeSingleConfig(
@@ -805,9 +800,6 @@ contract FeeDisburserTest is Test {
     function test_initialize_success() public {
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, 1 ether);
 
-        vm.expectEmit(address(feeDisburser));
-        emit SystemAddressesUpdated(1);
-
         feeDisburser.initialize(addrs, balances);
 
         assertEq(feeDisburser.systemAddresses(0), SYSTEM_ADDR);
@@ -869,7 +861,7 @@ contract FeeDisburserTest is Test {
         uint256 targetBal = 2 ether;
 
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, targetBal);
-        _initialize(addrs, balances);
+        feeDisburser.initialize(addrs, balances);
 
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
 
@@ -893,7 +885,7 @@ contract FeeDisburserTest is Test {
         vm.deal(SYSTEM_ADDR, targetBal);
 
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, targetBal);
-        _initialize(addrs, balances);
+        feeDisburser.initialize(addrs, balances);
 
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
 
@@ -917,7 +909,7 @@ contract FeeDisburserTest is Test {
         vm.deal(SYSTEM_ADDR, systemAddrStartBal);
 
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, targetBal);
-        _initialize(addrs, balances);
+        feeDisburser.initialize(addrs, balances);
 
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
 
@@ -947,7 +939,7 @@ contract FeeDisburserTest is Test {
         uint256[] memory bals = new uint256[](2);
         bals[0] = target1;
         bals[1] = target2;
-        _initialize(addrs, bals);
+        feeDisburser.initialize(addrs, bals);
 
         uint256 feeAmount = 10 ether;
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
@@ -973,7 +965,7 @@ contract FeeDisburserTest is Test {
         address payable bad = payable(address(0x9999));
 
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(bad, 1 ether);
-        _initialize(addrs, balances);
+        feeDisburser.initialize(addrs, balances);
 
         uint256 feeAmount = 2 ether;
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
@@ -1001,7 +993,7 @@ contract FeeDisburserTest is Test {
 
         (address payable[] memory addrs, uint256[] memory balances) =
             _makeSingleConfig(payable(address(attacker)), 1 ether);
-        _initialize(addrs, balances);
+        feeDisburser.initialize(addrs, balances);
 
         uint256 feeAmount = 2 ether;
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
