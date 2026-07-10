@@ -57,14 +57,14 @@ library Predeploys {
     /// @notice Address of the OperatorFeeVault predeploy.
     address internal constant OPERATOR_FEE_VAULT = 0x420000000000000000000000000000000000001b;
 
-    /// @notice Address of the BaseTime predeploy.
-    address internal constant BASE_TIME = 0x4200000000000000000000000000000000000030;
-
     /// @notice Address of the SchemaRegistry predeploy.
     address internal constant SCHEMA_REGISTRY = 0x4200000000000000000000000000000000000020;
 
     /// @notice Address of the EAS predeploy.
     address internal constant EAS = 0x4200000000000000000000000000000000000021;
+
+    /// @notice Address of the BaseTime predeploy.
+    address internal constant BASE_TIME = 0x4200000000000000000000000000000000000030;
 
     /// @custom:legacy
     /// @notice Address of the LegacyERC20ETH predeploy. Deprecated. Balances are migrated to the
@@ -90,10 +90,10 @@ library Predeploys {
         if (_addr == BASE_FEE_VAULT) return "BaseFeeVault";
         if (_addr == L1_FEE_VAULT) return "L1FeeVault";
         if (_addr == OPERATOR_FEE_VAULT) return "OperatorFeeVault";
-        if (_addr == BASE_TIME) return "BaseTime";
         if (_addr == SCHEMA_REGISTRY) return "SchemaRegistry";
         if (_addr == EAS) return "EAS";
         if (_addr == LEGACY_ERC20_ETH) return "LegacyERC20ETH";
+        if (_addr == BASE_TIME) return "BaseTime";
         revert("Predeploys: unnamed predeploy");
     }
 
@@ -108,7 +108,7 @@ library Predeploys {
             || _addr == L2_STANDARD_BRIDGE || _addr == SEQUENCER_FEE_WALLET || _addr == OPTIMISM_MINTABLE_ERC20_FACTORY
             || _addr == L2_ERC721_BRIDGE || _addr == L1_BLOCK_ATTRIBUTES || _addr == L2_TO_L1_MESSAGE_PASSER
             || _addr == OPTIMISM_MINTABLE_ERC721_FACTORY || _addr == PROXY_ADMIN || _addr == BASE_FEE_VAULT
-            || _addr == L1_FEE_VAULT || _addr == OPERATOR_FEE_VAULT || _addr == SCHEMA_REGISTRY || _addr == EAS;
+            || _addr == L1_FEE_VAULT || _addr == OPERATOR_FEE_VAULT || _addr == SCHEMA_REGISTRY || _addr == EAS || _addr == BASE_TIME;
     }
 
     function isPredeployNamespace(address _addr) internal pure returns (bool) {
