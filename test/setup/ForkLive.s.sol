@@ -21,6 +21,7 @@ import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.so
 import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
@@ -190,6 +191,7 @@ contract ForkLive is Script {
         ISuperchainConfig superchainConfig = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
         IProxyAdmin superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
         address superchainPAO = superchainProxyAdmin.owner();
+        IProtocolVersions protocolVersionsProxy = IProtocolVersions(artifacts.getAddress("ProtocolVersionsProxy"));
 
         // Run the shared SuperchainConfig upgrade as the Superchain ProxyAdmin owner. The script
         // skips this step when the proxy is already at or above the target implementation version.
@@ -199,7 +201,8 @@ contract ForkLive is Script {
                 saveArtifacts: false,
                 superchainConfigProxy: superchainConfig,
                 implementations: implementations,
-                systemConfigProxy: ISystemConfig(address(0))
+                systemConfigProxy: ISystemConfig(address(0)),
+                protocolVersionsProxy: IProtocolVersions(address(0))
             })
         );
 
@@ -210,7 +213,8 @@ contract ForkLive is Script {
                 saveArtifacts: false,
                 superchainConfigProxy: ISuperchainConfig(address(0)),
                 implementations: implementations,
-                systemConfigProxy: _systemConfigProxy
+                systemConfigProxy: _systemConfigProxy,
+                protocolVersionsProxy: protocolVersionsProxy
             })
         );
     }

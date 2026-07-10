@@ -108,6 +108,7 @@ contract SystemDeploy is Script {
         ISuperchainConfig superchainConfigProxy;
         Types.Implementations implementations;
         ISystemConfig systemConfigProxy;
+        IProtocolVersions protocolVersionsProxy;
     }
 
     struct UpgradeOutput {
@@ -339,7 +340,12 @@ contract SystemDeploy is Script {
                 revert SuperchainConfigNeedsUpgrade();
             }
 
-            _upgradeOPChain(systemConfigProxy, _input.implementations);
+            IProtocolVersions protocolVersionsProxy = _input.protocolVersionsProxy;
+            if (address(protocolVersionsProxy) == address(0) && address(artifacts).code.length != 0) {
+                protocolVersionsProxy = IProtocolVersions(artifacts.getAddress("ProtocolVersionsProxy"));
+            }
+
+            _upgradeOPChain(systemConfigProxy, _input.implementations, protocolVersionsProxy);
             output_.chainUpgraded = true;
         }
 
@@ -650,7 +656,13 @@ contract SystemDeploy is Script {
         upgraded_ = true;
     }
 
-    function _upgradeOPChain(ISystemConfig _systemConfigProxy, Types.Implementations memory _impls) internal {
+    function _upgradeOPChain(
+        ISystemConfig _systemConfigProxy,
+        Types.Implementations memory _impls,
+        IProtocolVersions _protocolVersionsProxy
+    )
+        internal
+    {
         IProxyAdmin proxyAdmin = _systemConfigProxy.proxyAdmin();
         uint256 l2ChainId = _systemConfigProxy.l2ChainId();
 
@@ -673,6 +685,10 @@ contract SystemDeploy is Script {
         _upgradeTo(proxyAdmin, opChainAddrs.l1ERC721Bridge, _impls.l1ERC721BridgeImpl);
         if (opChainAddrs.delayedWETH != address(0)) {
             _upgradeTo(proxyAdmin, opChainAddrs.delayedWETH, _impls.delayedWETHImpl);
+        }
+
+        if (address(_protocolVersionsProxy) != address(0)) {
+            _upgradeTo(proxyAdmin, address(_protocolVersionsProxy), _impls.protocolVersionsImpl);
         }
 
         emit Upgraded(l2ChainId, _systemConfigProxy, msg.sender);
