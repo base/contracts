@@ -17,6 +17,7 @@ import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.s
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
@@ -107,6 +108,7 @@ contract SystemDeploy is Script {
         ISuperchainConfig superchainConfigProxy;
         Types.Implementations implementations;
         ISystemConfig systemConfigProxy;
+        IProtocolVersions protocolVersionsProxy;
     }
 
     struct UpgradeOutput {
@@ -218,6 +220,7 @@ contract SystemDeploy is Script {
             disputeGameFactoryImpl: artifacts.mustGetAddress("DisputeGameFactoryImpl"),
             anchorStateRegistryImpl: artifacts.mustGetAddress("AnchorStateRegistryImpl"),
             delayedWETHImpl: artifacts.mustGetAddress("DelayedWETHImpl"),
+            protocolVersionsImpl: artifacts.mustGetAddress("ProtocolVersionsImpl"),
             aggregateVerifierImpl: artifacts.getAddress("AggregateVerifier"),
             teeProverRegistryImpl: artifacts.getAddress("TEEProverRegistryImpl"),
             teeVerifierImpl: artifacts.getAddress("TEEVerifier"),
@@ -279,7 +282,8 @@ contract SystemDeploy is Script {
                 opChainProxyAdminOwner: cfg.finalSystemOwner(),
                 systemConfigOwner: cfg.finalSystemOwner(),
                 batcher: cfg.batchSenderAddress(),
-                unsafeBlockSigner: cfg.p2pSequencerAddress()
+                unsafeBlockSigner: cfg.p2pSequencerAddress(),
+                incidentResponder: cfg.superchainConfigIncidentResponder()
             }),
             basefeeScalar: cfg.basefeeScalar(),
             blobBasefeeScalar: cfg.blobbasefeeScalar(),
@@ -336,7 +340,12 @@ contract SystemDeploy is Script {
                 revert SuperchainConfigNeedsUpgrade();
             }
 
-            _upgradeOPChain(systemConfigProxy, _input.implementations);
+            IProtocolVersions protocolVersionsProxy = _input.protocolVersionsProxy;
+            if (address(protocolVersionsProxy) == address(0) && address(artifacts).code.length != 0) {
+                protocolVersionsProxy = IProtocolVersions(artifacts.getAddress("ProtocolVersionsProxy"));
+            }
+
+            _upgradeOPChain(systemConfigProxy, _input.implementations, protocolVersionsProxy);
             output_.chainUpgraded = true;
         }
 
@@ -447,6 +456,7 @@ contract SystemDeploy is Script {
         output_.delayedWETHImpl = address(_deployDelayedWETHImpl(_input));
         output_.disputeGameFactoryImpl = address(_deployDisputeGameFactoryImpl());
         output_.anchorStateRegistryImpl = address(_deployAnchorStateRegistryImpl(_input));
+        output_.protocolVersionsImpl = address(_deployProtocolVersionsImpl());
     }
 
     function _deployOPChain(
@@ -487,6 +497,8 @@ contract SystemDeploy is Script {
         output_.anchorStateRegistryProxy =
             IAnchorStateRegistry(_deployProxy(_input, output_.opChainProxyAdmin, "AnchorStateRegistry"));
         output_.delayedWETHProxy = IDelayedWETH(payable(_deployProxy(_input, output_.opChainProxyAdmin, "DelayedWETH")));
+        output_.protocolVersionsProxy =
+            IProtocolVersions(_deployProxy(_input, output_.opChainProxyAdmin, "ProtocolVersions"));
 
         output_.l1StandardBridgeProxy = IL1StandardBridge(
             payable(_createDeterministic(
@@ -619,6 +631,13 @@ contract SystemDeploy is Script {
             _impls.anchorStateRegistryImpl,
             _encodeAnchorStateRegistryInitializer(_input, _output)
         );
+
+        _upgradeToAndCall(
+            _output.opChainProxyAdmin,
+            address(_output.protocolVersionsProxy),
+            _impls.protocolVersionsImpl,
+            abi.encodeCall(IProtocolVersions.initialize, (_input.roles.incidentResponder))
+        );
     }
 
     function _upgradeSuperchainConfigIfNeeded(
@@ -637,7 +656,13 @@ contract SystemDeploy is Script {
         upgraded_ = true;
     }
 
-    function _upgradeOPChain(ISystemConfig _systemConfigProxy, Types.Implementations memory _impls) internal {
+    function _upgradeOPChain(
+        ISystemConfig _systemConfigProxy,
+        Types.Implementations memory _impls,
+        IProtocolVersions _protocolVersionsProxy
+    )
+        internal
+    {
         IProxyAdmin proxyAdmin = _systemConfigProxy.proxyAdmin();
         uint256 l2ChainId = _systemConfigProxy.l2ChainId();
 
@@ -660,6 +685,10 @@ contract SystemDeploy is Script {
         _upgradeTo(proxyAdmin, opChainAddrs.l1ERC721Bridge, _impls.l1ERC721BridgeImpl);
         if (opChainAddrs.delayedWETH != address(0)) {
             _upgradeTo(proxyAdmin, opChainAddrs.delayedWETH, _impls.delayedWETHImpl);
+        }
+
+        if (address(_protocolVersionsProxy) != address(0)) {
+            _upgradeTo(proxyAdmin, address(_protocolVersionsProxy), _impls.protocolVersionsImpl);
         }
 
         emit Upgraded(l2ChainId, _systemConfigProxy, msg.sender);
@@ -947,6 +976,16 @@ contract SystemDeploy is Script {
         );
     }
 
+    function _deployProtocolVersionsImpl() internal returns (IProtocolVersions) {
+        return IProtocolVersions(
+            DeployUtils.createDeterministic({
+                _name: "ProtocolVersions",
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IProtocolVersions.__constructor__, ())),
+                _salt: DeployUtils.DEFAULT_SALT
+            })
+        );
+    }
+
     function _deployMultiproofContracts(
         Types.DeployInput memory _opChainInput,
         ImplementationInput memory _input,
@@ -1100,6 +1139,7 @@ contract SystemDeploy is Script {
         DeployUtils.assertValidContractAddress(_impls.disputeGameFactoryImpl);
         DeployUtils.assertValidContractAddress(_impls.anchorStateRegistryImpl);
         DeployUtils.assertValidContractAddress(_impls.delayedWETHImpl);
+        DeployUtils.assertValidContractAddress(_impls.protocolVersionsImpl);
     }
 
     function _implementationsEmpty(Types.Implementations memory _impls) internal pure returns (bool) {
@@ -1125,6 +1165,7 @@ contract SystemDeploy is Script {
         artifacts.save("DisputeGameFactoryProxy", address(chain.disputeGameFactoryProxy));
         artifacts.save("DelayedWETHProxy", address(chain.delayedWETHProxy));
         artifacts.save("AnchorStateRegistryProxy", address(chain.anchorStateRegistryProxy));
+        artifacts.save("ProtocolVersionsProxy", address(chain.protocolVersionsProxy));
         artifacts.save("OptimismPortalProxy", address(chain.optimismPortalProxy));
         artifacts.save("OptimismPortal2Proxy", address(chain.optimismPortalProxy));
         _saveIfSet("TEEProverRegistryProxy", address(chain.teeProverRegistryProxy));
@@ -1151,6 +1192,7 @@ contract SystemDeploy is Script {
         artifacts.save("DisputeGameFactoryImpl", _impls.disputeGameFactoryImpl);
         artifacts.save("AnchorStateRegistryImpl", _impls.anchorStateRegistryImpl);
         artifacts.save("DelayedWETHImpl", _impls.delayedWETHImpl);
+        artifacts.save("ProtocolVersionsImpl", _impls.protocolVersionsImpl);
         _saveIfSet("AggregateVerifier", _impls.aggregateVerifierImpl);
         _saveIfSet("TEEProverRegistryImpl", _impls.teeProverRegistryImpl);
         _saveIfSet("TEEVerifier", _impls.teeVerifierImpl);

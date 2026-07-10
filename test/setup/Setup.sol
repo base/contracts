@@ -29,6 +29,7 @@ import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IOptimismMintableERC721Factory } from "interfaces/L2/IOptimismMintableERC721Factory.sol";
@@ -105,6 +106,7 @@ abstract contract Setup is FeatureFlags {
     IL1ERC721Bridge l1ERC721Bridge;
     IOptimismMintableERC20Factory l1OptimismMintableERC20Factory;
     ISuperchainConfig superchainConfig;
+    IProtocolVersions protocolVersions;
 
     // L2 contracts
     IL2CrossDomainMessenger l2CrossDomainMessenger =
@@ -241,6 +243,9 @@ abstract contract Setup is FeatureFlags {
         anchorStateRegistry = IAnchorStateRegistry(artifacts.mustGetAddress("AnchorStateRegistryProxy"));
         disputeGameFactory = IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
         delayedWeth = IDelayedWETH(artifacts.mustGetAddress("DelayedWETHProxy"));
+        // Use getAddress instead of mustGetAddress because forked production chains predating
+        // ProtocolVersions won't have the proxy; those return address(0) rather than reverting.
+        protocolVersions = IProtocolVersions(artifacts.getAddress("ProtocolVersionsProxy"));
         proxyAdmin = IProxyAdmin(artifacts.mustGetAddress("ProxyAdmin"));
         proxyAdminOwner = proxyAdmin.owner();
         superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));

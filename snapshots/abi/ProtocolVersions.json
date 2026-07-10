@@ -1,0 +1,447 @@
+[
+  {
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "MIN_NOTICE",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "newTimestamp",
+        "type": "uint64"
+      }
+    ],
+    "name": "delayTimestamp",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getSchedule",
+    "outputs": [
+      {
+        "internalType": "uint64[]",
+        "name": "",
+        "type": "uint64[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "incidentResponder",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "initVersion",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_incidentResponder",
+        "type": "address"
+      }
+    ],
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "minimumProtocolVersion",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "proxyAdmin",
+    "outputs": [
+      {
+        "internalType": "contract IProxyAdmin",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "proxyAdminOwner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "timestamp",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint256",
+        "name": "minProtocolVersion",
+        "type": "uint256"
+      }
+    ],
+    "name": "registerUpgrade",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "scheduleId",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "name": "scheduleId",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newIncidentResponder",
+        "type": "address"
+      }
+    ],
+    "name": "setIncidentResponder",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "protocolVersion",
+        "type": "uint256"
+      }
+    ],
+    "name": "setMinimumProtocolVersion",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "timestamp",
+        "type": "uint64"
+      }
+    ],
+    "name": "setTimestamp",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "version",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousIncidentResponder",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newIncidentResponder",
+        "type": "address"
+      }
+    ],
+    "name": "IncidentResponderUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "version",
+        "type": "uint8"
+      }
+    ],
+    "name": "Initialized",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "protocolVersion",
+        "type": "uint256"
+      }
+    ],
+    "name": "MinimumProtocolVersionUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "newScheduleId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "ScheduleIdUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "TimestampSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "name": "UpgradeRegistered",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "activationTimestamp",
+        "type": "uint64"
+      }
+    ],
+    "name": "ProtocolVersions_ActivationAlreadyPassed",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "currentTimestamp",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "newTimestamp",
+        "type": "uint64"
+      }
+    ],
+    "name": "ProtocolVersions_DelayMustBeLater",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "timestamp",
+        "type": "uint64"
+      }
+    ],
+    "name": "ProtocolVersions_InsufficientNotice",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ProtocolVersions_InvalidProtocolVersion",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ProtocolVersions_NotIncidentResponder",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ProtocolVersions_NotInitialized",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "name": "ProtocolVersions_NotScheduled",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "name": "ProtocolVersions_UnknownUpgrade",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ProxyAdminOwnedBase_NotProxyAdmin",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ProxyAdminOwnedBase_NotProxyAdminOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ProxyAdminOwnedBase_NotResolvedDelegateProxy",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ProxyAdminOwnedBase_NotSharedProxyAdminOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ProxyAdminOwnedBase_ProxyAdminNotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ReinitializableBase_ZeroInitVersion",
+    "type": "error"
+  }
+]

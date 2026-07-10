@@ -9,6 +9,8 @@ import { Types } from "scripts/libraries/Types.sol";
 import { SystemDeployAssertions } from "test/deploy/SystemDeployAssertions.sol";
 
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
+import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
@@ -119,6 +121,12 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertNotEq(address(output.opChain.optimismPortalProxy), address(0), "portal");
         assertNotEq(address(output.opChain.ethLockboxProxy), address(0), "lockbox");
         assertNotEq(address(output.opChain.delayedWETHProxy), address(0), "delayed weth");
+        assertNotEq(address(output.opChain.protocolVersionsProxy), address(0), "protocol versions");
+        assertEq(
+            output.opChain.protocolVersionsProxy.incidentResponder(),
+            incidentResponder,
+            "protocol versions incident responder"
+        );
 
         assertEq(output.opChain.opChainProxyAdmin.owner(), owner, "op chain proxy admin owner");
         assertEq(output.opChain.systemConfigProxy.batchInbox(), Types.chainIdToBatchInboxAddress(l2ChainId), "inbox");
@@ -134,13 +142,17 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     function test_upgrade_withoutManagerDelegatecall_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+        Types.Implementations memory implementations = output.impls;
+        ProtocolVersions protocolVersionsImpl = new ProtocolVersions();
+        implementations.protocolVersionsImpl = address(protocolVersionsImpl);
 
         SystemDeploy.UpgradeOutput memory upgradeOutput = systemDeploy.upgrade(
             SystemDeploy.UpgradeInput({
                 saveArtifacts: false,
                 superchainConfigProxy: output.superchain.superchainConfigProxy,
-                implementations: output.impls,
-                systemConfigProxy: output.opChain.systemConfigProxy
+                implementations: implementations,
+                systemConfigProxy: output.opChain.systemConfigProxy,
+                protocolVersionsProxy: output.opChain.protocolVersionsProxy
             })
         );
 
@@ -152,7 +164,40 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             output.impls.superchainConfigImpl,
             "superchain config impl"
         );
+        assertEq(
+            output.opChain.opChainProxyAdmin.getProxyImplementation(address(output.opChain.protocolVersionsProxy)),
+            address(protocolVersionsImpl),
+            "protocol versions impl"
+        );
         assertValidStandardSystem(_expected(output, input));
+    }
+
+    function test_upgrade_discoversProtocolVersionsProxyFromArtifacts_succeeds() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+        Types.Implementations memory implementations = output.impls;
+        ProtocolVersions protocolVersionsImpl = new ProtocolVersions();
+        implementations.protocolVersionsImpl = address(protocolVersionsImpl);
+
+        _saveArtifact("ProtocolVersionsProxy", address(output.opChain.protocolVersionsProxy));
+
+        SystemDeploy.UpgradeOutput memory upgradeOutput = systemDeploy.upgrade(
+            SystemDeploy.UpgradeInput({
+                saveArtifacts: false,
+                superchainConfigProxy: output.superchain.superchainConfigProxy,
+                implementations: implementations,
+                systemConfigProxy: output.opChain.systemConfigProxy,
+                protocolVersionsProxy: IProtocolVersions(address(0))
+            })
+        );
+
+        assertFalse(upgradeOutput.superchainConfigUpgraded, "superchain already current");
+        assertTrue(upgradeOutput.chainUpgraded, "chain upgraded");
+        assertEq(
+            output.opChain.opChainProxyAdmin.getProxyImplementation(address(output.opChain.protocolVersionsProxy)),
+            address(protocolVersionsImpl),
+            "protocol versions impl"
+        );
     }
 
     function test_deploy_reusingImplementations_doesNotSaveZeroImplementationOnlyArtifacts() public {
@@ -203,7 +248,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
                 opChainProxyAdminOwner: owner,
                 systemConfigOwner: owner,
                 batcher: batcher,
-                unsafeBlockSigner: unsafeBlockSigner
+                unsafeBlockSigner: unsafeBlockSigner,
+                incidentResponder: incidentResponder
             }),
             basefeeScalar: 100,
             blobBasefeeScalar: 200,
@@ -269,6 +315,13 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             address(_input.implementationsInput.sp1Verifier),
             "zk verifier sp1"
         );
+    }
+
+    function _saveArtifact(string memory _name, address _addr) internal {
+        vm.etch(address(artifacts), vm.getDeployedCode("Artifacts.s.sol:Artifacts"));
+        bytes32 slot = keccak256(abi.encodePacked(_name, uint256(0)));
+        vm.store(address(artifacts), slot, bytes32(uint256(uint160(_addr))));
+        assertEq(artifacts.getAddress(_name), _addr, "artifact saved");
     }
 
     function _expected(

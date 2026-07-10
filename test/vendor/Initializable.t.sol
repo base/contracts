@@ -15,6 +15,7 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 // Interfaces
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
@@ -210,6 +211,24 @@ contract Initializer_Test is CommonTest {
             })
         );
 
+        // ProtocolVersions is deployed by the standard deployment script but is absent on older
+        // forked chains, so only track it when the proxy is present.
+        if (address(protocolVersions) != address(0)) {
+            initCalldata = abi.encodeCall(protocolVersions.initialize, (address(0)));
+            contracts.push(
+                InitializeableContract({
+                    name: "ProtocolVersionsImpl",
+                    target: EIP1967Helper.getImplementation(address(protocolVersions)),
+                    initCalldata: initCalldata
+                })
+            );
+            contracts.push(
+                InitializeableContract({
+                    name: "ProtocolVersionsProxy", target: address(protocolVersions), initCalldata: initCalldata
+                })
+            );
+        }
+
         // ETHLockbox is only deployed when interop is enabled
         if (address(ethLockbox) != address(0)) {
             initCalldata = abi.encodeCall(ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0)));
@@ -263,6 +282,10 @@ contract Initializer_Test is CommonTest {
         // ETHLockbox is only deployed when interop is enabled.
         if (address(ethLockbox) == address(0)) {
             excludes[j++] = "src/L1/ETHLockbox.sol";
+        }
+        // ProtocolVersions is not deployed on older forked chains.
+        if (address(protocolVersions) == address(0)) {
+            excludes[j++] = "src/L1/ProtocolVersions.sol";
         }
         // TEEProverRegistry is only deployed when multiproof is enabled.
         if (address(teeProverRegistry) == address(0)) {
