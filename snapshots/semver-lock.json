@@ -63,6 +63,10 @@
     "initCodeHash": "0x812f8ec3945f0b2e2a9615cd7c5cdd60dbe8927f41e606cb2bd488c5e6dec02a",
     "sourceCodeHash": "0xcb329746df0baddd3dc03c6c88da5d6bdc0f0a96d30e6dc78d0891bb1e935032"
   },
+  "src/L2/BaseTime.sol:BaseTime": {
+    "initCodeHash": "0x4c46d5d34b55f2df2c9a8478444d3fb699ea9c2f73459a568b6d501d13021a2e",
+    "sourceCodeHash": "0xb48649c7e7ffaab6ab0b228e672ccf83159e8a71211e9d0ac19cacc8d68810b2"
+  },
   "src/L2/FeeDisburser.sol:FeeDisburser": {
     "initCodeHash": "0x1278027e3756e2989e80c0a7b513e221a5fe0d3dbd9ded108375a29b2c1f3d57",
     "sourceCodeHash": "0xac49a0ecf22b8a7bb3ebef830a2d27b19050f9b08941186e8563d5113cf0ce9c"

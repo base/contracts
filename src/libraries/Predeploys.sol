@@ -57,6 +57,9 @@ library Predeploys {
     /// @notice Address of the OperatorFeeVault predeploy.
     address internal constant OPERATOR_FEE_VAULT = 0x420000000000000000000000000000000000001b;
 
+    /// @notice Address of the BaseTime predeploy.
+    address internal constant BASE_TIME = 0x4200000000000000000000000000000000000030;
+
     /// @notice Address of the SchemaRegistry predeploy.
     address internal constant SCHEMA_REGISTRY = 0x4200000000000000000000000000000000000020;
 
@@ -87,6 +90,7 @@ library Predeploys {
         if (_addr == BASE_FEE_VAULT) return "BaseFeeVault";
         if (_addr == L1_FEE_VAULT) return "L1FeeVault";
         if (_addr == OPERATOR_FEE_VAULT) return "OperatorFeeVault";
+        if (_addr == BASE_TIME) return "BaseTime";
         if (_addr == SCHEMA_REGISTRY) return "SchemaRegistry";
         if (_addr == EAS) return "EAS";
         if (_addr == LEGACY_ERC20_ETH) return "LegacyERC20ETH";
