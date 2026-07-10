@@ -6,6 +6,7 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { L2Genesis } from "scripts/L2Genesis.s.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { LATEST_FORK } from "scripts/libraries/Config.sol";
+import { IBaseTime } from "interfaces/L2/IBaseTime.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IOptimismMintableERC721Factory } from "interfaces/L2/IOptimismMintableERC721Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
@@ -57,6 +58,12 @@ abstract contract L2Genesis_TestInit is Test {
         }
 
         assertGt(Predeploys.WETH.code.length, 0);
+    }
+
+    function _assertBaseTime() internal view {
+        assertEq(Predeploys.BASE_TIME, 0x4200000000000000000000000000000000000030);
+        assertTrue(Predeploys.isSupportedPredeploy(Predeploys.BASE_TIME));
+        assertEq(IBaseTime(Predeploys.BASE_TIME).timestampMillisPart(), 0);
     }
 
     function _assertFeeVaultsWithoutRevenueShare() internal view {
@@ -160,6 +167,7 @@ contract L2Genesis_Run_Test is L2Genesis_TestInit {
 
         _assertProxyAdmin();
         _assertPredeploys();
+        _assertBaseTime();
         _assertFeeVaultsWithoutRevenueShare();
         _assertFactories();
         _assertForks();

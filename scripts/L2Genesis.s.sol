@@ -183,6 +183,7 @@ contract L2Genesis is Script {
         // 1C,1D,1E,1F: not used.
         setSchemaRegistry(); // 20
         setEAS(); // 21
+        setBaseTime(); // 30
     }
 
     function setProxyAdmin(Input memory _input) internal {
@@ -311,6 +312,11 @@ contract L2Genesis is Script {
             _withdrawalNetwork: Types.WithdrawalNetwork(_input.operatorFeeVaultWithdrawalNetwork),
             _proxyAdminOwner: _input.opChainProxyAdminOwner
         });
+    }
+
+    /// @notice This predeploy is following the safety invariant #1.
+    function setBaseTime() internal {
+        _setImplementationCode(Predeploys.BASE_TIME);
     }
 
     /// @notice This predeploy is following the safety invariant #1.

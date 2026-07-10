@@ -1,0 +1,9 @@
+[
+  {
+    "bytes": "2",
+    "label": "timestampMillisPart",
+    "offset": 0,
+    "slot": "0",
+    "type": "uint16"
+  }
+]
