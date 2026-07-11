@@ -1,5 +1,15 @@
-# Pins the Foundry version to match CI. Install mise (https://mise.jdx.dev) then run:
-#   mise install   — installs pinned tools
-#   mise use       — activates them in your shell
+# mise tool versions — https://mise.jdx.dev
+#
+# This file pins the toolchain versions used across the contracts repo.
+# Contributors should install mise and run `mise install` at the repo root so
+# that everyone executes builds, tests, and snapshot generation with
+# byte-identical tooling.
+#
+# When bumping any version here, also update the matching pin in
+# `.github/workflows/test.yml` (or anywhere else CI installs the same tool) so
+# that local and CI runs stay aligned.
+
 [tools]
-foundry = "stable"
+# Foundry (forge/cast/anvil/chisel) — pinned for deterministic build
+# artifacts, ABI/storage snapshots, and semver-lock hashes.
+foundry = "1.5.1"
