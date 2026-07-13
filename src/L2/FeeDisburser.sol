@@ -7,11 +7,12 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { SafeCall } from "src/libraries/SafeCall.sol";
 import { Initializable } from "src/vendor/Initializable.sol";
+import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 
 /// @custom:proxied true
 /// @title FeeDisburser
 /// @notice Withdraws funds from system FeeVault contracts and bridges to L1.
-contract FeeDisburser is Initializable, ISemver {
+contract FeeDisburser is Initializable, ProxyAdminOwnedBase, ISemver {
     ////////////////////////////////////////////////////////////////
     ///                     Constants
     ////////////////////////////////////////////////////////////////
@@ -180,21 +181,20 @@ contract FeeDisburser is Initializable, ISemver {
         }
 
         uint256 bridgeBalance = address(this).balance;
-        if (bridgeBalance == 0) {
-            emit FeesDisbursed(disbursementTime, 0, 0);
-            return;
+        if (bridgeBalance != 0) {
+            // Send remaining funds to L1 wallet on L1
+            IL2StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE)).bridgeETHTo{ value: bridgeBalance }(
+                L1_WALLET, WITHDRAWAL_MIN_GAS, bytes("")
+            );
         }
-
-        // Send remaining funds to L1 wallet on L1
-        IL2StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE)).bridgeETHTo{ value: bridgeBalance }(
-            L1_WALLET, WITHDRAWAL_MIN_GAS, bytes("")
-        );
 
         emit FeesDisbursed(disbursementTime, 0, bridgeBalance);
     }
 
     /// @notice Configures the L2 system addresses to refund and their target balances.
     ///         Called via upgradeAndCall when upgrading to this version.
+    ///
+    /// @dev Callable only by the ProxyAdmin or its owner.
     ///
     /// @param systemAddresses_ The system addresses being funded.
     /// @param targetBalances_  The target balances for system addresses.
@@ -205,6 +205,8 @@ contract FeeDisburser is Initializable, ISemver {
         external
         reinitializer(2)
     {
+        _assertOnlyProxyAdminOrProxyAdminOwner();
+
         uint256 systemAddressesLength = systemAddresses_.length;
         if (systemAddressesLength > MAX_SYSTEM_ADDRESS_COUNT) revert TooManySystemAddresses();
         if (systemAddressesLength != targetBalances_.length) revert ArrayLengthMismatch();

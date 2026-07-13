@@ -6,7 +6,10 @@ import { Test } from "lib/forge-std/src/Test.sol";
 import { FeeDisburser } from "src/L2/FeeDisburser.sol";
 import { IFeeVault, Types } from "interfaces/L2/IFeeVault.sol";
 import { IStandardBridge } from "interfaces/universal/IStandardBridge.sol";
+import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
+import { Constants } from "src/libraries/Constants.sol";
+import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 
 contract ReentrantReceiver {
     receive() external payable {
@@ -35,6 +38,8 @@ contract FeeDisburserTest is Test {
     address payable constant L1_WALLET = payable(address(0x1001));
     address constant ALICE = address(0xA11CE);
     address constant BOB = address(0xB0B);
+    address constant PROXY_ADMIN = address(0xAD1);
+    address constant PROXY_ADMIN_OWNER = address(0xAD2);
     address payable constant SYSTEM_ADDR = payable(address(0x5001));
 
     // Contract instances
@@ -105,6 +110,20 @@ contract FeeDisburserTest is Test {
     function _expectNoFeesCollected() internal {
         vm.expectEmit(address(feeDisburser));
         emit NoFeesCollected();
+    }
+
+    function _setProxyAdmin() internal {
+        vm.store(address(feeDisburser), Constants.PROXY_OWNER_ADDRESS, bytes32(uint256(uint160(PROXY_ADMIN))));
+    }
+
+    function _mockProxyAdminOwner() internal {
+        vm.mockCall(PROXY_ADMIN, abi.encodeCall(IProxyAdmin.owner, ()), abi.encode(PROXY_ADMIN_OWNER));
+    }
+
+    function _initializeAsProxyAdmin(address payable[] memory addrs, uint256[] memory balances) internal {
+        _setProxyAdmin();
+        vm.prank(PROXY_ADMIN);
+        feeDisburser.initialize(addrs, balances);
     }
 
     function _makeSingleConfig(
@@ -797,59 +816,74 @@ contract FeeDisburserTest is Test {
     //                    initialize Tests
     // ============================================================
 
-    function test_initialize_success() public {
+    function test_initialize_success_proxyAdmin() public {
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, 1 ether);
 
+        _initializeAsProxyAdmin(addrs, balances);
+
+        assertEq(feeDisburser.systemAddresses(0), SYSTEM_ADDR);
+        assertEq(feeDisburser.targetBalances(0), 1 ether);
+    }
+
+    function test_initialize_success_proxyAdminOwner() public {
+        (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, 1 ether);
+
+        _setProxyAdmin();
+        _mockProxyAdminOwner();
+        vm.prank(PROXY_ADMIN_OWNER);
         feeDisburser.initialize(addrs, balances);
 
         assertEq(feeDisburser.systemAddresses(0), SYSTEM_ADDR);
         assertEq(feeDisburser.targetBalances(0), 1 ether);
     }
 
+    function test_initialize_revert_notProxyAdminOrOwner() public {
+        (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, 1 ether);
+
+        _setProxyAdmin();
+        _mockProxyAdminOwner();
+        vm.expectRevert(ProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
+        vm.prank(ALICE);
+        feeDisburser.initialize(addrs, balances);
+    }
+
     function test_initialize_revert_alreadyInitialized() public {
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, 1 ether);
-        feeDisburser.initialize(addrs, balances);
+        _initializeAsProxyAdmin(addrs, balances);
 
         vm.expectRevert();
-        feeDisburser.initialize(addrs, balances);
+        _initializeAsProxyAdmin(addrs, balances);
     }
 
     function test_initialize_revert_tooManySystemAddresses() public {
         uint256 n = feeDisburser.MAX_SYSTEM_ADDRESS_COUNT() + 1;
         address payable[] memory addrs = new address payable[](n);
         uint256[] memory balances = new uint256[](n);
-        for (uint256 i; i < n; i++) {
-            addrs[i] = payable(address(uint160(0x6000 + i)));
-            balances[i] = 1 ether;
-        }
 
         vm.expectRevert(FeeDisburser.TooManySystemAddresses.selector);
-        feeDisburser.initialize(addrs, balances);
+        _initializeAsProxyAdmin(addrs, balances);
     }
 
     function test_initialize_revert_arrayLengthMismatch() public {
         address payable[] memory addrs = new address payable[](2);
-        addrs[0] = SYSTEM_ADDR;
-        addrs[1] = payable(ALICE);
         uint256[] memory balances = new uint256[](1);
-        balances[0] = 1 ether;
 
         vm.expectRevert(FeeDisburser.ArrayLengthMismatch.selector);
-        feeDisburser.initialize(addrs, balances);
+        _initializeAsProxyAdmin(addrs, balances);
     }
 
     function test_initialize_revert_zeroAddress() public {
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(payable(address(0)), 1 ether);
 
         vm.expectRevert(FeeDisburser.ZeroAddress.selector);
-        feeDisburser.initialize(addrs, balances);
+        _initializeAsProxyAdmin(addrs, balances);
     }
 
     function test_initialize_revert_zeroTargetBalance() public {
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, 0);
 
         vm.expectRevert(FeeDisburser.ZeroTargetBalance.selector);
-        feeDisburser.initialize(addrs, balances);
+        _initializeAsProxyAdmin(addrs, balances);
     }
 
     // ============================================================
@@ -861,7 +895,7 @@ contract FeeDisburserTest is Test {
         uint256 targetBal = 2 ether;
 
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, targetBal);
-        feeDisburser.initialize(addrs, balances);
+        _initializeAsProxyAdmin(addrs, balances);
 
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
 
@@ -885,7 +919,7 @@ contract FeeDisburserTest is Test {
         vm.deal(SYSTEM_ADDR, targetBal);
 
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, targetBal);
-        feeDisburser.initialize(addrs, balances);
+        _initializeAsProxyAdmin(addrs, balances);
 
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
 
@@ -909,7 +943,7 @@ contract FeeDisburserTest is Test {
         vm.deal(SYSTEM_ADDR, systemAddrStartBal);
 
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(SYSTEM_ADDR, targetBal);
-        feeDisburser.initialize(addrs, balances);
+        _initializeAsProxyAdmin(addrs, balances);
 
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
 
@@ -939,7 +973,7 @@ contract FeeDisburserTest is Test {
         uint256[] memory bals = new uint256[](2);
         bals[0] = target1;
         bals[1] = target2;
-        feeDisburser.initialize(addrs, bals);
+        _initializeAsProxyAdmin(addrs, bals);
 
         uint256 feeAmount = 10 ether;
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
@@ -965,7 +999,7 @@ contract FeeDisburserTest is Test {
         address payable bad = payable(address(0x9999));
 
         (address payable[] memory addrs, uint256[] memory balances) = _makeSingleConfig(bad, 1 ether);
-        feeDisburser.initialize(addrs, balances);
+        _initializeAsProxyAdmin(addrs, balances);
 
         uint256 feeAmount = 2 ether;
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
@@ -993,7 +1027,7 @@ contract FeeDisburserTest is Test {
 
         (address payable[] memory addrs, uint256[] memory balances) =
             _makeSingleConfig(payable(address(attacker)), 1 ether);
-        feeDisburser.initialize(addrs, balances);
+        _initializeAsProxyAdmin(addrs, balances);
 
         uint256 feeAmount = 2 ether;
         _mockVaultWithdrawal(Predeploys.SEQUENCER_FEE_WALLET, feeAmount);
