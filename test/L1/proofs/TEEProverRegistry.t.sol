@@ -121,7 +121,9 @@ contract TEEProverRegistryTest is Test {
         address tdxVerifier = makeAddr("tdx-verifier");
 
         vm.mockCall(
-            tdxVerifier, abi.encodeCall(ITDXVerifier.verify, (bytes(""), bytes(""))), abi.encode(signer, TEST_IMAGE_HASH)
+            tdxVerifier,
+            abi.encodeCall(ITDXVerifier.verify, (bytes(""), bytes(""))),
+            abi.encode(signer, TEST_IMAGE_HASH)
         );
 
         TEEProverRegistry registry = new TEEProverRegistry(
