@@ -16,12 +16,16 @@ import { TDXVerifier } from "src/L1/proofs/tee/TDXVerifier.sol";
 
 contract DeployTDXVerifier is Script {
     /// @param risc0VerifierRouter Existing RISC Zero verifier router.
-    /// @param tdxVerifierId RISC Zero image ID for the TDX DCAP verifier guest.
-    /// @param intelRootCaHash Hash of the trusted Intel root CA consumed by the guest.
-    function run(address risc0VerifierRouter, bytes32 tdxVerifierId, bytes32 intelRootCaHash) public {
+    /// @param tdxVerifierId RISC Zero image ID for the Confidential Space verifier guest.
+    /// @param confidentialSpaceRootCaHash Hash of the trusted Confidential Space root CA consumed by the guest.
+    function run(address risc0VerifierRouter, bytes32 tdxVerifierId, bytes32 confidentialSpaceRootCaHash) public {
         vm.startBroadcast();
 
-        address tdxVerifier = address(new TDXVerifier(1 hours, intelRootCaHash, risc0VerifierRouter, tdxVerifierId));
+        address tdxVerifier = address(
+            new TDXVerifier(
+                1 hours, confidentialSpaceRootCaHash, keccak256("base-tdx-prover"), risc0VerifierRouter, tdxVerifierId
+            )
+        );
 
         vm.stopBroadcast();
 

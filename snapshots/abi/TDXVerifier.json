@@ -12,6 +12,11 @@
         "type": "bytes32"
       },
       {
+        "internalType": "bytes32",
+        "name": "initialAudienceHash",
+        "type": "bytes32"
+      },
+      {
         "internalType": "address",
         "name": "initialRiscZeroVerifier",
         "type": "address"
@@ -24,6 +29,32 @@
     ],
     "stateMutability": "nonpayable",
     "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "GCP_INTEL_TDX_HASH",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "audienceHash",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [],
@@ -122,6 +153,22 @@
   {
     "inputs": [
       {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "actual",
+        "type": "bytes32"
+      }
+    ],
+    "name": "AudienceHashMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint64",
         "name": "expected",
         "type": "uint64"
@@ -136,25 +183,24 @@
     "type": "error"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint64",
-        "name": "collateralExpiration",
-        "type": "uint64"
-      }
-    ],
-    "name": "CollateralExpired",
+    "inputs": [],
+    "name": "DebugImageNotAllowed",
     "type": "error"
   },
   {
     "inputs": [
       {
-        "internalType": "uint64",
-        "name": "tdAttributes",
-        "type": "uint64"
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "actual",
+        "type": "bytes32"
       }
     ],
-    "name": "DebugTdNotAllowed",
+    "name": "HardwareModelMismatch",
     "type": "error"
   },
   {
@@ -166,7 +212,12 @@
     "inputs": [
       {
         "internalType": "uint64",
-        "name": "timestampSeconds",
+        "name": "issuedAt",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "expiration",
         "type": "uint64"
       },
       {
@@ -175,7 +226,12 @@
         "type": "uint256"
       }
     ],
-    "name": "InvalidTimestamp",
+    "name": "InvalidTokenTime",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "LaunchOverrideNotAllowed",
     "type": "error"
   },
   {
@@ -207,23 +263,12 @@
         "type": "bytes32"
       }
     ],
-    "name": "ReportDataMismatch",
+    "name": "RootCaHashMismatch",
     "type": "error"
   },
   {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "expected",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "actual",
-        "type": "bytes32"
-      }
-    ],
-    "name": "RootCaHashMismatch",
+    "inputs": [],
+    "name": "SecureBootRequired",
     "type": "error"
   },
   {
@@ -240,17 +285,6 @@
       }
     ],
     "name": "SignerMismatch",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "enum TDXTcbStatus",
-        "name": "status",
-        "type": "uint8"
-      }
-    ],
-    "name": "TcbStatusNotAllowed",
     "type": "error"
   },
   {

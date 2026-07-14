@@ -85,7 +85,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The hash of the Nitro TEE image.
     bytes32 public immutable TEE_NITRO_IMAGE_HASH;
 
-    /// @notice The CI-derived OCI manifest digest for the TDX prover workload.
+    /// @notice The OCI manifest digest for the Confidential Space TDX prover workload.
     bytes32 public immutable TEE_TDX_IMAGE_HASH;
 
     /// @notice The ZK prover.
@@ -258,7 +258,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param teeVerifier The TEE verifier.
     /// @param zkVerifier The ZK verifier.
     /// @param teeNitroImageHash The hash of the Nitro TEE image.
-    /// @param teeTdxImageHash The CI-derived OCI manifest digest for the TDX prover workload.
+    /// @param teeTdxImageHash The OCI manifest digest for the Confidential Space TDX prover workload.
     /// @param zkHashes The hashes of the ZK range and aggregate programs.
     /// @param configHash The hash of the rollup configuration.
     /// @param l2ChainId The chain ID of the L2 network.

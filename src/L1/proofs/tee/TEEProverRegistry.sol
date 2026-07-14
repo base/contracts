@@ -58,7 +58,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     mapping(address => bool) public isRegisteredSigner;
 
     /// @notice Mapping of signer address to the attested workload image hash.
-    /// @dev TDX values are CI-derived OCI manifest digests, while Nitro values
+    /// @dev TDX values are Confidential Space OCI manifest digests, while Nitro values
     ///      remain PCR0 hashes.
     ///      TEEVerifier checks this against the AggregateVerifier's type-specific TEE image hash at
     ///      proof-submission time, so signers automatically become unusable when the
@@ -226,7 +226,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         return _getExpectedImageHash(gameType, teeType);
     }
 
-    /// @notice Returns the CI-derived OCI manifest digest expected for TDX signers.
+    /// @notice Returns the Confidential Space OCI manifest digest expected for TDX signers.
     function getExpectedTDXImageHash() external view returns (bytes32) {
         return _getExpectedImageHash(gameType, TEEType.TDX);
     }

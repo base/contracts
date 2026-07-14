@@ -1,81 +1,64 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-/// @notice Intel TDX TCB status reduced to the statuses this contract's policy needs.
-/// @dev Unknown is index 0 so uninitialized values fail closed.
-enum TDXTcbStatus {
-    Unknown,
-    UpToDate,
-    SwHardeningNeeded,
-    ConfigurationNeeded,
-    ConfigurationAndSwHardeningNeeded,
-    OutOfDate,
-    OutOfDateConfigurationNeeded,
-    Revoked
-}
-
-/// @notice Result emitted by the TDX verifier guest.
+/// @notice Result emitted by the Confidential Space TDX verifier guest.
 enum TDXVerificationResult {
     Unknown,
     Success,
-    InvalidQuote,
-    QuoteSignatureInvalid,
+    TokenMalformed,
+    TokenSignatureInvalid,
     RootCaNotTrusted,
-    PckCertChainInvalid,
-    TcbInfoInvalid,
-    QeIdentityInvalid,
-    TcbStatusNotAllowed,
-    CollateralExpired,
-    InvalidTimestamp,
-    ReportDataMismatch
+    TokenClaimsInvalid,
+    TokenExpired,
+    TokenNonceMismatch
 }
 
-/// @notice Public journal emitted by the offchain/ZK TDX DCAP verifier.
-/// @param result Overall quote and collateral verification result.
-/// @param tcbStatus Intel TDX TCB status for the platform.
-/// @param timestamp Quote timestamp in milliseconds since Unix epoch.
-/// @param collateralExpiration Earliest expiration timestamp in seconds across accepted collateral.
-/// @param rootCaHash Hash of the Intel root CA used to validate the PCK/collateral signing chains.
-/// @param pckCertHash Hash of the PCK leaf certificate.
-/// @param tcbInfoHash Hash of the TCB info collateral.
-/// @param qeIdentityHash Hash of the QE identity collateral.
+/// @notice Public journal emitted by the offchain/ZK Confidential Space verifier.
+/// @param result Overall token verification result.
+/// @param issuedAt Token issuance time in seconds since Unix epoch.
+/// @param expiration Token expiration time in seconds since Unix epoch.
+/// @param rootCaHash Hash of the Google Confidential Space root CA.
+/// @param tokenLeafCertHash Hash of the token leaf certificate.
 /// @param publicKey Uncompressed secp256k1 public key.
 /// @param signer Ethereum address derived from `publicKey`.
-/// @param imageHash CI-derived OCI manifest digest for the prover workload.
-/// @param mrTdHash Keccak256 hash of the MRTD measurement for diagnostics.
-/// @param reportDataPrefix First 32 bytes of TDREPORT.REPORTDATA.
-/// @param reportDataSuffix Last 32 bytes of TDREPORT.REPORTDATA.
-/// @param tdAttributes TD attributes; the debug bit must be unset.
-/// @param chainId L1 chain ID bound into report data.
-/// @param registryAddress TEE prover registry address bound into report data.
+/// @param imageHash OCI manifest digest for the prover workload.
+/// @param audienceHash Hash of the token audience.
+/// @param tokenNonceHash Hash of the signer-bound registrar nonce.
+/// @param hardwareModelHash Hash of the token hardware model claim.
+/// @param secureBoot Whether Secure Boot was enabled.
+/// @param debugDisabled Whether the Confidential Space image was debug-disabled since boot.
+/// @param commandOverride Whether the workload command was overridden.
+/// @param environmentOverride Whether the workload environment was overridden.
+/// @param chainId L1 chain ID bound into the token nonce.
+/// @param registryAddress TEE prover registry address bound into the token nonce.
 struct TDXVerifierJournal {
     TDXVerificationResult result;
-    TDXTcbStatus tcbStatus;
-    uint64 timestamp;
-    uint64 collateralExpiration;
+    uint64 issuedAt;
+    uint64 expiration;
     bytes32 rootCaHash;
-    bytes32 pckCertHash;
-    bytes32 tcbInfoHash;
-    bytes32 qeIdentityHash;
+    bytes32 tokenLeafCertHash;
     bytes publicKey;
     address signer;
     bytes32 imageHash;
-    bytes32 mrTdHash;
-    bytes32 reportDataPrefix;
-    bytes32 reportDataSuffix;
-    uint64 tdAttributes;
+    bytes32 audienceHash;
+    bytes32 tokenNonceHash;
+    bytes32 hardwareModelHash;
+    bool secureBoot;
+    bool debugDisabled;
+    bool commandOverride;
+    bool environmentOverride;
     uint64 chainId;
     address registryAddress;
 }
 
 /// @title ITDXVerifier
-/// @notice Interface for Intel TDX quote verification used by TDX-aware TEE prover registries.
+/// @notice Interface for Confidential Space TDX verification used by TDX-aware TEE prover registries.
 interface ITDXVerifier {
-    /// @notice Verifies a ZK proof of Intel TDX DCAP quote verification and returns attested signer metadata.
+    /// @notice Verifies a ZK proof of a Confidential Space Intel TDX token and returns signer metadata.
     /// @param output ABI-encoded TDXVerifierJournal public values from the ZK verifier guest.
     /// @param proofBytes ZK proof bytes.
     /// @return signer Ethereum address derived from the attested public key.
-    /// @return imageHash CI-derived OCI manifest digest for the prover workload.
+    /// @return imageHash OCI manifest digest for the prover workload.
     function verify(
         bytes calldata output,
         bytes calldata proofBytes
