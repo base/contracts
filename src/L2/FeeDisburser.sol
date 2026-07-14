@@ -160,17 +160,13 @@ contract FeeDisburser is Initializable, ProxyAdminOwnedBase, ISemver {
         _feeVaultWithdrawal(payable(Predeploys.L1_FEE_VAULT));
         // Note: OPERATOR_FEE_VAULT is intentionally omitted because Base does not currently use it.
 
-        // Gross revenue is the sum of all fees
-        uint256 feeBalance = address(this).balance;
-
         // Stop execution if no fees were collected
-        if (feeBalance == 0) {
+        if (address(this).balance == 0) {
             emit NoFeesCollected();
             return;
         }
 
-        uint256 disbursementTime = block.timestamp;
-        lastDisbursementTime = disbursementTime;
+        lastDisbursementTime = block.timestamp;
 
         uint256 systemAddressesLength = systemAddresses.length;
         for (uint256 i; i < systemAddressesLength;) {
@@ -188,7 +184,7 @@ contract FeeDisburser is Initializable, ProxyAdminOwnedBase, ISemver {
             );
         }
 
-        emit FeesDisbursed(disbursementTime, 0, bridgeBalance);
+        emit FeesDisbursed(block.timestamp, 0, bridgeBalance);
     }
 
     /// @notice Configures the L2 system addresses to refund and their target balances.
