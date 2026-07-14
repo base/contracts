@@ -4,7 +4,12 @@ pragma solidity ^0.8.0;
 import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
 
 import { ISemver } from "interfaces/universal/ISemver.sol";
-import { ITDXVerifier, TDXTcbStatus, TDXVerifierJournal } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
+import {
+    ITDXVerifier,
+    TDXTcbStatus,
+    TDXVerificationResult,
+    TDXVerifierJournal
+} from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 
 /// @title TDXVerifier
 /// @notice Production-shape Intel TDX DCAP verifier for multiproof signer registration.
@@ -26,10 +31,16 @@ contract TDXVerifier is ITDXVerifier, ISemver {
 
     error ZeroInput();
     error RootCaHashMismatch(bytes32 expected, bytes32 actual);
+    error VerificationFailed(TDXVerificationResult result);
     error TcbStatusNotAllowed(TDXTcbStatus status);
     error CollateralExpired(uint64 collateralExpiration);
     error InvalidTimestamp(uint64 timestampSeconds, uint256 currentTimestamp);
+    error InvalidPublicKey();
     error ReportDataMismatch(bytes32 expected, bytes32 actual);
+    error SignerMismatch(address expected, address actual);
+    error DebugTdNotAllowed(uint64 tdAttributes);
+    error ChainIdMismatch(uint64 expected, uint64 actual);
+    error RegistryAddressMismatch(address expected, address actual);
 
     constructor(
         uint64 initialMaxTimeDiff,
@@ -59,6 +70,7 @@ contract TDXVerifier is ITDXVerifier, ISemver {
         riscZeroVerifier.verify(proofBytes, verifierId, sha256(output));
         TDXVerifierJournal memory journal = abi.decode(output, (TDXVerifierJournal));
 
+        if (journal.result != TDXVerificationResult.Success) revert VerificationFailed(journal.result);
         if (journal.rootCaHash != rootCaHash) revert RootCaHashMismatch(rootCaHash, journal.rootCaHash);
         if (journal.tcbStatus != TDXTcbStatus.UpToDate && journal.tcbStatus != TDXTcbStatus.SwHardeningNeeded) {
             revert TcbStatusNotAllowed(journal.tcbStatus);
@@ -70,17 +82,29 @@ contract TDXVerifier is ITDXVerifier, ISemver {
             revert InvalidTimestamp(timestamp, block.timestamp);
         }
 
-        bytes32 publicKeyHash = keccak256(abi.encodePacked(journal.publicKeyX, journal.publicKeyY));
+        if (journal.tdAttributes & 1 != 0) revert DebugTdNotAllowed(journal.tdAttributes);
+        if (journal.chainId != block.chainid) revert ChainIdMismatch(uint64(block.chainid), journal.chainId);
+        if (journal.registryAddress != msg.sender) revert RegistryAddressMismatch(msg.sender, journal.registryAddress);
+        if (journal.publicKey.length != 65 || journal.publicKey[0] != bytes1(0x04)) revert InvalidPublicKey();
+
+        bytes32 publicKeyHash;
+        bytes memory publicKey = journal.publicKey;
+        assembly {
+            publicKeyHash := keccak256(add(publicKey, 0x21), 64)
+        }
         if (journal.reportDataPrefix != publicKeyHash) {
             revert ReportDataMismatch(publicKeyHash, journal.reportDataPrefix);
         }
 
-        return (address(uint160(uint256(publicKeyHash))), journal.imageHash);
+        address derivedSigner = address(uint160(uint256(publicKeyHash)));
+        if (journal.signer != derivedSigner) revert SignerMismatch(derivedSigner, journal.signer);
+
+        return (derivedSigner, journal.imageHash);
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.3.0
+    /// @custom:semver 0.4.0
     function version() public pure virtual returns (string memory) {
-        return "0.3.0";
+        return "0.4.0";
     }
 }

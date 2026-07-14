@@ -29,7 +29,11 @@
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0xa01943ea100f6b04897860ebf21bb54fda9ec3b9b08b9aedc5496e6739a46920",
-    "sourceCodeHash": "0x6962d4835853937f304681679e43929a9a58f5873c80b658b0c3975e696736be"
+    "sourceCodeHash": "0x524909580c797b1af8167ff3b555699ab72ed89c4eede125fa9ee43a4f8465ac"
+  },
+  "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier:dispute": {
+    "initCodeHash": "0x65fb9d2c1eead6c878505cc6b290310eb72a785e9c6cccaf3f230e24849aeac0",
+    "sourceCodeHash": "0x524909580c797b1af8167ff3b555699ab72ed89c4eede125fa9ee43a4f8465ac"
   },
   "src/L1/proofs/AnchorStateRegistry.sol:AnchorStateRegistry": {
     "initCodeHash": "0x6f3afd2d0ef97a82ca3111976322b99343a270e54cd4a405028f2f29c75f7fb1",
@@ -44,22 +48,34 @@
     "sourceCodeHash": "0x62ff0209cffa08e5aaaaac47e0f22d89ea1fa6a0ea8773a162ab7230e50806ee"
   },
   "src/L1/proofs/tee/NitroEnclaveVerifier.sol:NitroEnclaveVerifier": {
-    "initCodeHash": "0xf79cd59d23f6a5ad78960b664e20779592d73bfcf52527c3e03adda04edd9645",
+    "initCodeHash": "0x95aa2b459acaf495dea2123d7955b6559c52d507f61345c546aa96d35da69f10",
     "sourceCodeHash": "0x03c164216b27f82ee13064ace6079d5e24e187d888f41bd01c8daffa60c575d6"
   },
   "src/L1/proofs/tee/TDXVerifier.sol:TDXVerifier": {
-    "initCodeHash": "0x14ec4c0f99e2c957fa5dc7284fd74c9e24347c68557b01719f0709f08f4bda0b",
-    "sourceCodeHash": "0x28bb714117e586feaafdc8846c82615fa3b106d256426fef12133f8c4a3dcd70"
+    "initCodeHash": "0x0218c02b9e81fd88ac00a174441c544dffdd19170231cf024a0f8a58c3857e5f",
+    "sourceCodeHash": "0x281585ed34810a1fe8fe32b2dbdf9bcbc2652546023ed5e896c6def87b48d08f"
   },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0xa21dc34428175e2781ba786b87542da46bb39318f7001b31606387df8a94fde9",
-    "sourceCodeHash": "0xcdbe2ba1aeac4e3dc6a4e138bda7bd3dd9d072b7d419f5a8af4f3e9a4a045217"
+    "initCodeHash": "0xfa7d9a51657de009210c35348ea1ee9ccdacf88b715133d86bda016e9a72f310",
+    "sourceCodeHash": "0xdbb872598ce8c7d3c4052264e08a49190b67849a582caf97e5f3851f0464f06b"
+  },
+  "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry:dispute": {
+    "initCodeHash": "0x7ac6216cf75199918a1e2809b69e20d0ebe40979c8e41bbaddff4df288f36439",
+    "sourceCodeHash": "0xdbb872598ce8c7d3c4052264e08a49190b67849a582caf97e5f3851f0464f06b"
   },
   "src/L1/proofs/tee/TEEVerifier.sol:TEEVerifier": {
-    "initCodeHash": "0x5f42455c6d41c0a49e05681a6fa7dbf21eb22c89705fd11b6030952b3227e559",
-    "sourceCodeHash": "0xcd8358734ff27b0c17af73713b7f3d2b0f348ba0646efc356345bad9fa8d6a8c"
+    "initCodeHash": "0x17cc64d7878217fd749f88143ac0efbf7b640bad1cbae9e5ec102edf72b367bb",
+    "sourceCodeHash": "0x23d9d7dca01690c685e6523ba8d67f9f4ea114e589f5197ad97fb39e4a62ea88"
+  },
+  "src/L1/proofs/tee/TEEVerifier.sol:TEEVerifier:dispute": {
+    "initCodeHash": "0x17cc64d7878217fd749f88143ac0efbf7b640bad1cbae9e5ec102edf72b367bb",
+    "sourceCodeHash": "0x23d9d7dca01690c685e6523ba8d67f9f4ea114e589f5197ad97fb39e4a62ea88"
   },
   "src/L1/proofs/zk/ZKVerifier.sol:ZKVerifier": {
+    "initCodeHash": "0xcdc5bd5fa8ffad76358b8f34a53b8c0cb36540176c31f82d52546373d0bd5245",
+    "sourceCodeHash": "0xf90e23a22c2e31d6bb11f9a8a9f7cb1c4eb0f20600d2d9aebf87023d1779972c"
+  },
+  "src/L1/proofs/zk/ZKVerifier.sol:ZKVerifier:dispute": {
     "initCodeHash": "0xcdc5bd5fa8ffad76358b8f34a53b8c0cb36540176c31f82d52546373d0bd5245",
     "sourceCodeHash": "0xf90e23a22c2e31d6bb11f9a8a9f7cb1c4eb0f20600d2d9aebf87023d1779972c"
   },

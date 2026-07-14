@@ -31,6 +31,7 @@ contract TEEProverRegistryTest is Test {
     function _deployRegistry(address[] memory proposers) internal returns (DevTEEProverRegistry) {
         address verifier = makeAddr("verifier");
         vm.mockCall(verifier, abi.encodeWithSignature("TEE_NITRO_IMAGE_HASH()"), abi.encode(TEST_IMAGE_HASH));
+        vm.mockCall(verifier, abi.encodeWithSignature("TEE_TDX_IMAGE_HASH()"), abi.encode(TEST_IMAGE_HASH));
 
         address factory = makeAddr("factory");
         vm.mockCall(factory, abi.encodeCall(IDisputeGameFactory.gameImpls, (TEST_GAME_TYPE)), abi.encode(verifier));
@@ -152,6 +153,10 @@ contract TEEProverRegistryTest is Test {
 
         assertTrue(teeProverRegistry.isValidSigner(signer));
         assertTrue(teeProverRegistry.signerTEEType(signer) == TEEProverRegistry.TEEType.NITRO);
+    }
+
+    function testGetExpectedTDXImageHash() public view {
+        assertEq(teeProverRegistry.getExpectedTDXImageHash(), TEST_IMAGE_HASH);
     }
 
     function testAddDevSignerFailsIfNotOwner() public {

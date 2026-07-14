@@ -1,270 +1,272 @@
 [
   {
-    "type": "constructor",
     "inputs": [
       {
+        "internalType": "uint64",
         "name": "initialMaxTimeDiff",
-        "type": "uint64",
-        "internalType": "uint64"
+        "type": "uint64"
       },
       {
+        "internalType": "bytes32",
         "name": "initialRootCaHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "type": "bytes32"
       },
       {
+        "internalType": "address",
         "name": "initialRiscZeroVerifier",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       },
       {
+        "internalType": "bytes32",
         "name": "initialVerifierId",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "type": "bytes32"
       }
     ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "nonpayable",
+    "type": "constructor"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "maxTimeDiff",
-    "inputs": [],
     "outputs": [
       {
+        "internalType": "uint64",
         "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
+        "type": "uint64"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "riscZeroVerifier",
-    "inputs": [],
     "outputs": [
       {
+        "internalType": "contract IRiscZeroVerifier",
         "name": "",
-        "type": "address",
-        "internalType": "address"
+        "type": "address"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "rootCaHash",
-    "inputs": [],
     "outputs": [
       {
+        "internalType": "bytes32",
         "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "type": "bytes32"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
+    "inputs": [],
     "name": "verifierId",
-    "inputs": [],
     "outputs": [
       {
+        "internalType": "bytes32",
         "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "type": "bytes32"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "verify",
     "inputs": [
       {
+        "internalType": "bytes",
         "name": "output",
-        "type": "bytes",
-        "internalType": "bytes"
+        "type": "bytes"
       },
       {
+        "internalType": "bytes",
         "name": "proofBytes",
-        "type": "bytes",
-        "internalType": "bytes"
+        "type": "bytes"
       }
     ],
+    "name": "verify",
     "outputs": [
       {
-        "name": "journal",
-        "type": "tuple",
-        "internalType": "struct TDXVerifierJournal",
-        "components": [
-          {
-            "name": "success",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "tcbStatus",
-            "type": "uint8",
-            "internalType": "enum TDXTcbStatus"
-          },
-          {
-            "name": "timestamp",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "collateralExpiration",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "rootCaHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "publicKey",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "signer",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "imageHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "reportDataPrefix",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "reportDataSuffix",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          }
-        ]
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "imageHash",
+        "type": "bytes32"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "type": "function",
-    "name": "version",
     "inputs": [],
+    "name": "version",
     "outputs": [
       {
+        "internalType": "string",
         "name": "",
-        "type": "string",
-        "internalType": "string"
+        "type": "string"
       }
     ],
-    "stateMutability": "pure"
+    "stateMutability": "pure",
+    "type": "function"
   },
   {
-    "type": "error",
-    "name": "CollateralExpired",
     "inputs": [
       {
+        "internalType": "uint64",
+        "name": "expected",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "actual",
+        "type": "uint64"
+      }
+    ],
+    "name": "ChainIdMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
         "name": "collateralExpiration",
-        "type": "uint64",
-        "internalType": "uint64"
+        "type": "uint64"
       }
-    ]
+    ],
+    "name": "CollateralExpired",
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "tdAttributes",
+        "type": "uint64"
+      }
+    ],
+    "name": "DebugTdNotAllowed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidPublicKey",
-    "inputs": []
+    "type": "error"
   },
   {
-    "type": "error",
-    "name": "InvalidTimestamp",
     "inputs": [
       {
+        "internalType": "uint64",
         "name": "timestampSeconds",
-        "type": "uint64",
-        "internalType": "uint64"
+        "type": "uint64"
       },
       {
+        "internalType": "uint256",
         "name": "currentTimestamp",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "uint256"
       }
-    ]
+    ],
+    "name": "InvalidTimestamp",
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "expected",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "actual",
+        "type": "address"
+      }
+    ],
+    "name": "RegistryAddressMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "actual",
+        "type": "bytes32"
+      }
+    ],
     "name": "ReportDataMismatch",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "actual",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "actual",
+        "type": "bytes32"
+      }
+    ],
     "name": "RootCaHashMismatch",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "actual",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "expected",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "actual",
+        "type": "address"
+      }
+    ],
     "name": "SignerMismatch",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "actual",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
+    "type": "error"
   },
   {
-    "type": "error",
-    "name": "TDXVerificationFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TcbStatusNotAllowed",
     "inputs": [
       {
+        "internalType": "enum TDXTcbStatus",
         "name": "status",
-        "type": "uint8",
-        "internalType": "enum TDXTcbStatus"
+        "type": "uint8"
       }
-    ]
+    ],
+    "name": "TcbStatusNotAllowed",
+    "type": "error"
   },
   {
-    "type": "error",
+    "inputs": [
+      {
+        "internalType": "enum TDXVerificationResult",
+        "name": "result",
+        "type": "uint8"
+      }
+    ],
+    "name": "VerificationFailed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ZeroInput",
-    "inputs": []
+    "type": "error"
   }
 ]

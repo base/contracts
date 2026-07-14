@@ -5,7 +5,7 @@ import { Test } from "forge-std/Test.sol";
 
 import { IRiscZeroVerifier } from "lib/risc0-ethereum/contracts/src/IRiscZeroVerifier.sol";
 
-import { TDXTcbStatus, TDXVerifierJournal } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
+import { TDXTcbStatus, TDXVerificationResult, TDXVerifierJournal } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 
 import { TDXVerifier } from "src/L1/proofs/tee/TDXVerifier.sol";
 
@@ -47,6 +47,13 @@ contract TDXVerifierTest is Test {
         _expectVerifyRevert(journal, TDXVerifier.RootCaHashMismatch.selector);
     }
 
+    function testVerifyRevertsWhenGuestReportedFailure() public {
+        TDXVerifierJournal memory journal = _successJournal();
+        journal.result = TDXVerificationResult.InvalidQuote;
+
+        _expectVerifyRevert(journal, TDXVerifier.VerificationFailed.selector);
+    }
+
     function testVerifyRevertsWhenTcbStatusIsNotAllowed() public {
         TDXVerifierJournal memory journal = _successJournal();
         journal.tcbStatus = TDXTcbStatus.ConfigurationNeeded;
@@ -82,16 +89,44 @@ contract TDXVerifierTest is Test {
         _expectVerifyRevert(journal, TDXVerifier.ReportDataMismatch.selector);
     }
 
+    function testVerifyRevertsForDebugTd() public {
+        TDXVerifierJournal memory journal = _successJournal();
+        journal.tdAttributes = 1;
+
+        _expectVerifyRevert(journal, TDXVerifier.DebugTdNotAllowed.selector);
+    }
+
+    function testVerifyRevertsWhenRegistrationContextDoesNotMatch() public {
+        TDXVerifierJournal memory journal = _successJournal();
+        journal.chainId = uint64(block.chainid + 1);
+
+        _expectVerifyRevert(journal, TDXVerifier.ChainIdMismatch.selector);
+
+        journal = _successJournal();
+        journal.registryAddress = makeAddr("wrong-registry");
+
+        _expectVerifyRevert(journal, TDXVerifier.RegistryAddressMismatch.selector);
+    }
+
     function _successJournal() internal view returns (TDXVerifierJournal memory journal) {
         journal = TDXVerifierJournal({
+            result: TDXVerificationResult.Success,
             tcbStatus: TDXTcbStatus.UpToDate,
             timestamp: uint64(block.timestamp - 1) * 1000,
             collateralExpiration: uint64(block.timestamp + 1 days),
             rootCaHash: ROOT_CA_HASH,
-            publicKeyX: PUBLIC_KEY_X,
-            publicKeyY: PUBLIC_KEY_Y,
+            pckCertHash: keccak256("pck-cert"),
+            tcbInfoHash: keccak256("tcb-info"),
+            qeIdentityHash: keccak256("qe-identity"),
+            publicKey: abi.encodePacked(bytes1(0x04), PUBLIC_KEY_X, PUBLIC_KEY_Y),
+            signer: address(uint160(uint256(_publicKeyHash()))),
             imageHash: IMAGE_HASH,
-            reportDataPrefix: _publicKeyHash()
+            mrTdHash: keccak256("mrtd"),
+            reportDataPrefix: _publicKeyHash(),
+            reportDataSuffix: keccak256("report-data"),
+            tdAttributes: 0,
+            chainId: uint64(block.chainid),
+            registryAddress: address(this)
         });
     }
 

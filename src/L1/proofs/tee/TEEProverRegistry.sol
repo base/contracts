@@ -57,8 +57,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Mapping of whether a signer address is registered.
     mapping(address => bool) public isRegisteredSigner;
 
-    /// @notice Mapping of signer address to the PCR0 image hash from their attestation.
-    /// @dev Stored at registration time from the ZK-verified attestation document.
+    /// @notice Mapping of signer address to the attested workload image hash.
+    /// @dev TDX values are CI-derived OCI manifest digests, while Nitro values
+    ///      remain PCR0 hashes.
     ///      TEEVerifier checks this against the AggregateVerifier's type-specific TEE image hash at
     ///      proof-submission time, so signers automatically become unusable when the
     ///      AggregateVerifier upgrades to a new image hash. isValidSigner also uses
@@ -223,6 +224,11 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Returns the expected TEE image hash for the given TEE type from the current AggregateVerifier.
     function getExpectedImageHash(TEEType teeType) external view returns (bytes32) {
         return _getExpectedImageHash(gameType, teeType);
+    }
+
+    /// @notice Returns the CI-derived OCI manifest digest expected for TDX signers.
+    function getExpectedTDXImageHash() external view returns (bytes32) {
+        return _getExpectedImageHash(gameType, TEEType.TDX);
     }
 
     /// @notice Initializes the contract with owner, manager, proposers, and game type.
