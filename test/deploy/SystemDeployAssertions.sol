@@ -39,7 +39,8 @@ abstract contract SystemDeployAssertions is Test {
         IETHLockbox ethLockbox;
         address proxyAdminOwner;
         GameType multiproofGameType;
-        bytes32 teeImageHash;
+        bytes32 teeNitroImageHash;
+        bytes32 teeTdxImageHash;
         bytes32 zkRangeHash;
         bytes32 zkAggregationHash;
         bytes32 multiproofConfigHash;
@@ -250,7 +251,8 @@ abstract contract SystemDeployAssertions is Test {
         assertEq(address(_aggregateVerifier.DELAYED_WETH()), address(_expected.delayedWETH), "AV-60");
         assertEq(address(_aggregateVerifier.TEE_VERIFIER()), _expected.implementations.teeVerifierImpl, "AV-70");
         assertEq(address(_aggregateVerifier.ZK_VERIFIER()), _expected.implementations.zkVerifierImpl, "AV-80");
-        assertEq(_aggregateVerifier.TEE_IMAGE_HASH(), _expected.teeImageHash, "AV-90");
+        assertEq(_aggregateVerifier.TEE_NITRO_IMAGE_HASH(), _expected.teeNitroImageHash, "AV-90");
+        assertEq(_aggregateVerifier.TEE_TDX_IMAGE_HASH(), _expected.teeTdxImageHash, "AV-95");
         assertEq(_aggregateVerifier.ZK_RANGE_HASH(), _expected.zkRangeHash, "AV-100");
         assertEq(_aggregateVerifier.ZK_AGGREGATE_HASH(), _expected.zkAggregationHash, "AV-110");
         assertEq(_aggregateVerifier.CONFIG_HASH(), _expected.multiproofConfigHash, "AV-120");

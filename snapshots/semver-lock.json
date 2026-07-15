@@ -32,8 +32,8 @@
     "sourceCodeHash": "0xf122a50487efe9bd5a620262ba20ef4adbca14eeec2af7fd32e6e16739001596"
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0x90629c679e821a70553d899a68e818bcddb672a004a0d2e09078d17028a2f082",
-    "sourceCodeHash": "0x4835d3de998b2951898f0e427c61b0c330ac3feb5f7a8dc9fd0deb78912a9b7a"
+    "initCodeHash": "0xa01943ea100f6b04897860ebf21bb54fda9ec3b9b08b9aedc5496e6739a46920",
+    "sourceCodeHash": "0x919e360226ca9bbfd63b8765ed73112dbafd0766bd666da3d89efced36dc7943"
   },
   "src/L1/proofs/AnchorStateRegistry.sol:AnchorStateRegistry": {
     "initCodeHash": "0x6f3afd2d0ef97a82ca3111976322b99343a270e54cd4a405028f2f29c75f7fb1",
@@ -51,13 +51,17 @@
     "initCodeHash": "0xf79cd59d23f6a5ad78960b664e20779592d73bfcf52527c3e03adda04edd9645",
     "sourceCodeHash": "0x03c164216b27f82ee13064ace6079d5e24e187d888f41bd01c8daffa60c575d6"
   },
+  "src/L1/proofs/tee/TDXVerifier.sol:TDXVerifier": {
+    "initCodeHash": "0x84cd7aa3db5b0adc76900b7bf0fab655d7f3961a1f7e9f6a480ca96391def525",
+    "sourceCodeHash": "0x43ec653bd3d82137e910fbab1ac3d31be78f074a803e045e2910242521c6eb9a"
+  },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0xfd1942e1c2f59b0aa72b33d698a948a53b6e4cf1040106f173fb5d89f63f57b0",
-    "sourceCodeHash": "0x7dc91bb80f476c50d3e1e39fc29316a216dd03eebe25b79c936a5a3d2f595489"
+    "initCodeHash": "0xfa7d9a51657de009210c35348ea1ee9ccdacf88b715133d86bda016e9a72f310",
+    "sourceCodeHash": "0x00d7d6e9dc474ef81109da7720a5cf67a60d1b525f8059b59bfc07a82a3e9962"
   },
   "src/L1/proofs/tee/TEEVerifier.sol:TEEVerifier": {
-    "initCodeHash": "0x655576cc21cc5c603d55fb4dd2a2f0ef57b11deeaabd3e539b0a70a5f7e2c9af",
-    "sourceCodeHash": "0x6c1d839e48cc8497af7b0d74a9566e76000599b14d7db7b3163a69e774a91bb3"
+    "initCodeHash": "0x17cc64d7878217fd749f88143ac0efbf7b640bad1cbae9e5ec102edf72b367bb",
+    "sourceCodeHash": "0x23d9d7dca01690c685e6523ba8d67f9f4ea114e589f5197ad97fb39e4a62ea88"
   },
   "src/L1/proofs/zk/ZKVerifier.sol:ZKVerifier": {
     "initCodeHash": "0xcdc5bd5fa8ffad76358b8f34a53b8c0cb36540176c31f82d52546373d0bd5245",

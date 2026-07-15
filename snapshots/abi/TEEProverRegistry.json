@@ -7,6 +7,11 @@
         "type": "address"
       },
       {
+        "internalType": "contract ITDXVerifier",
+        "name": "tdxVerifier",
+        "type": "address"
+      },
+      {
         "internalType": "contract IDisputeGameFactory",
         "name": "factory",
         "type": "address"
@@ -55,6 +60,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "TDX_VERIFIER",
+    "outputs": [
+      {
+        "internalType": "contract ITDXVerifier",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -81,8 +99,27 @@
     "type": "function"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "enum TEEProverRegistry.TEEType",
+        "name": "teeType",
+        "type": "uint8"
+      }
+    ],
     "name": "getExpectedImageHash",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getExpectedTDXImageHash",
     "outputs": [
       {
         "internalType": "bytes32",
@@ -236,6 +273,24 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "bytes",
+        "name": "output",
+        "type": "bytes"
+      },
+      {
+        "internalType": "bytes",
+        "name": "proofBytes",
+        "type": "bytes"
+      }
+    ],
+    "name": "registerTDXSigner",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "renounceManagement",
     "outputs": [],
@@ -294,6 +349,25 @@
         "internalType": "bytes32",
         "name": "",
         "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "signerTEEType",
+    "outputs": [
+      {
+        "internalType": "enum TEEProverRegistry.TEEType",
+        "name": "",
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -480,6 +554,11 @@
   {
     "inputs": [],
     "name": "PCR0NotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "TDXVerifierNotSet",
     "type": "error"
   }
 ]

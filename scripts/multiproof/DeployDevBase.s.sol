@@ -7,6 +7,9 @@ import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { DisputeGameFactory } from "src/L1/proofs/DisputeGameFactory.sol";
 import { GameType, Hash } from "src/libraries/bridge/Types.sol";
 
@@ -16,72 +19,60 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 
-import { MinimalProxyAdmin } from "./mocks/MinimalProxyAdmin.sol";
 import { MockAnchorStateRegistry } from "./mocks/MockAnchorStateRegistry.sol";
 import { MockDelayedWETH } from "./mocks/MockDelayedWETH.sol";
 
 abstract contract DeployDevBase is Script {
-    DeployConfig public constant cfg =
+    DeployConfig internal constant cfg =
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
-
-    address public teeProverRegistryProxy;
-    address public teeVerifier;
-    address public disputeGameFactory;
-    IAnchorStateRegistry public mockAnchorRegistry;
-    address public mockDelayedWETH;
-    address public aggregateVerifier;
 
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
         cfg.read(Config.deployConfigPath());
     }
 
-    function run() public {
+    function _run(
+        bytes32 asrStartingOutputRoot,
+        uint256 asrStartingBlockNumber,
+        address nitroVerifier,
+        address tdxVerifier,
+        address registrationManager,
+        uint256 initBond,
+        string memory outputSuffix
+    )
+        internal
+    {
+        require(asrStartingOutputRoot != bytes32(0), "asrStartingOutputRoot must be non-zero");
+        require(tdxVerifier != address(0), "tdxVerifier must be non-zero");
+        require(registrationManager != address(0), "registrationManager must be non-zero");
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
-
-        _preflight();
-        _logHeader();
+        string memory key = "deployment";
+        if (nitroVerifier != address(0)) {
+            vm.serializeAddress(key, "NitroEnclaveVerifier", nitroVerifier);
+            vm.serializeAddress(key, "TDXRegistrationManager", registrationManager);
+        }
+        vm.serializeAddress(key, "TDXVerifier", tdxVerifier);
 
         vm.startBroadcast();
 
-        _deployInfrastructure(gameType);
-        _deployTEEContracts(gameType);
-        _deployAggregateVerifier(gameType);
-
-        vm.stopBroadcast();
-
-        _printSummary();
-        _writeOutput();
-    }
-
-    function _deployInfrastructure(GameType gameType) internal {
-        address owner = cfg.finalSystemOwner();
-        address factoryImpl = address(new DisputeGameFactory());
-        MinimalProxyAdmin proxyAdmin = new MinimalProxyAdmin(owner);
-
         Proxy proxy = new Proxy(msg.sender);
-        proxy.upgradeTo(factoryImpl);
-        proxy.changeAdmin(address(proxyAdmin));
-        DisputeGameFactory(address(proxy)).initialize(owner);
-        disputeGameFactory = address(proxy);
+        proxy.upgradeTo(address(new DisputeGameFactory()));
+        DisputeGameFactory factory = DisputeGameFactory(address(proxy));
+        factory.initialize(msg.sender);
+        proxy.changeAdmin(address(0xdead));
+        factory.setInitBond(gameType, initBond);
+        vm.serializeAddress(key, "DisputeGameFactory", address(factory));
 
         MockAnchorStateRegistry asr = new MockAnchorStateRegistry();
-        mockAnchorRegistry = IAnchorStateRegistry(address(asr));
-        asr.initialize(
-            disputeGameFactory,
-            Hash.wrap(cfg.multiproofGenesisOutputRoot()),
-            cfg.multiproofGenesisBlockNumber(),
-            gameType
-        );
-    }
-
-    function _deployTEEContracts(GameType gameType) internal {
-        address owner = cfg.finalSystemOwner();
-        address teeRegistryImpl = _deployTEERegistryImpl();
+        asr.initialize(address(factory), Hash.wrap(asrStartingOutputRoot), asrStartingBlockNumber, gameType);
+        vm.serializeAddress(key, "AnchorStateRegistry", address(asr));
+        vm.serializeBytes32(key, "ASRStartingOutputRoot", asrStartingOutputRoot);
+        vm.serializeUint(key, "ASRStartingBlockNumber", asrStartingBlockNumber);
 
         address[] memory initialProposers = new address[](2);
         initialProposers[0] = cfg.teeProposer();
@@ -89,65 +80,58 @@ abstract contract DeployDevBase is Script {
 
         Proxy teeProxy = new Proxy(msg.sender);
         teeProxy.upgradeToAndCall(
-            teeRegistryImpl, abi.encodeCall(TEEProverRegistry.initialize, (owner, owner, initialProposers, gameType))
+            address(
+                new DevTEEProverRegistry(
+                    INitroEnclaveVerifier(nitroVerifier),
+                    ITDXVerifier(tdxVerifier),
+                    IDisputeGameFactory(address(factory))
+                )
+            ),
+            abi.encodeCall(
+                TEEProverRegistry.initialize, (cfg.finalSystemOwner(), registrationManager, initialProposers, gameType)
+            )
         );
         teeProxy.changeAdmin(address(0xdead));
-        teeProverRegistryProxy = address(teeProxy);
+        address teeProverRegistryProxy = address(teeProxy);
+        vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
 
-        teeVerifier = address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), mockAnchorRegistry));
-    }
+        if (nitroVerifier != address(0)) {
+            INitroEnclaveVerifier(nitroVerifier).setProofSubmitter(teeProverRegistryProxy);
+        }
 
-    function _deployAggregateVerifier(GameType gameType) internal {
-        address zkVerifier = address(new MockVerifier(mockAnchorRegistry));
-        mockDelayedWETH = address(new MockDelayedWETH());
+        address teeVerifier =
+            address(new TEEVerifier(TEEProverRegistry(teeProverRegistryProxy), IAnchorStateRegistry(address(asr))));
+        vm.serializeAddress(key, "TEEVerifier", teeVerifier);
 
-        AggregateVerifier.ZkHashes memory zkHashes =
-            AggregateVerifier.ZkHashes({ rangeHash: cfg.zkRangeHash(), aggregateHash: cfg.zkAggregationHash() });
+        MockDelayedWETH delayedWETH = new MockDelayedWETH();
+        vm.serializeAddress(key, "DelayedWETH", address(delayedWETH));
 
-        aggregateVerifier = address(
+        address aggregateVerifier = address(
             new AggregateVerifier(
                 gameType,
-                mockAnchorRegistry,
-                IDelayedWETH(payable(mockDelayedWETH)),
+                IAnchorStateRegistry(address(asr)),
+                IDelayedWETH(payable(address(delayedWETH))),
                 IVerifier(teeVerifier),
-                IVerifier(zkVerifier),
-                cfg.teeImageHash(),
-                zkHashes,
+                IVerifier(address(new MockVerifier(IAnchorStateRegistry(address(asr))))),
+                cfg.teeNitroImageHash(),
+                cfg.teeTdxImageHash(),
+                AggregateVerifier.ZkHashes({ rangeHash: cfg.zkRangeHash(), aggregateHash: cfg.zkAggregationHash() }),
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainId(),
-                _blockInterval(),
-                _intermediateBlockInterval()
+                cfg.multiproofBlockInterval(),
+                cfg.multiproofIntermediateBlockInterval()
             )
         );
 
-        DisputeGameFactory factory = DisputeGameFactory(disputeGameFactory);
-        factory.setImplementation(gameType, IDisputeGame(aggregateVerifier), "");
-        factory.setInitBond(gameType, _initBond());
-    }
+        factory.setImplementation(gameType, IDisputeGame(aggregateVerifier));
+        factory.transferOwnership(cfg.finalSystemOwner());
 
-    function _writeOutput() internal {
-        string memory key = "deployment";
-        vm.serializeAddress(key, "TEEProverRegistry", teeProverRegistryProxy);
-        vm.serializeAddress(key, "TEEVerifier", teeVerifier);
-        _serializeExtra(key);
-        vm.serializeAddress(key, "DisputeGameFactory", disputeGameFactory);
-        vm.serializeAddress(key, "AnchorStateRegistry", address(mockAnchorRegistry));
-        vm.serializeAddress(key, "DelayedWETH", mockDelayedWETH);
         string memory json = vm.serializeAddress(key, "AggregateVerifier", aggregateVerifier);
 
-        string memory outPath = string.concat("deployments/", vm.toString(block.chainid), _outputSuffix());
+        vm.stopBroadcast();
+
+        string memory outPath = string.concat("deployments/", vm.toString(block.chainid), outputSuffix);
         vm.writeJson(json, outPath);
         console.log("Deployment saved to:", outPath);
     }
-
-    function _blockInterval() internal pure virtual returns (uint256);
-    function _intermediateBlockInterval() internal pure virtual returns (uint256);
-    function _initBond() internal pure virtual returns (uint256);
-    function _outputSuffix() internal pure virtual returns (string memory);
-    function _deployTEERegistryImpl() internal virtual returns (address);
-    function _logHeader() internal view virtual;
-    function _printSummary() internal view virtual;
-
-    function _preflight() internal virtual { }
-    function _serializeExtra(string memory key) internal virtual { }
 }

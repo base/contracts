@@ -28,7 +28,12 @@
       },
       {
         "internalType": "bytes32",
-        "name": "teeImageHash",
+        "name": "teeNitroImageHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "teeTdxImageHash",
         "type": "bytes32"
       },
       {
@@ -230,7 +235,20 @@
   },
   {
     "inputs": [],
-    "name": "TEE_IMAGE_HASH",
+    "name": "TEE_NITRO_IMAGE_HASH",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "TEE_TDX_IMAGE_HASH",
     "outputs": [
       {
         "internalType": "bytes32",

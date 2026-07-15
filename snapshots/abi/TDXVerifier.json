@@ -1,0 +1,306 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "initialMaxTimeDiff",
+        "type": "uint64"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "initialRootCaHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "initialAudienceHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "initialRiscZeroVerifier",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "initialVerifierId",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "GCP_INTEL_TDX_HASH",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "audienceHash",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "maxTimeDiff",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "riscZeroVerifier",
+    "outputs": [
+      {
+        "internalType": "contract IRiscZeroVerifier",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "rootCaHash",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "verifierId",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes",
+        "name": "output",
+        "type": "bytes"
+      },
+      {
+        "internalType": "bytes",
+        "name": "proofBytes",
+        "type": "bytes"
+      }
+    ],
+    "name": "verify",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "signer",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "imageHash",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "version",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "actual",
+        "type": "bytes32"
+      }
+    ],
+    "name": "AudienceHashMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "expected",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "actual",
+        "type": "uint64"
+      }
+    ],
+    "name": "ChainIdMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "DebugImageNotAllowed",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "actual",
+        "type": "bytes32"
+      }
+    ],
+    "name": "HardwareModelMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidPublicKey",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "issuedAt",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "expiration",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint256",
+        "name": "currentTimestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "InvalidTokenTime",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "LaunchOverrideNotAllowed",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "expected",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "actual",
+        "type": "address"
+      }
+    ],
+    "name": "RegistryAddressMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "actual",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RootCaHashMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "SecureBootRequired",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "expected",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "actual",
+        "type": "address"
+      }
+    ],
+    "name": "SignerMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum TDXVerificationResult",
+        "name": "result",
+        "type": "uint8"
+      }
+    ],
+    "name": "VerificationFailed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroInput",
+    "type": "error"
+  }
+]

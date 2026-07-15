@@ -66,6 +66,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The minimum number of proofs required to resolve the game.
     uint256 public constant PROOF_THRESHOLD = 1;
+
     ////////////////////////////////////////////////////////////////
     //                         Immutables                         //
     ////////////////////////////////////////////////////////////////
@@ -81,8 +82,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The TEE prover.
     IVerifier public immutable TEE_VERIFIER;
 
-    /// @notice The hash of the TEE image.
-    bytes32 public immutable TEE_IMAGE_HASH;
+    /// @notice The hash of the Nitro TEE image.
+    bytes32 public immutable TEE_NITRO_IMAGE_HASH;
+
+    /// @notice The OCI manifest digest for the Confidential Space TDX prover workload.
+    bytes32 public immutable TEE_TDX_IMAGE_HASH;
 
     /// @notice The ZK prover.
     IVerifier public immutable ZK_VERIFIER;
@@ -253,7 +257,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param delayedWETH The delayed WETH contract.
     /// @param teeVerifier The TEE verifier.
     /// @param zkVerifier The ZK verifier.
-    /// @param teeImageHash The hash of the TEE image.
+    /// @param teeNitroImageHash The hash of the Nitro TEE image.
+    /// @param teeTdxImageHash The OCI manifest digest for the Confidential Space TDX prover workload.
     /// @param zkHashes The hashes of the ZK range and aggregate programs.
     /// @param configHash The hash of the rollup configuration.
     /// @param l2ChainId The chain ID of the L2 network.
@@ -265,7 +270,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         IDelayedWETH delayedWETH,
         IVerifier teeVerifier,
         IVerifier zkVerifier,
-        bytes32 teeImageHash,
+        bytes32 teeNitroImageHash,
+        bytes32 teeTdxImageHash,
         ZkHashes memory zkHashes,
         bytes32 configHash,
         uint256 l2ChainId,
@@ -284,7 +290,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         DELAYED_WETH = delayedWETH;
         TEE_VERIFIER = teeVerifier;
         ZK_VERIFIER = zkVerifier;
-        TEE_IMAGE_HASH = teeImageHash;
+        TEE_NITRO_IMAGE_HASH = teeNitroImageHash;
+        TEE_TDX_IMAGE_HASH = teeTdxImageHash;
         ZK_RANGE_HASH = zkHashes.rangeHash;
         ZK_AGGREGATE_HASH = zkHashes.aggregateHash;
         CONFIG_HASH = configHash;
@@ -875,7 +882,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Verifies a TEE proof for the current game.
-    /// @param proofBytes The proof: signature(65).
+    /// @param proofBytes The proof: nitro signature(65) + tdx signature(65).
     function _verifyTeeProof(
         bytes calldata proofBytes,
         address proposer,
@@ -889,23 +896,34 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         internal
         view
     {
-        bytes32 journal = keccak256(
-            abi.encodePacked(
-                proposer,
-                l1OriginHash,
-                startingRoot,
-                startingL2SequenceNumber,
-                endingRoot,
-                endingL2SequenceNumber,
-                intermediateRoots,
-                CONFIG_HASH,
-                TEE_IMAGE_HASH
-            )
+        if (proofBytes.length != 130) revert InvalidProof();
+
+        bytes memory journalPrefix = abi.encodePacked(
+            proposer,
+            l1OriginHash,
+            startingRoot,
+            startingL2SequenceNumber,
+            endingRoot,
+            endingL2SequenceNumber,
+            intermediateRoots,
+            CONFIG_HASH
         );
 
-        // Validate the proof.
-        bytes memory proof = abi.encodePacked(proposer, proofBytes);
-        if (!TEE_VERIFIER.verify(proof, TEE_IMAGE_HASH, journal)) revert InvalidProof();
+        if (!TEE_VERIFIER.verify(
+                abi.encodePacked(proposer, proofBytes[:65]),
+                TEE_NITRO_IMAGE_HASH,
+                keccak256(abi.encodePacked(journalPrefix, TEE_NITRO_IMAGE_HASH))
+            )) {
+            revert InvalidProof();
+        }
+
+        if (!TEE_VERIFIER.verify(
+                abi.encodePacked(proposer, proofBytes[65:130]),
+                TEE_TDX_IMAGE_HASH,
+                keccak256(abi.encodePacked(journalPrefix, TEE_TDX_IMAGE_HASH))
+            )) {
+            revert InvalidProof();
+        }
     }
 
     /// @notice Verifies a ZK proof for the current game.
@@ -1034,8 +1052,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.1.0
+    /// @custom:semver 0.2.0
     function version() public pure virtual returns (string memory) {
-        return "0.1.0";
+        return "0.2.0";
     }
 }

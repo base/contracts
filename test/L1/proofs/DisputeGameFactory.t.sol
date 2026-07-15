@@ -226,6 +226,7 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
             IVerifier(address(teeVerifier)),
             IVerifier(address(zkVerifier)),
             bytes32(uint256(1)),
+            bytes32(uint256(1)),
             AggregateVerifier.ZkHashes(bytes32(uint256(2)), bytes32(uint256(3))),
             bytes32(uint256(4)),
             L2_CHAIN_ID,

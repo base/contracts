@@ -86,6 +86,7 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
             IVerifier(address(teeVerifier)),
             IVerifier(address(zkVerifier)),
             bytes32(uint256(1)),
+            bytes32(uint256(1)),
             AggregateVerifier.ZkHashes(bytes32(uint256(2)), bytes32(uint256(3))),
             bytes32(uint256(4)),
             deploy.cfg().l2ChainId(),

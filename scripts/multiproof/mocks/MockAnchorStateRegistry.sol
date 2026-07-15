@@ -15,6 +15,7 @@ import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 contract MockAnchorStateRegistry {
     Hash public anchorRoot;
     uint256 public anchorL2BlockNumber;
+    IDisputeGame public anchorGame;
     address public factory;
     GameType public respectedGameType;
 
@@ -33,6 +34,10 @@ contract MockAnchorStateRegistry {
     }
 
     function getAnchorRoot() external view returns (Hash, uint256) {
+        if (address(anchorGame) != address(0)) {
+            return (Hash.wrap(anchorGame.rootClaim().raw()), anchorGame.l2SequenceNumber());
+        }
+
         return (anchorRoot, anchorL2BlockNumber);
     }
 
@@ -45,6 +50,7 @@ contract MockAnchorStateRegistry {
     }
 
     function setAnchorState(Hash newAnchorRoot, uint256 newAnchorL2BlockNumber) external {
+        anchorGame = IDisputeGame(address(0));
         anchorRoot = newAnchorRoot;
         anchorL2BlockNumber = newAnchorL2BlockNumber;
     }
@@ -79,5 +85,7 @@ contract MockAnchorStateRegistry {
         return _game.resolvedAt().raw() != 0;
     }
 
-    function setAnchorState(IDisputeGame) external { }
+    function setAnchorState(IDisputeGame game) external {
+        anchorGame = game;
+    }
 }

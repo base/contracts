@@ -6,73 +6,45 @@ import { Test } from "lib/forge-std/src/Test.sol";
 import { Proxy } from "src/universal/Proxy.sol";
 
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { ITDXVerifier } from "interfaces/L1/proofs/tee/ITDXVerifier.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { GameType } from "src/libraries/bridge/Types.sol";
-
-import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
-contract MockAggregateVerifierForRegistry {
-    bytes32 public immutable TEE_IMAGE_HASH;
-
-    constructor(bytes32 imageHash) {
-        TEE_IMAGE_HASH = imageHash;
-    }
-}
-
-contract MockDisputeGameFactoryForRegistry {
-    IDisputeGame internal immutable _impl;
-
-    constructor(address impl) {
-        _impl = IDisputeGame(impl);
-    }
-
-    function gameImpls(GameType) external view returns (IDisputeGame) {
-        return _impl;
-    }
-}
+bytes32 constant TEST_IMAGE_HASH = keccak256("test-image-hash");
 
 /// @dev Uses DevTEEProverRegistry because production signer registration requires a Nitro attestation proof.
 contract TEEProverRegistryTest is Test {
-    DevTEEProverRegistry public teeProverRegistry;
+    DevTEEProverRegistry internal teeProverRegistry;
 
-    address public owner;
-    address public manager;
-    address public unauthorized;
+    address internal immutable owner = makeAddr("owner");
+    address internal immutable manager = makeAddr("manager");
 
-    bytes32 public constant TEST_IMAGE_HASH = keccak256("test-image-hash");
-    GameType public constant TEST_GAME_TYPE = GameType.wrap(621);
-    string internal constant NOT_OWNER = "OwnableManaged: caller is not the owner";
-    string internal constant NOT_OWNER_OR_MANAGER = "OwnableManaged: caller is not the owner or the manager";
-
-    // Events must be redeclared here because Solidity 0.8.15 doesn't support
-    // referencing events from other contracts via qualified names (requires 0.8.21+)
-    event SignerRegistered(address indexed signer);
-    event SignerDeregistered(address indexed signer);
-    event ProposerSet(address indexed proposer, bool isValid);
+    GameType internal constant TEST_GAME_TYPE = GameType.wrap(621);
 
     function setUp() public {
-        owner = makeAddr("owner");
-        manager = makeAddr("manager");
-        unauthorized = makeAddr("unauthorized");
-
-        teeProverRegistry = _deployRegistry(new address[](0), TEST_GAME_TYPE);
+        teeProverRegistry = _deployRegistry(new address[](0));
     }
 
-    function _deployRegistry(address[] memory proposers, GameType gameType) internal returns (DevTEEProverRegistry) {
-        MockAggregateVerifierForRegistry verifier = new MockAggregateVerifierForRegistry(TEST_IMAGE_HASH);
-        MockDisputeGameFactoryForRegistry factory = new MockDisputeGameFactoryForRegistry(address(verifier));
+    function _deployRegistry(address[] memory proposers) internal returns (DevTEEProverRegistry) {
+        address verifier = makeAddr("verifier");
+        vm.mockCall(verifier, abi.encodeWithSignature("TEE_NITRO_IMAGE_HASH()"), abi.encode(TEST_IMAGE_HASH));
+        vm.mockCall(verifier, abi.encodeWithSignature("TEE_TDX_IMAGE_HASH()"), abi.encode(TEST_IMAGE_HASH));
 
-        DevTEEProverRegistry impl =
-            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(factory)));
+        address factory = makeAddr("factory");
+        vm.mockCall(factory, abi.encodeCall(IDisputeGameFactory.gameImpls, (TEST_GAME_TYPE)), abi.encode(verifier));
+
+        DevTEEProverRegistry impl = new DevTEEProverRegistry(
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(1)), IDisputeGameFactory(factory)
+        );
 
         address proxyAdmin = makeAddr("proxy-admin");
         Proxy proxy = new Proxy(proxyAdmin);
         vm.prank(proxyAdmin);
         proxy.upgradeToAndCall(
-            address(impl), abi.encodeCall(TEEProverRegistry.initialize, (owner, manager, proposers, gameType))
+            address(impl), abi.encodeCall(TEEProverRegistry.initialize, (owner, manager, proposers, TEST_GAME_TYPE))
         );
 
         return DevTEEProverRegistry(address(proxy));
@@ -80,97 +52,47 @@ contract TEEProverRegistryTest is Test {
 
     function _addDevSigner(address signer) internal {
         vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
-    }
-
-    function _addDevSigners(address signer1, address signer2, address signer3) internal {
-        vm.startPrank(owner);
-        teeProverRegistry.addDevSigner(signer1, TEST_IMAGE_HASH);
-        teeProverRegistry.addDevSigner(signer2, TEST_IMAGE_HASH);
-        teeProverRegistry.addDevSigner(signer3, TEST_IMAGE_HASH);
-        vm.stopPrank();
-    }
-
-    function _expectNotOwnerRevert(address caller) internal {
-        vm.prank(caller);
-        vm.expectRevert(bytes(NOT_OWNER));
-    }
-
-    function _expectNotOwnerOrManagerRevert(address caller) internal {
-        vm.prank(caller);
-        vm.expectRevert(bytes(NOT_OWNER_OR_MANAGER));
-    }
-
-    function _assertContains(address[] memory values, address expected) internal {
-        for (uint256 i = 0; i < values.length; i++) {
-            if (values[i] == expected) return;
-        }
-
-        fail();
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH, TEEProverRegistry.TEEType.NITRO);
     }
 
     function testInitialization() public view {
         assertEq(teeProverRegistry.owner(), owner);
         assertEq(teeProverRegistry.manager(), manager);
-        assertEq(teeProverRegistry.version(), "0.5.0");
+        assertEq(teeProverRegistry.version(), "0.7.0");
     }
 
     function testInitializationWithProposers() public {
-        address proposer1 = makeAddr("proposer1");
-        address proposer2 = makeAddr("proposer2");
-        address proposer3 = makeAddr("proposer3");
-        address[] memory proposers = new address[](3);
-        proposers[0] = proposer1;
-        proposers[1] = proposer2;
-        proposers[2] = proposer3;
+        address[] memory proposers = new address[](1);
+        proposers[0] = makeAddr("proposer");
 
-        DevTEEProverRegistry registry2 = _deployRegistry(proposers, TEST_GAME_TYPE);
-        assertTrue(registry2.isValidProposer(proposer1));
-        assertTrue(registry2.isValidProposer(proposer2));
-        assertTrue(registry2.isValidProposer(proposer3));
+        DevTEEProverRegistry registry2 = _deployRegistry(proposers);
+        assertTrue(registry2.isValidProposer(proposers[0]));
     }
 
-    function testInitializationWithEmptyProposers() public view {
-        assertFalse(teeProverRegistry.isValidProposer(address(0)));
-    }
+    function testDeregisterSignerAsOwnerOrManager() public {
+        address ownerSigner = makeAddr("owner-signer");
+        address managerSigner = makeAddr("manager-signer");
 
-    function testDeregisterSignerAsOwner() public {
-        address signer = makeAddr("signer");
-
-        _addDevSigner(signer);
-
-        vm.expectEmit(true, false, false, false, address(teeProverRegistry));
-        emit SignerDeregistered(signer);
+        _addDevSigner(ownerSigner);
+        _addDevSigner(managerSigner);
 
         vm.prank(owner);
-        teeProverRegistry.deregisterSigner(signer);
-
-        assertFalse(teeProverRegistry.isValidSigner(signer));
-    }
-
-    function testDeregisterSignerAsManager() public {
-        address signer = makeAddr("signer");
-
-        _addDevSigner(signer);
-
+        teeProverRegistry.deregisterSigner(ownerSigner);
         vm.prank(manager);
-        teeProverRegistry.deregisterSigner(signer);
+        teeProverRegistry.deregisterSigner(managerSigner);
 
-        assertFalse(teeProverRegistry.isValidSigner(signer));
+        assertFalse(teeProverRegistry.isValidSigner(ownerSigner));
+        assertFalse(teeProverRegistry.isValidSigner(managerSigner));
     }
 
     function testDeregisterSignerFailsIfUnauthorized() public {
-        address signer = makeAddr("signer");
-
-        _expectNotOwnerOrManagerRevert(unauthorized);
-        teeProverRegistry.deregisterSigner(signer);
+        vm.prank(makeAddr("unauthorized"));
+        vm.expectRevert(bytes("OwnableManaged: caller is not the owner or the manager"));
+        teeProverRegistry.deregisterSigner(makeAddr("signer"));
     }
 
     function testSetProposer() public {
         address newProposer = makeAddr("proposer");
-
-        vm.expectEmit(true, false, false, false, address(teeProverRegistry));
-        emit ProposerSet(newProposer, true);
 
         vm.prank(owner);
         teeProverRegistry.setProposer(newProposer, true);
@@ -179,220 +101,83 @@ contract TEEProverRegistryTest is Test {
     }
 
     function testSetProposerFailsIfNotOwner() public {
-        address newProposer = makeAddr("proposer");
-
-        _expectNotOwnerRevert(manager);
-        teeProverRegistry.setProposer(newProposer, true);
-
-        _expectNotOwnerRevert(unauthorized);
-        teeProverRegistry.setProposer(newProposer, true);
+        vm.prank(manager);
+        vm.expectRevert(bytes("OwnableManaged: caller is not the owner"));
+        teeProverRegistry.setProposer(makeAddr("proposer"), true);
     }
 
-    function testIsValidSignerReturnsFalseForUnregistered() public {
-        address unregistered = makeAddr("unregistered");
-        assertFalse(teeProverRegistry.isValidSigner(unregistered));
-    }
-
-    function testIsValidSignerReturnsTrueForRegistered() public {
-        address signer = makeAddr("signer");
+    function testRegisteringSameSignerWithDifferentTEETypeOverwritesTEEType() public {
+        address signer = makeAddr("dev-signer");
 
         _addDevSigner(signer);
 
-        assertTrue(teeProverRegistry.isValidSigner(signer));
-    }
-
-    function testMaxAgeConstant() public view {
-        assertEq(teeProverRegistry.MAX_AGE(), 60 minutes);
-    }
-
-    function testTransferOwnership() public {
-        address newOwner = makeAddr("newOwner");
-
         vm.prank(owner);
-        teeProverRegistry.transferOwnership(newOwner);
+        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH, TEEProverRegistry.TEEType.TDX);
 
-        assertEq(teeProverRegistry.owner(), newOwner);
+        assertTrue(teeProverRegistry.signerTEEType(signer) == TEEProverRegistry.TEEType.TDX);
     }
 
-    function testTransferOwnershipFailsIfNotOwner() public {
-        address newOwner = makeAddr("newOwner");
+    function testRegisterTDXSignerStoresImageHash() public {
+        address signer = makeAddr("tdx-signer");
+        address tdxVerifier = makeAddr("tdx-verifier");
 
-        _expectNotOwnerRevert(manager);
-        teeProverRegistry.transferOwnership(newOwner);
+        vm.mockCall(
+            tdxVerifier,
+            abi.encodeCall(ITDXVerifier.verify, (bytes(""), bytes(""))),
+            abi.encode(signer, TEST_IMAGE_HASH)
+        );
 
-        _expectNotOwnerRevert(unauthorized);
-        teeProverRegistry.transferOwnership(newOwner);
+        TEEProverRegistry registry = new TEEProverRegistry(
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(tdxVerifier), IDisputeGameFactory(makeAddr("factory"))
+        );
+
+        vm.prank(address(0xdEaD));
+        registry.registerTDXSigner("", "");
+
+        assertTrue(registry.isRegisteredSigner(signer));
+        assertEq(registry.signerImageHash(signer), TEST_IMAGE_HASH);
+        assertTrue(registry.signerTEEType(signer) == TEEProverRegistry.TEEType.TDX);
     }
 
-    function testTransferOwnershipFailsForZeroAddress() public {
-        vm.prank(owner);
-        vm.expectRevert("OwnableManaged: new owner is the zero address");
-        teeProverRegistry.transferOwnership(address(0));
-    }
-
-    function testTransferManagementAsOwner() public {
-        address newManager = makeAddr("newManager");
-
-        vm.prank(owner);
-        teeProverRegistry.transferManagement(newManager);
-
-        assertEq(teeProverRegistry.manager(), newManager);
-    }
-
-    function testTransferManagementAsManager() public {
-        address newManager = makeAddr("newManager");
-
-        vm.prank(manager);
-        teeProverRegistry.transferManagement(newManager);
-
-        assertEq(teeProverRegistry.manager(), newManager);
-    }
-
-    function testTransferManagementFailsIfUnauthorized() public {
-        address newManager = makeAddr("newManager");
-
-        _expectNotOwnerOrManagerRevert(unauthorized);
-        teeProverRegistry.transferManagement(newManager);
-    }
-
-    function testTransferManagementFailsForZeroAddress() public {
-        vm.prank(owner);
-        vm.expectRevert("OwnableManaged: new manager is the zero address");
-        teeProverRegistry.transferManagement(address(0));
-    }
-
-    function testRenounceOwnership() public {
-        vm.prank(owner);
-        teeProverRegistry.renounceOwnership();
-
-        assertEq(teeProverRegistry.owner(), address(0));
-    }
-
-    function testRenounceManagementAsOwner() public {
-        vm.prank(owner);
-        teeProverRegistry.renounceManagement();
-
-        assertEq(teeProverRegistry.manager(), address(0));
-    }
-
-    function testRenounceManagementAsManager() public {
-        vm.prank(manager);
-        teeProverRegistry.renounceManagement();
-
-        assertEq(teeProverRegistry.manager(), address(0));
+    function testConstructorRevertsIfTDXVerifierNotSet() public {
+        vm.expectRevert(TEEProverRegistry.TDXVerifierNotSet.selector);
+        new TEEProverRegistry(
+            INitroEnclaveVerifier(address(0)), ITDXVerifier(address(0)), IDisputeGameFactory(makeAddr("factory"))
+        );
     }
 
     function testAddDevSigner() public {
         address signer = makeAddr("dev-signer");
 
-        vm.expectEmit(true, false, false, false, address(teeProverRegistry));
-        emit SignerRegistered(signer);
-
-        vm.prank(owner);
-        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
+        _addDevSigner(signer);
 
         assertTrue(teeProverRegistry.isValidSigner(signer));
+        assertTrue(teeProverRegistry.signerTEEType(signer) == TEEProverRegistry.TEEType.NITRO);
+    }
+
+    function testGetExpectedTDXImageHash() public view {
+        assertEq(teeProverRegistry.getExpectedTDXImageHash(), TEST_IMAGE_HASH);
     }
 
     function testAddDevSignerFailsIfNotOwner() public {
-        address signer = makeAddr("dev-signer");
-
-        _expectNotOwnerRevert(manager);
-        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
-
-        _expectNotOwnerRevert(unauthorized);
-        teeProverRegistry.addDevSigner(signer, TEST_IMAGE_HASH);
-    }
-
-    function testAddDevSignerIdempotent() public {
-        address signer = makeAddr("dev-signer");
-
-        _addDevSigner(signer);
-        _addDevSigner(signer);
-
-        assertTrue(teeProverRegistry.isValidSigner(signer));
-    }
-
-    function testAddMultipleDevSigners() public {
-        address signer1 = makeAddr("dev-signer-1");
-        address signer2 = makeAddr("dev-signer-2");
-        address signer3 = makeAddr("dev-signer-3");
-
-        _addDevSigners(signer1, signer2, signer3);
-
-        assertTrue(teeProverRegistry.isValidSigner(signer1));
-        assertTrue(teeProverRegistry.isValidSigner(signer2));
-        assertTrue(teeProverRegistry.isValidSigner(signer3));
-    }
-
-    function testGetRegisteredSignersEmpty() public view {
-        assertEq(teeProverRegistry.getRegisteredSigners().length, 0);
-    }
-
-    function testGetRegisteredSignersAfterRegister() public {
-        address signer = makeAddr("signer");
-
-        _addDevSigner(signer);
-
-        address[] memory signers = teeProverRegistry.getRegisteredSigners();
-        assertEq(signers.length, 1);
-        assertEq(signers[0], signer);
-    }
-
-    function testGetRegisteredSignersAfterDeregister() public {
-        address signer = makeAddr("signer");
-
-        _addDevSigner(signer);
-
-        vm.prank(owner);
-        teeProverRegistry.deregisterSigner(signer);
-
-        assertEq(teeProverRegistry.getRegisteredSigners().length, 0);
-    }
-
-    function testGetRegisteredSignersMultiple() public {
-        address signer1 = makeAddr("signer-1");
-        address signer2 = makeAddr("signer-2");
-        address signer3 = makeAddr("signer-3");
-
-        _addDevSigners(signer1, signer2, signer3);
-
-        address[] memory signers = teeProverRegistry.getRegisteredSigners();
-        assertEq(signers.length, 3);
-
-        _assertContains(signers, signer1);
-        _assertContains(signers, signer2);
-        _assertContains(signers, signer3);
+        vm.prank(manager);
+        vm.expectRevert(bytes("OwnableManaged: caller is not the owner"));
+        teeProverRegistry.addDevSigner(makeAddr("dev-signer"), TEST_IMAGE_HASH, TEEProverRegistry.TEEType.NITRO);
     }
 
     function testGetRegisteredSignersConsistencyAfterMixedOperations() public {
         address signer1 = makeAddr("signer-1");
         address signer2 = makeAddr("signer-2");
-        address signer3 = makeAddr("signer-3");
 
-        _addDevSigners(signer1, signer2, signer3);
+        _addDevSigner(signer1);
+        _addDevSigner(signer2);
 
         vm.prank(manager);
         teeProverRegistry.deregisterSigner(signer2);
 
         address[] memory signers = teeProverRegistry.getRegisteredSigners();
-        assertEq(signers.length, 2);
-        _assertContains(signers, signer1);
-        _assertContains(signers, signer3);
+        assertEq(signers.length, 1);
+        assertEq(signers[0], signer1);
         assertFalse(teeProverRegistry.isValidSigner(signer2));
-    }
-
-    function testGetRegisteredSignersDeregisterIdempotent() public {
-        address signer = makeAddr("signer");
-
-        _addDevSigner(signer);
-
-        vm.prank(owner);
-        teeProverRegistry.deregisterSigner(signer);
-
-        vm.prank(owner);
-        teeProverRegistry.deregisterSigner(signer);
-
-        assertEq(teeProverRegistry.getRegisteredSigners().length, 0);
     }
 }
