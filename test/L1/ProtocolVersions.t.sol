@@ -176,12 +176,13 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         assertNotEq(protocolVersions.scheduleId(), bytes32(0));
     }
 
-    /// @notice Tests that registering with a timestamp inside the notice window reverts.
-    function test_registerUpgrade_insufficientNotice_reverts() external {
+    /// @notice Tests that registering with a timestamp inside the notice window succeeds — the
+    ///         notice period is not enforced at registration, only via `setTimestamp`/`delayTimestamp`.
+    function test_registerUpgrade_shortNotice_succeeds() external {
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() - 1;
-        vm.expectRevert(abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, ts));
         vm.prank(_owner);
         protocolVersions.registerUpgrade(ts, 0);
+        assertEq(protocolVersions.getSchedule()[CANYON], ts);
     }
 
     /// @notice Tests that a non-zero minProtocolVersion bumps the minimum during registration.
