@@ -38,7 +38,7 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 ///      The contract is deployed behind an OP proxy: the implementation constructor disables
 ///      initializers, and `initialize` (run through the proxy) seeds the hash chain.
 contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, ReinitializableBase, ISemver {
-    /// @notice Minimum notice period required when scheduling or modifying an activation timestamp.
+    /// @notice Minimum notice period required when changing a preexisting activation timestamp.
     uint64 public constant MIN_NOTICE = 1 hours;
 
     /// @notice Activation timestamp for each registered upgrade, indexed by upgrade id (0 = not scheduled).
@@ -117,19 +117,15 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @notice Registers a new upgrade, assigning it the next ascending id, optionally scheduling its
     ///         activation and bumping the minimum protocol version in the same call. Owner only.
     /// @dev Pass `timestamp` 0 to register without scheduling (schedule later via `setTimestamp`), or
-    ///      a value at least MIN_NOTICE seconds in the future to register and schedule at once.
-    ///      Either way registration extends the scheduleId chain with the new upgrade's link.
-    /// @param timestamp Future Unix activation timestamp (>= block.timestamp + MIN_NOTICE), or 0 to
-    ///                  leave the upgrade unscheduled.
+    ///      a non-zero value to register and schedule at once. Either way registration extends the
+    ///      scheduleId chain with the new upgrade's link.
+    /// @param timestamp Unix activation timestamp, or 0 to leave the upgrade unscheduled.
     /// @param minProtocolVersion New minimum protocol version to set at registration, or 0 to leave
     ///                  the current minimum unchanged.
     /// @return The ascending id assigned to the newly registered upgrade.
     function registerUpgrade(uint64 timestamp, uint256 minProtocolVersion) external returns (uint256) {
         _assertOnlyProxyAdminOwner();
         if (_upgradeScheduleId.length == 0) revert ProtocolVersions_NotInitialized();
-        if (timestamp != 0 && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
-            revert ProtocolVersions_InsufficientNotice(timestamp);
-        }
         uint256 id = _timestamps.length;
         _timestamps.push(0);
         // Reserve the link slot for this upgrade at index id + 1.
