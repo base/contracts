@@ -36,6 +36,7 @@ abstract contract DeployDevBase is Script {
     IAnchorStateRegistry public mockAnchorRegistry;
     address public mockDelayedWETH;
     address public aggregateVerifier;
+    MinimalProxyAdmin internal proxyAdmin;
 
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
@@ -63,7 +64,7 @@ abstract contract DeployDevBase is Script {
     function _deployInfrastructure(GameType gameType) internal {
         address owner = cfg.finalSystemOwner();
         address factoryImpl = address(new DisputeGameFactory());
-        MinimalProxyAdmin proxyAdmin = new MinimalProxyAdmin(owner);
+        proxyAdmin = new MinimalProxyAdmin(owner);
 
         Proxy proxy = new Proxy(msg.sender);
         proxy.upgradeTo(factoryImpl);
@@ -110,7 +111,7 @@ abstract contract DeployDevBase is Script {
         protocolVersionsProxy.upgradeToAndCall(
             address(new ProtocolVersions()), abi.encodeCall(IProtocolVersions.initialize, (address(0)))
         );
-        protocolVersionsProxy.changeAdmin(address(0xdead));
+        protocolVersionsProxy.changeAdmin(address(proxyAdmin));
 
         aggregateVerifier = address(
             new AggregateVerifier(
@@ -125,7 +126,7 @@ abstract contract DeployDevBase is Script {
                 cfg.l2ChainId(),
                 _blockInterval(),
                 _intermediateBlockInterval(),
-                IProtocolVersions(address(protocolVersionsProxy))
+                IProtocolVersions(vm.envAddress("PROTOCOL_VERSIONS_ADDRESS"))
             )
         );
 
