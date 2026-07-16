@@ -126,7 +126,7 @@ abstract contract DeployDevBase is Script {
                 cfg.l2ChainId(),
                 _blockInterval(),
                 _intermediateBlockInterval(),
-                IProtocolVersions(vm.envAddress("PROTOCOL_VERSIONS_ADDRESS"))
+                IProtocolVersions(address(protocolVersionsProxy))
             )
         );
 
