@@ -16,6 +16,8 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
@@ -34,6 +36,7 @@ abstract contract DeployDevBase is Script {
     IAnchorStateRegistry public mockAnchorRegistry;
     address public mockDelayedWETH;
     address public aggregateVerifier;
+    MinimalProxyAdmin internal proxyAdmin;
 
     function setUp() public {
         DeployUtils.etchLabelAndAllowCheatcodes({ _etchTo: address(cfg), _cname: "DeployConfig" });
@@ -61,7 +64,7 @@ abstract contract DeployDevBase is Script {
     function _deployInfrastructure(GameType gameType) internal {
         address owner = cfg.finalSystemOwner();
         address factoryImpl = address(new DisputeGameFactory());
-        MinimalProxyAdmin proxyAdmin = new MinimalProxyAdmin(owner);
+        proxyAdmin = new MinimalProxyAdmin(owner);
 
         Proxy proxy = new Proxy(msg.sender);
         proxy.upgradeTo(factoryImpl);
@@ -104,6 +107,12 @@ abstract contract DeployDevBase is Script {
         AggregateVerifier.ZkHashes memory zkHashes =
             AggregateVerifier.ZkHashes({ rangeHash: cfg.zkRangeHash(), aggregateHash: cfg.zkAggregationHash() });
 
+        Proxy protocolVersionsProxy = new Proxy(msg.sender);
+        protocolVersionsProxy.upgradeToAndCall(
+            address(new ProtocolVersions()), abi.encodeCall(IProtocolVersions.initialize, (address(0)))
+        );
+        protocolVersionsProxy.changeAdmin(address(proxyAdmin));
+
         aggregateVerifier = address(
             new AggregateVerifier(
                 gameType,
@@ -116,7 +125,8 @@ abstract contract DeployDevBase is Script {
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainId(),
                 _blockInterval(),
-                _intermediateBlockInterval()
+                _intermediateBlockInterval(),
+                IProtocolVersions(address(protocolVersionsProxy))
             )
         );
 

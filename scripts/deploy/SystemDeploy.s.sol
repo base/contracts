@@ -129,6 +129,7 @@ contract SystemDeploy is Script {
         uint256 l2ChainId;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+        IProtocolVersions protocolVersions;
     }
 
     struct MultiproofOutput {
@@ -1048,7 +1049,8 @@ contract SystemDeploy is Script {
                 multiproofConfigHash: _input.multiproofConfigHash,
                 l2ChainId: _opChainInput.l2ChainId,
                 multiproofBlockInterval: _input.multiproofBlockInterval,
-                multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval
+                multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval,
+                protocolVersions: _output.protocolVersionsProxy
             })
         );
 
@@ -1077,7 +1079,8 @@ contract SystemDeploy is Script {
                     _input.multiproofConfigHash,
                     _input.l2ChainId,
                     _input.multiproofBlockInterval,
-                    _input.multiproofIntermediateBlockInterval
+                    _input.multiproofIntermediateBlockInterval,
+                    _input.protocolVersions
                 )
             )
         );

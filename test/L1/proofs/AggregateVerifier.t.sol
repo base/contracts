@@ -11,6 +11,7 @@ import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 
 import { LibClone } from "lib/solady/src/utils/LibClone.sol";
 
@@ -34,6 +35,31 @@ contract AggregateVerifierTest is BaseTest {
 
     function testInitializeWithZKProof() public {
         _createAndAssertInitializedGame("zk-proof", AggregateVerifier.ProofType.ZK, ZK_PROVER, address(0), ZK_PROVER);
+    }
+
+    /// @notice init snapshots the live scheduleId into storage and pins it: a later schedule change
+    ///         must not alter the game's snapshot (proves it is stored once, not read live).
+    /// @dev Only covers the stored getter. That the snapshot flows into the proof journal is not
+    ///      asserted here — MockVerifier ignores the journal, so journal binding is untestable.
+    function test_initialize_pinsScheduleId_succeeds() public {
+        // Register an upgrade so the schedule commitment is non-trivial (non-zero).
+        protocolVersions.registerUpgrade(uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100, 1);
+        bytes32 pinned = protocolVersions.scheduleId();
+        assertTrue(pinned != bytes32(0));
+
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
+
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
+        );
+
+        assertEq(game.scheduleId(), pinned);
+
+        // Move the live schedule after creation; the game's snapshot must stay pinned.
+        protocolVersions.registerUpgrade(uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 200, 2);
+        assertNotEq(protocolVersions.scheduleId(), pinned);
+        assertEq(game.scheduleId(), pinned);
     }
 
     function testInitializeFailsIfInvalidCallDataSize() public {
@@ -417,7 +443,8 @@ contract AggregateVerifierTest is BaseTest {
             CONFIG_HASH,
             L2_CHAIN_ID,
             blockInterval,
-            intermediateBlockInterval
+            intermediateBlockInterval,
+            IProtocolVersions(address(protocolVersions))
         );
     }
 }
