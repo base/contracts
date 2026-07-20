@@ -12,7 +12,6 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { StateDiff } from "scripts/libraries/StateDiff.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
-import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
@@ -213,7 +212,6 @@ contract SystemDeploy is Script {
             superchainConfigImpl: artifacts.mustGetAddress("SuperchainConfigImpl"),
             l1ERC721BridgeImpl: artifacts.mustGetAddress("L1ERC721BridgeImpl"),
             optimismPortalImpl: artifacts.mustGetAddress("OptimismPortalImpl"),
-            ethLockboxImpl: artifacts.mustGetAddress("ETHLockboxImpl"),
             systemConfigImpl: artifacts.mustGetAddress("SystemConfigImpl"),
             optimismMintableERC20FactoryImpl: artifacts.mustGetAddress("OptimismMintableERC20FactoryImpl"),
             l1CrossDomainMessengerImpl: artifacts.mustGetAddress("L1CrossDomainMessengerImpl"),
@@ -453,7 +451,6 @@ contract SystemDeploy is Script {
         output_.l1StandardBridgeImpl = address(_deployL1StandardBridgeImpl());
         output_.optimismMintableERC20FactoryImpl = address(_deployOptimismMintableERC20FactoryImpl());
         output_.optimismPortalImpl = address(_deployOptimismPortalImpl(_input));
-        output_.ethLockboxImpl = address(_deployETHLockboxImpl());
         output_.delayedWETHImpl = address(_deployDelayedWETHImpl(_input));
         output_.disputeGameFactoryImpl = address(_deployDisputeGameFactoryImpl());
         output_.anchorStateRegistryImpl = address(_deployAnchorStateRegistryImpl(_input));
@@ -488,7 +485,6 @@ contract SystemDeploy is Script {
         output_.l1ERC721BridgeProxy = IL1ERC721Bridge(_deployProxy(_input, output_.opChainProxyAdmin, "L1ERC721Bridge"));
         output_.optimismPortalProxy =
             IOptimismPortal(payable(_deployProxy(_input, output_.opChainProxyAdmin, "OptimismPortal")));
-        output_.ethLockboxProxy = IETHLockbox(_deployProxy(_input, output_.opChainProxyAdmin, "ETHLockbox"));
         output_.systemConfigProxy = ISystemConfig(_deployProxy(_input, output_.opChainProxyAdmin, "SystemConfig"));
         output_.optimismMintableERC20FactoryProxy = IOptimismMintableERC20Factory(
             _deployProxy(_input, output_.opChainProxyAdmin, "OptimismMintableERC20Factory")
@@ -585,15 +581,6 @@ contract SystemDeploy is Script {
             address(_output.optimismPortalProxy),
             _impls.optimismPortalImpl,
             abi.encodeCall(IOptimismPortal.initialize, (_output.systemConfigProxy, _output.anchorStateRegistryProxy))
-        );
-
-        IOptimismPortal[] memory portals = new IOptimismPortal[](1);
-        portals[0] = _output.optimismPortalProxy;
-        _upgradeToAndCall(
-            _output.opChainProxyAdmin,
-            address(_output.ethLockboxProxy),
-            _impls.ethLockboxImpl,
-            abi.encodeCall(IETHLockbox.initialize, (_output.systemConfigProxy, portals))
         );
 
         _upgradeToAndCall(
@@ -933,16 +920,6 @@ contract SystemDeploy is Script {
         );
     }
 
-    function _deployETHLockboxImpl() internal returns (IETHLockbox) {
-        return IETHLockbox(
-            DeployUtils.createDeterministic({
-                _name: "ETHLockbox",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IETHLockbox.__constructor__, ())),
-                _salt: DeployUtils.DEFAULT_SALT
-            })
-        );
-    }
-
     function _deployDelayedWETHImpl(ImplementationInput memory _input) internal returns (IDelayedWETH) {
         return IDelayedWETH(
             DeployUtils.createDeterministic({
@@ -1134,7 +1111,6 @@ contract SystemDeploy is Script {
         DeployUtils.assertValidContractAddress(_impls.superchainConfigImpl);
         DeployUtils.assertValidContractAddress(_impls.l1ERC721BridgeImpl);
         DeployUtils.assertValidContractAddress(_impls.optimismPortalImpl);
-        DeployUtils.assertValidContractAddress(_impls.ethLockboxImpl);
         DeployUtils.assertValidContractAddress(_impls.systemConfigImpl);
         DeployUtils.assertValidContractAddress(_impls.optimismMintableERC20FactoryImpl);
         DeployUtils.assertValidContractAddress(_impls.l1CrossDomainMessengerImpl);
@@ -1164,7 +1140,6 @@ contract SystemDeploy is Script {
         artifacts.save("OptimismMintableERC20FactoryProxy", address(chain.optimismMintableERC20FactoryProxy));
         artifacts.save("L1StandardBridgeProxy", address(chain.l1StandardBridgeProxy));
         artifacts.save("L1CrossDomainMessengerProxy", address(chain.l1CrossDomainMessengerProxy));
-        artifacts.save("ETHLockboxProxy", address(chain.ethLockboxProxy));
         artifacts.save("DisputeGameFactoryProxy", address(chain.disputeGameFactoryProxy));
         artifacts.save("DelayedWETHProxy", address(chain.delayedWETHProxy));
         artifacts.save("AnchorStateRegistryProxy", address(chain.anchorStateRegistryProxy));
@@ -1187,7 +1162,6 @@ contract SystemDeploy is Script {
         artifacts.save("SuperchainConfigImpl", _impls.superchainConfigImpl);
         artifacts.save("L1ERC721BridgeImpl", _impls.l1ERC721BridgeImpl);
         artifacts.save("OptimismPortalImpl", _impls.optimismPortalImpl);
-        artifacts.save("ETHLockboxImpl", _impls.ethLockboxImpl);
         artifacts.save("SystemConfigImpl", _impls.systemConfigImpl);
         artifacts.save("OptimismMintableERC20FactoryImpl", _impls.optimismMintableERC20FactoryImpl);
         artifacts.save("L1CrossDomainMessengerImpl", _impls.l1CrossDomainMessengerImpl);

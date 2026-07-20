@@ -6,7 +6,6 @@ import { Test } from "lib/forge-std/src/Test.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
 import { Constants } from "src/libraries/Constants.sol";
-import { Features } from "src/libraries/Features.sol";
 import { Predeploys } from "src/libraries/Predeploys.sol";
 import { GameType, Hash } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
@@ -24,7 +23,6 @@ import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
@@ -36,7 +34,6 @@ abstract contract SystemDeployAssertions is Test {
         ISuperchainConfig superchainConfig;
         Types.Implementations implementations;
         IDelayedWETH delayedWETH;
-        IETHLockbox ethLockbox;
         address proxyAdminOwner;
         GameType multiproofGameType;
         bytes32 teeImageHash;
@@ -58,7 +55,6 @@ abstract contract SystemDeployAssertions is Test {
         _assertBridgeAndPortalWiring(_expected, proxyAdmin);
         _assertDisputeGameFactory(_expected, proxyAdmin);
         _assertGame(_expected, proxyAdmin, _expected.multiproofGameType);
-        _assertETHLockbox(_expected, proxyAdmin);
     }
 
     function _assertSuperchainConfig(ExpectedSystemDeployState memory _expected) private view {
@@ -298,24 +294,6 @@ abstract contract SystemDeployAssertions is Test {
         assertEq(address(_asr.systemConfig()), address(_expected.systemConfig), "AV-ANCHORP-40");
         assertEq(address(_proxyAdminFor(address(_asr))), address(_proxyAdmin), "AV-ANCHORP-50");
         assertGt(_asr.retirementTimestamp(), 0, "AV-ANCHORP-60");
-    }
-
-    function _assertETHLockbox(ExpectedSystemDeployState memory _expected, IProxyAdmin _proxyAdmin) private view {
-        IOptimismPortal2 portal = IOptimismPortal2(payable(_expected.systemConfig.optimismPortal()));
-        IETHLockbox lockbox = _expected.ethLockbox;
-
-        assertNotEq(address(lockbox), address(0), "LOCKBOX-05");
-        assertEq(_version(address(lockbox)), _version(_expected.implementations.ethLockboxImpl), "LOCKBOX-10");
-        assertEq(
-            _proxyAdmin.getProxyImplementation(address(lockbox)), _expected.implementations.ethLockboxImpl, "LOCKBOX-20"
-        );
-        assertEq(address(_proxyAdminFor(address(lockbox))), address(_proxyAdmin), "LOCKBOX-30");
-        assertEq(address(lockbox.systemConfig()), address(_expected.systemConfig), "LOCKBOX-40");
-        assertTrue(lockbox.authorizedPortals(portal), "LOCKBOX-50");
-
-        if (_expected.systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX)) {
-            assertEq(address(portal.ethLockbox()), address(lockbox), "LOCKBOX-60");
-        }
     }
 
     function _proxyAdminFor(address _contract) private view returns (IProxyAdmin) {

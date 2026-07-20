@@ -25,7 +25,6 @@ import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
 
 // Interfaces
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
-import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
@@ -98,7 +97,6 @@ abstract contract Setup is FeatureFlags {
     address superchainProxyAdminOwner;
     IProxyAdmin superchainProxyAdmin;
     IOptimismPortal optimismPortal2;
-    IETHLockbox ethLockbox;
     ISystemConfig systemConfig;
     IL1StandardBridge l1StandardBridge;
     IL1CrossDomainMessenger l1CrossDomainMessenger;
@@ -219,15 +217,6 @@ abstract contract Setup is FeatureFlags {
         console.log("Setup: completed L1 deployment, registering addresses now");
 
         optimismPortal2 = IOptimismPortal(artifacts.mustGetAddress("OptimismPortalProxy"));
-
-        // Only skip ETHLockbox assignment if we're in a fork test with non-upgraded fork
-        // TODO(#14691): Remove this check once Upgrade 15 is deployed on Mainnet.
-        if (!forkTest || deploy.cfg().useUpgradedFork()) {
-            // Here we use getAddress instead of mustGetAddress because some chains might not have
-            // the ETHLockbox proxy. Chains that don't have the ETHLockbox proxy will just return
-            // address(0) and cause a revert if we use mustGetAddress.
-            ethLockbox = IETHLockbox(artifacts.getAddress("ETHLockboxProxy"));
-        }
 
         systemConfig = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
         l1StandardBridge = IL1StandardBridge(artifacts.mustGetAddress("L1StandardBridgeProxy"));

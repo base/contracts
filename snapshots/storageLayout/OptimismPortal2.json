@@ -134,10 +134,10 @@
   },
   {
     "bytes": "20",
-    "label": "ethLockbox",
+    "label": "spacer_63_0_20",
     "offset": 0,
     "slot": "63",
-    "type": "contract IETHLockbox"
+    "type": "address"
   },
   {
     "bytes": "1",

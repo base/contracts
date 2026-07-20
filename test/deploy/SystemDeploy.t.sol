@@ -119,7 +119,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertNotEq(address(output.opChain.opChainProxyAdmin), address(0), "proxy admin");
         assertNotEq(address(output.opChain.systemConfigProxy), address(0), "system config");
         assertNotEq(address(output.opChain.optimismPortalProxy), address(0), "portal");
-        assertNotEq(address(output.opChain.ethLockboxProxy), address(0), "lockbox");
         assertNotEq(address(output.opChain.delayedWETHProxy), address(0), "delayed weth");
         assertNotEq(address(output.opChain.protocolVersionsProxy), address(0), "protocol versions");
         assertEq(
@@ -338,7 +337,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             superchainConfig: _output.superchain.superchainConfigProxy,
             implementations: _output.impls,
             delayedWETH: _output.opChain.delayedWETHProxy,
-            ethLockbox: _output.opChain.ethLockboxProxy,
             proxyAdminOwner: _input.opChainInput.roles.opChainProxyAdminOwner,
             multiproofGameType: GameType.wrap(uint32(_input.implementationsInput.multiproofGameType)),
             teeImageHash: _input.implementationsInput.teeImageHash,

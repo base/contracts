@@ -5,12 +5,10 @@ pragma solidity 0.8.15;
 import { CommonTest } from "test/setup/CommonTest.sol";
 
 // Scripts
-import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
 
 // Libraries
 import { Constants } from "src/libraries/Constants.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
-import { Features } from "src/libraries/Features.sol";
 
 // Interfaces
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
@@ -563,33 +561,14 @@ contract SystemConfig_Paused_Test is SystemConfig_TestInit {
         assertTrue(systemConfig.paused());
     }
 
-    /// @notice Tests that `paused()` returns true when OptimismPortal identifier is paused and
-    ///         the ETH_LOCKBOX feature is disabled.
+    /// @notice Tests that `paused()` returns true when the OptimismPortal identifier is paused.
     function test_paused_optimismPortalIdentifier_succeeds() external {
-        skipIfSysFeatureEnabled(Features.ETH_LOCKBOX);
-
         // Initially not paused
         assertFalse(systemConfig.paused());
 
         // Pause the system with OptimismPortal identifier
         vm.prank(superchainConfig.guardian());
         superchainConfig.pause(address(optimismPortal2));
-
-        // Verify paused state
-        assertTrue(systemConfig.paused());
-    }
-
-    /// @notice Tests that `paused()` returns true when ETHLockbox identifier is paused and
-    ///         ETH_LOCKBOX feature is enabled.
-    function test_paused_ethLockboxIdentifier_succeeds() external {
-        skipIfSysFeatureDisabled(Features.ETH_LOCKBOX);
-
-        // Initially not paused
-        assertFalse(systemConfig.paused());
-
-        // Pause the system with ETHLockbox identifier
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(ethLockbox));
 
         // Verify paused state
         assertTrue(systemConfig.paused());
@@ -614,7 +593,6 @@ contract SystemConfig_Paused_Test is SystemConfig_TestInit {
     function testFuzz_paused_otherAddress_succeeds(address _address) external {
         vm.assume(_address != address(0));
         vm.assume(_address != address(optimismPortal2));
-        vm.assume(_address != address(ethLockbox));
 
         // Initially not paused
         assertFalse(systemConfig.paused());
@@ -632,15 +610,6 @@ contract SystemConfig_Paused_Test is SystemConfig_TestInit {
 /// @notice Test contract for SystemConfig `setFeature` function.
 contract SystemConfig_SetFeature_Test is SystemConfig_TestInit {
     event FeatureSet(bytes32 indexed feature, bool indexed enabled);
-
-    function _enableEthLockboxIfDisabled(address proxyAdmin) internal {
-        if (!systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX)) {
-            vm.prank(proxyAdmin);
-            systemConfig.setFeature(Features.ETH_LOCKBOX, true);
-        }
-
-        assertTrue(systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX));
-    }
 
     /// @notice Tests that `setFeature` reverts if the caller is not ProxyAdmin or ProxyAdmin owner.
     /// @param _sender The address to test.
@@ -732,55 +701,6 @@ contract SystemConfig_SetFeature_Test is SystemConfig_TestInit {
         vm.prank(address(systemConfig.proxyAdmin()));
         vm.expectRevert(ISystemConfig.SystemConfig_InvalidFeatureState.selector);
         systemConfig.setFeature(EXAMPLE_FEATURE, false);
-    }
-
-    /// @notice Tests that disabling ETH_LOCKBOX reverts if the OptimismPortal has a non-zero
-    ///         ETHLockbox configured.
-    function test_setFeature_ethLockboxDisableWhileConfigured_reverts() external {
-        address proxyAdmin = address(systemConfig.proxyAdmin());
-
-        _enableEthLockboxIfDisabled(proxyAdmin);
-
-        // Force the portal to have a configured ETHLockbox address.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("OptimismPortal2", "ethLockbox");
-        vm.store(address(optimismPortal2), bytes32(slot.slot), bytes32(uint256(uint160(address(1)))));
-
-        // Disabling should revert due to safety check while lockbox is configured.
-        vm.expectRevert(ISystemConfig.SystemConfig_InvalidFeatureState.selector);
-        vm.prank(proxyAdmin);
-        systemConfig.setFeature(Features.ETH_LOCKBOX, false);
-    }
-
-    /// @notice Tests that enabling ETH_LOCKBOX while the system is paused (global) reverts.
-    function test_setFeature_ethLockboxEnableWhilePaused_reverts() external {
-        address proxyAdmin = address(systemConfig.proxyAdmin());
-
-        _enableEthLockboxIfDisabled(proxyAdmin);
-
-        // Pause globally.
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(0));
-
-        // Enabling while paused should revert.
-        vm.expectRevert(ISystemConfig.SystemConfig_InvalidFeatureState.selector);
-        vm.prank(proxyAdmin);
-        systemConfig.setFeature(Features.ETH_LOCKBOX, true);
-    }
-
-    /// @notice Tests that disabling ETH_LOCKBOX while the system is paused (global) reverts.
-    function test_setFeature_ethLockboxDisableWhilePaused_reverts() external {
-        address proxyAdmin = address(systemConfig.proxyAdmin());
-
-        _enableEthLockboxIfDisabled(proxyAdmin);
-
-        // Pause globally.
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(0));
-
-        // Disabling while paused should revert.
-        vm.expectRevert(ISystemConfig.SystemConfig_InvalidFeatureState.selector);
-        vm.prank(proxyAdmin);
-        systemConfig.setFeature(Features.ETH_LOCKBOX, false);
     }
 }
 

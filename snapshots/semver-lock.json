@@ -1,8 +1,4 @@
 {
-  "src/L1/ETHLockbox.sol:ETHLockbox": {
-    "initCodeHash": "0x65db3aa3c2e3221065752f66016fa02b66688a01cc5c3066533b27fe620619c8",
-    "sourceCodeHash": "0x519c4606618c1d5fa489dc99437c895171b16179cbb74f602011ffe0b5902788"
-  },
   "src/L1/L1CrossDomainMessenger.sol:L1CrossDomainMessenger": {
     "initCodeHash": "0x3dc659aafb03bd357f92abfc6794af89ee0ddd5212364551637422bf8d0b00f9",
     "sourceCodeHash": "0xb1467f925aaf0a834bc98cdfaffe8832bdf57d57a0e22087179d1c3b4bee2c53"
@@ -16,8 +12,8 @@
     "sourceCodeHash": "0xd9f576a79e97bc541b3d7a2ee928f34223edaaecb074eeb9e6e2ecee857ce6a0"
   },
   "src/L1/OptimismPortal2.sol:OptimismPortal2": {
-    "initCodeHash": "0xdd5d13b03c015d45d0cdda512795c4fe8bbd60557e3848fed53260ee887b2df4",
-    "sourceCodeHash": "0xa1281f5da03fa0431eabad33da23f51a8d835b0dd04554603fd59e11efe9fa51"
+    "initCodeHash": "0xe8145d0c3bd0e35f84086cddd75c73915332c42b40046d52188d822119915c3d",
+    "sourceCodeHash": "0x811596e7486cab9ceeeb61405b9ae510d93fcbbdfa11949201a367506c53194a"
   },
   "src/L1/ProtocolVersions.sol:ProtocolVersions": {
     "initCodeHash": "0x8ff4bbb0adb8115a3d77e1b706038b0758fdb3a0b183108a794b3cb6200acd83",
@@ -28,8 +24,8 @@
     "sourceCodeHash": "0x79f0c771fc5f6d222d89b05addedc08ce40a7a42423fbd66f7cbb6cde3c2e74f"
   },
   "src/L1/SystemConfig.sol:SystemConfig": {
-    "initCodeHash": "0x3e8e52d96398a6de91d8922769cc5d0bc7acb2a692689ceb70f1de816e8d6b14",
-    "sourceCodeHash": "0xf122a50487efe9bd5a620262ba20ef4adbca14eeec2af7fd32e6e16739001596"
+    "initCodeHash": "0xb91123c7a4c051f2c9af220a5981301499d43c7740892db4ea8abce183437a8c",
+    "sourceCodeHash": "0x780ff372493ba9010bc0d13100ac896f2bf75730a9b17d4bb63aaf694dc3c634"
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0x6f3c53245830b9c72c8199695e93959d5ed3b0cb8352e5b50b3dfa28183ac787",
