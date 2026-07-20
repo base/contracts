@@ -18,7 +18,6 @@ import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
 /// @title Initializer_Test
@@ -229,24 +228,6 @@ contract Initializer_Test is CommonTest {
             );
         }
 
-        // ETHLockbox is only deployed when interop is enabled
-        if (address(ethLockbox) != address(0)) {
-            initCalldata = abi.encodeCall(ethLockbox.initialize, (ISystemConfig(address(0)), new IOptimismPortal2[](0)));
-            contracts.push(
-                InitializeableContract({
-                    name: "ETHLockboxImpl",
-                    target: EIP1967Helper.getImplementation(address(ethLockbox)),
-                    initCalldata: initCalldata
-                })
-            );
-
-            contracts.push(
-                InitializeableContract({
-                    name: "ETHLockboxProxy", target: address(ethLockbox), initCalldata: initCalldata
-                })
-            );
-        }
-
         // AggregateVerifier uses a custom `bool initialized` instead of OpenZeppelin's `_initialized`
         // uint8, so it cannot be tested by this framework. It is excluded below.
 
@@ -279,10 +260,6 @@ contract Initializer_Test is CommonTest {
         excludes[j++] = "src/L1/BalanceTracker.sol";
         // AggregateVerifier uses a custom `bool initialized` instead of OpenZeppelin's `_initialized` uint8.
         excludes[j++] = "src/L1/proofs/AggregateVerifier.sol";
-        // ETHLockbox is only deployed when interop is enabled.
-        if (address(ethLockbox) == address(0)) {
-            excludes[j++] = "src/L1/ETHLockbox.sol";
-        }
         // ProtocolVersions is not deployed on older forked chains.
         if (address(protocolVersions) == address(0)) {
             excludes[j++] = "src/L1/ProtocolVersions.sol";

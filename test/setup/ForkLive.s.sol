@@ -23,8 +23,6 @@ import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
-import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
-import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 
 /// @title ForkLive
 /// @notice This script is called by Setup.sol as a preparation step for the foundry test suite, and is run as an
@@ -143,15 +141,6 @@ contract ForkLive is Script {
         artifacts.save("OptimismPortalProxy", optimismPortal);
         artifacts.save("OptimismPortal2Impl", EIP1967Helper.getImplementation(optimismPortal));
 
-        // Get the lockbox address from the portal, and save it
-        /// NOTE: Using try catch because this function could be called before or after the upgrade.
-        try IOptimismPortal2(payable(optimismPortal)).ethLockbox() returns (IETHLockbox ethLockbox_) {
-            console.log("ForkLive: ETHLockboxProxy found: %s", address(ethLockbox_));
-            artifacts.save("ETHLockboxProxy", address(ethLockbox_));
-        } catch {
-            console.log("ForkLive: ETHLockboxProxy not found");
-        }
-
         address l1CrossDomainMessenger = systemConfigAddresses.l1CrossDomainMessenger;
         address addressManager = _legacyAddressManager(l1CrossDomainMessenger);
         artifacts.save("AddressManager", addressManager);
@@ -241,10 +230,6 @@ contract ForkLive is Script {
         IAggregateVerifier aggregateVerifier =
             IAggregateVerifier(address(disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER)));
         artifacts.save("AggregateVerifier", address(aggregateVerifier));
-
-        IOptimismPortal2 portal = IOptimismPortal2(artifacts.mustGetAddress("OptimismPortalProxy"));
-        address lockboxAddress = address(portal.ethLockbox());
-        artifacts.save("ETHLockboxProxy", lockboxAddress);
 
         GameAddresses memory gameAddresses = _aggregateVerifierAddresses(aggregateVerifier);
         artifacts.save("AnchorStateRegistryProxy", gameAddresses.anchorStateRegistry);
