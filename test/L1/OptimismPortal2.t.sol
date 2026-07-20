@@ -969,12 +969,14 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         _proveDefaultWithdrawal();
 
         _resolveGameAndWarpPastProofMaturity(game);
+        uint256 portalBalanceBefore = address(optimismPortal2).balance;
         vm.expectEmit(true, true, true, true);
         emit WithdrawalFinalized(_withdrawalHash, false);
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
 
         // Bob's balance should not have changed.
         assertEq(address(bob).balance, bobBalanceBefore);
+        assertEq(address(optimismPortal2).balance, portalBalanceBefore);
     }
 
     /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the withdrawal has already
