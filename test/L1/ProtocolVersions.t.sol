@@ -548,12 +548,12 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     /// @notice Cross-implementation golden value for the Base mainnet schedule as of Beryl,
     ///         shared with the offchain prover (`schedule_id_matches_mainnet_golden_value` in
     ///         base's `crates/proof/proof/src/schedule_id.rs`). Ids follow the node's
-    ///         CONTRACT_VARIANTS registration order. The genesis-active regolith (timestamp 0),
-    ///         the mainnet pectra_blob_schedule gap, and the unscheduled cobalt tail all
-    ///         contribute no link.
+    ///         CONTRACT_VARIANTS registration order. Genesis-active regolith is registered at the
+    ///         L2 genesis timestamp (0 is the "not scheduled" sentinel); the mainnet
+    ///         pectra_blob_schedule gap and the unscheduled cobalt tail contribute no link.
     function test_scheduleId_matchesMainnetGoldenValue_succeeds() external {
         uint64[13] memory mainnetSchedule = [
-            uint64(0), // regolith: genesis-active, encoded as 0 => no link
+            uint64(1_686_789_347), // regolith: genesis-active, pinned to the L2 genesis timestamp
             1_704_992_401, // canyon
             1_708_560_000, // delta
             1_710_374_401, // ecotone
@@ -574,7 +574,7 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         }
         vm.stopPrank();
 
-        assertEq(protocolVersions.scheduleId(), 0xe7ed922ecb2a9d7704cf21e21c62313eabe90f345c212cad1a4706633dcf4efd);
+        assertEq(protocolVersions.scheduleId(), 0x689503a0192dda23fbb770faf397d562a78ff4ec69df10b596c94c9a437e0f72);
     }
 }
 
