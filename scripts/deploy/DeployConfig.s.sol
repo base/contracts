@@ -52,6 +52,7 @@ contract DeployConfig is Script {
     uint256 public multiproofGameType;
     uint256 public multiproofGenesisBlockNumber;
     uint256 public multiproofIntermediateBlockInterval;
+    uint256 public multiproofMaxUpgradeId;
     uint256 public operatorFeeVaultMinimumWithdrawalAmount;
     uint256 public operatorFeeVaultWithdrawalNetwork;
     uint256 public proofMaturityDelaySeconds;
@@ -104,6 +105,8 @@ contract DeployConfig is Script {
         multiproofGameType = _json.readUintOr("$.multiproofGameType", 621);
         multiproofGenesisBlockNumber = _json.readUintOr("$.multiproofGenesisBlockNumber", 0);
         multiproofIntermediateBlockInterval = _json.readUintOr("$.multiproofIntermediateBlockInterval", 10);
+        // Mandatory: must match the highest upgrade id in the prover image (BaseUpgrade::CONTRACT_VARIANTS).
+        multiproofMaxUpgradeId = _json.readUint("$.multiproofMaxUpgradeId");
         operatorFeeVaultMinimumWithdrawalAmount = _json.readUint("$.operatorFeeVaultMinimumWithdrawalAmount");
         operatorFeeVaultWithdrawalNetwork = _json.readUint("$.operatorFeeVaultWithdrawalNetwork");
         proofMaturityDelaySeconds = _json.readUintOr("$.proofMaturityDelaySeconds", 0);

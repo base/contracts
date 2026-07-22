@@ -80,6 +80,7 @@ contract SystemDeploy is Script {
         address nitroEnclaveVerifier;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+        uint256 multiproofMaxUpgradeId;
         ISP1Verifier sp1Verifier;
         address teeProposer;
         address teeChallenger;
@@ -128,6 +129,7 @@ contract SystemDeploy is Script {
         uint256 l2ChainId;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+        uint256 multiproofMaxUpgradeId;
         IProtocolVersions protocolVersions;
     }
 
@@ -267,6 +269,7 @@ contract SystemDeploy is Script {
             nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
             multiproofBlockInterval: cfg.multiproofBlockInterval(),
             multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
+            multiproofMaxUpgradeId: cfg.multiproofMaxUpgradeId(),
             sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
             teeProposer: cfg.teeProposer(),
             teeChallenger: cfg.teeChallenger(),
@@ -1013,6 +1016,14 @@ contract SystemDeploy is Script {
         vm.broadcast(msg.sender);
         output_.zkVerifier = IVerifier(address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryProxy)));
 
+        // Seed unscheduled upgrades through multiproofMaxUpgradeId so the AggregateVerifier
+        // constructor check passes; governance schedules activations later.
+        uint256 registered = _output.protocolVersionsProxy.getSchedule().length;
+        for (uint256 i = registered; i <= _input.multiproofMaxUpgradeId; i++) {
+            vm.broadcast(msg.sender);
+            _output.protocolVersionsProxy.registerUpgrade(0, 0);
+        }
+
         output_.aggregateVerifier = _newAggregateVerifier(
             AggregateVerifierInput({
                 multiproofGameType: gameType,
@@ -1027,6 +1038,7 @@ contract SystemDeploy is Script {
                 l2ChainId: _opChainInput.l2ChainId,
                 multiproofBlockInterval: _input.multiproofBlockInterval,
                 multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval,
+                multiproofMaxUpgradeId: _input.multiproofMaxUpgradeId,
                 protocolVersions: _output.protocolVersionsProxy
             })
         );
@@ -1057,7 +1069,9 @@ contract SystemDeploy is Script {
                     _input.l2ChainId,
                     _input.multiproofBlockInterval,
                     _input.multiproofIntermediateBlockInterval,
-                    _input.protocolVersions
+                    AggregateVerifier.ScheduleConfig({
+                        protocolVersions: _input.protocolVersions, maxUpgradeId: _input.multiproofMaxUpgradeId
+                    })
                 )
             )
         );

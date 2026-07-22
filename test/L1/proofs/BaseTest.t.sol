@@ -37,6 +37,9 @@ contract BaseTest is Test {
     // Finality delay handled by the AggregateVerifier
     uint256 internal constant FINALITY_DELAY = 0 days;
 
+    // The ProtocolVersions upgrade id the AggregateVerifier under test is pinned to.
+    uint256 internal constant MAX_UPGRADE_ID = 2;
+
     uint256 internal currentL2BlockNumber;
 
     address internal immutable TEE_PROVER = makeAddr("tee-prover");
@@ -110,6 +113,12 @@ contract BaseTest is Test {
         factory.initialize(address(this));
         delayedWETH.initialize(systemConfig);
         protocolVersions.initialize(address(0));
+
+        // Seed unscheduled upgrades through MAX_UPGRADE_ID so the AggregateVerifier constructor
+        // check passes.
+        for (uint256 i = 0; i <= MAX_UPGRADE_ID; i++) {
+            protocolVersions.registerUpgrade(0, 0);
+        }
     }
 
     function _deployAndSetAggregateVerifier() internal {
@@ -125,7 +134,9 @@ contract BaseTest is Test {
             L2_CHAIN_ID,
             BLOCK_INTERVAL,
             INTERMEDIATE_BLOCK_INTERVAL,
-            IProtocolVersions(address(protocolVersions))
+            AggregateVerifier.ScheduleConfig({
+                protocolVersions: IProtocolVersions(address(protocolVersions)), maxUpgradeId: MAX_UPGRADE_ID
+            })
         );
 
         factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(aggregateVerifierImpl)));
