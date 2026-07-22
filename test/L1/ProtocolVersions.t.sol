@@ -21,6 +21,7 @@ abstract contract ProtocolVersions_TestInit is CommonTest {
     event MinimumProtocolVersionUpdated(uint256 indexed protocolVersion);
     event IncidentResponderUpdated(address indexed previousIncidentResponder, address indexed newIncidentResponder);
     event TimestampSet(uint256 indexed id, uint256 timestamp);
+    event ScheduleIdUpdated(bytes32 indexed newScheduleId);
 
     /// @dev Ascending ids assigned by registration order in these tests.
     uint256 internal constant CANYON = 0;
@@ -119,15 +120,42 @@ contract ProtocolVersions_Version_Test is ProtocolVersions_TestInit {
 /// @title ProtocolVersions_RegisterUpgrade_Test
 /// @notice Test contract for the `registerUpgrade` function.
 contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
-    /// @notice Tests that registering an upgrade extends the scheduleId chain.
-    function test_registerUpgrade_changesScheduleId_succeeds() external {
+    /// @notice Tests that registering an upgrade without a timestamp leaves the scheduleId
+    ///         unchanged: unscheduled upgrades carry the previous link forward, so the registry
+    ///         and offchain provers can add upgrades asynchronously.
+    function test_registerUpgrade_unscheduled_keepsScheduleId_succeeds() external {
+        // Register-only from the empty registry: scheduleId stays at the bytes32(0) seed.
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
+        assertEq(protocolVersions.scheduleId(), bytes32(0));
+
+        // Schedule the first upgrade, then register another without a timestamp: the new
+        // unscheduled entry must not move the commitment.
+        uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+        vm.prank(_owner);
+        protocolVersions.setTimestamp(CANYON, ts);
         bytes32 idBefore = protocolVersions.scheduleId();
 
         vm.roll(block.number + 1);
         vm.prank(_owner);
         protocolVersions.registerUpgrade(0, 0);
 
-        assertNotEq(protocolVersions.scheduleId(), idBefore);
+        assertEq(protocolVersions.scheduleId(), idBefore);
+    }
+
+    /// @notice Tests that register-only still emits `ScheduleIdUpdated`, carrying the unchanged
+    ///         commitment. Pins the deliberate emit-always semantics so indexers can rely on the
+    ///         event firing for every registration, scheduled or not.
+    function test_registerUpgrade_unscheduled_emitsUnchangedScheduleId_succeeds() external {
+        uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(ts, 0);
+        bytes32 idBefore = protocolVersions.scheduleId();
+
+        vm.expectEmit(true, false, false, false, address(protocolVersions));
+        emit ScheduleIdUpdated(idBefore);
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
     }
 
     /// @notice Tests that `registerUpgrade` assigns ascending ids and returns them.
@@ -289,7 +317,8 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
     }
 
     /// @notice Tests that passing 0 clears a scheduled timestamp, changes the scheduleId, and
-    ///         restores it to the value it held immediately after registration (ts=0 link).
+    ///         restores it to the value it held immediately after registration (the cleared entry
+    ///         carries the previous link forward again).
     function test_setTimestamp_clearTimestamp_succeeds() external {
         vm.prank(_owner);
         protocolVersions.registerUpgrade(0, 0);
@@ -346,6 +375,69 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         );
         vm.prank(_owner);
         protocolVersions.setTimestamp(CANYON, 500);
+    }
+
+    /// @notice Tests that `setTimestamp` succeeds at exactly `block.timestamp + MIN_NOTICE`, the
+    ///         boundary of the notice window.
+    function test_setTimestamp_exactMinNotice_succeeds() external {
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
+
+        uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE();
+        vm.prank(_owner);
+        protocolVersions.setTimestamp(CANYON, ts);
+
+        assertEq(protocolVersions.getSchedule()[CANYON], ts);
+    }
+
+    /// @notice Tests that `setTimestamp` emits `ScheduleIdUpdated` carrying the exact new
+    ///         commitment tail.
+    function test_setTimestamp_emitsScheduleIdUpdated_succeeds() external {
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
+
+        uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+        bytes32 expectedTail = keccak256(abi.encode(bytes32(0), uint256(0), ts));
+
+        vm.expectEmit(true, false, false, false, address(protocolVersions));
+        emit ScheduleIdUpdated(expectedTail);
+        vm.prank(_owner);
+        protocolVersions.setTimestamp(CANYON, ts);
+
+        assertEq(protocolVersions.scheduleId(), expectedTail);
+    }
+
+    /// @notice Tests that clearing a mid-chain upgrade recomputes all downstream links: the
+    ///         cleared entry carries its predecessor's link forward and every later scheduled
+    ///         entry is rehashed on top, leaving no stale link behind.
+    function test_setTimestamp_clearMidChain_recomputesDownstreamLinks_succeeds() external {
+        // Register and schedule three upgrades.
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.registerUpgrade(0, 0);
+
+        uint64 ts1 = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+        uint64 ts2 = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 200;
+        uint64 ts3 = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 300;
+        protocolVersions.setTimestamp(0, ts1);
+        protocolVersions.setTimestamp(1, ts2);
+        protocolVersions.setTimestamp(2, ts3);
+
+        // Clear the middle upgrade, punching a gap into a fully scheduled chain.
+        protocolVersions.setTimestamp(1, 0);
+        vm.stopPrank();
+
+        // The chain now skips id 1: id 0 links directly to id 2.
+        bytes32 link0 = keccak256(abi.encode(bytes32(0), uint256(0), ts1));
+        bytes32 link2 = keccak256(abi.encode(link0, uint256(2), ts3));
+        assertEq(protocolVersions.scheduleId(), link2);
+
+        // Per-id commitments: the cleared id 1 carries id 0's link forward, and id 2 was
+        // recomputed on top of it rather than left holding the stale ts2-inclusive link.
+        assertEq(protocolVersions.scheduleId(0), link0);
+        assertEq(protocolVersions.scheduleId(1), link0);
+        assertEq(protocolVersions.scheduleId(2), link2);
     }
 
     /// @notice Tests that `setTimestamp` reverts when the timestamp is within MIN_NOTICE of now.
@@ -408,6 +500,81 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         bytes32 link1 = keccak256(abi.encode(link0, uint256(1), ts2));
 
         assertEq(protocolVersions.scheduleId(), link1);
+    }
+
+    /// @notice Tests that an unscheduled upgrade in the middle of the registry is skipped by the
+    ///         scheduleId chain: only scheduled (id, timestamp) pairs contribute links, so a
+    ///         permanent gap (e.g. a fork that never activates on this chain) does not shift the
+    ///         commitment.
+    function test_setTimestamp_scheduleIdSkipsUnscheduledGap_succeeds() external {
+        // Register three upgrades; only ids 0 and 2 get scheduled, id 1 stays unscheduled.
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.registerUpgrade(0, 0);
+
+        uint64 ts1 = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+        uint64 ts3 = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 300;
+        protocolVersions.setTimestamp(0, ts1);
+        protocolVersions.setTimestamp(2, ts3);
+        vm.stopPrank();
+
+        // The chain links ids 0 and 2 directly; the unscheduled id 1 contributes no link but its
+        // id still pins each scheduled entry to its registration position.
+        bytes32 link0 = keccak256(abi.encode(bytes32(0), uint256(0), ts1));
+        bytes32 link2 = keccak256(abi.encode(link0, uint256(2), ts3));
+
+        assertEq(protocolVersions.scheduleId(), link2);
+    }
+
+    /// @notice Cross-implementation golden value shared with the offchain prover
+    ///         (`ScheduleId::from_upgrades` in base's `crates/proof/proof/src/schedule_id.rs`):
+    ///         ids 0 and 1 scheduled at 10 and 20, ids 2-9 unscheduled, id 10 scheduled at 30.
+    ///         Both sides MUST derive the same commitment for this schedule.
+    function test_scheduleId_matchesProverGoldenValue_succeeds() external {
+        // registerUpgrade does not enforce the notice window, so historical timestamps are fine.
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(10, 0);
+        protocolVersions.registerUpgrade(20, 0);
+        for (uint256 i = 0; i < 8; i++) {
+            protocolVersions.registerUpgrade(0, 0);
+        }
+        protocolVersions.registerUpgrade(30, 0);
+        vm.stopPrank();
+
+        assertEq(protocolVersions.scheduleId(), 0xa24ace1024856cce0f999daface9269cbe7c1a8d1069a0e75196635146ee2058);
+    }
+
+    /// @notice Cross-implementation golden value for the Base mainnet schedule as of Beryl,
+    ///         shared with the offchain prover (`schedule_id_matches_mainnet_golden_value` in
+    ///         base's `crates/proof/proof/src/schedule_id.rs`). Ids follow the node's
+    ///         CONTRACT_VARIANTS registration order. The genesis-active regolith (timestamp 0),
+    ///         the mainnet pectra_blob_schedule gap, and the unscheduled cobalt tail all
+    ///         contribute no link.
+    function test_scheduleId_matchesMainnetGoldenValue_succeeds() external {
+        uint64[13] memory mainnetSchedule = [
+            uint64(0), // regolith: genesis-active, encoded as 0 => no link
+            1_704_992_401, // canyon
+            1_708_560_000, // delta
+            1_710_374_401, // ecotone
+            1_720_627_201, // fjord
+            1_726_070_401, // granite
+            1_736_445_601, // holocene
+            0, // pectra_blob_schedule: never activates on mainnet => no link
+            1_746_806_401, // isthmus
+            1_764_691_201, // jovian
+            1_779_991_200, // azul
+            1_782_410_400, // beryl
+            0 // cobalt: not yet scheduled => no link
+        ];
+
+        vm.startPrank(_owner);
+        for (uint256 i = 0; i < mainnetSchedule.length; i++) {
+            protocolVersions.registerUpgrade(mainnetSchedule[i], 0);
+        }
+        vm.stopPrank();
+
+        assertEq(protocolVersions.scheduleId(), 0xe7ed922ecb2a9d7704cf21e21c62313eabe90f345c212cad1a4706633dcf4efd);
     }
 }
 
@@ -579,7 +746,8 @@ contract ProtocolVersions_Uncategorized_Test is ProtocolVersions_TestInit {
         assertEq(s[ECOTONE], 0);
     }
 
-    /// @notice Tests that `scheduleId(id)` returns each upgrade's cumulative commitment, and that
+    /// @notice Tests that `scheduleId(id)` returns each upgrade's cumulative commitment: scheduled
+    ///         upgrades add a link, unscheduled upgrades carry the previous commitment forward, and
     ///         the last upgrade's commitment equals the current scheduleId.
     function test_scheduleId_byId_succeeds() external {
         vm.prank(_owner);
@@ -587,7 +755,17 @@ contract ProtocolVersions_Uncategorized_Test is ProtocolVersions_TestInit {
         vm.prank(_owner);
         protocolVersions.registerUpgrade(0, 0);
 
-        assertNotEq(protocolVersions.scheduleId(CANYON), protocolVersions.scheduleId(ECOTONE));
+        // Both unscheduled: each per-id commitment is the carried-forward bytes32(0) seed.
+        assertEq(protocolVersions.scheduleId(CANYON), protocolVersions.scheduleId(ECOTONE));
+        assertEq(protocolVersions.scheduleId(ECOTONE), bytes32(0));
+
+        // Scheduling CANYON adds its link; the unscheduled ECOTONE carries it forward as the tail.
+        uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+        vm.prank(_owner);
+        protocolVersions.setTimestamp(CANYON, ts);
+
+        assertNotEq(protocolVersions.scheduleId(CANYON), bytes32(0));
+        assertEq(protocolVersions.scheduleId(ECOTONE), protocolVersions.scheduleId(CANYON));
         assertEq(protocolVersions.scheduleId(ECOTONE), protocolVersions.scheduleId());
     }
 

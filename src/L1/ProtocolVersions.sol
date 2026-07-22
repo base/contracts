@@ -20,20 +20,26 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 ///      same upgrade.
 ///
 ///      The canonical schedule commitment (`scheduleId`) is the tail of a hash chain that is
-///      seeded at index 0 and extended by one link per registered upgrade:
+///      seeded at index 0 and extended by one link per *scheduled* registered upgrade:
 ///
 ///        _upgradeScheduleId[0]   = bytes32(0)                                              (seed)
-///        _upgradeScheduleId[i+1] = keccak256(abi.encode(_upgradeScheduleId[i], i, timestamp_i))
+///        _upgradeScheduleId[i+1] = timestamp_i == 0
+///                                    ? _upgradeScheduleId[i]
+///                                    : keccak256(abi.encode(_upgradeScheduleId[i], i, timestamp_i))
 ///        scheduleId              = _upgradeScheduleId[last]
 ///
-///      where timestamp_i is upgrade i's current activation timestamp (0 = not yet scheduled).
-///      Changing any upgrade's timestamp recomputes its link and all subsequent links, making
-///      scheduleId fully reproducible from (upgrade count, current timestamps). Keeping the seed as
-///      the array's first element lets both `scheduleId` and the refresh loop avoid an
-///      empty-registry special case. Proof journals bind to `scheduleId`, pinning every proof in a
-///      dispute game to the schedule in effect at the game's L1 origin block; cross-chain domain
-///      separation is provided by the journal itself, which commits the L2 chain id and registry
-///      address alongside `scheduleId`.
+///      where timestamp_i is upgrade i's current activation timestamp (0 = not scheduled).
+///      Unscheduled upgrades carry the previous link forward, so scheduleId commits only to the
+///      effective schedule — the set of (id, timestamp) pairs that affect L2 execution. This lets
+///      the registry register a new upgrade (timestamp 0) without moving scheduleId, so offchain
+///      provers that derive the same commitment from their rollup config need no lockstep update
+///      when an upgrade is registered but not yet scheduled. Changing any upgrade's timestamp
+///      recomputes its link and all subsequent links, making scheduleId fully reproducible from
+///      (upgrade count, current timestamps). Keeping the seed as the array's first element lets
+///      both `scheduleId` and the refresh loop avoid an empty-registry special case. Proof
+///      journals bind to `scheduleId`, pinning every proof in a dispute game to the schedule in
+///      effect at the game's L1 origin block; cross-chain domain separation is provided by the
+///      journal itself, which commits the L2 chain id and registry address alongside `scheduleId`.
 ///
 ///      The contract is deployed behind an OP proxy: the implementation constructor disables
 ///      initializers, and `initialize` (run through the proxy) seeds the hash chain.
@@ -46,8 +52,9 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     uint64[] private _timestamps;
 
     /// @notice Hash chain links. Element 0 is the seed (`bytes32(0)`), pushed in `initialize`;
-    ///         element `i + 1` is the cumulative hash through upgrade `i`:
-    ///         _upgradeScheduleId[i + 1] = keccak256(abi.encode(_upgradeScheduleId[i], i, _timestamps[i])).
+    ///         element `i + 1` is the cumulative hash through upgrade `i`: the previous link
+    ///         carried forward when upgrade `i` is unscheduled (timestamp 0), otherwise
+    ///         keccak256(abi.encode(_upgradeScheduleId[i], i, _timestamps[i])).
     ///         Stored per-link so that changing upgrade j's timestamp recomputes only j..n-1 links
     ///         rather than the entire chain. Non-empty iff the contract has been initialized.
     bytes32[] private _upgradeScheduleId;
@@ -117,8 +124,9 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @notice Registers a new upgrade, assigning it the next ascending id, optionally scheduling its
     ///         activation and bumping the minimum protocol version in the same call. Owner only.
     /// @dev Pass `timestamp` 0 to register without scheduling (schedule later via `setTimestamp`), or
-    ///      a non-zero value to register and schedule at once. Either way registration extends the
-    ///      scheduleId chain with the new upgrade's link.
+    ///      a non-zero value to register and schedule at once. Register-only leaves scheduleId
+    ///      unchanged (unscheduled upgrades carry the previous link forward); registering with a
+    ///      timestamp extends the chain with the new upgrade's link.
     /// @param timestamp Unix activation timestamp, or 0 to leave the upgrade unscheduled.
     /// @param minProtocolVersion New minimum protocol version to set at registration, or 0 to leave
     ///                  the current minimum unchanged.
@@ -132,7 +140,8 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         _upgradeScheduleId.push();
         emit UpgradeRegistered(id);
         if (timestamp == 0) {
-            // Register-only: commit the new (id, 0) link.
+            // Register-only: the unscheduled upgrade carries the previous link forward, so
+            // scheduleId is unchanged and offchain provers need no matching update.
             _refreshScheduleId(id);
         } else {
             // Register and schedule at once via the shared pure-write helper.
@@ -259,8 +268,9 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
 
     /// @dev Recomputes the per-upgrade cumulative hash chain starting from upgrade `startIndex` and
     ///      bubbles the result through all subsequent registered upgrades. Cost is O(n-startIndex).
-    ///      Only ever called after a state change (registration, or a timestamp that actually moved),
-    ///      so the resulting tail is always a new scheduleId.
+    ///      Unscheduled upgrades (timestamp 0) carry the previous link forward instead of adding a
+    ///      link, so the tail commits only to the effective schedule. The emitted tail is unchanged
+    ///      when the state change only touched unscheduled entries (register-only).
     function _refreshScheduleId(uint256 startIndex) private {
         uint256 n = _timestamps.length;
 
@@ -268,7 +278,10 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         // startIndex == 0). Recompute from startIndex onward, storing each link at index i + 1.
         bytes32 prev = _upgradeScheduleId[startIndex];
         for (uint256 i = startIndex; i < n; i++) {
-            prev = keccak256(abi.encode(prev, i, _timestamps[i]));
+            uint64 ts = _timestamps[i];
+            if (ts != 0) {
+                prev = keccak256(abi.encode(prev, i, ts));
+            }
             _upgradeScheduleId[i + 1] = prev;
         }
 
