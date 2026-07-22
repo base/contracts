@@ -4,6 +4,16 @@ pragma solidity ^0.8.0;
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { Types } from "src/libraries/Types.sol";
 
+/// @title IFeeVault
+/// @notice Interface for fee vault contracts using the upgradeable proxy pattern.
+/// @dev Implementing contracts MUST include initialization guards to prevent
+///      Uninitialized Proxy/Implementation Front-running attacks. Specifically:
+///      - The implementation contract's constructor MUST call _disableInitializers()
+///        (or equivalent) to prevent unauthorized initialization.
+///      - The initialize() function MUST use an initializer modifier to ensure
+///        it can only be called once.
+///      - Access control (e.g., only ProxyAdmin or ProxyAdmin owner) SHOULD be
+///        enforced on the initialize() function.
 interface IFeeVault is IProxyAdminOwnedBase {
     error InvalidInitialization();
     error NotInitializing();
