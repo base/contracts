@@ -25,6 +25,7 @@ interface IAggregateVerifier is IDisputeGame {
     function ZK_AGGREGATE_HASH() external view returns (bytes32);
     function CONFIG_HASH() external view returns (bytes32);
     function PROTOCOL_VERSIONS() external view returns (IProtocolVersions);
+    function MAX_UPGRADE_ID() external view returns (uint256);
     function L2_CHAIN_ID() external view returns (uint256);
     function BLOCK_INTERVAL() external view returns (uint256);
     function INTERMEDIATE_BLOCK_INTERVAL() external view returns (uint256);

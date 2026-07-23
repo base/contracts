@@ -37,15 +37,13 @@ contract AggregateVerifierTest is BaseTest {
         _createAndAssertInitializedGame("zk-proof", AggregateVerifier.ProofType.ZK, ZK_PROVER, address(0), ZK_PROVER);
     }
 
-    /// @notice init snapshots the live scheduleId into storage and pins it: a later schedule change
-    ///         must not alter the game's snapshot (proves it is stored once, not read live).
-    /// @dev Only covers the stored getter. That the snapshot flows into the proof journal is not
-    ///      asserted here — MockVerifier ignores the journal, so journal binding is untestable.
-    function test_initialize_pinsScheduleId_succeeds() public {
-        // Register an upgrade so the schedule commitment is non-trivial (non-zero).
-        protocolVersions.registerUpgrade(uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100, 1);
-        bytes32 pinned = protocolVersions.scheduleId();
+    /// @notice init pins scheduleId(MAX_UPGRADE_ID): upgrades registered beyond the pin affect
+    ///         neither existing snapshots nor what new games snapshot.
+    function test_initialize_pinsScheduleIdAtMaxUpgradeId_succeeds() public {
+        bytes32 pinned = protocolVersions.scheduleId(MAX_UPGRADE_ID);
         assertTrue(pinned != bytes32(0));
+        // Nothing is registered beyond the pin yet, so the pinned link is the live tail.
+        assertEq(protocolVersions.scheduleId(), pinned);
 
         Claim rootClaim = _advanceL2BlockAndClaim();
         bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
@@ -56,10 +54,50 @@ contract AggregateVerifierTest is BaseTest {
 
         assertEq(game.scheduleId(), pinned);
 
-        // Move the live schedule after creation; the game's snapshot must stay pinned.
-        protocolVersions.registerUpgrade(uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 200, 2);
+        // Registering beyond the pin moves the live tail but not the pinned commitment.
+        protocolVersions.registerUpgrade(uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100, 1);
         assertNotEq(protocolVersions.scheduleId(), pinned);
+        assertEq(protocolVersions.scheduleId(MAX_UPGRADE_ID), pinned);
         assertEq(game.scheduleId(), pinned);
+
+        // A game created after the live tail moved still snapshots the pinned commitment.
+        rootClaim = _advanceL2BlockAndClaim();
+        proof = _generateProof("tee-proof-2", AggregateVerifier.ProofType.TEE);
+        AggregateVerifier game2 =
+            _createAggregateVerifierGame(TEE_PROVER, rootClaim, currentL2BlockNumber, address(game), proof);
+        assertEq(game2.scheduleId(), pinned);
+    }
+
+    /// @notice Scheduling an upgrade inside the pinned prefix moves the pinned commitment, so a
+    ///         game created afterwards snapshots the new value.
+    function test_initialize_scheduleChangeWithinPin_movesSnapshot_succeeds() public {
+        bytes32 unscheduled = protocolVersions.scheduleId(MAX_UPGRADE_ID);
+
+        // Schedule the last pinned upgrade; the pinned commitment must move.
+        protocolVersions.setTimestamp(MAX_UPGRADE_ID, uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100);
+        bytes32 scheduled = protocolVersions.scheduleId(MAX_UPGRADE_ID);
+        assertNotEq(scheduled, unscheduled);
+
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
+
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
+        );
+
+        assertEq(game.scheduleId(), scheduled);
+    }
+
+    /// @notice The constructor stores MAX_UPGRADE_ID and reverts if the registry has not
+    ///         registered up to it.
+    function test_constructor_maxUpgradeId_works() public {
+        AggregateVerifier impl = _deployAggregateVerifierWithMaxUpgradeId(MAX_UPGRADE_ID);
+        assertEq(impl.MAX_UPGRADE_ID(), MAX_UPGRADE_ID);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_UnknownUpgrade.selector, MAX_UPGRADE_ID + 1)
+        );
+        _deployAggregateVerifierWithMaxUpgradeId(MAX_UPGRADE_ID + 1);
     }
 
     function testInitializeFailsIfInvalidCallDataSize() public {
@@ -432,6 +470,21 @@ contract AggregateVerifierTest is BaseTest {
         private
         returns (AggregateVerifier)
     {
+        return _deployAggregateVerifier(blockInterval, intermediateBlockInterval, MAX_UPGRADE_ID);
+    }
+
+    function _deployAggregateVerifierWithMaxUpgradeId(uint256 maxUpgradeId) private returns (AggregateVerifier) {
+        return _deployAggregateVerifier(BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL, maxUpgradeId);
+    }
+
+    function _deployAggregateVerifier(
+        uint256 blockInterval,
+        uint256 intermediateBlockInterval,
+        uint256 maxUpgradeId
+    )
+        private
+        returns (AggregateVerifier)
+    {
         return new AggregateVerifier(
             GameTypes.AGGREGATE_VERIFIER,
             IAnchorStateRegistry(address(anchorStateRegistry)),
@@ -444,7 +497,9 @@ contract AggregateVerifierTest is BaseTest {
             L2_CHAIN_ID,
             blockInterval,
             intermediateBlockInterval,
-            IProtocolVersions(address(protocolVersions))
+            AggregateVerifier.ScheduleConfig({
+                protocolVersions: IProtocolVersions(address(protocolVersions)), maxUpgradeId: maxUpgradeId
+            })
         );
     }
 }

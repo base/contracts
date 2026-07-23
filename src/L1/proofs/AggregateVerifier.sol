@@ -45,6 +45,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 aggregateHash;
     }
 
+    /// @notice The ProtocolVersions registry and the highest upgrade id the prover image supports.
+    struct ScheduleConfig {
+        IProtocolVersions protocolVersions;
+        uint256 maxUpgradeId;
+    }
+
     ////////////////////////////////////////////////////////////////
     //                         Constants                          //
     ////////////////////////////////////////////////////////////////
@@ -117,6 +123,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The ProtocolVersions upgrade schedule contract.
     IProtocolVersions public immutable PROTOCOL_VERSIONS;
 
+    /// @notice The highest ProtocolVersions upgrade id the prover image supports. Games pin the
+    ///         schedule commitment at this id, so later registrations cannot affect this game type.
+    /// @dev    Governance must retire this game type before an upgrade beyond the pin activates.
+    uint256 public immutable MAX_UPGRADE_ID;
+
     ////////////////////////////////////////////////////////////////
     //                         State Vars                         //
     ////////////////////////////////////////////////////////////////
@@ -166,9 +177,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The number of proofs provided.
     uint8 public proofCount;
 
-    /// @notice The ProtocolVersions scheduleId snapshotted at game initialization.
-    /// @dev Pinned once at init; every proof in this game commits to this value, binding it to the
-    ///      upgrade schedule in effect when the game was created.
+    /// @notice The ProtocolVersions schedule commitment through MAX_UPGRADE_ID, pinned at game
+    ///         initialization. Every proof in this game commits to this value.
     bytes32 public scheduleId;
 
     ////////////////////////////////////////////////////////////////
@@ -268,7 +278,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param l2ChainId The chain ID of the L2 network.
     /// @param blockInterval The block interval.
     /// @param intermediateBlockInterval The intermediate block interval.
-    /// @param protocolVersions The ProtocolVersions upgrade schedule contract.
+    /// @param scheduleConfig The ProtocolVersions registry and the pinned max upgrade id.
     constructor(
         GameType gameType_,
         IAnchorStateRegistry anchorStateRegistry_,
@@ -281,7 +291,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         uint256 l2ChainId,
         uint256 blockInterval,
         uint256 intermediateBlockInterval,
-        IProtocolVersions protocolVersions
+        ScheduleConfig memory scheduleConfig
     ) {
         // Block interval and intermediate block interval must be positive and divisible.
         if (blockInterval == 0 || intermediateBlockInterval == 0 || blockInterval % intermediateBlockInterval != 0) {
@@ -302,7 +312,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         L2_CHAIN_ID = l2ChainId;
         BLOCK_INTERVAL = blockInterval;
         INTERMEDIATE_BLOCK_INTERVAL = intermediateBlockInterval;
-        PROTOCOL_VERSIONS = protocolVersions;
+        PROTOCOL_VERSIONS = scheduleConfig.protocolVersions;
+        MAX_UPGRADE_ID = scheduleConfig.maxUpgradeId;
+
+        // Reverts if the registry has not yet registered upgrade `maxUpgradeId`.
+        scheduleConfig.protocolVersions.scheduleId(scheduleConfig.maxUpgradeId);
 
         INITIALIZE_CALLDATA_SIZE = 0x8E + 0x20 * intermediateOutputRootsCount();
     }
@@ -376,9 +390,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // Set the game as initialized.
         initialized = true;
 
-        // Snapshot the scheduleId from ProtocolVersions. Every proof in this game commits to this
-        // value, pinning them to the upgrade schedule in effect at the game's creation block.
-        scheduleId = PROTOCOL_VERSIONS.scheduleId();
+        // Pin the schedule commitment through MAX_UPGRADE_ID; every proof in this game commits
+        // to it.
+        scheduleId = PROTOCOL_VERSIONS.scheduleId(MAX_UPGRADE_ID);
 
         // Set the game's starting timestamp.
         createdAt = Timestamp.wrap(uint64(block.timestamp));

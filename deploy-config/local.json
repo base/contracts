@@ -22,6 +22,7 @@
   "multiproofGameType": 621,
   "multiproofGenesisBlockNumber": 0,
   "multiproofIntermediateBlockInterval": 10,
+  "multiproofMaxUpgradeId": 12,
   "multiproofGenesisOutputRoot": "0x0000000000000000000000000000000000000000000000000000000000000001",
   "nitroEnclaveVerifier": "0x0000000000000000000000000000000000000000",
   "operatorFeeVaultMinimumWithdrawalAmount": "0x8ac7230489e80000",

@@ -236,6 +236,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             nitroEnclaveVerifier: address(nitroEnclaveVerifier),
             multiproofBlockInterval: 100,
             multiproofIntermediateBlockInterval: 10,
+            multiproofMaxUpgradeId: 12,
             sp1Verifier: ISP1Verifier(address(sp1Verifier)),
             teeProposer: proposer,
             teeChallenger: challenger,
