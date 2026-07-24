@@ -11,6 +11,7 @@ import { SystemDeployAssertions } from "test/deploy/SystemDeployAssertions.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
+import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
@@ -138,6 +139,29 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertValidStandardSystem(_expected(output, input));
     }
 
+    function test_deploy_multiproofDisabled_allowsUnsetL2BlockTime_succeeds() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.implementationsInput.multiproofConfigHash = bytes32(0);
+        input.implementationsInput.scheduleConfig = AggregateVerifier.ScheduleConfig({
+            protocolVersions: IProtocolVersions(address(0)), genesisBlockNumber: 0, genesisTimestamp: 0, blockTime: 0
+        });
+
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+
+        assertNotEq(address(output.opChain.protocolVersionsProxy), address(0), "protocol versions");
+        assertEq(address(output.opChain.aggregateVerifier), address(0), "aggregate verifier");
+        assertEq(address(output.opChain.teeProverRegistryProxy), address(0), "tee registry");
+        assertEq(output.impls.aggregateVerifierImpl, address(0), "aggregate verifier impl");
+    }
+
+    function test_deploy_multiproofEnabled_withoutL2GenesisTimestamp_reverts() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.implementationsInput.scheduleConfig.genesisTimestamp = 0;
+
+        vm.expectRevert("SystemDeploy: L2 genesis timestamp not set");
+        systemDeploy.deploy(input);
+    }
+
     function test_upgrade_withoutManagerDelegatecall_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
@@ -234,6 +258,12 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             multiproofConfigHash: bytes32(uint256(4)),
             multiproofGameType: 621,
             nitroEnclaveVerifier: address(nitroEnclaveVerifier),
+            scheduleConfig: AggregateVerifier.ScheduleConfig({
+                protocolVersions: IProtocolVersions(address(0)),
+                genesisBlockNumber: 0,
+                genesisTimestamp: 1,
+                blockTime: 2
+            }),
             multiproofBlockInterval: 100,
             multiproofIntermediateBlockInterval: 10,
             sp1Verifier: ISP1Verifier(address(sp1Verifier)),
@@ -344,6 +374,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             zkAggregationHash: _input.implementationsInput.zkAggregationHash,
             multiproofConfigHash: _input.implementationsInput.multiproofConfigHash,
             l2ChainId: _input.opChainInput.l2ChainId,
+            l2GenesisBlockNumber: _input.implementationsInput.scheduleConfig.genesisBlockNumber,
+            l2GenesisTimestamp: _input.implementationsInput.scheduleConfig.genesisTimestamp,
+            l2BlockTime: _input.implementationsInput.scheduleConfig.blockTime,
             multiproofBlockInterval: _input.implementationsInput.multiproofBlockInterval,
             multiproofIntermediateBlockInterval: _input.implementationsInput.multiproofIntermediateBlockInterval,
             withdrawalDelaySeconds: _input.implementationsInput.withdrawalDelaySeconds
