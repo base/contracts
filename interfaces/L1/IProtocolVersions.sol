@@ -36,6 +36,7 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     function incidentResponder() external view returns (address);
     function scheduleId() external view returns (bytes32);
     function scheduleId(uint256 id) external view returns (bytes32);
+    function activatedScheduleId(uint64 l2Timestamp) external view returns (bytes32);
     function getSchedule() external view returns (uint64[] memory);
 
     function __constructor__() external;

@@ -597,3 +597,115 @@ contract ProtocolVersions_Uncategorized_Test is ProtocolVersions_TestInit {
         protocolVersions.scheduleId(0);
     }
 }
+
+/// @title ProtocolVersions_ActivatedScheduleId_Test
+/// @notice Tests for commitments to the upgrades active at a supplied L2 timestamp.
+contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit {
+    /// @notice An empty registry and a registry containing only inactive entries both commit to the
+    ///         zero hash-chain seed.
+    function test_activatedScheduleId_noneActivated_returnsSeed() external {
+        assertEq(protocolVersions.activatedScheduleId(uint64(block.timestamp)), bytes32(0));
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.registerUpgrade(uint64(block.timestamp + 100), 0);
+        vm.stopPrank();
+
+        assertEq(protocolVersions.activatedScheduleId(uint64(block.timestamp)), bytes32(0));
+    }
+
+    /// @notice Activation is inclusive at the supplied L2 timestamp.
+    function test_activatedScheduleId_boundaryInclusive_succeeds() external {
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(100, 0);
+
+        assertEq(protocolVersions.activatedScheduleId(99), bytes32(0));
+        assertEq(
+            protocolVersions.activatedScheduleId(100), keccak256(abi.encode(bytes32(0), uint256(CANYON), uint64(100)))
+        );
+    }
+
+    /// @notice The commitment includes every registered entry through the highest active upgrade,
+    ///         including an inactive gap below it.
+    function test_activatedScheduleId_commitsPrefixThroughHighestActive_succeeds() external {
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(10, 0);
+        protocolVersions.registerUpgrade(50, 0);
+        protocolVersions.registerUpgrade(30, 0);
+        vm.stopPrank();
+
+        bytes32 link0 = keccak256(abi.encode(bytes32(0), uint256(0), uint64(10)));
+        bytes32 link1 = keccak256(abi.encode(link0, uint256(1), uint64(50)));
+        bytes32 link2 = keccak256(abi.encode(link1, uint256(2), uint64(30)));
+
+        assertEq(protocolVersions.activatedScheduleId(30), link2);
+    }
+
+    /// @notice Appending unscheduled or future upgrades cannot move a historical activated
+    ///         commitment.
+    function test_activatedScheduleId_stableAcrossFutureAppends_succeeds() external {
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(10, 0);
+        bytes32 pinned = protocolVersions.activatedScheduleId(10);
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.registerUpgrade(100, 0);
+        vm.stopPrank();
+
+        assertEq(protocolVersions.activatedScheduleId(10), pinned);
+        assertNotEq(protocolVersions.scheduleId(), pinned);
+    }
+
+    /// @notice Cross-implementation golden shared with Base's `ScheduleId` tests for the real Base
+    ///         mainnet static schedule. The activation cutoff is Beryl, so the commitment contains
+    ///         the prefix through id 11 and excludes the unscheduled Cobalt placeholder at id 12.
+    function test_activatedScheduleId_matchesBaseMainnetGoldenValue_succeeds() external {
+        _registerBaseMainnetStaticSchedule();
+
+        assertEq(
+            protocolVersions.activatedScheduleId(BASE_MAINNET_BERYL_TIMESTAMP),
+            0xadd4aa9bd3532969035a9543c16b8c7d71298e15836f0ac731fdd3eea552c6e2
+        );
+    }
+
+    /// @notice Cross-implementation golden for the full real Base mainnet contract-backed schedule.
+    ///         The live tail commits to all 13 entries, including PectraBlobSchedule and Cobalt as
+    ///         unscheduled zero-timestamp entries.
+    function test_scheduleId_matchesBaseMainnetFullScheduleGoldenValue_succeeds() external {
+        _registerBaseMainnetStaticSchedule();
+
+        assertEq(protocolVersions.scheduleId(), 0x5ee41f186b0a439783060587cfbb942f6f1d94ecc76376c9782580c943ff2b6d);
+        assertEq(protocolVersions.scheduleId(12), protocolVersions.scheduleId());
+    }
+
+    uint64 private constant BASE_MAINNET_GENESIS_TIMESTAMP = 1_686_789_347;
+    uint64 private constant BASE_MAINNET_CANYON_TIMESTAMP = 1_704_992_401;
+    uint64 private constant BASE_MAINNET_DELTA_TIMESTAMP = 1_708_560_000;
+    uint64 private constant BASE_MAINNET_ECOTONE_TIMESTAMP = 1_710_374_401;
+    uint64 private constant BASE_MAINNET_FJORD_TIMESTAMP = 1_720_627_201;
+    uint64 private constant BASE_MAINNET_GRANITE_TIMESTAMP = 1_726_070_401;
+    uint64 private constant BASE_MAINNET_HOLOCENE_TIMESTAMP = 1_736_445_601;
+    uint64 private constant BASE_MAINNET_ISTHMUS_TIMESTAMP = 1_746_806_401;
+    uint64 private constant BASE_MAINNET_JOVIAN_TIMESTAMP = 1_764_691_201;
+    uint64 private constant BASE_MAINNET_AZUL_TIMESTAMP = 1_779_991_200;
+    uint64 private constant BASE_MAINNET_BERYL_TIMESTAMP = 1_782_410_400;
+
+    function _registerBaseMainnetStaticSchedule() private {
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(BASE_MAINNET_GENESIS_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_CANYON_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_DELTA_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_ECOTONE_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_FJORD_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_GRANITE_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_HOLOCENE_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(0, 0); // PectraBlobSchedule is unscheduled on Base mainnet.
+        protocolVersions.registerUpgrade(BASE_MAINNET_ISTHMUS_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_JOVIAN_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_AZUL_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_BERYL_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(0, 0); // Cobalt is unscheduled on Base mainnet.
+        vm.stopPrank();
+    }
+}

@@ -226,6 +226,24 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         return _upgradeScheduleId[id + 1];
     }
 
+    /// @notice Returns the schedule commitment through the highest upgrade active at `l2Timestamp`.
+    /// @dev Searches from the newest registration downward, returning the cached cumulative link
+    ///      for the first active upgrade. Entries above that upgrade are excluded, while every
+    ///      registered entry through it remains committed by the prefix. Zero-valued holes inside
+    ///      the prefix remain part of the positional schedule.
+    /// @param l2Timestamp Inclusive L2 activation cutoff.
+    /// @return Hash-chain commitment through the highest activated upgrade.
+    function activatedScheduleId(uint64 l2Timestamp) external view returns (bytes32) {
+        if (_upgradeScheduleId.length == 0) revert ProtocolVersions_NotInitialized();
+
+        for (uint256 i = _timestamps.length; i > 0; i--) {
+            uint64 activationTimestamp = _timestamps[i - 1];
+            if (activationTimestamp != 0 && activationTimestamp <= l2Timestamp) return _upgradeScheduleId[i];
+        }
+
+        return _upgradeScheduleId[0];
+    }
+
     /// @notice Returns the activation timestamp for every registered upgrade, ordered by upgrade id
     ///         (0 = not scheduled). The array index equals the upgrade `id`; names are resolved
     ///         offchain, and per-upgrade schedule hashes can be reproduced from these timestamps and
