@@ -423,6 +423,74 @@
         "internalType": "uint256",
         "name": "id",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "nextScheduledId",
+        "type": "uint256"
+      }
+    ],
+    "name": "ProtocolVersions_StaticScheduleHole",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "previousId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "previousTimestamp",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "timestamp",
+        "type": "uint64"
+      }
+    ],
+    "name": "ProtocolVersions_TimestampNotAfterPrevious",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "nextId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "timestamp",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "nextTimestamp",
+        "type": "uint64"
+      }
+    ],
+    "name": "ProtocolVersions_TimestampNotBeforeNext",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
       }
     ],
     "name": "ProtocolVersions_UnknownUpgrade",

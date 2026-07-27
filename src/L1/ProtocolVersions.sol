@@ -87,6 +87,14 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     error ProtocolVersions_NotScheduled(uint256 id);
     /// @notice Thrown when a new timestamp is not sufficiently later than the current one.
     error ProtocolVersions_DelayMustBeLater(uint64 currentTimestamp, uint64 newTimestamp);
+    /// @notice Thrown when scheduling a zero-valued static hole below a scheduled successor.
+    error ProtocolVersions_StaticScheduleHole(uint256 id, uint256 nextScheduledId);
+    /// @notice Thrown when a non-zero timestamp is not greater than the previous scheduled upgrade.
+    error ProtocolVersions_TimestampNotAfterPrevious(
+        uint256 id, uint256 previousId, uint64 previousTimestamp, uint64 timestamp
+    );
+    /// @notice Thrown when a non-zero timestamp is not less than the next scheduled upgrade.
+    error ProtocolVersions_TimestampNotBeforeNext(uint256 id, uint256 nextId, uint64 timestamp, uint64 nextTimestamp);
     /// @notice Thrown when scheduleId is read before initialize has been called.
     error ProtocolVersions_NotInitialized();
     /// @notice Thrown when a non-zero timestamp does not provide at least MIN_NOTICE seconds of notice.
@@ -127,6 +135,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         _assertOnlyProxyAdminOwner();
         if (_upgradeScheduleId.length == 0) revert ProtocolVersions_NotInitialized();
         uint256 id = _timestamps.length;
+        _assertTimestampAfterPrevious(id, timestamp);
         _timestamps.push(0);
         // Reserve the link slot for this upgrade at index id + 1.
         _upgradeScheduleId.push();
@@ -172,6 +181,11 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         if (timestamp != 0 && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
             revert ProtocolVersions_InsufficientNotice(timestamp);
         }
+        if (timestamp != 0) {
+            if (current == 0) _assertNoScheduledSuccessor(id);
+            _assertTimestampAfterPrevious(id, timestamp);
+            _assertTimestampBeforeNext(id, timestamp);
+        }
         _writeTimestamp(id, timestamp);
     }
 
@@ -206,6 +220,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         // The new timestamp must also provide at least MIN_NOTICE seconds of notice from now.
         uint64 minFloor = uint64(block.timestamp) + MIN_NOTICE;
         if (newTimestamp < minFloor) revert ProtocolVersions_InsufficientNotice(newTimestamp);
+        _assertTimestampBeforeNext(id, newTimestamp);
         _writeTimestamp(id, newTimestamp);
     }
 
@@ -229,8 +244,9 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @notice Returns the schedule commitment through the highest upgrade active at `l2Timestamp`.
     /// @dev Searches from the newest registration downward, returning the cached cumulative link
     ///      for the first active upgrade. Entries above that upgrade are excluded, while every
-    ///      registered entry through it remains committed by the prefix. Zero-valued holes inside
-    ///      the prefix remain part of the positional schedule.
+    ///      registered entry through it remains committed by the prefix. Non-zero timestamps are
+    ///      ordered by id, and zero-valued holes below a scheduled successor cannot be scheduled
+    ///      later, preventing inactive prefix holes from moving activated schedule commitments.
     /// @param l2Timestamp Inclusive L2 activation cutoff.
     /// @return Hash-chain commitment through the highest activated upgrade.
     function activatedScheduleId(uint64 l2Timestamp) external view returns (bytes32) {
@@ -291,6 +307,41 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         }
 
         emit ScheduleIdUpdated(prev);
+    }
+
+    /// @dev Prevents scheduling a zero-valued hole once a later upgrade has a timestamp.
+    function _assertNoScheduledSuccessor(uint256 id) private view {
+        for (uint256 i = id + 1; i < _timestamps.length; i++) {
+            if (_timestamps[i] != 0) revert ProtocolVersions_StaticScheduleHole(id, i);
+        }
+    }
+
+    /// @dev Requires `timestamp` to be greater than the closest lower-id scheduled upgrade.
+    function _assertTimestampAfterPrevious(uint256 id, uint64 timestamp) private view {
+        if (timestamp == 0) return;
+
+        for (uint256 i = id; i > 0; i--) {
+            uint64 previous = _timestamps[i - 1];
+            if (previous != 0) {
+                if (timestamp <= previous) {
+                    revert ProtocolVersions_TimestampNotAfterPrevious(id, i - 1, previous, timestamp);
+                }
+                return;
+            }
+        }
+    }
+
+    /// @dev Requires `timestamp` to be less than the closest higher-id scheduled upgrade.
+    function _assertTimestampBeforeNext(uint256 id, uint64 timestamp) private view {
+        if (timestamp == 0) return;
+
+        for (uint256 i = id + 1; i < _timestamps.length; i++) {
+            uint64 next = _timestamps[i];
+            if (next != 0) {
+                if (timestamp >= next) revert ProtocolVersions_TimestampNotBeforeNext(id, i, timestamp, next);
+                return;
+            }
+        }
     }
 
     /// @dev Reverts if `id` is not a registered upgrade.
