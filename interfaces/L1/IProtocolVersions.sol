@@ -21,6 +21,11 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     error ProtocolVersions_NotIncidentResponder();
     error ProtocolVersions_NotScheduled(uint256 id);
     error ProtocolVersions_DelayMustBeLater(uint64 currentTimestamp, uint64 newTimestamp);
+    error ProtocolVersions_StaticScheduleHole(uint256 id, uint256 nextScheduledId);
+    error ProtocolVersions_TimestampNotAfterPrevious(
+        uint256 id, uint256 previousId, uint64 previousTimestamp, uint64 timestamp
+    );
+    error ProtocolVersions_TimestampNotBeforeNext(uint256 id, uint256 nextId, uint64 timestamp, uint64 nextTimestamp);
     error ProtocolVersions_NotInitialized();
     error ProtocolVersions_InsufficientNotice(uint64 timestamp);
 
@@ -36,6 +41,7 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     function incidentResponder() external view returns (address);
     function scheduleId() external view returns (bytes32);
     function scheduleId(uint256 id) external view returns (bytes32);
+    function activatedScheduleId(uint64 l2Timestamp) external view returns (bytes32);
     function getSchedule() external view returns (uint64[] memory);
 
     function __constructor__() external;

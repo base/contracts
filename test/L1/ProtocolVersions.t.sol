@@ -185,6 +185,68 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         assertEq(protocolVersions.getSchedule()[CANYON], ts);
     }
 
+    /// @notice Tests that a scheduled registration must be after the previous scheduled upgrade.
+    function test_registerUpgrade_timestampAfterPrevious_succeeds() external {
+        uint64 first = uint64(block.timestamp) + 100;
+        uint64 second = first + 1;
+
+        vm.prank(_owner);
+        assertEq(protocolVersions.registerUpgrade(first, 0), CANYON);
+        vm.prank(_owner);
+        assertEq(protocolVersions.registerUpgrade(second, 0), ECOTONE);
+
+        uint64[] memory schedule = protocolVersions.getSchedule();
+        assertEq(schedule[CANYON], first);
+        assertEq(schedule[ECOTONE], second);
+    }
+
+    /// @notice Tests that zero remains the unscheduled/disabled value and is exempt from ordering.
+    function test_registerUpgrade_zeroTimestampAfterScheduledPrevious_succeeds() external {
+        uint64 first = uint64(block.timestamp) + 100;
+
+        vm.prank(_owner);
+        assertEq(protocolVersions.registerUpgrade(first, 0), CANYON);
+        vm.prank(_owner);
+        assertEq(protocolVersions.registerUpgrade(0, 0), ECOTONE);
+
+        uint64[] memory schedule = protocolVersions.getSchedule();
+        assertEq(schedule[CANYON], first);
+        assertEq(schedule[ECOTONE], 0);
+    }
+
+    /// @notice Tests that scheduled registration scans past zero holes to the previous timestamp.
+    function test_registerUpgrade_timestampAfterPreviousSkipsZeroHoles_succeeds() external {
+        uint64 first = uint64(block.timestamp) + 100;
+        uint64 second = first + 1;
+
+        vm.startPrank(_owner);
+        assertEq(protocolVersions.registerUpgrade(first, 0), CANYON);
+        assertEq(protocolVersions.registerUpgrade(0, 0), ECOTONE);
+        assertEq(protocolVersions.registerUpgrade(second, 0), 2);
+        vm.stopPrank();
+
+        uint64[] memory schedule = protocolVersions.getSchedule();
+        assertEq(schedule[CANYON], first);
+        assertEq(schedule[ECOTONE], 0);
+        assertEq(schedule[2], second);
+    }
+
+    /// @notice Tests that registering an out-of-order timestamp reverts.
+    function test_registerUpgrade_timestampNotAfterPrevious_reverts() external {
+        uint64 first = uint64(block.timestamp) + 100;
+
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(first, 0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_TimestampNotAfterPrevious.selector, ECOTONE, CANYON, first, first
+            )
+        );
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(first, 0);
+    }
+
     /// @notice Tests that a non-zero minProtocolVersion bumps the minimum during registration.
     function test_registerUpgrade_setsMinProtocolVersion_succeeds() external {
         vm.expectEmit(true, false, false, false, address(protocolVersions));
@@ -359,6 +421,82 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         protocolVersions.setTimestamp(CANYON, ts);
     }
 
+    /// @notice Tests that a zero-valued hole below a scheduled successor cannot be scheduled later.
+    function test_setTimestamp_staticScheduleHole_reverts() external {
+        uint64 successor = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 200;
+        uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.registerUpgrade(successor, 0);
+        vm.stopPrank();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_StaticScheduleHole.selector, CANYON, ECOTONE)
+        );
+        vm.prank(_owner);
+        protocolVersions.setTimestamp(CANYON, ts);
+    }
+
+    /// @notice Tests that static-hole detection scans past zero holes to the next scheduled upgrade.
+    function test_setTimestamp_staticScheduleHoleSkipsZeroHoles_reverts() external {
+        uint64 successor = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 200;
+        uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.registerUpgrade(successor, 0);
+        vm.stopPrank();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_StaticScheduleHole.selector, CANYON, uint256(2))
+        );
+        vm.prank(_owner);
+        protocolVersions.setTimestamp(CANYON, ts);
+    }
+
+    /// @notice Tests that `setTimestamp` reverts when the timestamp is not after the previous one.
+    function test_setTimestamp_timestampNotAfterPrevious_reverts() external {
+        uint64 previous = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(previous, 0);
+        protocolVersions.registerUpgrade(0, 0);
+        vm.stopPrank();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_TimestampNotAfterPrevious.selector,
+                ECOTONE,
+                CANYON,
+                previous,
+                previous
+            )
+        );
+        vm.prank(_owner);
+        protocolVersions.setTimestamp(ECOTONE, previous);
+    }
+
+    /// @notice Tests that `setTimestamp` reverts when the timestamp is not before the next one.
+    function test_setTimestamp_timestampNotBeforeNext_reverts() external {
+        uint64 current = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+        uint64 next = current + 100;
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(current, 0);
+        protocolVersions.registerUpgrade(next, 0);
+        vm.stopPrank();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_TimestampNotBeforeNext.selector, CANYON, ECOTONE, next, next
+            )
+        );
+        vm.prank(_owner);
+        protocolVersions.setTimestamp(CANYON, next);
+    }
+
     /// @notice Tests that `setTimestamp` reverts when the upgrade has already activated.
     function test_setTimestamp_afterActivation_reverts() external {
         vm.prank(_owner);
@@ -468,6 +606,26 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
         vm.expectRevert(abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_DelayMustBeLater.selector, ts, ts));
         vm.prank(_incidentResponder);
         protocolVersions.delayTimestamp(CANYON, ts);
+    }
+
+    /// @notice Tests that `delayTimestamp` cannot move an upgrade to or beyond its next scheduled successor.
+    function test_delayTimestamp_timestampNotBeforeNext_reverts() external {
+        uint64 current = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+        uint64 next = current + 100;
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(current, 0);
+        protocolVersions.registerUpgrade(next, 0);
+        protocolVersions.setIncidentResponder(_incidentResponder);
+        vm.stopPrank();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_TimestampNotBeforeNext.selector, CANYON, ECOTONE, next, next
+            )
+        );
+        vm.prank(_incidentResponder);
+        protocolVersions.delayTimestamp(CANYON, next);
     }
 
     /// @notice Tests that `delayTimestamp` reverts when the upgrade has no scheduled timestamp.
@@ -595,5 +753,118 @@ contract ProtocolVersions_Uncategorized_Test is ProtocolVersions_TestInit {
     function test_scheduleId_byId_unregistered_reverts() external {
         vm.expectRevert(abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_UnknownUpgrade.selector, uint256(0)));
         protocolVersions.scheduleId(0);
+    }
+}
+
+/// @title ProtocolVersions_ActivatedScheduleId_Test
+/// @notice Tests for commitments to the upgrades active at a supplied L2 timestamp.
+contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit {
+    /// @notice An empty registry and a registry containing only inactive entries both commit to the
+    ///         zero hash-chain seed.
+    function test_activatedScheduleId_noneActivated_returnsSeed() external {
+        assertEq(protocolVersions.activatedScheduleId(uint64(block.timestamp)), bytes32(0));
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.registerUpgrade(uint64(block.timestamp + 100), 0);
+        vm.stopPrank();
+
+        assertEq(protocolVersions.activatedScheduleId(uint64(block.timestamp)), bytes32(0));
+    }
+
+    /// @notice Activation is inclusive at the supplied L2 timestamp.
+    function test_activatedScheduleId_boundaryInclusive_succeeds() external {
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(100, 0);
+
+        assertEq(protocolVersions.activatedScheduleId(99), bytes32(0));
+        assertEq(
+            protocolVersions.activatedScheduleId(100), keccak256(abi.encode(bytes32(0), uint256(CANYON), uint64(100)))
+        );
+    }
+
+    /// @notice The commitment includes every registered entry through the highest active upgrade,
+    ///         including a static zero-valued hole below it.
+    function test_activatedScheduleId_commitsPrefixThroughHighestActive_succeeds() external {
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(10, 0);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.registerUpgrade(30, 0);
+        vm.stopPrank();
+
+        bytes32 link0 = keccak256(abi.encode(bytes32(0), uint256(0), uint64(10)));
+        bytes32 link1 = keccak256(abi.encode(link0, uint256(1), uint64(0)));
+        bytes32 link2 = keccak256(abi.encode(link1, uint256(2), uint64(30)));
+
+        assertEq(protocolVersions.activatedScheduleId(30), link2);
+    }
+
+    /// @notice Appending unscheduled or future upgrades above the active prefix cannot move the
+    ///         activated commitment selected by that prefix.
+    function test_activatedScheduleId_stableAcrossAppendsAboveActivePrefix_succeeds() external {
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(10, 0);
+        bytes32 pinned = protocolVersions.activatedScheduleId(10);
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.registerUpgrade(100, 0);
+        vm.stopPrank();
+
+        assertEq(protocolVersions.activatedScheduleId(10), pinned);
+        assertNotEq(protocolVersions.scheduleId(), pinned);
+    }
+
+    /// @notice Cross-implementation golden shared with Base's `ScheduleId` tests for the real Base
+    ///         mainnet static schedule. The activation cutoff is Beryl, so the commitment contains
+    ///         the prefix through id 11, including the static PectraBlobSchedule hole at id 7, and
+    ///         excludes the unscheduled Cobalt placeholder at id 12.
+    function test_activatedScheduleId_matchesBaseMainnetGoldenValue_succeeds() external {
+        _registerBaseMainnetStaticSchedule();
+
+        assertEq(
+            protocolVersions.activatedScheduleId(BASE_MAINNET_BERYL_TIMESTAMP),
+            0xadd4aa9bd3532969035a9543c16b8c7d71298e15836f0ac731fdd3eea552c6e2
+        );
+    }
+
+    /// @notice Cross-implementation golden for the full real Base mainnet contract-backed schedule.
+    ///         The live tail commits to all 13 entries, including PectraBlobSchedule and Cobalt as
+    ///         unscheduled zero-timestamp entries.
+    function test_scheduleId_matchesBaseMainnetFullScheduleGoldenValue_succeeds() external {
+        _registerBaseMainnetStaticSchedule();
+
+        assertEq(protocolVersions.scheduleId(), 0x5ee41f186b0a439783060587cfbb942f6f1d94ecc76376c9782580c943ff2b6d);
+        assertEq(protocolVersions.scheduleId(12), protocolVersions.scheduleId());
+    }
+
+    uint64 private constant BASE_MAINNET_GENESIS_TIMESTAMP = 1_686_789_347;
+    uint64 private constant BASE_MAINNET_CANYON_TIMESTAMP = 1_704_992_401;
+    uint64 private constant BASE_MAINNET_DELTA_TIMESTAMP = 1_708_560_000;
+    uint64 private constant BASE_MAINNET_ECOTONE_TIMESTAMP = 1_710_374_401;
+    uint64 private constant BASE_MAINNET_FJORD_TIMESTAMP = 1_720_627_201;
+    uint64 private constant BASE_MAINNET_GRANITE_TIMESTAMP = 1_726_070_401;
+    uint64 private constant BASE_MAINNET_HOLOCENE_TIMESTAMP = 1_736_445_601;
+    uint64 private constant BASE_MAINNET_ISTHMUS_TIMESTAMP = 1_746_806_401;
+    uint64 private constant BASE_MAINNET_JOVIAN_TIMESTAMP = 1_764_691_201;
+    uint64 private constant BASE_MAINNET_AZUL_TIMESTAMP = 1_779_991_200;
+    uint64 private constant BASE_MAINNET_BERYL_TIMESTAMP = 1_782_410_400;
+
+    function _registerBaseMainnetStaticSchedule() private {
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(BASE_MAINNET_GENESIS_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_CANYON_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_DELTA_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_ECOTONE_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_FJORD_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_GRANITE_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_HOLOCENE_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(0, 0); // PectraBlobSchedule is unscheduled on Base mainnet.
+        protocolVersions.registerUpgrade(BASE_MAINNET_ISTHMUS_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_JOVIAN_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_AZUL_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(BASE_MAINNET_BERYL_TIMESTAMP, 0);
+        protocolVersions.registerUpgrade(0, 0); // Cobalt is unscheduled on Base mainnet.
+        vm.stopPrank();
     }
 }
