@@ -231,7 +231,9 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
             L2_CHAIN_ID,
             AGGREGATE_BLOCK_INTERVAL,
             AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL,
-            protocolVersions
+            AggregateVerifier.ScheduleConfig({
+                protocolVersions: protocolVersions, genesisBlockNumber: 0, genesisTimestamp: 0, blockTime: 2
+            })
         );
         _setGame(address(gameImpl), GameTypes.AGGREGATE_VERIFIER);
 

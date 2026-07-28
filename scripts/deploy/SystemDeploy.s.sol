@@ -78,6 +78,7 @@ contract SystemDeploy is Script {
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
         address nitroEnclaveVerifier;
+        AggregateVerifier.ScheduleConfig scheduleConfig;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
         ISP1Verifier sp1Verifier;
@@ -126,9 +127,9 @@ contract SystemDeploy is Script {
         bytes32 zkAggregationHash;
         bytes32 multiproofConfigHash;
         uint256 l2ChainId;
+        AggregateVerifier.ScheduleConfig scheduleConfig;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
-        IProtocolVersions protocolVersions;
     }
 
     struct MultiproofOutput {
@@ -265,6 +266,7 @@ contract SystemDeploy is Script {
             multiproofConfigHash: cfg.multiproofConfigHash(),
             multiproofGameType: cfg.multiproofGameType(),
             nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
+            scheduleConfig: _configuredScheduleConfig(),
             multiproofBlockInterval: cfg.multiproofBlockInterval(),
             multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
             sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
@@ -272,6 +274,20 @@ contract SystemDeploy is Script {
             teeChallenger: cfg.teeChallenger(),
             guardian: cfg.superchainConfigGuardian(),
             incidentResponder: cfg.superchainConfigIncidentResponder()
+        });
+    }
+
+    function _configuredScheduleConfig() internal view returns (AggregateVerifier.ScheduleConfig memory config_) {
+        uint256 genesisTimestamp = cfg.l2GenesisTimestamp();
+        uint256 blockTime = cfg.l2BlockTime();
+        require(genesisTimestamp <= type(uint64).max, "SystemDeploy: L2 genesis timestamp overflow");
+        require(blockTime <= type(uint64).max, "SystemDeploy: L2 block time overflow");
+
+        config_ = AggregateVerifier.ScheduleConfig({
+            protocolVersions: IProtocolVersions(address(0)),
+            genesisBlockNumber: cfg.l2GenesisBlockNumber(),
+            genesisTimestamp: uint64(genesisTimestamp),
+            blockTime: uint64(blockTime)
         });
     }
 
@@ -1013,6 +1029,9 @@ contract SystemDeploy is Script {
         vm.broadcast(msg.sender);
         output_.zkVerifier = IVerifier(address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryProxy)));
 
+        AggregateVerifier.ScheduleConfig memory scheduleConfig = _input.scheduleConfig;
+        scheduleConfig.protocolVersions = _output.protocolVersionsProxy;
+
         output_.aggregateVerifier = _newAggregateVerifier(
             AggregateVerifierInput({
                 multiproofGameType: gameType,
@@ -1025,9 +1044,9 @@ contract SystemDeploy is Script {
                 zkAggregationHash: _input.zkAggregationHash,
                 multiproofConfigHash: _input.multiproofConfigHash,
                 l2ChainId: _opChainInput.l2ChainId,
+                scheduleConfig: scheduleConfig,
                 multiproofBlockInterval: _input.multiproofBlockInterval,
-                multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval,
-                protocolVersions: _output.protocolVersionsProxy
+                multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval
             })
         );
 
@@ -1057,7 +1076,7 @@ contract SystemDeploy is Script {
                     _input.l2ChainId,
                     _input.multiproofBlockInterval,
                     _input.multiproofIntermediateBlockInterval,
-                    _input.protocolVersions
+                    _input.scheduleConfig
                 )
             )
         );
@@ -1090,6 +1109,8 @@ contract SystemDeploy is Script {
         require(_input.zkAggregationHash != bytes32(0), "SystemDeploy: zkAggregationHash not set");
         require(_input.multiproofConfigHash != bytes32(0), "SystemDeploy: multiproofConfigHash not set");
         require(_input.multiproofGameType != 0, "SystemDeploy: multiproofGameType not set");
+        require(_input.scheduleConfig.blockTime != 0, "SystemDeploy: L2 block time not set");
+        require(_input.scheduleConfig.genesisTimestamp != 0, "SystemDeploy: L2 genesis timestamp not set");
         require(_input.nitroEnclaveVerifier != address(0), "SystemDeploy: nitroEnclaveVerifier not set");
         require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
         DeployUtils.assertValidContractAddress(_input.nitroEnclaveVerifier);

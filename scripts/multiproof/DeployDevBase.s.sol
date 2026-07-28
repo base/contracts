@@ -126,7 +126,12 @@ abstract contract DeployDevBase is Script {
                 cfg.l2ChainId(),
                 _blockInterval(),
                 _intermediateBlockInterval(),
-                IProtocolVersions(address(protocolVersionsProxy))
+                AggregateVerifier.ScheduleConfig({
+                    protocolVersions: IProtocolVersions(address(protocolVersionsProxy)),
+                    genesisBlockNumber: cfg.l2GenesisBlockNumber(),
+                    genesisTimestamp: uint64(cfg.l2GenesisTimestamp()),
+                    blockTime: uint64(cfg.l2BlockTime())
+                })
             )
         );
 
@@ -158,6 +163,10 @@ abstract contract DeployDevBase is Script {
     function _logHeader() internal view virtual;
     function _printSummary() internal view virtual;
 
-    function _preflight() internal virtual { }
+    function _preflight() internal virtual {
+        require(cfg.l2BlockTime() != 0, "l2BlockTime must be set in config");
+        require(cfg.l2GenesisTimestamp() != 0, "l2GenesisTimestamp must be set in config");
+    }
+
     function _serializeExtra(string memory key) internal virtual { }
 }

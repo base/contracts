@@ -91,7 +91,9 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
             deploy.cfg().l2ChainId(),
             100,
             10,
-            protocolVersions
+            AggregateVerifier.ScheduleConfig({
+                protocolVersions: protocolVersions, genesisBlockNumber: 0, genesisTimestamp: 1, blockTime: 2
+            })
         );
         disputeGameFactory.setImplementation(respectedGameType, IDisputeGame(address(gameImpl)));
         disputeGameFactory.setInitBond(respectedGameType, 0);
