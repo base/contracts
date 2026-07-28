@@ -43,6 +43,9 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
 
     /// @notice Activation timestamp for each registered upgrade, indexed by upgrade id (0 = not scheduled).
     ///         An upgrade id is registered iff it is a valid index into this array.
+    /// @dev Every loop in this contract iterates this array. Its length is deliberately uncapped: it only
+    ///      grows via owner-gated `registerUpgrade`, one entry per hardfork, so the unbounded iteration
+    ///      poses no gas exhaustion risk.
     uint64[] private _timestamps;
 
     /// @notice Hash chain links. Element 0 is the seed (`bytes32(0)`), pushed in `initialize`;
