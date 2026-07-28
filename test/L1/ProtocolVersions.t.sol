@@ -267,6 +267,20 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
 
         assertEq(protocolVersions.minimumProtocolVersion(), 7);
     }
+
+    /// @notice Tests that a minProtocolVersion exceeding 128 bits reverts.
+    function test_registerUpgrade_minProtocolVersionTooLarge_reverts() external {
+        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(0, uint256(type(uint128).max) + 1);
+    }
+
+    /// @notice Tests that the maximum representable minProtocolVersion (128 bits set) succeeds.
+    function test_registerUpgrade_minProtocolVersionMaxValue_succeeds() external {
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(0, type(uint128).max);
+        assertEq(protocolVersions.minimumProtocolVersion(), type(uint128).max);
+    }
 }
 
 /// @title ProtocolVersions_SetMinimumProtocolVersion_Test
@@ -300,6 +314,20 @@ contract ProtocolVersions_SetMinimumProtocolVersion_Test is ProtocolVersions_Tes
         vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
         vm.prank(_owner);
         protocolVersions.setMinimumProtocolVersion(0);
+    }
+
+    /// @notice Tests that a protocol version exceeding 128 bits reverts.
+    function test_setMinimumProtocolVersion_tooLarge_reverts() external {
+        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
+        vm.prank(_owner);
+        protocolVersions.setMinimumProtocolVersion(uint256(type(uint128).max) + 1);
+    }
+
+    /// @notice Tests that the maximum representable protocol version (128 bits set) succeeds.
+    function test_setMinimumProtocolVersion_maxValue_succeeds() external {
+        vm.prank(_owner);
+        protocolVersions.setMinimumProtocolVersion(type(uint128).max);
+        assertEq(protocolVersions.minimumProtocolVersion(), type(uint128).max);
     }
 
     /// @notice Tests that only the owner can call `setMinimumProtocolVersion`.
