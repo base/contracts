@@ -132,7 +132,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     ///      scheduleId chain with the new upgrade's link.
     /// @param timestamp Unix activation timestamp, or 0 to leave the upgrade unscheduled.
     /// @param minProtocolVersion New minimum protocol version to set at registration, or 0 to leave
-    ///                  the current minimum unchanged.
+    ///                  the current minimum unchanged. Must fit in 128 bits if non-zero.
     /// @return The ascending id assigned to the newly registered upgrade.
     function registerUpgrade(uint64 timestamp, uint256 minProtocolVersion) external returns (uint256) {
         _assertOnlyProxyAdminOwner();
@@ -151,7 +151,10 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
             _writeTimestamp(id, timestamp);
         }
         // Optionally bump the global minimum protocol version in the same call (0 = leave unchanged).
-        if (minProtocolVersion != 0) _writeMinimumProtocolVersion(minProtocolVersion);
+        if (minProtocolVersion != 0) {
+            if (minProtocolVersion > type(uint128).max) revert ProtocolVersions_InvalidProtocolVersion();
+            _writeMinimumProtocolVersion(minProtocolVersion);
+        }
         return id;
     }
 
@@ -159,10 +162,11 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @dev Informational signal for offchain clients; independent of the upgrade schedule and NOT
     ///      part of the scheduleId commitment, so it can be updated at any time without shifting any
     ///      proof binding.
-    /// @param protocolVersion Packed semver uint256 (must be non-zero).
+    /// @param protocolVersion Packed semver uint256 (must be non-zero and fit in 128 bits).
     function setMinimumProtocolVersion(uint256 protocolVersion) external {
         _assertOnlyProxyAdminOwner();
         if (protocolVersion == 0) revert ProtocolVersions_InvalidProtocolVersion();
+        if (protocolVersion > type(uint128).max) revert ProtocolVersions_InvalidProtocolVersion();
         _writeMinimumProtocolVersion(protocolVersion);
     }
 
