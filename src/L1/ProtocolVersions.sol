@@ -11,7 +11,7 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 
 /// @custom:proxied true
 /// @title ProtocolVersions
-/// @notice Security Council-controlled upgrade activation schedule contract.
+/// @notice Upgrade activation schedule contract, controlled by the ProxyAdmin owner (2-of-2 multisig).
 /// @dev Maintains an ordered registry of upgrades and their L2 activation timestamps.
 ///      Each upgrade is identified by an ascending numeric `id` equal to its registration
 ///      index (0, 1, 2, ...). Human-readable names are intentionally kept offchain: a client
@@ -43,6 +43,9 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
 
     /// @notice Activation timestamp for each registered upgrade, indexed by upgrade id (0 = not scheduled).
     ///         An upgrade id is registered iff it is a valid index into this array.
+    /// @dev Every loop in this contract iterates this array. Its length is deliberately uncapped: it only
+    ///      grows via owner-gated `registerUpgrade`, one entry per hardfork, so the unbounded iteration
+    ///      poses no gas exhaustion risk.
     uint64[] private _timestamps;
 
     /// @notice Hash chain links. Element 0 is the seed (`bytes32(0)`), pushed in `initialize`;
@@ -123,7 +126,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     }
 
     /// @notice Registers a new upgrade, assigning it the next ascending id, optionally scheduling its
-    ///         activation and bumping the minimum protocol version in the same call. Owner only.
+    ///         activation and bumping the minimum protocol version in the same call. ProxyAdmin owner only.
     /// @dev Pass `timestamp` 0 to register without scheduling (schedule later via `setTimestamp`), or
     ///      a non-zero value to register and schedule at once. Either way registration extends the
     ///      scheduleId chain with the new upgrade's link.
@@ -152,7 +155,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         return id;
     }
 
-    /// @notice Sets the minimum protocol version clients must run. Owner (Security Council) only.
+    /// @notice Sets the minimum protocol version clients must run. ProxyAdmin owner only.
     /// @dev Informational signal for offchain clients; independent of the upgrade schedule and NOT
     ///      part of the scheduleId commitment, so it can be updated at any time without shifting any
     ///      proof binding.
@@ -189,7 +192,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         _writeTimestamp(id, timestamp);
     }
 
-    /// @notice Appoints, replaces, or clears (set to zero) the incidentResponder role. Owner only.
+    /// @notice Appoints, replaces, or clears (set to zero) the incidentResponder role. ProxyAdmin owner only.
     /// @param newIncidentResponder New incidentResponder address, or address(0) to revoke the role.
     function setIncidentResponder(address newIncidentResponder) external {
         _assertOnlyProxyAdminOwner();
