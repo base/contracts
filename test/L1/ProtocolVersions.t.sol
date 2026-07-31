@@ -185,10 +185,10 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         assertEq(protocolVersions.getSchedule()[CANYON], ts);
     }
 
-    /// @notice Tests that a scheduled registration must be after the previous scheduled upgrade.
-    function test_registerUpgrade_timestampAfterPrevious_succeeds() external {
+    /// @notice Tests that a scheduled registration may share the previous scheduled upgrade's timestamp.
+    function test_registerUpgrade_timestampEqualToPrevious_succeeds() external {
         uint64 first = uint64(block.timestamp) + 100;
-        uint64 second = first + 1;
+        uint64 second = first;
 
         vm.prank(_owner);
         assertEq(protocolVersions.registerUpgrade(first, 0), CANYON);
@@ -231,7 +231,7 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         assertEq(schedule[2], second);
     }
 
-    /// @notice Tests that registering an out-of-order timestamp reverts.
+    /// @notice Tests that registering a timestamp before the previous scheduled upgrade reverts.
     function test_registerUpgrade_timestampNotAfterPrevious_reverts() external {
         uint64 first = uint64(block.timestamp) + 100;
 
@@ -240,11 +240,11 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IProtocolVersions.ProtocolVersions_TimestampNotAfterPrevious.selector, ECOTONE, CANYON, first, first
+                IProtocolVersions.ProtocolVersions_TimestampNotAfterPrevious.selector, ECOTONE, CANYON, first, first - 1
             )
         );
         vm.prank(_owner);
-        protocolVersions.registerUpgrade(first, 0);
+        protocolVersions.registerUpgrade(first - 1, 0);
     }
 
     /// @notice Tests that a non-zero minProtocolVersion bumps the minimum during registration.
@@ -484,7 +484,22 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         protocolVersions.setTimestamp(CANYON, ts);
     }
 
-    /// @notice Tests that `setTimestamp` reverts when the timestamp is not after the previous one.
+    /// @notice Tests that `setTimestamp` may share the previous scheduled upgrade's timestamp.
+    function test_setTimestamp_timestampEqualToPrevious_succeeds() external {
+        uint64 previous = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(previous, 0);
+        protocolVersions.registerUpgrade(0, 0);
+        protocolVersions.setTimestamp(ECOTONE, previous);
+        vm.stopPrank();
+
+        uint64[] memory schedule = protocolVersions.getSchedule();
+        assertEq(schedule[CANYON], previous);
+        assertEq(schedule[ECOTONE], previous);
+    }
+
+    /// @notice Tests that `setTimestamp` reverts when the timestamp is before the previous one.
     function test_setTimestamp_timestampNotAfterPrevious_reverts() external {
         uint64 previous = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
 
@@ -499,11 +514,11 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
                 ECOTONE,
                 CANYON,
                 previous,
-                previous
+                previous - 1
             )
         );
         vm.prank(_owner);
-        protocolVersions.setTimestamp(ECOTONE, previous);
+        protocolVersions.setTimestamp(ECOTONE, previous - 1);
     }
 
     /// @notice Tests that `setTimestamp` reverts when the timestamp is not before the next one.

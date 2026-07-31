@@ -92,7 +92,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     error ProtocolVersions_DelayMustBeLater(uint64 currentTimestamp, uint64 newTimestamp);
     /// @notice Thrown when scheduling a zero-valued static hole below a scheduled successor.
     error ProtocolVersions_StaticScheduleHole(uint256 id, uint256 nextScheduledId);
-    /// @notice Thrown when a non-zero timestamp is not greater than the previous scheduled upgrade.
+    /// @notice Thrown when a non-zero timestamp is less than the previous scheduled upgrade.
     error ProtocolVersions_TimestampNotAfterPrevious(
         uint256 id, uint256 previousId, uint64 previousTimestamp, uint64 timestamp
     );
@@ -323,14 +323,14 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         }
     }
 
-    /// @dev Requires `timestamp` to be greater than the closest lower-id scheduled upgrade.
+    /// @dev Requires `timestamp` to be greater than or equal to the closest lower-id scheduled upgrade.
     function _assertTimestampAfterPrevious(uint256 id, uint64 timestamp) private view {
         if (timestamp == 0) return;
 
         for (uint256 i = id; i > 0; i--) {
             uint64 previous = _timestamps[i - 1];
             if (previous != 0) {
-                if (timestamp <= previous) {
+                if (timestamp < previous) {
                     revert ProtocolVersions_TimestampNotAfterPrevious(id, i - 1, previous, timestamp);
                 }
                 return;
