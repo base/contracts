@@ -120,7 +120,7 @@ contract SuperchainConfig is ProxyAdminOwnedBase, ISemver {
         _assertOnlyGuardian();
 
         // Cannot extend the pause if not already paused.
-        if (pauseTimestamps[_identifier] == 0) {
+        if (!paused(_identifier)) {
             revert SuperchainConfig_NotAlreadyPaused(_identifier);
         }
 
