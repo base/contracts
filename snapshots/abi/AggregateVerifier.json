@@ -96,18 +96,8 @@
               },
               {
                 "internalType": "uint256",
-                "name": "genesisBlockNumber",
+                "name": "maxUpgradeId",
                 "type": "uint256"
-              },
-              {
-                "internalType": "uint64",
-                "name": "genesisTimestamp",
-                "type": "uint64"
-              },
-              {
-                "internalType": "uint64",
-                "name": "blockTime",
-                "type": "uint64"
               }
             ],
             "internalType": "struct AggregateVerifier.ScheduleConfig",
@@ -242,19 +232,6 @@
   },
   {
     "inputs": [],
-    "name": "L2_BLOCK_TIME",
-    "outputs": [
-      {
-        "internalType": "uint64",
-        "name": "",
-        "type": "uint64"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "L2_CHAIN_ID",
     "outputs": [
       {
@@ -268,25 +245,12 @@
   },
   {
     "inputs": [],
-    "name": "L2_GENESIS_BLOCK_NUMBER",
+    "name": "MAX_UPGRADE_ID",
     "outputs": [
       {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "L2_GENESIS_TIMESTAMP",
-    "outputs": [
-      {
-        "internalType": "uint64",
-        "name": "",
-        "type": "uint64"
       }
     ],
     "stateMutability": "view",
@@ -1119,11 +1083,6 @@
   },
   {
     "inputs": [],
-    "name": "InvalidL2BlockTime",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "InvalidParentGame",
     "type": "error"
   },
@@ -1183,33 +1142,6 @@
       }
     ],
     "name": "L1OriginTooOld",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "blockNumber",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "genesisBlockNumber",
-        "type": "uint256"
-      }
-    ],
-    "name": "L2BlockBeforeGenesis",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "blockNumber",
-        "type": "uint256"
-      }
-    ],
-    "name": "L2TimestampOverflow",
     "type": "error"
   },
   {

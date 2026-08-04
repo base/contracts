@@ -159,12 +159,27 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertValidStandardSystem(_expected(output, input));
     }
 
-    function test_deploy_multiproofDisabled_allowsUnsetL2BlockTime_succeeds() public {
+    /// @notice Deployment seeds the same 13-slot unscheduled schedule hashed by the Base Rust prover.
+    function test_deploy_seedsRustProverSchedule_succeeds() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+
+        assertEq(output.opChain.protocolVersionsProxy.getSchedule().length, 13, "registered upgrade slots");
+        assertEq(
+            output.opChain.protocolVersionsProxy.scheduleId(input.implementationsInput.multiproofMaxUpgradeId),
+            0xc61ddfdfe1ff9422919909549df660a43d53127a318e01274a0448443e54146d,
+            "Rust prover schedule golden"
+        );
+        assertEq(
+            IAggregateVerifier(address(output.opChain.aggregateVerifier)).MAX_UPGRADE_ID(),
+            input.implementationsInput.multiproofMaxUpgradeId,
+            "aggregate verifier max upgrade id"
+        );
+    }
+
+    function test_deploy_multiproofDisabled_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.implementationsInput.multiproofConfigHash = bytes32(0);
-        input.implementationsInput.scheduleConfig = AggregateVerifier.ScheduleConfig({
-            protocolVersions: IProtocolVersions(address(0)), genesisBlockNumber: 0, genesisTimestamp: 0, blockTime: 0
-        });
 
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
 
@@ -172,14 +187,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertEq(address(output.opChain.aggregateVerifier), address(0), "aggregate verifier");
         assertEq(address(output.opChain.teeProverRegistryProxy), address(0), "tee registry");
         assertEq(output.impls.aggregateVerifierImpl, address(0), "aggregate verifier impl");
-    }
-
-    function test_deploy_multiproofEnabled_withoutL2GenesisTimestamp_reverts() public {
-        SystemDeploy.DeployInput memory input = _defaultDeployInput();
-        input.implementationsInput.scheduleConfig.genesisTimestamp = 0;
-
-        vm.expectRevert("SystemDeploy: L2 genesis timestamp not set");
-        systemDeploy.deploy(input);
     }
 
     function test_upgrade_withoutManagerDelegatecall_succeeds() public {
@@ -395,14 +402,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             multiproofConfigHash: bytes32(uint256(4)),
             multiproofGameType: 621,
             nitroEnclaveVerifier: address(nitroEnclaveVerifier),
-            scheduleConfig: AggregateVerifier.ScheduleConfig({
-                protocolVersions: IProtocolVersions(address(0)),
-                genesisBlockNumber: 0,
-                genesisTimestamp: 1,
-                blockTime: 2
-            }),
             multiproofBlockInterval: 100,
             multiproofIntermediateBlockInterval: 10,
+            multiproofMaxUpgradeId: 12,
             sp1Verifier: ISP1Verifier(address(sp1Verifier)),
             teeProposer: proposer,
             teeChallenger: challenger,
@@ -520,11 +522,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             zkAggregationHash: _input.implementationsInput.zkAggregationHash,
             multiproofConfigHash: _input.implementationsInput.multiproofConfigHash,
             l2ChainId: _input.opChainInput.l2ChainId,
-            l2GenesisBlockNumber: _input.implementationsInput.scheduleConfig.genesisBlockNumber,
-            l2GenesisTimestamp: _input.implementationsInput.scheduleConfig.genesisTimestamp,
-            l2BlockTime: _input.implementationsInput.scheduleConfig.blockTime,
             multiproofBlockInterval: _input.implementationsInput.multiproofBlockInterval,
             multiproofIntermediateBlockInterval: _input.implementationsInput.multiproofIntermediateBlockInterval,
+            multiproofMaxUpgradeId: _input.implementationsInput.multiproofMaxUpgradeId,
             withdrawalDelaySeconds: _input.implementationsInput.withdrawalDelaySeconds
         });
     }
@@ -658,7 +658,7 @@ contract ZKBricking_Test is Test {
                 intermediateRoots,
                 input.implementationsInput.multiproofConfigHash,
                 input.implementationsInput.teeImageHash,
-                _scheduleId(endingL2SeqNum)
+                _scheduleId()
             )
         );
 
@@ -668,11 +668,8 @@ contract ZKBricking_Test is Test {
         return abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, signature);
     }
 
-    function _scheduleId(uint64 endingL2SeqNum) internal view returns (bytes32) {
-        AggregateVerifier.ScheduleConfig memory scheduleConfig = input.implementationsInput.scheduleConfig;
-        uint64 endingL2Timestamp = scheduleConfig.genesisTimestamp
-            + uint64((uint256(endingL2SeqNum) - scheduleConfig.genesisBlockNumber) * uint256(scheduleConfig.blockTime));
-        return output.opChain.protocolVersionsProxy.activatedScheduleId(endingL2Timestamp);
+    function _scheduleId() internal view returns (bytes32) {
+        return output.opChain.protocolVersionsProxy.scheduleId(input.implementationsInput.multiproofMaxUpgradeId);
     }
 
     function _extractIntermediateRoots(bytes memory extraData) internal pure returns (bytes memory) {
@@ -743,14 +740,9 @@ contract ZKBricking_Test is Test {
             multiproofConfigHash: bytes32(uint256(4)),
             multiproofGameType: 621,
             nitroEnclaveVerifier: address(0),
-            scheduleConfig: AggregateVerifier.ScheduleConfig({
-                protocolVersions: IProtocolVersions(address(0)),
-                genesisBlockNumber: 0,
-                genesisTimestamp: 1,
-                blockTime: 2
-            }),
             multiproofBlockInterval: BLOCK_INTERVAL,
             multiproofIntermediateBlockInterval: INTERMEDIATE_BLOCK_INTERVAL,
+            multiproofMaxUpgradeId: 12,
             sp1Verifier: ISP1Verifier(address(0)),
             teeProposer: proposer,
             teeChallenger: challenger,

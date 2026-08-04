@@ -113,6 +113,22 @@ abstract contract DeployDevBase is Script {
         );
         protocolVersionsProxy.changeAdmin(address(proxyAdmin));
 
+        // Seed unscheduled upgrades through multiproofMaxUpgradeId so the AggregateVerifier
+        // constructor check passes; requires finalSystemOwner to be the broadcasting deployer.
+        uint256 maxUpgradeId = cfg.multiproofMaxUpgradeId();
+        for (uint256 i = 0; i <= maxUpgradeId; i++) {
+            IProtocolVersions(address(protocolVersionsProxy)).registerUpgrade(0, 0);
+        }
+
+        AggregateVerifier.GameConfig memory gameConfig = AggregateVerifier.GameConfig({
+            finalizationDelays: AggregateVerifier.FinalizationDelays(
+                cfg.slowFinalizationDelay(), cfg.fastFinalizationDelay()
+            ),
+            schedule: AggregateVerifier.ScheduleConfig({
+                protocolVersions: IProtocolVersions(address(protocolVersionsProxy)), maxUpgradeId: maxUpgradeId
+            })
+        });
+
         aggregateVerifier = address(
             new AggregateVerifier(
                 gameType,
@@ -126,17 +142,7 @@ abstract contract DeployDevBase is Script {
                 cfg.l2ChainId(),
                 _blockInterval(),
                 _intermediateBlockInterval(),
-                AggregateVerifier.GameConfig({
-                    finalizationDelays: AggregateVerifier.FinalizationDelays(
-                        cfg.slowFinalizationDelay(), cfg.fastFinalizationDelay()
-                    ),
-                    schedule: AggregateVerifier.ScheduleConfig({
-                        protocolVersions: IProtocolVersions(address(protocolVersionsProxy)),
-                        genesisBlockNumber: cfg.l2GenesisBlockNumber(),
-                        genesisTimestamp: uint64(cfg.l2GenesisTimestamp()),
-                        blockTime: uint64(cfg.l2BlockTime())
-                    })
-                })
+                gameConfig
             )
         );
 

@@ -79,9 +79,9 @@ contract SystemDeploy is Script {
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
         address nitroEnclaveVerifier;
-        AggregateVerifier.ScheduleConfig scheduleConfig;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+        uint256 multiproofMaxUpgradeId;
         ISP1Verifier sp1Verifier;
         address teeProposer;
         address teeChallenger;
@@ -131,9 +131,10 @@ contract SystemDeploy is Script {
         bytes32 zkAggregationHash;
         bytes32 multiproofConfigHash;
         uint256 l2ChainId;
-        AggregateVerifier.ScheduleConfig scheduleConfig;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+        uint256 multiproofMaxUpgradeId;
+        IProtocolVersions protocolVersions;
         uint64 slowFinalizationDelay;
         uint64 fastFinalizationDelay;
     }
@@ -287,8 +288,6 @@ contract SystemDeploy is Script {
         }
 
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
-        AggregateVerifier.ScheduleConfig memory scheduleConfig = implInput.scheduleConfig;
-        scheduleConfig.protocolVersions = IProtocolVersions(artifacts.mustGetAddress("ProtocolVersionsProxy"));
 
         // zkVerifier is the dev sentinel (0xdead); this entrypoint is dev-multiproof only.
         IVerifier aggregateVerifier = _newAggregateVerifier(
@@ -303,9 +302,10 @@ contract SystemDeploy is Script {
                 zkAggregationHash: cfg.zkAggregationHash(),
                 multiproofConfigHash: _multiproofConfigHash,
                 l2ChainId: cfg.l2ChainId(),
-                scheduleConfig: scheduleConfig,
                 multiproofBlockInterval: cfg.multiproofBlockInterval(),
                 multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
+                multiproofMaxUpgradeId: cfg.multiproofMaxUpgradeId(),
+                protocolVersions: IProtocolVersions(artifacts.mustGetAddress("ProtocolVersionsProxy")),
                 slowFinalizationDelay: cfg.slowFinalizationDelay(),
                 fastFinalizationDelay: cfg.fastFinalizationDelay()
             })
@@ -365,9 +365,9 @@ contract SystemDeploy is Script {
             multiproofConfigHash: cfg.multiproofConfigHash(),
             multiproofGameType: cfg.multiproofGameType(),
             nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
-            scheduleConfig: _configuredScheduleConfig(),
             multiproofBlockInterval: cfg.multiproofBlockInterval(),
             multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
+            multiproofMaxUpgradeId: cfg.multiproofMaxUpgradeId(),
             sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
             teeProposer: cfg.teeProposer(),
             teeChallenger: cfg.teeChallenger(),
@@ -376,20 +376,6 @@ contract SystemDeploy is Script {
             incidentResponder: cfg.superchainConfigIncidentResponder(),
             slowFinalizationDelay: cfg.slowFinalizationDelay(),
             fastFinalizationDelay: cfg.fastFinalizationDelay()
-        });
-    }
-
-    function _configuredScheduleConfig() internal view returns (AggregateVerifier.ScheduleConfig memory config_) {
-        uint256 genesisTimestamp = cfg.l2GenesisTimestamp();
-        uint256 blockTime = cfg.l2BlockTime();
-        require(genesisTimestamp <= type(uint64).max, "SystemDeploy: L2 genesis timestamp overflow");
-        require(blockTime <= type(uint64).max, "SystemDeploy: L2 block time overflow");
-
-        config_ = AggregateVerifier.ScheduleConfig({
-            protocolVersions: IProtocolVersions(address(0)),
-            genesisBlockNumber: cfg.l2GenesisBlockNumber(),
-            genesisTimestamp: uint64(genesisTimestamp),
-            blockTime: uint64(blockTime)
         });
     }
 
@@ -1161,8 +1147,13 @@ contract SystemDeploy is Script {
                 IVerifier(address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryProxy)));
         }
 
-        AggregateVerifier.ScheduleConfig memory scheduleConfig = _input.scheduleConfig;
-        scheduleConfig.protocolVersions = _output.protocolVersionsProxy;
+        // Seed unscheduled upgrades through multiproofMaxUpgradeId so the AggregateVerifier
+        // constructor check passes; governance schedules activations later.
+        uint256 registered = _output.protocolVersionsProxy.getSchedule().length;
+        for (uint256 i = registered; i <= _input.multiproofMaxUpgradeId; i++) {
+            vm.broadcast(msg.sender);
+            _output.protocolVersionsProxy.registerUpgrade(0, 0);
+        }
 
         if (_deferAggregateVerifierRegistration(_input)) {
             // The multiproof config_hash commits to the L2 genesis block hash, which is only known
@@ -1183,9 +1174,10 @@ contract SystemDeploy is Script {
                     zkAggregationHash: _input.zkAggregationHash,
                     multiproofConfigHash: _input.multiproofConfigHash,
                     l2ChainId: _opChainInput.l2ChainId,
-                    scheduleConfig: scheduleConfig,
                     multiproofBlockInterval: _input.multiproofBlockInterval,
                     multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval,
+                    multiproofMaxUpgradeId: _input.multiproofMaxUpgradeId,
+                    protocolVersions: _output.protocolVersionsProxy,
                     slowFinalizationDelay: _input.slowFinalizationDelay,
                     fastFinalizationDelay: _input.fastFinalizationDelay
                 })
@@ -1208,7 +1200,9 @@ contract SystemDeploy is Script {
             finalizationDelays: AggregateVerifier.FinalizationDelays(
                 _input.slowFinalizationDelay, _input.fastFinalizationDelay
             ),
-            schedule: _input.scheduleConfig
+            schedule: AggregateVerifier.ScheduleConfig({
+                protocolVersions: _input.protocolVersions, maxUpgradeId: _input.multiproofMaxUpgradeId
+            })
         });
 
         vm.broadcast(msg.sender);
@@ -1285,8 +1279,6 @@ contract SystemDeploy is Script {
     function _assertValidMultiproofInput(ImplementationInput memory _input) internal view {
         require(_input.multiproofConfigHash != bytes32(0), "SystemDeploy: multiproofConfigHash not set");
         require(_input.multiproofGameType != 0, "SystemDeploy: multiproofGameType not set");
-        require(_input.scheduleConfig.blockTime != 0, "SystemDeploy: L2 block time not set");
-        require(_input.scheduleConfig.genesisTimestamp != 0, "SystemDeploy: L2 genesis timestamp not set");
         require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
         require(
             _input.multiproofIntermediateBlockInterval != 0, "SystemDeploy: multiproof intermediate interval not set"
