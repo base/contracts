@@ -221,6 +221,19 @@ contract SuperchainConfig_Extend_Test is SuperchainConfig_TestInit {
         );
         superchainConfig.extend(_identifier);
     }
+
+    /// @notice Tests that `extend` reverts when the pause has already expired.
+    /// @param _identifier The identifier to test.
+    function testFuzz_extend_expiredPause_reverts(address _identifier) external {
+        _pauseAsGuardian(_identifier);
+        vm.warp(block.timestamp + PAUSE_EXPIRY + 1);
+        assertFalse(superchainConfig.paused(_identifier));
+        vm.prank(superchainConfig.guardian());
+        vm.expectRevert(
+            abi.encodeWithSelector(ISuperchainConfig.SuperchainConfig_NotAlreadyPaused.selector, _identifier)
+        );
+        superchainConfig.extend(_identifier);
+    }
 }
 
 /// @title SuperchainConfig_Pausable_Test
