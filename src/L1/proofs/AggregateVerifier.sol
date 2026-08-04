@@ -51,12 +51,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         uint64 fast;
     }
 
-    /// @notice Upgrade registry and L2 timestamp anchor used to pin proof games.
+    /// @notice The ProtocolVersions registry and the highest upgrade id the prover image supports.
     struct ScheduleConfig {
         IProtocolVersions protocolVersions;
-        uint256 genesisBlockNumber;
-        uint64 genesisTimestamp;
-        uint64 blockTime;
+        uint256 maxUpgradeId;
     }
 
     /// @notice Finalization and upgrade schedule configuration for the dispute game.
@@ -114,18 +112,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The chain ID of the L2 network this contract argues about.
     uint256 public immutable L2_CHAIN_ID;
 
-    /// @notice The L2 genesis block number used as the timestamp anchor.
-    uint256 public immutable L2_GENESIS_BLOCK_NUMBER;
-
-    /// @notice The timestamp of the L2 genesis block.
-    uint64 public immutable L2_GENESIS_TIMESTAMP;
-
-    /// @notice The fixed number of seconds between consecutive L2 blocks.
-    /// @dev    This verifier derives L2 timestamps linearly from the configured genesis anchor. If
-    ///         the chain changes block time, deploy a new verifier anchored at the transition block
-    ///         and migrate to that game type for post-transition claims.
-    uint64 public immutable L2_BLOCK_TIME;
-
     /// @notice The block interval between each proposal.
     /// @dev    The parent's block number + BLOCK_INTERVAL = this proposal's block number.
     uint256 public immutable BLOCK_INTERVAL;
@@ -148,6 +134,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The ProtocolVersions upgrade schedule contract.
     IProtocolVersions public immutable PROTOCOL_VERSIONS;
+
+    /// @notice The highest ProtocolVersions upgrade id the prover image supports. Games pin the
+    ///         schedule commitment at this id, so later registrations cannot affect this game type.
+    /// @dev    Governance must retire this game type before an upgrade beyond the pin activates.
+    uint256 public immutable MAX_UPGRADE_ID;
 
     ////////////////////////////////////////////////////////////////
     //                         State Vars                         //
@@ -198,10 +189,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The number of proofs provided.
     uint8 public proofCount;
 
-    /// @notice Commitment to upgrades activated at this game's ending L2 block.
-    /// @dev Pinned once at initialization. The game's ending L2 block deterministically selects
-    ///      the activation cutoff, so every proof for the game commits to the same historical
-    ///      schedule even after newer upgrades are registered or activated.
+    /// @notice The ProtocolVersions schedule commitment through MAX_UPGRADE_ID, pinned at game
+    ///         initialization. Every proof in this game commits to this value.
     bytes32 public scheduleId;
 
     ////////////////////////////////////////////////////////////////
@@ -287,15 +276,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice Thrown when the L1 origin hash doesn't match the actual blockhash.
     error L1OriginHashMismatch(bytes32 claimed, bytes32 actual);
 
-    /// @notice Thrown when the configured L2 block time is zero.
-    error InvalidL2BlockTime();
-
-    /// @notice Thrown when an L2 block precedes the configured genesis block.
-    error L2BlockBeforeGenesis(uint256 blockNumber, uint256 genesisBlockNumber);
-
-    /// @notice Thrown when an L2 block timestamp cannot be represented as a uint64.
-    error L2TimestampOverflow(uint256 blockNumber);
-
     /// @notice Thrown when there are not enough proofs to resolve the game.
     error NotEnoughProofs();
 
@@ -310,7 +290,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param l2ChainId The chain ID of the L2 network.
     /// @param blockInterval The block interval.
     /// @param intermediateBlockInterval The intermediate block interval.
-    /// @param gameConfig Finalization delays, upgrade registry, and deterministic L2 timestamp configuration.
+    /// @param gameConfig Finalization delays, ProtocolVersions registry, and the pinned max upgrade id.
     constructor(
         GameType gameType_,
         IAnchorStateRegistry anchorStateRegistry_,
@@ -329,8 +309,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         if (blockInterval == 0 || intermediateBlockInterval == 0 || blockInterval % intermediateBlockInterval != 0) {
             revert InvalidBlockInterval(blockInterval, intermediateBlockInterval);
         }
-        if (gameConfig.schedule.blockTime == 0) revert InvalidL2BlockTime();
-
         // Set up initial game state.
         GAME_TYPE = gameType_;
         ANCHOR_STATE_REGISTRY = anchorStateRegistry_;
@@ -343,14 +321,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         ZK_AGGREGATE_HASH = zkHashes.aggregateHash;
         CONFIG_HASH = configHash;
         L2_CHAIN_ID = l2ChainId;
-        L2_GENESIS_BLOCK_NUMBER = gameConfig.schedule.genesisBlockNumber;
-        L2_GENESIS_TIMESTAMP = gameConfig.schedule.genesisTimestamp;
-        L2_BLOCK_TIME = gameConfig.schedule.blockTime;
         BLOCK_INTERVAL = blockInterval;
         INTERMEDIATE_BLOCK_INTERVAL = intermediateBlockInterval;
         SLOW_FINALIZATION_DELAY = gameConfig.finalizationDelays.slow;
         FAST_FINALIZATION_DELAY = gameConfig.finalizationDelays.fast;
         PROTOCOL_VERSIONS = gameConfig.schedule.protocolVersions;
+        MAX_UPGRADE_ID = gameConfig.schedule.maxUpgradeId;
+
+        // Reverts if the registry has not yet registered upgrade `maxUpgradeId`.
+        gameConfig.schedule.protocolVersions.scheduleId(gameConfig.schedule.maxUpgradeId);
 
         INITIALIZE_CALLDATA_SIZE = 0x8E + 0x20 * intermediateOutputRootsCount();
     }
@@ -424,20 +403,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // Set the game as initialized.
         initialized = true;
 
-        // L2 timestamps are fixed by the rollup genesis and block time. Pinning the upgrades active
-        // at the ending L2 block makes the schedule independent of both the proof's L1 head and the
-        // L1 block in which this game is created.
-        uint256 claimBlock = l2SequenceNumber();
-        if (claimBlock < L2_GENESIS_BLOCK_NUMBER) {
-            revert L2BlockBeforeGenesis(claimBlock, L2_GENESIS_BLOCK_NUMBER);
-        }
-
-        uint256 blocksSinceGenesis = claimBlock - L2_GENESIS_BLOCK_NUMBER;
-        uint256 maxBlocks = (type(uint64).max - L2_GENESIS_TIMESTAMP) / L2_BLOCK_TIME;
-        if (blocksSinceGenesis > maxBlocks) revert L2TimestampOverflow(claimBlock);
-
-        uint64 claimTimestamp = L2_GENESIS_TIMESTAMP + uint64(blocksSinceGenesis * uint256(L2_BLOCK_TIME));
-        scheduleId = PROTOCOL_VERSIONS.activatedScheduleId(claimTimestamp);
+        // Pin the schedule commitment through MAX_UPGRADE_ID; every proof in this game commits
+        // to it.
+        scheduleId = PROTOCOL_VERSIONS.scheduleId(MAX_UPGRADE_ID);
 
         // Set the game's starting timestamp.
         createdAt = Timestamp.wrap(uint64(block.timestamp));

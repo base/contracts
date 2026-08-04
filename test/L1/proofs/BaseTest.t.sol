@@ -26,9 +26,6 @@ import { MockVerifier } from "test/mocks/MockVerifier.sol";
 
 contract BaseTest is Test {
     uint256 internal constant L2_CHAIN_ID = 8453;
-    uint256 internal constant L2_GENESIS_BLOCK_NUMBER = 0;
-    uint64 internal constant L2_GENESIS_TIMESTAMP = 0;
-    uint64 internal constant L2_BLOCK_TIME = 2;
 
     // AggregateVerifier expects evenly spaced intermediate roots.
     uint256 internal constant BLOCK_INTERVAL = 100;
@@ -39,6 +36,9 @@ contract BaseTest is Test {
     uint256 internal constant DELAYED_WETH_DELAY = 1 days;
     // Finality delay handled by the AggregateVerifier
     uint256 internal constant FINALITY_DELAY = 0 days;
+
+    // The ProtocolVersions upgrade id the AggregateVerifier under test is pinned to.
+    uint256 internal constant MAX_UPGRADE_ID = 2;
 
     uint256 internal currentL2BlockNumber;
 
@@ -113,6 +113,12 @@ contract BaseTest is Test {
         factory.initialize(address(this));
         delayedWETH.initialize(systemConfig);
         protocolVersions.initialize(address(0));
+
+        // Seed unscheduled upgrades through MAX_UPGRADE_ID so the AggregateVerifier constructor
+        // check passes.
+        for (uint256 i = 0; i <= MAX_UPGRADE_ID; i++) {
+            protocolVersions.registerUpgrade(0, 0);
+        }
     }
 
     function _deployAndSetAggregateVerifier() internal {
@@ -131,10 +137,7 @@ contract BaseTest is Test {
             AggregateVerifier.GameConfig({
                 finalizationDelays: AggregateVerifier.FinalizationDelays({ slow: 5 days, fast: 1 days }),
                 schedule: AggregateVerifier.ScheduleConfig({
-                    protocolVersions: IProtocolVersions(address(protocolVersions)),
-                    genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
-                    genesisTimestamp: L2_GENESIS_TIMESTAMP,
-                    blockTime: L2_BLOCK_TIME
+                    protocolVersions: IProtocolVersions(address(protocolVersions)), maxUpgradeId: MAX_UPGRADE_ID
                 })
             })
         );

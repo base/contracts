@@ -219,6 +219,9 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
     function test_create_implArgs_succeeds() public {
         MockVerifier teeVerifier = new MockVerifier(anchorStateRegistry);
         MockVerifier zkVerifier = new MockVerifier(anchorStateRegistry);
+        // The AggregateVerifier constructor requires the pinned upgrade id to be registered.
+        vm.prank(proxyAdminOwner);
+        protocolVersions.registerUpgrade(0, 0);
         AggregateVerifier gameImpl = new AggregateVerifier(
             GameTypes.AGGREGATE_VERIFIER,
             anchorStateRegistry,
@@ -234,7 +237,7 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
             AggregateVerifier.GameConfig({
                 finalizationDelays: AggregateVerifier.FinalizationDelays({ slow: 5 days, fast: 1 days }),
                 schedule: AggregateVerifier.ScheduleConfig({
-                    protocolVersions: protocolVersions, genesisBlockNumber: 0, genesisTimestamp: 0, blockTime: 2
+                    protocolVersions: protocolVersions, maxUpgradeId: protocolVersions.getSchedule().length - 1
                 })
             })
         );

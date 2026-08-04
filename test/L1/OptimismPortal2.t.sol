@@ -80,6 +80,9 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
         respectedGameType = optimismPortal2.respectedGameType();
         MockVerifier teeVerifier = new MockVerifier(anchorStateRegistry);
         MockVerifier zkVerifier = new MockVerifier(anchorStateRegistry);
+        // The AggregateVerifier constructor requires the pinned upgrade id to be registered.
+        vm.prank(proxyAdminOwner);
+        protocolVersions.registerUpgrade(0, 0);
         AggregateVerifier gameImpl = new AggregateVerifier(
             respectedGameType,
             anchorStateRegistry,
@@ -95,7 +98,7 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
             AggregateVerifier.GameConfig({
                 finalizationDelays: AggregateVerifier.FinalizationDelays({ slow: 0, fast: 0 }),
                 schedule: AggregateVerifier.ScheduleConfig({
-                    protocolVersions: protocolVersions, genesisBlockNumber: 0, genesisTimestamp: 1, blockTime: 2
+                    protocolVersions: protocolVersions, maxUpgradeId: protocolVersions.getSchedule().length - 1
                 })
             })
         );

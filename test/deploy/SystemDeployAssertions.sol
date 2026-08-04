@@ -41,11 +41,9 @@ abstract contract SystemDeployAssertions is Test {
         bytes32 zkAggregationHash;
         bytes32 multiproofConfigHash;
         uint256 l2ChainId;
-        uint256 l2GenesisBlockNumber;
-        uint64 l2GenesisTimestamp;
-        uint64 l2BlockTime;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+        uint256 multiproofMaxUpgradeId;
         uint256 withdrawalDelaySeconds;
     }
 
@@ -254,13 +252,11 @@ abstract contract SystemDeployAssertions is Test {
         assertEq(_aggregateVerifier.ZK_AGGREGATE_HASH(), _expected.zkAggregationHash, "AV-110");
         assertEq(_aggregateVerifier.CONFIG_HASH(), _expected.multiproofConfigHash, "AV-120");
         assertEq(_aggregateVerifier.L2_CHAIN_ID(), _expected.l2ChainId, "AV-130");
-        assertEq(_aggregateVerifier.L2_GENESIS_BLOCK_NUMBER(), _expected.l2GenesisBlockNumber, "AV-132");
-        assertEq(_aggregateVerifier.L2_GENESIS_TIMESTAMP(), _expected.l2GenesisTimestamp, "AV-134");
-        assertEq(_aggregateVerifier.L2_BLOCK_TIME(), _expected.l2BlockTime, "AV-136");
         assertEq(_aggregateVerifier.BLOCK_INTERVAL(), _expected.multiproofBlockInterval, "AV-140");
         assertEq(
             _aggregateVerifier.INTERMEDIATE_BLOCK_INTERVAL(), _expected.multiproofIntermediateBlockInterval, "AV-150"
         );
+        assertEq(_aggregateVerifier.MAX_UPGRADE_ID(), _expected.multiproofMaxUpgradeId, "AV-160");
     }
 
     function _assertDelayedWETH(
