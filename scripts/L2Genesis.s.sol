@@ -275,10 +275,20 @@ contract L2Genesis is Script {
     }
 
     /// @notice This predeploy is following the safety invariant #1.
-    ///         This contract is NOT proxied and the state that is set
-    ///         in the constructor is set manually.
+    ///         This contract is NOT proxied.
+    ///         The WETH contract (src/L2/WETH.sol) has no constructor side effects:
+    ///          - `name()` and `symbol()` are `pure` functions that read from the
+    ///            L1Block predeploy, not from storage.
+    ///          - `decimals` is a `constant` (no storage slot).
+    ///          - `_balanceOf` (slot 0) and `_allowance` (slot 1) are mappings
+    ///            that correctly start empty.
+    ///         We explicitly zero both storage slots after `vm.etch` for clarity,
+    ///         even though the EVM zero-initializes all storage after `vm.etch`.
     function setWETH() internal {
         vm.etch(Predeploys.WETH, vm.getDeployedCode("WETH.sol:WETH"));
+        // Explicitly zero-initialize storage slots for audit clarity:
+        vm.store(Predeploys.WETH, bytes32(uint256(0)), bytes32(0)); // _balanceOf (slot 0)
+        vm.store(Predeploys.WETH, bytes32(uint256(1)), bytes32(0)); // _allowance (slot 1)
     }
 
     /// @notice This predeploy is following the safety invariant #2.
