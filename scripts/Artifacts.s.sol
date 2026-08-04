@@ -48,6 +48,7 @@ contract Artifacts {
         _predeploys[keccak256("OperatorFeeVault")] = payable(Predeploys.OPERATOR_FEE_VAULT);
         _predeploys[keccak256("SchemaRegistry")] = payable(Predeploys.SCHEMA_REGISTRY);
         _predeploys[keccak256("EAS")] = payable(Predeploys.EAS);
+        _predeploys[keccak256("BaseTime")] = payable(Predeploys.BASE_TIME);
     }
 
     /// @notice Loads previously-saved deployments from the outfile back into memory.

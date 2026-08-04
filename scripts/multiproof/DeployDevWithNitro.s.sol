@@ -42,6 +42,7 @@ contract DeployDevWithNitro is DeployDevBase {
     }
 
     function _preflight() internal override {
+        super._preflight();
         nitroEnclaveVerifierAddr = cfg.nitroEnclaveVerifier();
         require(
             nitroEnclaveVerifierAddr != address(0),

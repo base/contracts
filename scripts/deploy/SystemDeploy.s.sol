@@ -12,11 +12,11 @@ import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 import { StateDiff } from "scripts/libraries/StateDiff.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
-import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
@@ -79,6 +79,7 @@ contract SystemDeploy is Script {
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
         address nitroEnclaveVerifier;
+        AggregateVerifier.ScheduleConfig scheduleConfig;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
         ISP1Verifier sp1Verifier;
@@ -111,6 +112,7 @@ contract SystemDeploy is Script {
         ISuperchainConfig superchainConfigProxy;
         Types.Implementations implementations;
         ISystemConfig systemConfigProxy;
+        IProtocolVersions protocolVersionsProxy;
     }
 
     struct UpgradeOutput {
@@ -129,6 +131,7 @@ contract SystemDeploy is Script {
         bytes32 zkAggregationHash;
         bytes32 multiproofConfigHash;
         uint256 l2ChainId;
+        AggregateVerifier.ScheduleConfig scheduleConfig;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
         uint64 slowFinalizationDelay;
@@ -216,7 +219,6 @@ contract SystemDeploy is Script {
             superchainConfigImpl: artifacts.mustGetAddress("SuperchainConfigImpl"),
             l1ERC721BridgeImpl: artifacts.mustGetAddress("L1ERC721BridgeImpl"),
             optimismPortalImpl: artifacts.mustGetAddress("OptimismPortalImpl"),
-            ethLockboxImpl: artifacts.mustGetAddress("ETHLockboxImpl"),
             systemConfigImpl: artifacts.mustGetAddress("SystemConfigImpl"),
             optimismMintableERC20FactoryImpl: artifacts.mustGetAddress("OptimismMintableERC20FactoryImpl"),
             l1CrossDomainMessengerImpl: artifacts.mustGetAddress("L1CrossDomainMessengerImpl"),
@@ -224,6 +226,7 @@ contract SystemDeploy is Script {
             disputeGameFactoryImpl: artifacts.mustGetAddress("DisputeGameFactoryImpl"),
             anchorStateRegistryImpl: artifacts.mustGetAddress("AnchorStateRegistryImpl"),
             delayedWETHImpl: artifacts.mustGetAddress("DelayedWETHImpl"),
+            protocolVersionsImpl: artifacts.mustGetAddress("ProtocolVersionsImpl"),
             aggregateVerifierImpl: artifacts.getAddress("AggregateVerifier"),
             teeProverRegistryImpl: artifacts.getAddress("TEEProverRegistryImpl"),
             teeVerifierImpl: artifacts.getAddress("TEEVerifier"),
@@ -284,6 +287,8 @@ contract SystemDeploy is Script {
         }
 
         GameType gameType = GameType.wrap(uint32(cfg.multiproofGameType()));
+        AggregateVerifier.ScheduleConfig memory scheduleConfig = implInput.scheduleConfig;
+        scheduleConfig.protocolVersions = IProtocolVersions(artifacts.mustGetAddress("ProtocolVersionsProxy"));
 
         // zkVerifier is the dev sentinel (0xdead); this entrypoint is dev-multiproof only.
         IVerifier aggregateVerifier = _newAggregateVerifier(
@@ -298,6 +303,7 @@ contract SystemDeploy is Script {
                 zkAggregationHash: cfg.zkAggregationHash(),
                 multiproofConfigHash: _multiproofConfigHash,
                 l2ChainId: cfg.l2ChainId(),
+                scheduleConfig: scheduleConfig,
                 multiproofBlockInterval: cfg.multiproofBlockInterval(),
                 multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
                 slowFinalizationDelay: cfg.slowFinalizationDelay(),
@@ -359,6 +365,7 @@ contract SystemDeploy is Script {
             multiproofConfigHash: cfg.multiproofConfigHash(),
             multiproofGameType: cfg.multiproofGameType(),
             nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
+            scheduleConfig: _configuredScheduleConfig(),
             multiproofBlockInterval: cfg.multiproofBlockInterval(),
             multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
             sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
@@ -372,13 +379,28 @@ contract SystemDeploy is Script {
         });
     }
 
+    function _configuredScheduleConfig() internal view returns (AggregateVerifier.ScheduleConfig memory config_) {
+        uint256 genesisTimestamp = cfg.l2GenesisTimestamp();
+        uint256 blockTime = cfg.l2BlockTime();
+        require(genesisTimestamp <= type(uint64).max, "SystemDeploy: L2 genesis timestamp overflow");
+        require(blockTime <= type(uint64).max, "SystemDeploy: L2 block time overflow");
+
+        config_ = AggregateVerifier.ScheduleConfig({
+            protocolVersions: IProtocolVersions(address(0)),
+            genesisBlockNumber: cfg.l2GenesisBlockNumber(),
+            genesisTimestamp: uint64(genesisTimestamp),
+            blockTime: uint64(blockTime)
+        });
+    }
+
     function _configuredOPChainInput() internal view returns (Types.DeployInput memory input_) {
         input_ = Types.DeployInput({
             roles: Types.Roles({
                 opChainProxyAdminOwner: cfg.finalSystemOwner(),
                 systemConfigOwner: cfg.finalSystemOwner(),
                 batcher: cfg.batchSenderAddress(),
-                unsafeBlockSigner: cfg.p2pSequencerAddress()
+                unsafeBlockSigner: cfg.p2pSequencerAddress(),
+                incidentResponder: cfg.superchainConfigIncidentResponder()
             }),
             basefeeScalar: cfg.basefeeScalar(),
             blobBasefeeScalar: cfg.blobbasefeeScalar(),
@@ -435,7 +457,12 @@ contract SystemDeploy is Script {
                 revert SuperchainConfigNeedsUpgrade();
             }
 
-            _upgradeOPChain(systemConfigProxy, _input.implementations);
+            IProtocolVersions protocolVersionsProxy = _input.protocolVersionsProxy;
+            if (address(protocolVersionsProxy) == address(0) && address(artifacts).code.length != 0) {
+                protocolVersionsProxy = IProtocolVersions(artifacts.getAddress("ProtocolVersionsProxy"));
+            }
+
+            _upgradeOPChain(systemConfigProxy, _input.implementations, protocolVersionsProxy);
             output_.chainUpgraded = true;
         }
 
@@ -542,10 +569,10 @@ contract SystemDeploy is Script {
         output_.l1StandardBridgeImpl = address(_deployL1StandardBridgeImpl());
         output_.optimismMintableERC20FactoryImpl = address(_deployOptimismMintableERC20FactoryImpl());
         output_.optimismPortalImpl = address(_deployOptimismPortalImpl(_input));
-        output_.ethLockboxImpl = address(_deployETHLockboxImpl());
         output_.delayedWETHImpl = address(_deployDelayedWETHImpl(_input));
         output_.disputeGameFactoryImpl = address(_deployDisputeGameFactoryImpl());
         output_.anchorStateRegistryImpl = address(_deployAnchorStateRegistryImpl(_input));
+        output_.protocolVersionsImpl = address(_deployProtocolVersionsImpl());
     }
 
     function _deployOPChain(
@@ -576,7 +603,6 @@ contract SystemDeploy is Script {
         output_.l1ERC721BridgeProxy = IL1ERC721Bridge(_deployProxy(_input, output_.opChainProxyAdmin, "L1ERC721Bridge"));
         output_.optimismPortalProxy =
             IOptimismPortal(payable(_deployProxy(_input, output_.opChainProxyAdmin, "OptimismPortal")));
-        output_.ethLockboxProxy = IETHLockbox(_deployProxy(_input, output_.opChainProxyAdmin, "ETHLockbox"));
         output_.systemConfigProxy = ISystemConfig(_deployProxy(_input, output_.opChainProxyAdmin, "SystemConfig"));
         output_.optimismMintableERC20FactoryProxy = IOptimismMintableERC20Factory(
             _deployProxy(_input, output_.opChainProxyAdmin, "OptimismMintableERC20Factory")
@@ -586,6 +612,8 @@ contract SystemDeploy is Script {
         output_.anchorStateRegistryProxy =
             IAnchorStateRegistry(_deployProxy(_input, output_.opChainProxyAdmin, "AnchorStateRegistry"));
         output_.delayedWETHProxy = IDelayedWETH(payable(_deployProxy(_input, output_.opChainProxyAdmin, "DelayedWETH")));
+        output_.protocolVersionsProxy =
+            IProtocolVersions(_deployProxy(_input, output_.opChainProxyAdmin, "ProtocolVersions"));
 
         output_.l1StandardBridgeProxy = IL1StandardBridge(
             payable(_createDeterministic(
@@ -674,15 +702,6 @@ contract SystemDeploy is Script {
             abi.encodeCall(IOptimismPortal.initialize, (_output.systemConfigProxy, _output.anchorStateRegistryProxy))
         );
 
-        IOptimismPortal[] memory portals = new IOptimismPortal[](1);
-        portals[0] = _output.optimismPortalProxy;
-        _upgradeToAndCall(
-            _output.opChainProxyAdmin,
-            address(_output.ethLockboxProxy),
-            _impls.ethLockboxImpl,
-            abi.encodeCall(IETHLockbox.initialize, (_output.systemConfigProxy, portals))
-        );
-
         _upgradeToAndCall(
             _output.opChainProxyAdmin,
             address(_output.optimismMintableERC20FactoryProxy),
@@ -730,6 +749,13 @@ contract SystemDeploy is Script {
                 _encodeAnchorStateRegistryInitializer(_input, _output)
             );
         }
+
+        _upgradeToAndCall(
+            _output.opChainProxyAdmin,
+            address(_output.protocolVersionsProxy),
+            _impls.protocolVersionsImpl,
+            abi.encodeCall(IProtocolVersions.initialize, (_input.roles.incidentResponder))
+        );
     }
 
     function _upgradeSuperchainConfigIfNeeded(
@@ -748,7 +774,13 @@ contract SystemDeploy is Script {
         upgraded_ = true;
     }
 
-    function _upgradeOPChain(ISystemConfig _systemConfigProxy, Types.Implementations memory _impls) internal {
+    function _upgradeOPChain(
+        ISystemConfig _systemConfigProxy,
+        Types.Implementations memory _impls,
+        IProtocolVersions _protocolVersionsProxy
+    )
+        internal
+    {
         IProxyAdmin proxyAdmin = _systemConfigProxy.proxyAdmin();
         uint256 l2ChainId = _systemConfigProxy.l2ChainId();
 
@@ -771,6 +803,10 @@ contract SystemDeploy is Script {
         _upgradeTo(proxyAdmin, opChainAddrs.l1ERC721Bridge, _impls.l1ERC721BridgeImpl);
         if (opChainAddrs.delayedWETH != address(0)) {
             _upgradeTo(proxyAdmin, opChainAddrs.delayedWETH, _impls.delayedWETHImpl);
+        }
+
+        if (address(_protocolVersionsProxy) != address(0)) {
+            _upgradeTo(proxyAdmin, address(_protocolVersionsProxy), _impls.protocolVersionsImpl);
         }
 
         emit Upgraded(l2ChainId, _systemConfigProxy, msg.sender);
@@ -1014,16 +1050,6 @@ contract SystemDeploy is Script {
         );
     }
 
-    function _deployETHLockboxImpl() internal returns (IETHLockbox) {
-        return IETHLockbox(
-            DeployUtils.createDeterministic({
-                _name: "ETHLockbox",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IETHLockbox.__constructor__, ())),
-                _salt: DeployUtils.DEFAULT_SALT
-            })
-        );
-    }
-
     function _deployDelayedWETHImpl(ImplementationInput memory _input) internal returns (IDelayedWETH) {
         return IDelayedWETH(
             DeployUtils.createDeterministic({
@@ -1053,6 +1079,16 @@ contract SystemDeploy is Script {
                 _args: DeployUtils.encodeConstructor(
                     abi.encodeCall(IAnchorStateRegistry.__constructor__, (_input.disputeGameFinalityDelaySeconds))
                 ),
+                _salt: DeployUtils.DEFAULT_SALT
+            })
+        );
+    }
+
+    function _deployProtocolVersionsImpl() internal returns (IProtocolVersions) {
+        return IProtocolVersions(
+            DeployUtils.createDeterministic({
+                _name: "ProtocolVersions",
+                _args: DeployUtils.encodeConstructor(abi.encodeCall(IProtocolVersions.__constructor__, ())),
                 _salt: DeployUtils.DEFAULT_SALT
             })
         );
@@ -1125,6 +1161,9 @@ contract SystemDeploy is Script {
                 IVerifier(address(new ZKVerifier(_input.sp1Verifier, _output.anchorStateRegistryProxy)));
         }
 
+        AggregateVerifier.ScheduleConfig memory scheduleConfig = _input.scheduleConfig;
+        scheduleConfig.protocolVersions = _output.protocolVersionsProxy;
+
         if (_deferAggregateVerifierRegistration(_input)) {
             // The multiproof config_hash commits to the L2 genesis block hash, which is only known
             // after the L2 execution client initializes from the generated genesis. Defer
@@ -1144,6 +1183,7 @@ contract SystemDeploy is Script {
                     zkAggregationHash: _input.zkAggregationHash,
                     multiproofConfigHash: _input.multiproofConfigHash,
                     l2ChainId: _opChainInput.l2ChainId,
+                    scheduleConfig: scheduleConfig,
                     multiproofBlockInterval: _input.multiproofBlockInterval,
                     multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval,
                     slowFinalizationDelay: _input.slowFinalizationDelay,
@@ -1164,6 +1204,13 @@ contract SystemDeploy is Script {
     }
 
     function _newAggregateVerifier(AggregateVerifierInput memory _input) internal returns (IVerifier) {
+        AggregateVerifier.GameConfig memory gameConfig = AggregateVerifier.GameConfig({
+            finalizationDelays: AggregateVerifier.FinalizationDelays(
+                _input.slowFinalizationDelay, _input.fastFinalizationDelay
+            ),
+            schedule: _input.scheduleConfig
+        });
+
         vm.broadcast(msg.sender);
         return IVerifier(
             address(
@@ -1179,7 +1226,7 @@ contract SystemDeploy is Script {
                     _input.l2ChainId,
                     _input.multiproofBlockInterval,
                     _input.multiproofIntermediateBlockInterval,
-                    AggregateVerifier.FinalizationDelays(_input.slowFinalizationDelay, _input.fastFinalizationDelay)
+                    gameConfig
                 )
             )
         );
@@ -1238,6 +1285,8 @@ contract SystemDeploy is Script {
     function _assertValidMultiproofInput(ImplementationInput memory _input) internal view {
         require(_input.multiproofConfigHash != bytes32(0), "SystemDeploy: multiproofConfigHash not set");
         require(_input.multiproofGameType != 0, "SystemDeploy: multiproofGameType not set");
+        require(_input.scheduleConfig.blockTime != 0, "SystemDeploy: L2 block time not set");
+        require(_input.scheduleConfig.genesisTimestamp != 0, "SystemDeploy: L2 genesis timestamp not set");
         require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
         require(
             _input.multiproofIntermediateBlockInterval != 0, "SystemDeploy: multiproof intermediate interval not set"
@@ -1272,7 +1321,6 @@ contract SystemDeploy is Script {
         DeployUtils.assertValidContractAddress(_impls.superchainConfigImpl);
         DeployUtils.assertValidContractAddress(_impls.l1ERC721BridgeImpl);
         DeployUtils.assertValidContractAddress(_impls.optimismPortalImpl);
-        DeployUtils.assertValidContractAddress(_impls.ethLockboxImpl);
         DeployUtils.assertValidContractAddress(_impls.systemConfigImpl);
         DeployUtils.assertValidContractAddress(_impls.optimismMintableERC20FactoryImpl);
         DeployUtils.assertValidContractAddress(_impls.l1CrossDomainMessengerImpl);
@@ -1280,6 +1328,7 @@ contract SystemDeploy is Script {
         DeployUtils.assertValidContractAddress(_impls.disputeGameFactoryImpl);
         DeployUtils.assertValidContractAddress(_impls.anchorStateRegistryImpl);
         DeployUtils.assertValidContractAddress(_impls.delayedWETHImpl);
+        DeployUtils.assertValidContractAddress(_impls.protocolVersionsImpl);
     }
 
     function _implementationsEmpty(Types.Implementations memory _impls) internal pure returns (bool) {
@@ -1301,10 +1350,10 @@ contract SystemDeploy is Script {
         artifacts.save("OptimismMintableERC20FactoryProxy", address(chain.optimismMintableERC20FactoryProxy));
         artifacts.save("L1StandardBridgeProxy", address(chain.l1StandardBridgeProxy));
         artifacts.save("L1CrossDomainMessengerProxy", address(chain.l1CrossDomainMessengerProxy));
-        artifacts.save("ETHLockboxProxy", address(chain.ethLockboxProxy));
         artifacts.save("DisputeGameFactoryProxy", address(chain.disputeGameFactoryProxy));
         artifacts.save("DelayedWETHProxy", address(chain.delayedWETHProxy));
         artifacts.save("AnchorStateRegistryProxy", address(chain.anchorStateRegistryProxy));
+        artifacts.save("ProtocolVersionsProxy", address(chain.protocolVersionsProxy));
         artifacts.save("OptimismPortalProxy", address(chain.optimismPortalProxy));
         artifacts.save("OptimismPortal2Proxy", address(chain.optimismPortalProxy));
         _saveIfSet("TEEProverRegistryProxy", address(chain.teeProverRegistryProxy));
@@ -1323,7 +1372,6 @@ contract SystemDeploy is Script {
         artifacts.save("SuperchainConfigImpl", _impls.superchainConfigImpl);
         artifacts.save("L1ERC721BridgeImpl", _impls.l1ERC721BridgeImpl);
         artifacts.save("OptimismPortalImpl", _impls.optimismPortalImpl);
-        artifacts.save("ETHLockboxImpl", _impls.ethLockboxImpl);
         artifacts.save("SystemConfigImpl", _impls.systemConfigImpl);
         artifacts.save("OptimismMintableERC20FactoryImpl", _impls.optimismMintableERC20FactoryImpl);
         artifacts.save("L1CrossDomainMessengerImpl", _impls.l1CrossDomainMessengerImpl);
@@ -1331,6 +1379,7 @@ contract SystemDeploy is Script {
         artifacts.save("DisputeGameFactoryImpl", _impls.disputeGameFactoryImpl);
         artifacts.save("AnchorStateRegistryImpl", _impls.anchorStateRegistryImpl);
         artifacts.save("DelayedWETHImpl", _impls.delayedWETHImpl);
+        artifacts.save("ProtocolVersionsImpl", _impls.protocolVersionsImpl);
         _saveIfSet("AggregateVerifier", _impls.aggregateVerifierImpl);
         _saveIfSet("TEEProverRegistryImpl", _impls.teeProverRegistryImpl);
         _saveIfSet("TEEVerifier", _impls.teeVerifierImpl);

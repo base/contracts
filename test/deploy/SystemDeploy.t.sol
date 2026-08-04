@@ -14,6 +14,8 @@ import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
+import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
@@ -138,8 +140,13 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertNotEq(address(output.opChain.opChainProxyAdmin), address(0), "proxy admin");
         assertNotEq(address(output.opChain.systemConfigProxy), address(0), "system config");
         assertNotEq(address(output.opChain.optimismPortalProxy), address(0), "portal");
-        assertNotEq(address(output.opChain.ethLockboxProxy), address(0), "lockbox");
         assertNotEq(address(output.opChain.delayedWETHProxy), address(0), "delayed weth");
+        assertNotEq(address(output.opChain.protocolVersionsProxy), address(0), "protocol versions");
+        assertEq(
+            output.opChain.protocolVersionsProxy.incidentResponder(),
+            incidentResponder,
+            "protocol versions incident responder"
+        );
 
         assertEq(output.opChain.opChainProxyAdmin.owner(), owner, "op chain proxy admin owner");
         assertEq(output.opChain.systemConfigProxy.batchInbox(), Types.chainIdToBatchInboxAddress(l2ChainId), "inbox");
@@ -152,16 +159,43 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertValidStandardSystem(_expected(output, input));
     }
 
+    function test_deploy_multiproofDisabled_allowsUnsetL2BlockTime_succeeds() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.implementationsInput.multiproofConfigHash = bytes32(0);
+        input.implementationsInput.scheduleConfig = AggregateVerifier.ScheduleConfig({
+            protocolVersions: IProtocolVersions(address(0)), genesisBlockNumber: 0, genesisTimestamp: 0, blockTime: 0
+        });
+
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+
+        assertNotEq(address(output.opChain.protocolVersionsProxy), address(0), "protocol versions");
+        assertEq(address(output.opChain.aggregateVerifier), address(0), "aggregate verifier");
+        assertEq(address(output.opChain.teeProverRegistryProxy), address(0), "tee registry");
+        assertEq(output.impls.aggregateVerifierImpl, address(0), "aggregate verifier impl");
+    }
+
+    function test_deploy_multiproofEnabled_withoutL2GenesisTimestamp_reverts() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.implementationsInput.scheduleConfig.genesisTimestamp = 0;
+
+        vm.expectRevert("SystemDeploy: L2 genesis timestamp not set");
+        systemDeploy.deploy(input);
+    }
+
     function test_upgrade_withoutManagerDelegatecall_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+        Types.Implementations memory implementations = output.impls;
+        ProtocolVersions protocolVersionsImpl = new ProtocolVersions();
+        implementations.protocolVersionsImpl = address(protocolVersionsImpl);
 
         SystemDeploy.UpgradeOutput memory upgradeOutput = systemDeploy.upgrade(
             SystemDeploy.UpgradeInput({
                 saveArtifacts: false,
                 superchainConfigProxy: output.superchain.superchainConfigProxy,
-                implementations: output.impls,
-                systemConfigProxy: output.opChain.systemConfigProxy
+                implementations: implementations,
+                systemConfigProxy: output.opChain.systemConfigProxy,
+                protocolVersionsProxy: output.opChain.protocolVersionsProxy
             })
         );
 
@@ -173,7 +207,40 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             output.impls.superchainConfigImpl,
             "superchain config impl"
         );
+        assertEq(
+            output.opChain.opChainProxyAdmin.getProxyImplementation(address(output.opChain.protocolVersionsProxy)),
+            address(protocolVersionsImpl),
+            "protocol versions impl"
+        );
         assertValidStandardSystem(_expected(output, input));
+    }
+
+    function test_upgrade_discoversProtocolVersionsProxyFromArtifacts_succeeds() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+        Types.Implementations memory implementations = output.impls;
+        ProtocolVersions protocolVersionsImpl = new ProtocolVersions();
+        implementations.protocolVersionsImpl = address(protocolVersionsImpl);
+
+        _saveArtifact("ProtocolVersionsProxy", address(output.opChain.protocolVersionsProxy));
+
+        SystemDeploy.UpgradeOutput memory upgradeOutput = systemDeploy.upgrade(
+            SystemDeploy.UpgradeInput({
+                saveArtifacts: false,
+                superchainConfigProxy: output.superchain.superchainConfigProxy,
+                implementations: implementations,
+                systemConfigProxy: output.opChain.systemConfigProxy,
+                protocolVersionsProxy: IProtocolVersions(address(0))
+            })
+        );
+
+        assertFalse(upgradeOutput.superchainConfigUpgraded, "superchain already current");
+        assertTrue(upgradeOutput.chainUpgraded, "chain upgraded");
+        assertEq(
+            output.opChain.opChainProxyAdmin.getProxyImplementation(address(output.opChain.protocolVersionsProxy)),
+            address(protocolVersionsImpl),
+            "protocol versions impl"
+        );
     }
 
     function test_deploy_reusingImplementations_doesNotSaveZeroImplementationOnlyArtifacts() public {
@@ -328,6 +395,12 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             multiproofConfigHash: bytes32(uint256(4)),
             multiproofGameType: 621,
             nitroEnclaveVerifier: address(nitroEnclaveVerifier),
+            scheduleConfig: AggregateVerifier.ScheduleConfig({
+                protocolVersions: IProtocolVersions(address(0)),
+                genesisBlockNumber: 0,
+                genesisTimestamp: 1,
+                blockTime: 2
+            }),
             multiproofBlockInterval: 100,
             multiproofIntermediateBlockInterval: 10,
             sp1Verifier: ISP1Verifier(address(sp1Verifier)),
@@ -344,7 +417,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
                 opChainProxyAdminOwner: owner,
                 systemConfigOwner: owner,
                 batcher: batcher,
-                unsafeBlockSigner: unsafeBlockSigner
+                unsafeBlockSigner: unsafeBlockSigner,
+                incidentResponder: incidentResponder
             }),
             basefeeScalar: 100,
             blobBasefeeScalar: 200,
@@ -418,6 +492,13 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         }
     }
 
+    function _saveArtifact(string memory _name, address _addr) internal {
+        vm.etch(address(artifacts), vm.getDeployedCode("Artifacts.s.sol:Artifacts"));
+        bytes32 slot = keccak256(abi.encodePacked(_name, uint256(0)));
+        vm.store(address(artifacts), slot, bytes32(uint256(uint160(_addr))));
+        assertEq(artifacts.getAddress(_name), _addr, "artifact saved");
+    }
+
     function _expected(
         SystemDeploy.DeployOutput memory _output,
         SystemDeploy.DeployInput memory _input
@@ -432,7 +513,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             superchainConfig: _output.superchain.superchainConfigProxy,
             implementations: _output.impls,
             delayedWETH: _output.opChain.delayedWETHProxy,
-            ethLockbox: _output.opChain.ethLockboxProxy,
             proxyAdminOwner: _input.opChainInput.roles.opChainProxyAdminOwner,
             multiproofGameType: GameType.wrap(uint32(_input.implementationsInput.multiproofGameType)),
             teeImageHash: _input.implementationsInput.teeImageHash,
@@ -440,6 +520,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             zkAggregationHash: _input.implementationsInput.zkAggregationHash,
             multiproofConfigHash: _input.implementationsInput.multiproofConfigHash,
             l2ChainId: _input.opChainInput.l2ChainId,
+            l2GenesisBlockNumber: _input.implementationsInput.scheduleConfig.genesisBlockNumber,
+            l2GenesisTimestamp: _input.implementationsInput.scheduleConfig.genesisTimestamp,
+            l2BlockTime: _input.implementationsInput.scheduleConfig.blockTime,
             multiproofBlockInterval: _input.implementationsInput.multiproofBlockInterval,
             multiproofIntermediateBlockInterval: _input.implementationsInput.multiproofIntermediateBlockInterval,
             withdrawalDelaySeconds: _input.implementationsInput.withdrawalDelaySeconds
@@ -574,7 +657,8 @@ contract ZKBricking_Test is Test {
                 endingL2SeqNum,
                 intermediateRoots,
                 input.implementationsInput.multiproofConfigHash,
-                input.implementationsInput.teeImageHash
+                input.implementationsInput.teeImageHash,
+                _scheduleId(endingL2SeqNum)
             )
         );
 
@@ -582,6 +666,13 @@ contract ZKBricking_Test is Test {
         bytes memory signature = abi.encodePacked(r, s, v);
 
         return abi.encodePacked(uint8(AggregateVerifier.ProofType.TEE), l1OriginHash, l1OriginNumber, signature);
+    }
+
+    function _scheduleId(uint64 endingL2SeqNum) internal view returns (bytes32) {
+        AggregateVerifier.ScheduleConfig memory scheduleConfig = input.implementationsInput.scheduleConfig;
+        uint64 endingL2Timestamp = scheduleConfig.genesisTimestamp
+            + uint64((uint256(endingL2SeqNum) - scheduleConfig.genesisBlockNumber) * uint256(scheduleConfig.blockTime));
+        return output.opChain.protocolVersionsProxy.activatedScheduleId(endingL2Timestamp);
     }
 
     function _extractIntermediateRoots(bytes memory extraData) internal pure returns (bytes memory) {
@@ -652,6 +743,12 @@ contract ZKBricking_Test is Test {
             multiproofConfigHash: bytes32(uint256(4)),
             multiproofGameType: 621,
             nitroEnclaveVerifier: address(0),
+            scheduleConfig: AggregateVerifier.ScheduleConfig({
+                protocolVersions: IProtocolVersions(address(0)),
+                genesisBlockNumber: 0,
+                genesisTimestamp: 1,
+                blockTime: 2
+            }),
             multiproofBlockInterval: BLOCK_INTERVAL,
             multiproofIntermediateBlockInterval: INTERMEDIATE_BLOCK_INTERVAL,
             sp1Verifier: ISP1Verifier(address(0)),
@@ -668,7 +765,8 @@ contract ZKBricking_Test is Test {
                 opChainProxyAdminOwner: owner,
                 systemConfigOwner: owner,
                 batcher: makeAddr("batcher"),
-                unsafeBlockSigner: makeAddr("unsafeBlockSigner")
+                unsafeBlockSigner: makeAddr("unsafeBlockSigner"),
+                incidentResponder: incidentResponder
             }),
             basefeeScalar: 100,
             blobBasefeeScalar: 200,

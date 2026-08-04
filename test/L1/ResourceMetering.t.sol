@@ -72,6 +72,9 @@ abstract contract ResourceMetering_TestInit is Test {
 /// @dev Tests are based on the default config values. It is expected that these config values are
 ///      used in production.
 contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
+    /// @dev Gas overhead from the metering logic and `measuredUse` wrapper, excluding the burn loop.
+    uint256 internal constant METERING_GAS_OVERHEAD = 1000;
+
     /// @notice Tests that updating the resource params to the same values works correctly.
     function test_metered_updateParamsNoChange_succeeds() external {
         meter.use(0); // equivalent to just updating the base fee and block number
@@ -188,6 +191,42 @@ contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
         (uint128 prevBaseFee, uint64 prevBoughtGas,) = meter.params();
         assertEq(prevBoughtGas, target / 2);
         assertGt(prevBaseFee, 0);
+    }
+
+    /// @notice Tests that deposits are charged the full resource cost when L1 base fee is below
+    ///         1 gwei but above the 0.01 gwei floor.
+    function test_metered_subGweiBaseFee_collectsFullResourceCost_succeeds() external {
+        uint64 amount = 100_000;
+        uint128 prevBaseFee = 1 gwei;
+        uint256 l1BaseFee = 0.1 gwei;
+        uint256 resourceCost = uint256(amount) * uint256(prevBaseFee);
+        uint256 expectedGasCost = resourceCost / l1BaseFee;
+
+        meter.set(prevBaseFee, 0, uint64(block.number));
+        vm.fee(l1BaseFee);
+
+        uint256 gasConsumed = meter.measuredUse(amount);
+
+        assertApproxEqAbs(gasConsumed, expectedGasCost, METERING_GAS_OVERHEAD);
+        assertApproxEqAbs(gasConsumed * l1BaseFee, resourceCost, METERING_GAS_OVERHEAD * l1BaseFee);
+    }
+
+    /// @notice Tests that the 0.01 gwei floor is applied when L1 base fee falls below it.
+    function test_metered_belowFloorBaseFee_usesFloor_succeeds() external {
+        uint64 amount = 100_000;
+        uint128 prevBaseFee = 1 gwei;
+        uint256 l1BaseFee = 0.005 gwei;
+        uint256 floor = 0.01 gwei;
+        uint256 resourceCost = uint256(amount) * uint256(prevBaseFee);
+        uint256 expectedGasCost = resourceCost / floor;
+
+        meter.set(prevBaseFee, 0, uint64(block.number));
+        vm.fee(l1BaseFee);
+
+        uint256 gasConsumed = meter.measuredUse(amount);
+
+        assertApproxEqAbs(gasConsumed, expectedGasCost, METERING_GAS_OVERHEAD);
+        assertApproxEqAbs(gasConsumed * l1BaseFee, resourceCost / 2, METERING_GAS_OVERHEAD * l1BaseFee);
     }
 
     /// @notice Tests that base fee decreases when gas usage is below target.

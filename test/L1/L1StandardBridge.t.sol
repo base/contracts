@@ -25,20 +25,8 @@ import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 /// @title L1StandardBridge_TestInit
 /// @notice Reusable test initialization for `L1StandardBridge` tests.
 abstract contract L1StandardBridge_TestInit is CommonTest {
-    function _assertETHBridgeCustody(
-        uint256 _portalBalanceBefore,
-        uint256 _ethLockboxBalanceBefore,
-        uint256 _amount
-    )
-        internal
-        view
-    {
-        if (isSysFeatureEnabled(Features.ETH_LOCKBOX)) {
-            assertEq(address(optimismPortal2).balance, _portalBalanceBefore);
-            assertEq(address(ethLockbox).balance, _ethLockboxBalanceBefore + _amount);
-        } else {
-            assertEq(address(optimismPortal2).balance, _portalBalanceBefore + _amount);
-        }
+    function _assertETHBridgeCustody(uint256 _portalBalanceBefore, uint256 _amount) internal view {
+        assertEq(address(optimismPortal2).balance, _portalBalanceBefore + _amount);
     }
 
     function _mockXDomainMessageSender(address _sender) internal {
@@ -356,7 +344,6 @@ contract L1StandardBridge_Receive_Test is L1StandardBridge_TestInit {
     function test_receive_succeeds() external {
         skipIfSysFeatureEnabled(Features.CUSTOM_GAS_TOKEN);
         uint256 portalBalanceBefore = address(optimismPortal2).balance;
-        uint256 ethLockboxBalanceBefore = address(ethLockbox).balance;
 
         // The legacy event must be emitted for backwards compatibility
         vm.expectEmit(address(l1StandardBridge));
@@ -381,7 +368,7 @@ contract L1StandardBridge_Receive_Test is L1StandardBridge_TestInit {
         (bool success,) = address(l1StandardBridge).call{ value: 100 }(hex"");
         assertTrue(success);
 
-        _assertETHBridgeCustody(portalBalanceBefore, ethLockboxBalanceBefore, 100);
+        _assertETHBridgeCustody(portalBalanceBefore, 100);
     }
 
     /// @notice Verifies receive function reverts when called by contracts
@@ -407,10 +394,9 @@ contract L1StandardBridge_DepositETH_Test is L1StandardBridge_TestInit {
         skipIfSysFeatureEnabled(Features.CUSTOM_GAS_TOKEN);
         _preBridgeETH({ isLegacy: true, value: 500 });
         uint256 portalBalanceBefore = address(optimismPortal2).balance;
-        uint256 ethLockboxBalanceBefore = address(ethLockbox).balance;
         l1StandardBridge.depositETH{ value: 500 }(50000, hex"dead");
 
-        _assertETHBridgeCustody(portalBalanceBefore, ethLockboxBalanceBefore, 500);
+        _assertETHBridgeCustody(portalBalanceBefore, 500);
     }
 
     /// @notice Tests that depositing ETH succeeds for an EOA using 7702 delegation.
@@ -421,10 +407,9 @@ contract L1StandardBridge_DepositETH_Test is L1StandardBridge_TestInit {
 
         _preBridgeETH({ isLegacy: true, value: 500 });
         uint256 portalBalanceBefore = address(optimismPortal2).balance;
-        uint256 ethLockboxBalanceBefore = address(ethLockbox).balance;
         l1StandardBridge.depositETH{ value: 500 }(50000, hex"dead");
 
-        _assertETHBridgeCustody(portalBalanceBefore, ethLockboxBalanceBefore, 500);
+        _assertETHBridgeCustody(portalBalanceBefore, 500);
     }
 
     /// @notice Tests that depositing ETH reverts if the call is not from an EOA.
@@ -448,10 +433,9 @@ contract L1StandardBridge_DepositETHTo_Test is L1StandardBridge_TestInit {
         skipIfSysFeatureEnabled(Features.CUSTOM_GAS_TOKEN);
         _preBridgeETHTo({ isLegacy: true, value: 600 });
         uint256 portalBalanceBefore = address(optimismPortal2).balance;
-        uint256 ethLockboxBalanceBefore = address(ethLockbox).balance;
         l1StandardBridge.depositETHTo{ value: 600 }(bob, 60000, hex"dead");
 
-        _assertETHBridgeCustody(portalBalanceBefore, ethLockboxBalanceBefore, 600);
+        _assertETHBridgeCustody(portalBalanceBefore, 600);
     }
 
     /// @notice Verifies depositETHTo succeeds with various recipients and amounts
@@ -465,12 +449,11 @@ contract L1StandardBridge_DepositETHTo_Test is L1StandardBridge_TestInit {
         vm.deal(alice, _amount);
 
         uint256 portalBalanceBefore = address(optimismPortal2).balance;
-        uint256 ethLockboxBalanceBefore = address(ethLockbox).balance;
 
         vm.prank(alice);
         l1StandardBridge.depositETHTo{ value: _amount }(_to, 60000, hex"dead");
 
-        _assertETHBridgeCustody(portalBalanceBefore, ethLockboxBalanceBefore, _amount);
+        _assertETHBridgeCustody(portalBalanceBefore, _amount);
     }
 }
 
@@ -739,10 +722,9 @@ contract L1StandardBridge_Uncategorized_Test is L1StandardBridge_TestInit {
         skipIfSysFeatureEnabled(Features.CUSTOM_GAS_TOKEN);
         _preBridgeETH({ isLegacy: false, value: 500 });
         uint256 portalBalanceBefore = address(optimismPortal2).balance;
-        uint256 ethLockboxBalanceBefore = address(ethLockbox).balance;
         l1StandardBridge.bridgeETH{ value: 500 }(50000, hex"dead");
 
-        _assertETHBridgeCustody(portalBalanceBefore, ethLockboxBalanceBefore, 500);
+        _assertETHBridgeCustody(portalBalanceBefore, 500);
     }
 
     /// @notice Tests that bridging ETH to a different address succeeds.
@@ -754,10 +736,9 @@ contract L1StandardBridge_Uncategorized_Test is L1StandardBridge_TestInit {
         skipIfSysFeatureEnabled(Features.CUSTOM_GAS_TOKEN);
         _preBridgeETHTo({ isLegacy: false, value: 600 });
         uint256 portalBalanceBefore = address(optimismPortal2).balance;
-        uint256 ethLockboxBalanceBefore = address(ethLockbox).balance;
         l1StandardBridge.bridgeETHTo{ value: 600 }(bob, 60000, hex"dead");
 
-        _assertETHBridgeCustody(portalBalanceBefore, ethLockboxBalanceBefore, 600);
+        _assertETHBridgeCustody(portalBalanceBefore, 600);
     }
 
     /// @notice Tests that finalizing bridged ETH succeeds.

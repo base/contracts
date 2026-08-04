@@ -11,6 +11,7 @@ import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 
 import { LibClone } from "lib/solady/src/utils/LibClone.sol";
 
@@ -34,6 +35,120 @@ contract AggregateVerifierTest is BaseTest {
 
     function testInitializeWithZKProof() public {
         _createAndAssertInitializedGame("zk-proof", AggregateVerifier.ProofType.ZK, ZK_PROVER, address(0), ZK_PROVER);
+    }
+
+    /// @notice Initialization pins the upgrades active at the claimed L2 block, independently of
+    ///         the L1 game-creation timestamp, and later schedule changes cannot alter the pin.
+    function test_initialize_pinsScheduleId_succeeds() public {
+        // The first game ends at L2 block 100, whose deterministic timestamp is 200. The first
+        // upgrade is active there; the second is not.
+        protocolVersions.registerUpgrade(200, 1);
+        bytes32 pinned = protocolVersions.activatedScheduleId(200);
+        assertTrue(pinned != bytes32(0));
+        protocolVersions.registerUpgrade(300, 2);
+        assertNotEq(protocolVersions.scheduleId(), pinned);
+
+        // Even though the L1 clock has passed the second activation, the game's schedule is
+        // selected by its claimed L2 block timestamp.
+        vm.warp(300);
+
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
+
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
+        );
+
+        assertEq(game.scheduleId(), pinned);
+
+        // Move the live schedule after creation; the game's snapshot remains pinned.
+        protocolVersions.registerUpgrade(400, 3);
+        assertNotEq(protocolVersions.scheduleId(), pinned);
+        assertEq(game.scheduleId(), pinned);
+    }
+
+    /// @notice Consecutive games on opposite sides of an L2 activation boundary pin different
+    ///         schedule commitments.
+    function test_initialize_scheduleChangesAtL2ActivationBoundary_succeeds() public {
+        protocolVersions.registerUpgrade(300, 1);
+
+        Claim firstClaim = _advanceL2BlockAndClaim();
+        AggregateVerifier firstGame = _createAggregateVerifierGame(
+            TEE_PROVER,
+            firstClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _generateProof("first", AggregateVerifier.ProofType.TEE)
+        );
+        assertEq(firstGame.scheduleId(), bytes32(0));
+
+        Claim secondClaim = _advanceL2BlockAndClaim();
+        AggregateVerifier secondGame = _createAggregateVerifierGame(
+            TEE_PROVER,
+            secondClaim,
+            currentL2BlockNumber,
+            address(firstGame),
+            _generateProof("second", AggregateVerifier.ProofType.TEE)
+        );
+        assertEq(secondGame.scheduleId(), protocolVersions.activatedScheduleId(400));
+    }
+
+    function test_constructor_zeroL2BlockTime_reverts() public {
+        AggregateVerifier.ScheduleConfig memory scheduleConfig = AggregateVerifier.ScheduleConfig({
+            protocolVersions: IProtocolVersions(address(protocolVersions)),
+            genesisBlockNumber: 0,
+            genesisTimestamp: 0,
+            blockTime: 0
+        });
+
+        vm.expectRevert(AggregateVerifier.InvalidL2BlockTime.selector);
+        _deployAggregateVerifierWithScheduleConfig(scheduleConfig);
+    }
+
+    function test_initialize_l2BlockBeforeGenesis_reverts() public {
+        AggregateVerifier.ScheduleConfig memory scheduleConfig = AggregateVerifier.ScheduleConfig({
+            protocolVersions: IProtocolVersions(address(protocolVersions)),
+            genesisBlockNumber: BLOCK_INTERVAL + 1,
+            genesisTimestamp: 0,
+            blockTime: L2_BLOCK_TIME
+        });
+        AggregateVerifier implementation = _deployAggregateVerifierWithScheduleConfig(scheduleConfig);
+        factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(implementation)));
+
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AggregateVerifier.L2BlockBeforeGenesis.selector, currentL2BlockNumber, BLOCK_INTERVAL + 1
+            )
+        );
+        _createAggregateVerifierGame(
+            TEE_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _generateProof("before-genesis", AggregateVerifier.ProofType.TEE)
+        );
+    }
+
+    function test_initialize_l2TimestampOverflow_reverts() public {
+        AggregateVerifier.ScheduleConfig memory scheduleConfig = AggregateVerifier.ScheduleConfig({
+            protocolVersions: IProtocolVersions(address(protocolVersions)),
+            genesisBlockNumber: 0,
+            genesisTimestamp: type(uint64).max,
+            blockTime: L2_BLOCK_TIME
+        });
+        AggregateVerifier implementation = _deployAggregateVerifierWithScheduleConfig(scheduleConfig);
+        factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(implementation)));
+
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L2TimestampOverflow.selector, currentL2BlockNumber));
+        _createAggregateVerifierGame(
+            TEE_PROVER,
+            rootClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _generateProof("timestamp-overflow", AggregateVerifier.ProofType.TEE)
+        );
     }
 
     function testInitializeFailsIfInvalidCallDataSize() public {
@@ -406,6 +521,33 @@ contract AggregateVerifierTest is BaseTest {
         private
         returns (AggregateVerifier)
     {
+        return _deployAggregateVerifier(
+            blockInterval,
+            intermediateBlockInterval,
+            AggregateVerifier.ScheduleConfig({
+                protocolVersions: IProtocolVersions(address(protocolVersions)),
+                genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
+                genesisTimestamp: L2_GENESIS_TIMESTAMP,
+                blockTime: L2_BLOCK_TIME
+            })
+        );
+    }
+
+    function _deployAggregateVerifierWithScheduleConfig(AggregateVerifier.ScheduleConfig memory scheduleConfig)
+        private
+        returns (AggregateVerifier)
+    {
+        return _deployAggregateVerifier(BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL, scheduleConfig);
+    }
+
+    function _deployAggregateVerifier(
+        uint256 blockInterval,
+        uint256 intermediateBlockInterval,
+        AggregateVerifier.ScheduleConfig memory scheduleConfig
+    )
+        private
+        returns (AggregateVerifier)
+    {
         return new AggregateVerifier(
             GameTypes.AGGREGATE_VERIFIER,
             IAnchorStateRegistry(address(anchorStateRegistry)),
@@ -418,7 +560,10 @@ contract AggregateVerifierTest is BaseTest {
             L2_CHAIN_ID,
             blockInterval,
             intermediateBlockInterval,
-            AggregateVerifier.FinalizationDelays({ slow: 5 days, fast: 1 days })
+            AggregateVerifier.GameConfig({
+                finalizationDelays: AggregateVerifier.FinalizationDelays({ slow: 5 days, fast: 1 days }),
+                schedule: scheduleConfig
+            })
         );
     }
 }

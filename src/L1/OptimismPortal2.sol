@@ -25,7 +25,6 @@ import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 
 /// @custom:proxied true
@@ -120,11 +119,10 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     /// @notice Address of the AnchorStateRegistry contract.
     IAnchorStateRegistry public anchorStateRegistry;
 
-    /// @notice Address of the ETHLockbox contract. NOTE that as of v4.1.0 it is not possible to
-    ///         set this value in storage and it is only possible for this value to be set if the
-    ///         chain was first upgraded to v4.0.0. Chains that skip v4.0.0 will not have any
-    ///         ETHLockbox set here.
-    IETHLockbox public ethLockbox;
+    /// @custom:legacy
+    /// @custom:spacer
+    /// @notice Spacer taking up a legacy address slot.
+    address private spacer_63_0_20;
 
     /// @custom:legacy
     /// @custom:spacer superRootsActive
@@ -208,9 +206,6 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     ///         not been configured for immediate finality (PROOF_MATURITY_DELAY_SECONDS != 0).
     error OptimismPortal_ImmediateFinalityNotEnabled();
 
-    /// @notice Thrown when ETHLockbox is set/unset incorrectly depending on the feature flag.
-    error OptimismPortal_InvalidLockboxState();
-
     /// @notice Semantic version.
     /// @custom:semver 5.2.0
     function version() public pure virtual returns (string memory) {
@@ -239,9 +234,6 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         // Now perform initialization logic.
         systemConfig = _systemConfig;
         anchorStateRegistry = _anchorStateRegistry;
-
-        // Assert that the lockbox state is valid.
-        _assertValidLockboxState();
 
         // Set the l2Sender slot, only if it is currently empty. This signals the first
         // initialization of the contract.
@@ -445,11 +437,6 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         // Mark the withdrawal as finalized so it can't be replayed.
         finalizedWithdrawals[withdrawalHash] = true;
 
-        // If using ETHLockbox, unlock the ETH from the ETHLockbox.
-        if (_isUsingLockbox()) {
-            if (_tx.value > 0) ethLockbox.unlockETH(_tx.value);
-        }
-
         // Set the l2Sender so contracts know who triggered this withdrawal on L2.
         l2Sender = _tx.sender;
 
@@ -468,14 +455,6 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         // All withdrawals are immediately finalized. Replayability can
         // be achieved through contracts built on top of this contract
         emit WithdrawalFinalized(withdrawalHash, success);
-
-        // If using ETHLockbox, send ETH back to the Lockbox in the case of a failed transaction or
-        // it'll get stuck here and would need to be moved back via admin action.
-        if (_isUsingLockbox()) {
-            if (!success && _tx.value > 0) {
-                ethLockbox.lockETH{ value: _tx.value }();
-            }
-        }
 
         // Reverting here is useful for determining the exact gas cost to successfully execute the
         // sub call to the target contract if the minimum gas limit specified by the user would not
@@ -609,11 +588,6 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         // Mark the withdrawal as finalized so it can't be replayed.
         finalizedWithdrawals[withdrawalHash] = true;
 
-        // If using ETHLockbox, unlock the ETH from the ETHLockbox.
-        if (_isUsingLockbox()) {
-            if (_tx.value > 0) ethLockbox.unlockETH(_tx.value);
-        }
-
         // Set the l2Sender so contracts know who triggered this withdrawal on L2.
         l2Sender = _tx.sender;
 
@@ -634,14 +608,6 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         emit WithdrawalProven(withdrawalHash, _tx.sender, _tx.target);
         emit WithdrawalProvenExtension1(withdrawalHash, msg.sender);
         emit WithdrawalFinalized(withdrawalHash, success);
-
-        // If using ETHLockbox, send ETH back to the Lockbox in the case of a failed transaction or
-        // it'll get stuck here and would need to be moved back via admin action.
-        if (_isUsingLockbox()) {
-            if (!success && _tx.value > 0) {
-                ethLockbox.lockETH{ value: _tx.value }();
-            }
-        }
 
         // Reverting here is useful for determining the exact gas cost to successfully execute the
         // sub call to the target contract if the minimum gas limit specified by the user would not
@@ -677,8 +643,8 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     ///         deriving deposit transactions. Note that if a deposit is made by a contract, its
     ///         address will be aliased when retrieved using `tx.origin` or `msg.sender`. Consider
     ///         using the CrossDomainMessenger contracts for a simpler developer experience.
-    /// @dev    The `msg.value` is locked on the ETHLockbox and minted as ETH when the deposit
-    ///         arrives on L2, while `_value` specifies how much ETH to send to the target.
+    /// @dev    The `msg.value` is minted as ETH when the deposit arrives on L2, while `_value`
+    ///         specifies how much ETH to send to the target.
     /// @param _to         Target address on L2.
     /// @param _value      ETH value to send to the recipient.
     /// @param _gasLimit   Amount of L2 gas to purchase by burning gas on L1.
@@ -697,11 +663,6 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     {
         if (_isUsingCustomGasToken()) {
             if (msg.value > 0) revert OptimismPortal_NotAllowedOnCGTMode();
-        }
-
-        // If using ETHLockbox, lock the ETH in the ETHLockbox.
-        if (_isUsingLockbox()) {
-            if (msg.value > 0) ethLockbox.lockETH{ value: msg.value }();
         }
 
         // Just to be safe, make sure that people specify address(0) as the target when doing
@@ -747,12 +708,6 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         return proofSubmitters[_withdrawalHash].length;
     }
 
-    /// @notice Checks if the ETHLockbox feature is enabled.
-    /// @return bool True if the ETHLockbox feature is enabled.
-    function _isUsingLockbox() internal view returns (bool) {
-        return systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX) && address(ethLockbox) != address(0);
-    }
-
     /// @notice Checks if the Custom Gas Token feature is enabled.
     /// @return bool True if the Custom Gas Token feature is enabled.
     function _isUsingCustomGasToken() internal view returns (bool) {
@@ -765,16 +720,6 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     function _assertNotPaused() internal view {
         if (paused()) {
             revert OptimismPortal_CallPaused();
-        }
-    }
-
-    /// @notice Asserts that the ETHLockbox is set/unset correctly depending on the feature flag.
-    function _assertValidLockboxState() internal view {
-        if (
-            systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX) && address(ethLockbox) == address(0)
-                || !systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX) && address(ethLockbox) != address(0)
-        ) {
-            revert OptimismPortal_InvalidLockboxState();
         }
     }
 
@@ -832,7 +777,7 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     /// @notice Checks if a target address is unsafe.
     function _isUnsafeTarget(address _target) internal view virtual returns (bool) {
         // Prevent users from targeting an unsafe target address on a withdrawal transaction.
-        return _target == address(this) || _target == address(ethLockbox);
+        return _target == address(this);
     }
 
     /// @notice Getter for the resource config. Used internally by the ResourceMetering contract.

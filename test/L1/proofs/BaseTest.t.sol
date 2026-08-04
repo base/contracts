@@ -19,11 +19,16 @@ import { ProxyAdmin } from "src/universal/ProxyAdmin.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 
 contract BaseTest is Test {
     uint256 internal constant L2_CHAIN_ID = 8453;
+    uint256 internal constant L2_GENESIS_BLOCK_NUMBER = 0;
+    uint64 internal constant L2_GENESIS_TIMESTAMP = 0;
+    uint64 internal constant L2_BLOCK_TIME = 2;
 
     // AggregateVerifier expects evenly spaced intermediate roots.
     uint256 internal constant BLOCK_INTERVAL = 100;
@@ -54,6 +59,7 @@ contract BaseTest is Test {
 
     MockVerifier internal teeVerifier;
     MockVerifier internal zkVerifier;
+    ProtocolVersions internal protocolVersions;
 
     function setUp() public virtual {
         _deployContractsAndProxies();
@@ -78,9 +84,12 @@ contract BaseTest is Test {
 
         proxyAdmin = new ProxyAdmin(address(this));
 
+        ProtocolVersions _protocolVersions = new ProtocolVersions();
+
         anchorStateRegistry = AnchorStateRegistry(_deployProxy(address(_anchorStateRegistry)));
         factory = DisputeGameFactory(_deployProxy(address(_factory)));
         delayedWETH = DelayedWETH(payable(_deployProxy(address(_delayedWETH))));
+        protocolVersions = ProtocolVersions(_deployProxy(address(_protocolVersions)));
 
         teeVerifier = new MockVerifier(IAnchorStateRegistry(address(anchorStateRegistry)));
         zkVerifier = new MockVerifier(IAnchorStateRegistry(address(anchorStateRegistry)));
@@ -103,6 +112,7 @@ contract BaseTest is Test {
         );
         factory.initialize(address(this));
         delayedWETH.initialize(systemConfig);
+        protocolVersions.initialize(address(0));
     }
 
     function _deployAndSetAggregateVerifier() internal {
@@ -118,7 +128,15 @@ contract BaseTest is Test {
             L2_CHAIN_ID,
             BLOCK_INTERVAL,
             INTERMEDIATE_BLOCK_INTERVAL,
-            AggregateVerifier.FinalizationDelays({ slow: 5 days, fast: 1 days })
+            AggregateVerifier.GameConfig({
+                finalizationDelays: AggregateVerifier.FinalizationDelays({ slow: 5 days, fast: 1 days }),
+                schedule: AggregateVerifier.ScheduleConfig({
+                    protocolVersions: IProtocolVersions(address(protocolVersions)),
+                    genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
+                    genesisTimestamp: L2_GENESIS_TIMESTAMP,
+                    blockTime: L2_BLOCK_TIME
+                })
+            })
         );
 
         factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(aggregateVerifierImpl)));
@@ -180,7 +198,7 @@ contract BaseTest is Test {
         return abi.encodePacked(l2BlockNumber, parentAddress, _generateIntermediateRoots(l2BlockNumber, rootClaim));
     }
 
-    function _generateIntermediateRoots(uint256 l2BlockNumber, Claim rootClaim) private pure returns (bytes memory) {
+    function _generateIntermediateRoots(uint256 l2BlockNumber, Claim rootClaim) internal pure returns (bytes memory) {
         bytes32[] memory intermediateRoots = new bytes32[](INTERMEDIATE_ROOTS_COUNT);
         uint256 startingL2BlockNumber = l2BlockNumber - BLOCK_INTERVAL;
         for (uint256 i = 1; i < INTERMEDIATE_ROOTS_COUNT; i++) {

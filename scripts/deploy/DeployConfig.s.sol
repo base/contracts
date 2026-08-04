@@ -47,8 +47,11 @@ contract DeployConfig is Script {
     uint256 public l1ChainId;
     uint256 public l1FeeVaultMinimumWithdrawalAmount;
     uint256 public l1FeeVaultWithdrawalNetwork;
+    uint256 public l2BlockTime;
     uint256 public l2ChainId;
     uint256 public l2GenesisBlockGasLimit;
+    uint256 public l2GenesisBlockNumber;
+    uint256 public l2GenesisTimestamp;
     uint256 public l2OutputOracleStartingBlockNumber;
     uint256 public l2OutputOracleStartingTimestamp;
     uint256 public multiproofBlockInterval;
@@ -103,10 +106,13 @@ contract DeployConfig is Script {
         l1ChainId = _json.readUint("$.l1ChainId");
         l1FeeVaultMinimumWithdrawalAmount = _json.readUint("$.l1FeeVaultMinimumWithdrawalAmount");
         l1FeeVaultWithdrawalNetwork = _json.readUint("$.l1FeeVaultWithdrawalNetwork");
+        l2BlockTime = _json.readUintOr("$.l2BlockTime", 0);
         l2ChainId = _json.readUint("$.l2ChainId");
         l2GenesisBlockGasLimit = _json.readUint("$.l2GenesisBlockGasLimit");
         l2OutputOracleStartingBlockNumber = _json.readUint("$.l2OutputOracleStartingBlockNumber");
         l2OutputOracleStartingTimestamp = _json.readUint("$.l2OutputOracleStartingTimestamp");
+        l2GenesisBlockNumber = _json.readUintOr("$.l2GenesisBlockNumber", 0);
+        l2GenesisTimestamp = _json.readUintOr("$.l2GenesisTimestamp", 0);
         multiproofBlockInterval = _json.readUintOr("$.multiproofBlockInterval", 100);
         multiproofGameType = _json.readUintOr("$.multiproofGameType", 621);
         multiproofGenesisBlockNumber = _json.readUintOr("$.multiproofGenesisBlockNumber", 0);

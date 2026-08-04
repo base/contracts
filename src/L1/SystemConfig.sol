@@ -546,32 +546,6 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
             revert SystemConfig_InvalidFeatureState();
         }
 
-        // Handle feature-specific safety logic here.
-        if (_feature == Features.ETH_LOCKBOX) {
-            // It would probably better to check that the ETHLockbox contract is set inside the
-            // OptimismPortal2 contract before you're allowed to enable the feature here, but the
-            // portal checks that the feature is set before allowing you to set the lockbox, so
-            // these checks are good enough.
-
-            // Lockbox shouldn't be unset if the ethLockbox address is still configured in the
-            // OptimismPortal2 contract. Doing so would cause the system to start keeping ETH in
-            // the portal. This check means there's no way to stop using ETHLockbox at the moment
-            // after it's been configured (which is expected).
-            if (
-                isFeatureEnabled[_feature] && !_enabled
-                    && address(IOptimismPortal2(payable(optimismPortal())).ethLockbox()) != address(0)
-            ) {
-                revert SystemConfig_InvalidFeatureState();
-            }
-
-            // Lockbox can't be set or unset if the system is currently paused because it would
-            // change the pause identifier which would potentially cause the system to become
-            // unpaused unexpectedly.
-            if (paused()) {
-                revert SystemConfig_InvalidFeatureState();
-            }
-        }
-
         // Set the feature.
         isFeatureEnabled[_feature] = _enabled;
 
@@ -579,20 +553,10 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         emit FeatureSet(_feature, _enabled);
     }
 
-    /// @notice Returns the current pause state for this network. If the network is using
-    ///         ETHLockbox, the system is paused if either the global pause is active or the pause
-    ///         is active where the ETHLockbox address is used as the identifier. If the network is
-    ///         not using ETHLockbox, the system is paused if either the global pause is active or
-    ///         the pause is active where the OptimismPortal address is used as the identifier.
+    /// @notice Returns the current pause state for this network.
     /// @return bool True if the system is paused, false otherwise.
     function paused() public view returns (bool) {
-        // Determine the appropriate chain identifier based on the feature flags.
-        address identifier = isFeatureEnabled[Features.ETH_LOCKBOX]
-            ? address(IOptimismPortal2(payable(optimismPortal())).ethLockbox())
-            : address(optimismPortal());
-
-        // Check if either global or local pause is active.
-        return superchainConfig.paused(address(0)) || superchainConfig.paused(identifier);
+        return superchainConfig.paused(address(0)) || superchainConfig.paused(optimismPortal());
     }
 
     /// @notice Returns the guardian address of the SuperchainConfig.

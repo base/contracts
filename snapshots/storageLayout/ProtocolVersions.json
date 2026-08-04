@@ -1,0 +1,44 @@
+[
+  {
+    "bytes": "1",
+    "label": "_initialized",
+    "offset": 0,
+    "slot": "0",
+    "type": "uint8"
+  },
+  {
+    "bytes": "1",
+    "label": "_initializing",
+    "offset": 1,
+    "slot": "0",
+    "type": "bool"
+  },
+  {
+    "bytes": "32",
+    "label": "_timestamps",
+    "offset": 0,
+    "slot": "1",
+    "type": "uint64[]"
+  },
+  {
+    "bytes": "32",
+    "label": "_upgradeScheduleId",
+    "offset": 0,
+    "slot": "2",
+    "type": "bytes32[]"
+  },
+  {
+    "bytes": "32",
+    "label": "minimumProtocolVersion",
+    "offset": 0,
+    "slot": "3",
+    "type": "uint256"
+  },
+  {
+    "bytes": "20",
+    "label": "incidentResponder",
+    "offset": 0,
+    "slot": "4",
+    "type": "address"
+  }
+]

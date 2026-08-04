@@ -16,7 +16,7 @@ import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.s
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
-import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 
 import { Proposal } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
@@ -28,6 +28,7 @@ library Types {
         address systemConfigOwner;
         address batcher;
         address unsafeBlockSigner;
+        address incidentResponder;
     }
 
     /// @notice The full set of inputs to deploy a new OP Stack chain.
@@ -50,11 +51,11 @@ library Types {
         IOptimismMintableERC20Factory optimismMintableERC20FactoryProxy;
         IL1StandardBridge l1StandardBridgeProxy;
         IL1CrossDomainMessenger l1CrossDomainMessengerProxy;
-        IETHLockbox ethLockboxProxy;
         IOptimismPortal2 optimismPortalProxy;
         IDisputeGameFactory disputeGameFactoryProxy;
         IAnchorStateRegistry anchorStateRegistryProxy;
         IDelayedWETH delayedWETHProxy;
+        IProtocolVersions protocolVersionsProxy;
         IVerifier aggregateVerifier;
         ITEEProverRegistry teeProverRegistryProxy;
         IVerifier teeVerifier;
@@ -68,7 +69,6 @@ library Types {
         address superchainConfigImpl;
         address l1ERC721BridgeImpl;
         address optimismPortalImpl;
-        address ethLockboxImpl;
         address systemConfigImpl;
         address optimismMintableERC20FactoryImpl;
         address l1CrossDomainMessengerImpl;
@@ -76,6 +76,7 @@ library Types {
         address disputeGameFactoryImpl;
         address anchorStateRegistryImpl;
         address delayedWETHImpl;
+        address protocolVersionsImpl;
         address aggregateVerifierImpl;
         address teeProverRegistryImpl;
         address teeVerifierImpl;

@@ -92,7 +92,12 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
             deploy.cfg().l2ChainId(),
             100,
             10,
-            AggregateVerifier.FinalizationDelays({ slow: 0, fast: 0 })
+            AggregateVerifier.GameConfig({
+                finalizationDelays: AggregateVerifier.FinalizationDelays({ slow: 0, fast: 0 }),
+                schedule: AggregateVerifier.ScheduleConfig({
+                    protocolVersions: protocolVersions, genesisBlockNumber: 0, genesisTimestamp: 1, blockTime: 2
+                })
+            })
         );
         disputeGameFactory.setImplementation(respectedGameType, IDisputeGame(address(gameImpl)));
         disputeGameFactory.setInitBond(respectedGameType, 0);
@@ -115,9 +120,6 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
 
         // Fund the portal so that we can withdraw ETH.
         vm.deal(address(optimismPortal2), 0xFFFFFFFF);
-        if (isUsingLockbox()) {
-            vm.deal(address(ethLockbox), 0xFFFFFFFF);
-        }
     }
 
     function _createDisputeGame(Claim _rootClaim, uint256 _salt) internal returns (IAggregateVerifier game_) {
@@ -190,9 +192,6 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
     {
         uint256 value = bound(_value, 0, 200_000_000 ether);
         vm.deal(address(optimismPortal2), value);
-        if (isUsingLockbox()) {
-            vm.deal(address(ethLockbox), value);
-        }
 
         uint256 gasLimit = bound(_gasLimit, 0, 50_000_000);
         withdrawalTx_ = Types.WithdrawalTransaction({
@@ -240,31 +239,6 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
         // Assert that the withdrawal was not finalized.
         assertFalse(optimismPortal2.finalizedWithdrawals(Hashing.hashWithdrawal(_defaultTx)));
     }
-
-    /// @notice Checks if the ETHLockbox feature is enabled.
-    /// @return bool True if the ETHLockbox feature is enabled.
-    function isUsingLockbox() internal view returns (bool) {
-        return
-            systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX) && address(optimismPortal2.ethLockbox()) != address(0);
-    }
-
-    /// @notice Enables the ETHLockbox feature if not enabled.
-    /// @param _lockbox Address of the lockbox to enable.
-    function forceEnableLockbox(address _lockbox) internal {
-        if (!isSysFeatureEnabled(Features.ETH_LOCKBOX)) {
-            vm.prank(address(proxyAdmin));
-            systemConfig.setFeature(Features.ETH_LOCKBOX, true);
-        }
-
-        // Overwrite the lockbox either way.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("OptimismPortal2", "ethLockbox");
-        vm.store(address(optimismPortal2), bytes32(slot.slot), bytes32(uint256(uint160(address(_lockbox)))));
-
-        // If the recipient address has no code, store STOP so we don't get reverts.
-        if (address(_lockbox).code.length == 0) {
-            vm.etch(address(_lockbox), hex"00");
-        }
-    }
 }
 
 /// @title OptimismPortal2_Version_Test
@@ -286,7 +260,6 @@ contract OptimismPortal2_Constructor_Test is OptimismPortal2_TestInit {
         assertEq(address(opImpl.anchorStateRegistry()), address(0));
         assertEq(address(opImpl.systemConfig()), address(0));
         assertEq(opImpl.l2Sender(), address(0));
-        assertEq(address(opImpl.ethLockbox()), address(0));
     }
 }
 
@@ -301,16 +274,6 @@ contract OptimismPortal2_Initialize_Test is OptimismPortal2_TestInit {
         assertEq(optimismPortal2.l2Sender(), Constants.DEFAULT_L2_SENDER);
         assertEq(optimismPortal2.paused(), false);
         assertEq(address(optimismPortal2.systemConfig()), address(systemConfig));
-
-        if (isUsingLockbox()) {
-            assertEq(address(optimismPortal2.ethLockbox()), address(ethLockbox));
-        } else {
-            assertEq(address(optimismPortal2.ethLockbox()), address(0));
-        }
-
-        if (!isUsingLockbox()) {
-            assertFalse(optimismPortal2.systemConfig().isFeatureEnabled(Features.CUSTOM_GAS_TOKEN));
-        }
 
         returnIfForkTest(
             "OptimismPortal2_Initialize_Test: Do not check guardian and respectedGameType on forked networks"
@@ -337,32 +300,6 @@ contract OptimismPortal2_Initialize_Test is OptimismPortal2_TestInit {
 
         // Assert that the initializer value matches the expected value.
         assertEq(val, optimismPortal2.initVersion());
-    }
-
-    /// @notice Tests that the initialize function reverts when lockbox state is invalid.
-    function test_initialize_invalidLockboxState_reverts() external {
-        // Get the slot for _initialized.
-        StorageSlot memory slot = ForgeArtifacts.getSlot("OptimismPortal2", "_initialized");
-
-        // Set the initialized slot to 0.
-        vm.store(address(optimismPortal2), bytes32(slot.slot), bytes32(0));
-
-        // Enable ETH_LOCKBOX feature but clear the lockbox address to create invalid state.
-        if (!systemConfig.isFeatureEnabled(Features.ETH_LOCKBOX)) {
-            vm.prank(address(proxyAdmin));
-            systemConfig.setFeature(Features.ETH_LOCKBOX, true);
-        }
-
-        // Clear the lockbox address.
-        StorageSlot memory lockboxSlot = ForgeArtifacts.getSlot("OptimismPortal2", "ethLockbox");
-        vm.store(address(optimismPortal2), bytes32(lockboxSlot.slot), bytes32(0));
-
-        // Expect the revert with `OptimismPortal_InvalidLockboxState` selector.
-        vm.expectRevert(IOptimismPortal.OptimismPortal_InvalidLockboxState.selector);
-
-        // Call the `initialize` function
-        vm.prank(address(proxyAdmin));
-        optimismPortal2.initialize(systemConfig, anchorStateRegistry);
     }
 
     /// @notice Tests that the initialize function reverts if called by a non-proxy admin or owner.
@@ -547,9 +484,7 @@ contract OptimismPortal2_Receive_Test is OptimismPortal2_TestInit {
     function testFuzz_receive_succeeds(uint256 _value) external {
         skipIfSysFeatureEnabled(Features.CUSTOM_GAS_TOKEN);
         // Prevent overflow on an upgrade context
-        _value = bound(_value, 0, type(uint256).max - address(ethLockbox).balance);
         uint256 balanceBefore = address(optimismPortal2).balance;
-        uint256 lockboxBalanceBefore = address(ethLockbox).balance;
         _value = bound(_value, 0, type(uint256).max - balanceBefore);
 
         vm.expectEmit(address(optimismPortal2));
@@ -563,11 +498,6 @@ contract OptimismPortal2_Receive_Test is OptimismPortal2_TestInit {
             _data: hex""
         });
 
-        if (isUsingLockbox()) {
-            // Expect call to the ETHLockbox to lock the funds only if the value is greater than 0.
-            vm.expectCall(address(ethLockbox), _value, abi.encodeCall(ethLockbox.lockETH, ()), _value > 0 ? 1 : 0);
-        }
-
         // give alice money and send as an eoa
         vm.deal(alice, _value);
         vm.prank(alice, alice);
@@ -575,50 +505,7 @@ contract OptimismPortal2_Receive_Test is OptimismPortal2_TestInit {
 
         assertTrue(s);
 
-        if (isUsingLockbox()) {
-            assertEq(address(optimismPortal2).balance, balanceBefore);
-            assertEq(address(ethLockbox).balance, lockboxBalanceBefore + _value);
-        } else {
-            assertEq(address(optimismPortal2).balance, balanceBefore + _value);
-        }
-    }
-
-    function testFuzz_receive_withLockbox_succeeds(uint256 _value) external {
-        skipIfSysFeatureEnabled(Features.CUSTOM_GAS_TOKEN);
-        // Prevent overflow on an upgrade context.
-        // We use a dummy lockbox here because the real one won't work for upgrade tests.
-        address dummyLockbox = address(0xdeadbeef);
-        _value = bound(_value, 0, type(uint256).max - address(dummyLockbox).balance);
-        uint256 balanceBefore = address(optimismPortal2).balance;
-        uint256 lockboxBalanceBefore = address(dummyLockbox).balance;
-        _value = bound(_value, 0, type(uint256).max - balanceBefore);
-
-        // Enable the lockbox.
-        forceEnableLockbox(dummyLockbox);
-
-        // Expect the transaction deposited event.
-        vm.expectEmit(address(optimismPortal2));
-        emitTransactionDeposited({
-            _from: alice,
-            _to: alice,
-            _value: _value,
-            _mint: _value,
-            _gasLimit: 100_000,
-            _isCreation: false,
-            _data: hex""
-        });
-
-        // Expect call to the ETHLockbox to lock the funds only if the value is greater than 0.
-        vm.expectCall(address(dummyLockbox), _value, abi.encodeCall(ethLockbox.lockETH, ()), _value > 0 ? 1 : 0);
-
-        // give alice money and send as an eoa
-        vm.deal(alice, _value);
-        vm.prank(alice, alice);
-        (bool s,) = address(optimismPortal2).call{ value: _value }(hex"");
-
-        assertTrue(s);
-        assertEq(address(optimismPortal2).balance, balanceBefore);
-        assertEq(address(dummyLockbox).balance, lockboxBalanceBefore + _value);
+        assertEq(address(optimismPortal2).balance, balanceBefore + _value);
     }
 }
 
@@ -631,7 +518,6 @@ contract OptimismPortal2_DonateETH_Test is OptimismPortal2_TestInit {
         vm.deal(alice, _amount);
 
         uint256 preBalance = address(optimismPortal2).balance;
-        uint256 lockboxBalanceBefore = address(ethLockbox).balance;
         _amount = bound(_amount, 0, type(uint256).max - preBalance);
 
         vm.startStateDiffRecording();
@@ -639,8 +525,6 @@ contract OptimismPortal2_DonateETH_Test is OptimismPortal2_TestInit {
         VmSafe.AccountAccess[] memory accountAccesses = vm.stopAndReturnStateDiff();
 
         assertEq(address(optimismPortal2).balance, preBalance + _amount);
-
-        assertEq(address(ethLockbox).balance, lockboxBalanceBefore);
 
         // 0 for extcodesize of proxy before being called by this test,
         // 1 for the call to the proxy by the pranked address
@@ -692,17 +576,6 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
             _outputRootProof: _outputRootProof,
             _withdrawalProof: _withdrawalProof
         });
-
-        if (isUsingLockbox()) {
-            _defaultTx.target = address(ethLockbox);
-            vm.expectRevert(IOptimismPortal.OptimismPortal_BadTarget.selector);
-            optimismPortal2.proveWithdrawalTransaction({
-                _tx: _defaultTx,
-                _disputeGameIndex: _proposedGameIndex,
-                _outputRootProof: _outputRootProof,
-                _withdrawalProof: _withdrawalProof
-            });
-        }
     }
 
     /// @notice Tests that `proveWithdrawalTransaction` reverts when the current timestamp is less
@@ -888,17 +761,11 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
 /// @notice Test contract for OptimismPortal2 `finalizeWithdrawalTransaction` function.
 contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_TestInit {
     /// @notice Tests that `finalizeWithdrawalTransaction` reverts when the target is the portal
-    ///         contract or the lockbox.
+    ///         contract.
     function test_finalizeWithdrawalTransaction_badTarget_reverts() external {
         _defaultTx.target = address(optimismPortal2);
         vm.expectRevert(IOptimismPortal.OptimismPortal_BadTarget.selector);
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
-
-        if (isUsingLockbox()) {
-            _defaultTx.target = address(ethLockbox);
-            vm.expectRevert(IOptimismPortal.OptimismPortal_BadTarget.selector);
-            optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
-        }
     }
 
     /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the target reverts and caller
@@ -947,9 +814,6 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         vm.warp(gameNoData.expectedResolution().raw() + 1 seconds);
 
         vm.deal(address(optimismPortal2), 0xFFFFFFFF);
-        if (isUsingLockbox()) {
-            vm.deal(address(ethLockbox), 0xFFFFFFFF);
-        }
 
         uint256 bobBalanceBefore = bob.balance;
 
@@ -1105,53 +969,20 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
 
     /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the target reverts.
     function test_finalizeWithdrawalTransaction_targetFails_fails() external {
-        if (isSysFeatureEnabled(Features.ETH_LOCKBOX)) {
-            vm.deal(address(optimismPortal2), 0); // no balance
-        }
-
         uint256 bobBalanceBefore = address(bob).balance;
         vm.etch(bob, hex"fe"); // Contract with just the invalid opcode.
 
         _proveDefaultWithdrawal();
 
         _resolveGameAndWarpPastProofMaturity(game);
+        uint256 portalBalanceBefore = address(optimismPortal2).balance;
         vm.expectEmit(true, true, true, true);
         emit WithdrawalFinalized(_withdrawalHash, false);
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
 
         // Bob's balance should not have changed.
         assertEq(address(bob).balance, bobBalanceBefore);
-
-        if (isSysFeatureEnabled(Features.ETH_LOCKBOX)) {
-            // OptimismPortal2 should not have any stuck ETH.
-            assertEq(address(optimismPortal2).balance, 0);
-        }
-    }
-
-    /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the target reverts when
-    ///         using the ETHLockbox.
-    function test_finalizeWithdrawalTransaction_lockboxAndTargetFails_fails() external {
-        // Enable the ETHLockbox.
-        address dummyLockbox = address(0xdeadbeef);
-        forceEnableLockbox(dummyLockbox);
-        vm.deal(address(dummyLockbox), 0xFFFFFFFF);
-        vm.deal(address(optimismPortal2), _defaultTx.value);
-
-        uint256 bobBalanceBefore = address(bob).balance;
-        vm.etch(bob, hex"fe"); // Contract with just the invalid opcode.
-
-        _proveDefaultWithdrawal();
-
-        _resolveGameAndWarpPastProofMaturity(game);
-        vm.expectEmit(true, true, true, true);
-        emit WithdrawalFinalized(_withdrawalHash, false);
-        optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
-
-        // Bob's balance should not have changed.
-        assertEq(address(bob).balance, bobBalanceBefore);
-
-        // OptimismPortal2 should not have any stuck ETH.
-        assertEq(address(optimismPortal2).balance, 0);
+        assertEq(address(optimismPortal2).balance, portalBalanceBefore);
     }
 
     /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the withdrawal has already
@@ -1640,12 +1471,7 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
         external
     {
         // Prevent overflow on an upgrade context
-        // Since the value always goes through the portal
         _mint = bound(_mint, 0, type(uint256).max - address(optimismPortal2).balance);
-
-        if (isUsingLockbox() && address(optimismPortal2).balance > address(ethLockbox).balance) {
-            _mint = bound(_mint, 0, type(uint256).max - address(ethLockbox).balance);
-        }
 
         _gasLimit = uint64(
             bound(
@@ -1657,7 +1483,6 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
         if (_isCreation) _to = address(0);
 
         uint256 balanceBefore = address(optimismPortal2).balance;
-        uint256 lockboxBalanceBefore = address(ethLockbox).balance;
 
         // EOA emulation
         vm.expectEmit(address(optimismPortal2));
@@ -1671,23 +1496,13 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
             _data: _data
         });
 
-        if (isSysFeatureEnabled(Features.ETH_LOCKBOX)) {
-            // Expect call to the ETHLockbox to lock the funds only if the value is greater than 0.
-            vm.expectCall(address(ethLockbox), _mint, abi.encodeCall(ethLockbox.lockETH, ()), _mint > 0 ? 1 : 0);
-        }
-
         vm.deal(depositor, _mint);
         vm.prank(depositor, depositor);
         optimismPortal2.depositTransaction{ value: _mint }({
             _to: _to, _value: _value, _gasLimit: _gasLimit, _isCreation: _isCreation, _data: _data
         });
 
-        if (isSysFeatureEnabled(Features.ETH_LOCKBOX)) {
-            assertEq(address(optimismPortal2).balance, balanceBefore);
-            assertEq(address(ethLockbox).balance, lockboxBalanceBefore + _mint);
-        } else {
-            assertEq(address(optimismPortal2).balance, balanceBefore + _mint);
-        }
+        assertEq(address(optimismPortal2).balance, balanceBefore + _mint);
     }
 
     /// @notice Tests that `depositTransaction` succeeds for an EOA using 7702 delegation.
@@ -1706,7 +1521,7 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
         vm.assume(_7702Target != address(0));
 
         // Prevent overflow on an upgrade context
-        _mint = bound(_mint, 0, type(uint256).max - address(ethLockbox).balance);
+        _mint = bound(_mint, 0, type(uint256).max - address(optimismPortal2).balance);
 
         _gasLimit = uint64(
             bound(
@@ -1718,8 +1533,6 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
         if (_isCreation) _to = address(0);
 
         uint256 portalBalanceBefore = address(optimismPortal2).balance;
-        uint256 lockboxBalanceBefore = address(ethLockbox).balance;
-        _mint = bound(_mint, 0, type(uint256).max - portalBalanceBefore);
 
         // EOA emulation
         vm.expectEmit(address(optimismPortal2));
@@ -1742,12 +1555,7 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
             _to: _to, _value: _value, _gasLimit: _gasLimit, _isCreation: _isCreation, _data: _data
         });
 
-        if (isSysFeatureEnabled(Features.ETH_LOCKBOX)) {
-            assertEq(address(optimismPortal2).balance, portalBalanceBefore);
-            assertEq(address(ethLockbox).balance, lockboxBalanceBefore + _mint);
-        } else {
-            assertEq(address(optimismPortal2).balance, portalBalanceBefore + _mint);
-        }
+        assertEq(address(optimismPortal2).balance, portalBalanceBefore + _mint);
     }
 
     /// @notice Tests that `depositTransaction` succeeds for a contract.
@@ -1762,7 +1570,7 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
         external
     {
         // Prevent overflow on an upgrade context
-        _mint = bound(_mint, 0, type(uint256).max - address(ethLockbox).balance);
+        _mint = bound(_mint, 0, type(uint256).max - address(optimismPortal2).balance);
         _gasLimit = uint64(
             bound(
                 _gasLimit,
@@ -1773,8 +1581,6 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
         if (_isCreation) _to = address(0);
 
         uint256 balanceBefore = address(optimismPortal2).balance;
-        uint256 lockboxBalanceBefore = address(ethLockbox).balance;
-        _mint = bound(_mint, 0, type(uint256).max - balanceBefore);
 
         vm.expectEmit(address(optimismPortal2));
         emitTransactionDeposited({
@@ -1787,23 +1593,13 @@ contract OptimismPortal2_DepositTransaction_Test is OptimismPortal2_TestInit {
             _data: _data
         });
 
-        if (isSysFeatureEnabled(Features.ETH_LOCKBOX)) {
-            // Expect call to the ETHLockbox to lock the funds only if the value is greater than 0.
-            vm.expectCall(address(ethLockbox), _mint, abi.encodeCall(ethLockbox.lockETH, ()), _mint > 0 ? 1 : 0);
-        }
-
         vm.deal(address(this), _mint);
         vm.prank(address(this));
         optimismPortal2.depositTransaction{ value: _mint }({
             _to: _to, _value: _value, _gasLimit: _gasLimit, _isCreation: _isCreation, _data: _data
         });
 
-        if (isSysFeatureEnabled(Features.ETH_LOCKBOX)) {
-            assertEq(address(optimismPortal2).balance, balanceBefore);
-            assertEq(address(ethLockbox).balance, lockboxBalanceBefore + _mint);
-        } else {
-            assertEq(address(optimismPortal2).balance, balanceBefore + _mint);
-        }
+        assertEq(address(optimismPortal2).balance, balanceBefore + _mint);
     }
 }
 
@@ -1929,15 +1725,8 @@ contract OptimismPortal2_ProveAndFinalizeWithdrawalTransaction_Test is OptimismP
                 && _target != CONSOLE // The console has no code but behaves like a contract
                 && uint160(_target) > 9 // No precompiles (or zero address)
         );
-        if (isUsingLockbox()) {
-            vm.assume(_target != address(ethLockbox));
-        }
-
         uint256 value = bound(_value, 0, 200_000_000 ether);
         vm.deal(address(optimismPortal2), value);
-        if (isUsingLockbox()) {
-            vm.deal(address(ethLockbox), value);
-        }
 
         uint256 gasLimit = bound(_gasLimit, 0, 50_000_000);
         Types.WithdrawalTransaction memory withdrawalTx = Types.WithdrawalTransaction({
@@ -2075,7 +1864,7 @@ contract OptimismPortal2_ProveAndFinalizeWithdrawalTransaction_Test is OptimismP
     }
 
     /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` reverts when the target is
-    ///         the portal itself or the ETH lockbox.
+    ///         the portal itself.
     function test_proveAndFinalizeWithdrawalTransaction_unsafeTarget_reverts() external {
         game.resolve();
 
@@ -2089,17 +1878,6 @@ contract OptimismPortal2_ProveAndFinalizeWithdrawalTransaction_Test is OptimismP
             _outputRootProof: _outputRootProof,
             _withdrawalProof: _withdrawalProof
         });
-
-        if (isUsingLockbox()) {
-            badTx.target = address(ethLockbox);
-            vm.expectRevert(IOptimismPortal.OptimismPortal_BadTarget.selector);
-            optimismPortal2.proveAndFinalizeWithdrawalTransaction({
-                _tx: badTx,
-                _disputeGameIndex: _proposedGameIndex,
-                _outputRootProof: _outputRootProof,
-                _withdrawalProof: _withdrawalProof
-            });
-        }
     }
 
     /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` correctly handles reentrancy.
@@ -2141,34 +1919,8 @@ contract OptimismPortal2_ProveAndFinalizeWithdrawalTransaction_Test is OptimismP
         assertTrue(optimismPortal2.finalizedWithdrawals(withdrawalHash));
     }
 
-    /// @notice Tests that `proveAndFinalizeWithdrawalTransaction` calls unlockETH on the
-    ///         ETHLockbox when the lockbox feature is enabled.
-    function test_proveAndFinalizeWithdrawalTransaction_withETHLockbox_succeeds() external {
-        address dummyLockbox = address(0xdeadbeef);
-        forceEnableLockbox(dummyLockbox);
-        vm.deal(address(dummyLockbox), 0xFFFFFFFF);
-        vm.deal(address(optimismPortal2), _defaultTx.value);
-
-        uint256 bobBalanceBefore = address(bob).balance;
-        game.resolve();
-
-        vm.expectCall(address(dummyLockbox), abi.encodeCall(ethLockbox.unlockETH, (_defaultTx.value)));
-        optimismPortal2.proveAndFinalizeWithdrawalTransaction({
-            _tx: _defaultTx,
-            _disputeGameIndex: _proposedGameIndex,
-            _outputRootProof: _outputRootProof,
-            _withdrawalProof: _withdrawalProof
-        });
-
-        assertEq(address(bob).balance, bobBalanceBefore + _defaultTx.value);
-        assertTrue(optimismPortal2.finalizedWithdrawals(_withdrawalHash));
-    }
-
-    /// @notice Tests that when the target call fails, ETH is re-locked in the lockbox.
-    function test_proveAndFinalizeWithdrawalTransaction_targetFailsAndRelocks_fails() external {
-        address dummyLockbox = address(0xdeadbeef);
-        forceEnableLockbox(dummyLockbox);
-        vm.deal(address(dummyLockbox), 0xFFFFFFFF);
+    /// @notice Tests that a failed target call is recorded without reverting the withdrawal.
+    function test_proveAndFinalizeWithdrawalTransaction_targetFails_succeeds() external {
         vm.deal(address(optimismPortal2), _defaultTx.value);
 
         uint256 bobBalanceBefore = address(bob).balance;

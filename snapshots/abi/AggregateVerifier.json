@@ -67,6 +67,57 @@
         "internalType": "uint256",
         "name": "intermediateBlockInterval",
         "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "components": [
+              {
+                "internalType": "uint64",
+                "name": "slow",
+                "type": "uint64"
+              },
+              {
+                "internalType": "uint64",
+                "name": "fast",
+                "type": "uint64"
+              }
+            ],
+            "internalType": "struct AggregateVerifier.FinalizationDelays",
+            "name": "finalizationDelays",
+            "type": "tuple"
+          },
+          {
+            "components": [
+              {
+                "internalType": "contract IProtocolVersions",
+                "name": "protocolVersions",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "genesisBlockNumber",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint64",
+                "name": "genesisTimestamp",
+                "type": "uint64"
+              },
+              {
+                "internalType": "uint64",
+                "name": "blockTime",
+                "type": "uint64"
+              }
+            ],
+            "internalType": "struct AggregateVerifier.ScheduleConfig",
+            "name": "schedule",
+            "type": "tuple"
+          }
+        ],
+        "internalType": "struct AggregateVerifier.GameConfig",
+        "name": "gameConfig",
+        "type": "tuple"
       }
     ],
     "stateMutability": "nonpayable",
@@ -191,6 +242,19 @@
   },
   {
     "inputs": [],
+    "name": "L2_BLOCK_TIME",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "L2_CHAIN_ID",
     "outputs": [
       {
@@ -204,12 +268,51 @@
   },
   {
     "inputs": [],
+    "name": "L2_GENESIS_BLOCK_NUMBER",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "L2_GENESIS_TIMESTAMP",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "PROOF_THRESHOLD",
     "outputs": [
       {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "PROTOCOL_VERSIONS",
+    "outputs": [
+      {
+        "internalType": "contract IProtocolVersions",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -683,6 +786,19 @@
   },
   {
     "inputs": [],
+    "name": "scheduleId",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "startingBlockNumber",
     "outputs": [
       {
@@ -1003,6 +1119,11 @@
   },
   {
     "inputs": [],
+    "name": "InvalidL2BlockTime",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidParentGame",
     "type": "error"
   },
@@ -1062,6 +1183,33 @@
       }
     ],
     "name": "L1OriginTooOld",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "blockNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "genesisBlockNumber",
+        "type": "uint256"
+      }
+    ],
+    "name": "L2BlockBeforeGenesis",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "blockNumber",
+        "type": "uint256"
+      }
+    ],
+    "name": "L2TimestampOverflow",
     "type": "error"
   },
   {

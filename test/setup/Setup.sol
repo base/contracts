@@ -25,10 +25,10 @@ import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
 
 // Interfaces
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
-import { IETHLockbox } from "interfaces/L1/IETHLockbox.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IOptimismMintableERC721Factory } from "interfaces/L2/IOptimismMintableERC721Factory.sol";
@@ -97,7 +97,6 @@ abstract contract Setup is FeatureFlags {
     address superchainProxyAdminOwner;
     IProxyAdmin superchainProxyAdmin;
     IOptimismPortal optimismPortal2;
-    IETHLockbox ethLockbox;
     ISystemConfig systemConfig;
     IL1StandardBridge l1StandardBridge;
     IL1CrossDomainMessenger l1CrossDomainMessenger;
@@ -105,6 +104,7 @@ abstract contract Setup is FeatureFlags {
     IL1ERC721Bridge l1ERC721Bridge;
     IOptimismMintableERC20Factory l1OptimismMintableERC20Factory;
     ISuperchainConfig superchainConfig;
+    IProtocolVersions protocolVersions;
 
     // L2 contracts
     IL2CrossDomainMessenger l2CrossDomainMessenger =
@@ -218,15 +218,6 @@ abstract contract Setup is FeatureFlags {
 
         optimismPortal2 = IOptimismPortal(artifacts.mustGetAddress("OptimismPortalProxy"));
 
-        // Only skip ETHLockbox assignment if we're in a fork test with non-upgraded fork
-        // TODO(#14691): Remove this check once Upgrade 15 is deployed on Mainnet.
-        if (!forkTest || deploy.cfg().useUpgradedFork()) {
-            // Here we use getAddress instead of mustGetAddress because some chains might not have
-            // the ETHLockbox proxy. Chains that don't have the ETHLockbox proxy will just return
-            // address(0) and cause a revert if we use mustGetAddress.
-            ethLockbox = IETHLockbox(artifacts.getAddress("ETHLockboxProxy"));
-        }
-
         systemConfig = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
         l1StandardBridge = IL1StandardBridge(artifacts.mustGetAddress("L1StandardBridgeProxy"));
         l1CrossDomainMessenger = IL1CrossDomainMessenger(artifacts.mustGetAddress("L1CrossDomainMessengerProxy"));
@@ -241,6 +232,9 @@ abstract contract Setup is FeatureFlags {
         anchorStateRegistry = IAnchorStateRegistry(artifacts.mustGetAddress("AnchorStateRegistryProxy"));
         disputeGameFactory = IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
         delayedWeth = IDelayedWETH(artifacts.mustGetAddress("DelayedWETHProxy"));
+        // Use getAddress instead of mustGetAddress because forked production chains predating
+        // ProtocolVersions won't have the proxy; those return address(0) rather than reverting.
+        protocolVersions = IProtocolVersions(artifacts.getAddress("ProtocolVersionsProxy"));
         proxyAdmin = IProxyAdmin(artifacts.mustGetAddress("ProxyAdmin"));
         proxyAdminOwner = proxyAdmin.owner();
         superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
