@@ -17,6 +17,7 @@ contract MockAnchorStateRegistry {
     uint256 public anchorL2BlockNumber;
     address public factory;
     GameType public respectedGameType;
+    IDisputeGame public anchorGame;
 
     function initialize(
         address newFactory,
@@ -79,5 +80,7 @@ contract MockAnchorStateRegistry {
         return _game.resolvedAt().raw() != 0;
     }
 
-    function setAnchorState(IDisputeGame) external { }
+    function setAnchorState(IDisputeGame _game) external {
+        anchorGame = _game;
+    }
 }
