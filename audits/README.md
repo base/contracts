@@ -11,8 +11,6 @@ Audits of the formerly shared OP Stack components can be found in [Optimism’s 
 | 06/04/26 | [Cantina](https://cantina.xyz/portfolio/6ce647dc-3b2c-448c-9421-426087341ce8) | Proof Contracts Update | [Report](./cantina_coinbase_proof_contracts_update_jun2026.pdf) | [e225648a7ed538e7e28c041d44f3b7a606ba7743](https://github.com/base/contracts/tree/e225648a7ed538e7e28c041d44f3b7a606ba7743)  |
 | 08/03/26 | [Cantina](https://cantina.xyz/) | Hinted P-384 Nitro Attestation Validator | [Report](https://github.com/base/nitro-validator/blob/0ea0d12366b4fa44f9e07e4755f2ad36561cb674/audits/cantina-nitro-validator-05294ec0-2026-08-03.pdf) | [05294ec098f7f38ef33b2d2470cfbbd08186b943](https://github.com/base/nitro-validator/tree/05294ec098f7f38ef33b2d2470cfbbd08186b943) |
 
-The `nitro-validator` dependency is pinned at
-[`0ea0d123`](https://github.com/base/nitro-validator/tree/0ea0d12366b4fa44f9e07e4755f2ad36561cb674).
-Compared with the reviewed commit, the pin includes follow-up certificate revocation and parser hardening, stricter
-P-384 public-key validation, and the audit report itself. The complete delta is available in the
-[`05294ec0...0ea0d123` comparison](https://github.com/base/nitro-validator/compare/05294ec098f7f38ef33b2d2470cfbbd08186b943...0ea0d12366b4fa44f9e07e4755f2ad36561cb674).
+The report's initial review baseline is `05294ec0`. The `nitro-validator` dependency is pinned at
+[`0ea0d123`](https://github.com/base/nitro-validator/tree/0ea0d12366b4fa44f9e07e4755f2ad36561cb674),
+which includes the Cantina-verified remediation PRs documented in the final report and the report itself.

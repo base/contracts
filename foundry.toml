@@ -19,6 +19,7 @@ optimizer_runs = 999999
 # entire build directory.
 additional_compiler_profiles = [
   { name = "dispute", optimizer_runs = 5000 },
+  { name = "nitro-validator", optimizer = true, optimizer_runs = 10000 },
 ]
 compilation_restrictions = [
   { paths = "src/L1/proofs/DisputeGameFactory.sol", optimizer_runs = 5000 },
@@ -31,6 +32,7 @@ compilation_restrictions = [
   { paths = "src/universal/Proxy.sol", optimizer_runs = 5000 },
   { paths = "src/L2/OptimismMintableERC721.sol", optimizer_runs = 5000 },
   { paths = "src/L2/OptimismMintableERC721Factory.sol", optimizer_runs = 5000 },
+  { paths = "src/vendor/NitroValidatorArtifacts.sol", version = "=0.8.26", optimizer_runs = 10000 },
 ]
 
 extra_output = ['devdoc', 'userdoc', 'metadata', 'storageLayout']
@@ -40,7 +42,6 @@ evm_version = 'cancun'
 
 remappings = [
   '@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts',
-  'nitro-validator/=lib/nitro-validator/src/',
   'openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/',
 ]
 
@@ -77,24 +78,6 @@ wrap_comments=true
 
 [lint]
 lint_on_build = false
-
-################################################################
-#                PROFILE: NITRO VALIDATOR                      #
-################################################################
-
-[profile.nitro-validator]
-src = 'lib/nitro-validator/src'
-test = 'lib/nitro-validator/test'
-script = 'lib/nitro-validator/script'
-out = 'artifacts/nitro-validator-forge-artifacts'
-cache_path = 'cache/nitro-validator'
-build_info_path = 'artifacts/nitro-validator-build-info'
-solc_version = '0.8.26'
-optimizer = true
-optimizer_runs = 10000
-
-# Deployments must use artifacts produced by this profile. Importing the concrete
-# deployables into the root profile recompiles them with settings that exceed EIP-170.
 
 ################################################################
 #                         PROFILE: CI                          #
@@ -154,6 +137,7 @@ depth = 8
 # See the info in the "DEFAULT" profile to understand this section.
 additional_compiler_profiles = [
   { name = "dispute", optimizer_runs = 0 },
+  { name = "nitro-validator", optimizer = true, optimizer_runs = 10000 },
 ]
 compilation_restrictions = [
   { paths = "src/L1/proofs/DisputeGameFactory.sol", optimizer_runs = 0 },
@@ -166,4 +150,5 @@ compilation_restrictions = [
   { paths = "src/universal/Proxy.sol", optimizer_runs = 0 },
   { paths = "src/L2/OptimismMintableERC721.sol", optimizer_runs = 0 },
   { paths = "src/L2/OptimismMintableERC721Factory.sol", optimizer_runs = 0 },
+  { paths = "src/vendor/NitroValidatorArtifacts.sol", version = "=0.8.26", optimizer_runs = 10000 },
 ]

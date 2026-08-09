@@ -61,10 +61,6 @@ build-source:
 build-no-tests:
   forge build --skip "/**/test/**"
 
-# Builds nitro-validator with its pinned production compiler settings.
-nitro-validator-build *ARGS:
-  FOUNDRY_PROFILE=nitro-validator forge build {{ARGS}}
-
 # Builds the contracts.
 build *ARGS: lint-fix-no-fail
   just forge-build {{ARGS}}
@@ -254,7 +250,6 @@ reinitializer-check-no-build:
 # Checks that the size of the contracts is within the limit.
 size-check:
   forge build --sizes --skip "/**/test/**" --skip "/**/scripts/**"
-  just nitro-validator-build --sizes --skip "/**/test/**" --skip "/**/script/**"
 
 # Checks that the semgrep tests are valid.
 semgrep-test-validity-check:
