@@ -53,6 +53,10 @@ jobs:
         run: just forge-build
         id: build
 
+      - name: Check contract sizes
+        run: just size-check
+        id: size-check
+
       - name: Validate semver-lock
         id: semver-lock
         run: |

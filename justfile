@@ -15,6 +15,7 @@ deps: clean-lib
     github.com/OpenZeppelin/openzeppelin-contracts-upgradeable@0a2cb9a445c365870ed7a8ab461b12acf3e27d63 \
     github.com/transmissions11/solmate@8f9b23f8838670afda0fd8983f2c41e8037ae6bc \
     github.com/Vectorized/solady@502cc1ea718e6fa73b380635ee0868b0740595f0 \
+    github.com/base/nitro-validator@0ea0d12366b4fa44f9e07e4755f2ad36561cb674 \
     github.com/risc0/risc0-ethereum@a78ac4a52fe9cfa14120c3b496430f0d42e1d8d3
 
 # Cleans dependency installs.
@@ -59,6 +60,10 @@ build-source:
 # Builds source contracts and scripts, skipping tests.
 build-no-tests:
   forge build --skip "/**/test/**"
+
+# Builds nitro-validator with its pinned production compiler settings.
+nitro-validator-build *ARGS:
+  FOUNDRY_PROFILE=nitro-validator forge build {{ARGS}}
 
 # Builds the contracts.
 build *ARGS: lint-fix-no-fail
@@ -249,6 +254,7 @@ reinitializer-check-no-build:
 # Checks that the size of the contracts is within the limit.
 size-check:
   forge build --sizes --skip "/**/test/**" --skip "/**/scripts/**"
+  just nitro-validator-build --sizes --skip "/**/test/**" --skip "/**/script/**"
 
 # Checks that the semgrep tests are valid.
 semgrep-test-validity-check:

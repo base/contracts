@@ -40,6 +40,7 @@ evm_version = 'cancun'
 
 remappings = [
   '@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts',
+  'nitro-validator/=lib/nitro-validator/src/',
   'openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/',
 ]
 
@@ -76,6 +77,24 @@ wrap_comments=true
 
 [lint]
 lint_on_build = false
+
+################################################################
+#                PROFILE: NITRO VALIDATOR                      #
+################################################################
+
+[profile.nitro-validator]
+src = 'lib/nitro-validator/src'
+test = 'lib/nitro-validator/test'
+script = 'lib/nitro-validator/script'
+out = 'artifacts/nitro-validator-forge-artifacts'
+cache_path = 'cache/nitro-validator'
+build_info_path = 'artifacts/nitro-validator-build-info'
+solc_version = '0.8.26'
+optimizer = true
+optimizer_runs = 10000
+
+# Deployments must use artifacts produced by this profile. Importing the concrete
+# deployables into the root profile recompiles them with settings that exceed EIP-170.
 
 ################################################################
 #                         PROFILE: CI                          #

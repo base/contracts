@@ -9,3 +9,10 @@ Audits of the formerly shared OP Stack components can be found in [Optimism’s 
 | 04/10/26 | [Cantina](https://cantina.xyz/portfolio/a4f952cf-1c5b-4e3c-8153-c3adff899613) | TEE Multiproof Contracts 2 | [Report](./cantina_coinbase_nitro_enclave_apr2026.pdf) | [fe2af8cbffefa44bbb1a3917507f8bd8ebec7a2](https://github.com/base/contracts/tree/ffe2af8cbffefa44bbb1a3917507f8bd8ebec7a2)  |
 | 04/10/26 | [Cantina](https://cantina.xyz/portfolio/b72c7078-f6da-4074-a3bd-4f938f469fb7) | AggregateVerifier Multiproof Contracts 2 | [Report](./cantina_coinbase_aggregateverifier_apr2026.pdf) | [ffe2af8cbffefa44bbb1a3917507f8bd8ebec7a2](https://github.com/base/contracts/tree/ffe2af8cbffefa44bbb1a3917507f8bd8ebec7a2)  |
 | 06/04/26 | [Cantina](https://cantina.xyz/portfolio/6ce647dc-3b2c-448c-9421-426087341ce8) | Proof Contracts Update | [Report](./cantina_coinbase_proof_contracts_update_jun2026.pdf) | [e225648a7ed538e7e28c041d44f3b7a606ba7743](https://github.com/base/contracts/tree/e225648a7ed538e7e28c041d44f3b7a606ba7743)  |
+| 08/03/26 | [Cantina](https://cantina.xyz/) | Hinted P-384 Nitro Attestation Validator | [Report](https://github.com/base/nitro-validator/blob/0ea0d12366b4fa44f9e07e4755f2ad36561cb674/audits/cantina-nitro-validator-05294ec0-2026-08-03.pdf) | [05294ec098f7f38ef33b2d2470cfbbd08186b943](https://github.com/base/nitro-validator/tree/05294ec098f7f38ef33b2d2470cfbbd08186b943) |
+
+The `nitro-validator` dependency is pinned at
+[`0ea0d123`](https://github.com/base/nitro-validator/tree/0ea0d12366b4fa44f9e07e4755f2ad36561cb674).
+Compared with the reviewed commit, the pin includes follow-up certificate revocation and parser hardening, stricter
+P-384 public-key validation, and the audit report itself. The complete delta is available in the
+[`05294ec0...0ea0d123` comparison](https://github.com/base/nitro-validator/compare/05294ec098f7f38ef33b2d2470cfbbd08186b943...0ea0d12366b4fa44f9e07e4755f2ad36561cb674).
