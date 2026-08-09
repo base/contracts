@@ -14,6 +14,8 @@ tests win.
 - Snapshot generation is handled by Go scripts under `scripts/autogen`.
 - Tests: `just test` (full suite), `just test --match-path <file>` (single file), `just test --match-test <name>` (single test).
 - mise is used to keep local and CI Foundry versions in sync. Run `mise install` once after cloning.
+- Do not add Foundry remappings for dependencies. Import them through explicit `lib/<dependency>/...` paths; existing
+  remappings are special cases, not precedent.
 
 ## Contract structure conventions
 
