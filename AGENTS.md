@@ -17,6 +17,14 @@ tests win.
 - Do not add Foundry remappings for dependencies. Import them through explicit `lib/<dependency>/...` paths; existing
   remappings are special cases, not precedent.
 
+## Solidity style guide
+
+- Follow the [Coinbase Solidity Style Guide](https://github.com/coinbase/solidity-style-guide) for new or modified
+  Solidity code.
+- Before making non-trivial Solidity changes, consult the relevant sections of the guide.
+- If the guide conflicts with this file, nearby code, formatting tools, or enforced tests, the repository-local rules
+  take precedence.
+
 ## Contract structure conventions
 
 ### Style-guide ordering inside a contract
