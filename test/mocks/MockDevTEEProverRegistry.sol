@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
 
-import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { EnumerableSetLib } from "src/vendor/EnumerableSetLib.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
 /// @title DevTEEProverRegistry
 /// @notice Test/development registry that can register signers without Nitro attestation verification.
@@ -13,11 +13,8 @@ import { EnumerableSetLib } from "src/vendor/EnumerableSetLib.sol";
 contract DevTEEProverRegistry is TEEProverRegistry {
     using EnumerableSetLib for EnumerableSetLib.AddressSet;
 
-    constructor(
-        INitroEnclaveVerifier nitroVerifier,
-        IDisputeGameFactory factory
-    )
-        TEEProverRegistry(nitroVerifier, factory)
+    constructor(NitroValidator nitroValidator, IDisputeGameFactory factory)
+        TEEProverRegistry(nitroValidator, factory)
     { }
 
     /// @notice Registers a signer and image hash without attestation verification.

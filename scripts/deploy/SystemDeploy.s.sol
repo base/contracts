@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { VmSafe } from "lib/forge-std/src/Vm.sol";
 import { console2 as console } from "lib/forge-std/src/console2.sol";
+import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
+import { VmSafe } from "lib/forge-std/src/Vm.sol";
 
 import { Artifacts } from "scripts/Artifacts.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
@@ -27,6 +28,7 @@ import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
@@ -36,7 +38,6 @@ import { AddressManager } from "src/legacy/AddressManager.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
-import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { Constants } from "src/libraries/Constants.sol";
@@ -78,6 +79,7 @@ contract SystemDeploy is Script {
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
         address nitroEnclaveVerifier;
+        address nitroValidator;
         AggregateVerifier.ScheduleConfig scheduleConfig;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
@@ -202,6 +204,29 @@ contract SystemDeploy is Script {
         _saveUpgradeArtifacts(output_);
     }
 
+    /// @notice Deploys and saves a TEEProverRegistry implementation for an existing OP Chain.
+    /// @param _systemConfigProxy The existing chain's SystemConfig proxy.
+    /// @return output_ The deployed TEEProverRegistry implementation.
+    function deployTEEProverRegistryImplementation(ISystemConfig _systemConfigProxy)
+        public
+        returns (TEEProverRegistry output_)
+    {
+        DeployUtils.assertValidContractAddress(address(_systemConfigProxy));
+        NitroValidator nitroValidator = NitroValidator(cfg.nitroValidator());
+        DeployUtils.assertValidContractAddress(address(nitroValidator));
+        IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(_systemConfigProxy.disputeGameFactory());
+        DeployUtils.assertValidContractAddress(address(disputeGameFactory));
+
+        vm.broadcast(msg.sender);
+        output_ = new TEEProverRegistry({ nitroValidator: nitroValidator, factory: disputeGameFactory });
+
+        address currentImplementation = artifacts.getAddress("TEEProverRegistryImpl");
+        if (currentImplementation != address(0) && artifacts.getAddress("TEEProverRegistryLegacyImpl") == address(0)) {
+            artifacts.save("TEEProverRegistryLegacyImpl", currentImplementation);
+        }
+        artifacts.save("TEEProverRegistryImpl", address(output_));
+    }
+
     /// @notice Deploys the shared Superchain proxy admin and SuperchainConfig proxy.
     function deploySuperchain(SuperchainInput memory _input) public returns (SuperchainOutput memory output_) {
         output_ = _deploySuperchain(_input);
@@ -266,6 +291,7 @@ contract SystemDeploy is Script {
             multiproofConfigHash: cfg.multiproofConfigHash(),
             multiproofGameType: cfg.multiproofGameType(),
             nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
+            nitroValidator: cfg.nitroValidator(),
             scheduleConfig: _configuredScheduleConfig(),
             multiproofBlockInterval: cfg.multiproofBlockInterval(),
             multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
@@ -564,6 +590,7 @@ contract SystemDeploy is Script {
             output_.zkVerifier = multiproof.zkVerifier;
             output_.nitroEnclaveVerifier = INitroEnclaveVerifier(_implementationsInput.nitroEnclaveVerifier);
             output_.sp1Verifier = _implementationsInput.sp1Verifier;
+            output_.nitroValidator = NitroValidator(_implementationsInput.nitroValidator);
         }
 
         _transferOwnership(address(output_.disputeGameFactoryProxy), _input.roles.opChainProxyAdminOwner);
@@ -709,6 +736,13 @@ contract SystemDeploy is Script {
         if (address(currentGameImpl) == address(0)) return;
 
         if (_impls.teeProverRegistryImpl != address(0)) {
+            TEEProverRegistry newTEEProverRegistry = TEEProverRegistry(_impls.teeProverRegistryImpl);
+            DeployUtils.assertValidContractAddress(address(newTEEProverRegistry));
+            DeployUtils.assertValidContractAddress(address(newTEEProverRegistry.NITRO_VALIDATOR()));
+            require(
+                address(newTEEProverRegistry.DISPUTE_GAME_FACTORY()) == address(_disputeGameFactory),
+                "SystemDeploy: TEEProverRegistry factory mismatch"
+            );
             AggregateVerifier currentAggregateVerifier = AggregateVerifier(address(currentGameImpl));
             TEEProverRegistry teeProverRegistry =
                 TEEVerifier(address(currentAggregateVerifier.TEE_VERIFIER())).TEE_PROVER_REGISTRY();
@@ -993,9 +1027,9 @@ contract SystemDeploy is Script {
         GameType gameType = GameType.wrap(uint32(_input.multiproofGameType));
 
         vm.broadcast(msg.sender);
-        output_.teeProverRegistryImpl = new TEEProverRegistry(
-            INitroEnclaveVerifier(_input.nitroEnclaveVerifier), _output.disputeGameFactoryProxy
-        );
+        output_.teeProverRegistryImpl = new TEEProverRegistry({
+            nitroValidator: NitroValidator(_input.nitroValidator), factory: _output.disputeGameFactoryProxy
+        });
 
         output_.teeProverRegistryProxy =
             TEEProverRegistry(_deployProxy(_opChainInput, _output.opChainProxyAdmin, "TEEProverRegistry"));
@@ -1016,12 +1050,6 @@ contract SystemDeploy is Script {
                 )
             )
         );
-
-        INitroEnclaveVerifier nitroVerifier = INitroEnclaveVerifier(_input.nitroEnclaveVerifier);
-        if (nitroVerifier.proofSubmitter() != address(output_.teeProverRegistryProxy)) {
-            vm.broadcast(msg.sender);
-            nitroVerifier.setProofSubmitter(address(output_.teeProverRegistryProxy));
-        }
 
         vm.broadcast(msg.sender);
         output_.teeVerifier =
@@ -1112,8 +1140,10 @@ contract SystemDeploy is Script {
         require(_input.scheduleConfig.blockTime != 0, "SystemDeploy: L2 block time not set");
         require(_input.scheduleConfig.genesisTimestamp != 0, "SystemDeploy: L2 genesis timestamp not set");
         require(_input.nitroEnclaveVerifier != address(0), "SystemDeploy: nitroEnclaveVerifier not set");
+        require(_input.nitroValidator != address(0), "SystemDeploy: nitroValidator not set");
         require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
         DeployUtils.assertValidContractAddress(_input.nitroEnclaveVerifier);
+        DeployUtils.assertValidContractAddress(_input.nitroValidator);
         DeployUtils.assertValidContractAddress(address(_input.sp1Verifier));
         require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
         require(
@@ -1170,6 +1200,7 @@ contract SystemDeploy is Script {
         _saveIfSet("TEEProverRegistryProxy", address(chain.teeProverRegistryProxy));
         _saveIfSet("TEEProverRegistry", address(chain.teeProverRegistryProxy));
         _saveIfSet("NitroEnclaveVerifier", address(chain.nitroEnclaveVerifier));
+        _saveIfSet("NitroValidator", address(chain.nitroValidator));
         _saveIfSet("SP1Verifier", address(chain.sp1Verifier));
     }
 

@@ -2,8 +2,8 @@
   {
     "inputs": [
       {
-        "internalType": "contract INitroEnclaveVerifier",
-        "name": "nitroVerifier",
+        "internalType": "contract NitroValidator",
+        "name": "nitroValidator",
         "type": "address"
       },
       {
@@ -43,10 +43,10 @@
   },
   {
     "inputs": [],
-    "name": "NITRO_VERIFIER",
+    "name": "NITRO_VALIDATOR",
     "outputs": [
       {
-        "internalType": "contract INitroEnclaveVerifier",
+        "internalType": "contract NitroValidator",
         "name": "",
         "type": "address"
       }
@@ -221,12 +221,17 @@
     "inputs": [
       {
         "internalType": "bytes",
-        "name": "output",
+        "name": "attestationTbs",
         "type": "bytes"
       },
       {
         "internalType": "bytes",
-        "name": "proofBytes",
+        "name": "signature",
+        "type": "bytes"
+      },
+      {
+        "internalType": "bytes",
+        "name": "hints",
         "type": "bytes"
       }
     ],
@@ -449,12 +454,12 @@
   },
   {
     "inputs": [],
-    "name": "AttestationTooOld",
+    "name": "AttestationFromFuture",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "AttestationVerificationFailed",
+    "name": "AttestationTooOld",
     "type": "error"
   },
   {
@@ -470,6 +475,11 @@
   {
     "inputs": [],
     "name": "InvalidGameType",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidPCR0",
     "type": "error"
   },
   {

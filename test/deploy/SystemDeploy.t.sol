@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
 import { Test } from "lib/forge-std/src/Test.sol";
 
 import { Artifacts } from "scripts/Artifacts.s.sol";
@@ -9,6 +10,7 @@ import { Types } from "scripts/libraries/Types.sol";
 import { SystemDeployAssertions } from "test/deploy/SystemDeployAssertions.sol";
 
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
@@ -17,12 +19,27 @@ import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
+import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
+import { MockNitroValidator } from "test/mocks/MockNitroValidator.sol";
 
 contract MockNitroEnclaveVerifier {
     address public proofSubmitter;
 
     function setProofSubmitter(address _proofSubmitter) external {
         proofSubmitter = _proofSubmitter;
+    }
+}
+
+contract MockLegacyTEEProverRegistry is DevTEEProverRegistry {
+    constructor(
+        NitroValidator nitroValidator,
+        IDisputeGameFactory factory
+    )
+        DevTEEProverRegistry(nitroValidator, factory)
+    { }
+
+    function version() public pure override returns (string memory) {
+        return "0.5.0";
     }
 }
 
@@ -43,6 +60,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     address internal proposer = makeAddr("proposer");
     address internal challenger = makeAddr("challenger");
     MockNitroEnclaveVerifier internal nitroEnclaveVerifier;
+    MockNitroValidator internal nitroValidator;
     MockSP1Verifier internal sp1Verifier;
 
     uint256 internal l2ChainId = 901;
@@ -50,6 +68,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     function setUp() public {
         systemDeploy = new SystemDeploy();
         nitroEnclaveVerifier = new MockNitroEnclaveVerifier();
+        nitroValidator = new MockNitroValidator();
         sp1Verifier = new MockSP1Verifier();
     }
 
@@ -162,6 +181,14 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         systemDeploy.deploy(input);
     }
 
+    function test_deploy_withoutNitroValidator_reverts() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.implementationsInput.nitroValidator = address(0);
+
+        vm.expectRevert("SystemDeploy: nitroValidator not set");
+        systemDeploy.deploy(input);
+    }
+
     function test_upgrade_withoutManagerDelegatecall_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
@@ -193,6 +220,58 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             "protocol versions impl"
         );
         assertValidStandardSystem(_expected(output, input));
+    }
+
+    function test_deployTEEProverRegistryImplementation_upgradeExistingProxy_succeeds() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+        TEEProverRegistry registry = TEEProverRegistry(address(output.opChain.teeProverRegistryProxy));
+        MockLegacyTEEProverRegistry legacyImpl = new MockLegacyTEEProverRegistry({
+            nitroValidator: NitroValidator(address(nitroValidator)), factory: registry.DISPUTE_GAME_FACTORY()
+        });
+        output.opChain.opChainProxyAdmin.upgrade(payable(address(registry)), address(legacyImpl));
+
+        address signer = makeAddr("existing-signer");
+        bytes32 imageHash = keccak256("existing-image");
+        DevTEEProverRegistry(address(registry)).addDevSigner(signer, imageHash);
+        vm.etch(address(artifacts), vm.getDeployedCode("Artifacts.s.sol:Artifacts"));
+        artifacts.setUp();
+        _saveArtifact("TEEProverRegistryImpl", address(legacyImpl));
+        vm.mockCall(
+            address(systemDeploy.cfg()),
+            abi.encodeWithSignature("nitroValidator()"),
+            abi.encode(address(nitroValidator))
+        );
+
+        TEEProverRegistry newImpl = systemDeploy.deployTEEProverRegistryImplementation(output.opChain.systemConfigProxy);
+        Types.Implementations memory implementations = output.impls;
+        implementations.teeProverRegistryImpl = address(newImpl);
+        systemDeploy.upgrade(
+            SystemDeploy.UpgradeInput({
+                saveArtifacts: false,
+                superchainConfigProxy: output.superchain.superchainConfigProxy,
+                implementations: implementations,
+                systemConfigProxy: output.opChain.systemConfigProxy,
+                protocolVersionsProxy: output.opChain.protocolVersionsProxy
+            })
+        );
+
+        assertEq(
+            output.opChain.opChainProxyAdmin.getProxyImplementation(address(registry)),
+            address(newImpl),
+            "tee registry impl"
+        );
+        assertEq(artifacts.getAddress("TEEProverRegistryLegacyImpl"), address(legacyImpl), "legacy artifact");
+        assertEq(artifacts.getAddress("TEEProverRegistryImpl"), address(newImpl), "implementation artifact");
+        assertEq(registry.version(), "0.6.0");
+        assertEq(registry.owner(), owner);
+        assertEq(registry.manager(), owner);
+        assertEq(GameType.unwrap(registry.gameType()), uint32(input.implementationsInput.multiproofGameType));
+        assertTrue(registry.isValidProposer(proposer));
+        assertTrue(registry.isValidProposer(challenger));
+        assertTrue(registry.isRegisteredSigner(signer));
+        assertEq(registry.signerImageHash(signer), imageHash);
+        assertEq(address(registry.NITRO_VALIDATOR()), address(nitroValidator));
     }
 
     function test_upgrade_discoversProtocolVersionsProxyFromArtifacts_succeeds() public {
@@ -258,6 +337,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             multiproofConfigHash: bytes32(uint256(4)),
             multiproofGameType: 621,
             nitroEnclaveVerifier: address(nitroEnclaveVerifier),
+            nitroValidator: address(nitroValidator),
             scheduleConfig: AggregateVerifier.ScheduleConfig({
                 protocolVersions: IProtocolVersions(address(0)),
                 genesisBlockNumber: 0,
@@ -311,6 +391,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             _input.implementationsInput.nitroEnclaveVerifier,
             "nitro enclave verifier"
         );
+        assertEq(address(_output.opChain.nitroValidator), _input.implementationsInput.nitroValidator, "nitro validator");
         assertEq(address(_output.opChain.sp1Verifier), address(_input.implementationsInput.sp1Verifier), "sp1 verifier");
         assertEq(
             _output.opChain.opChainProxyAdmin.getProxyImplementation(teeProverRegistryProxyAddr),
@@ -325,13 +406,13 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertTrue(teeProverRegistry.isValidProposer(_input.implementationsInput.teeChallenger), "tee challenger");
         assertEq(
             MockNitroEnclaveVerifier(_input.implementationsInput.nitroEnclaveVerifier).proofSubmitter(),
-            teeProverRegistryProxyAddr,
-            "nitro proof submitter"
+            address(0),
+            "legacy nitro proof submitter"
         );
         assertEq(
-            address(teeProverRegistry.NITRO_VERIFIER()),
-            _input.implementationsInput.nitroEnclaveVerifier,
-            "tee registry nitro verifier"
+            address(teeProverRegistry.NITRO_VALIDATOR()),
+            _input.implementationsInput.nitroValidator,
+            "tee registry nitro validator"
         );
         assertEq(
             address(teeProverRegistry.DISPUTE_GAME_FACTORY()),

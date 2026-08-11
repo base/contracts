@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { Script } from "lib/forge-std/src/Script.sol";
 import { console } from "lib/forge-std/src/console.sol";
+import { Script } from "lib/forge-std/src/Script.sol";
 import { stdJson } from "lib/forge-std/src/StdJson.sol";
 
 /// @title DeployConfig
@@ -15,6 +15,7 @@ contract DeployConfig is Script {
     address public finalSystemOwner;
     address public l1FeeVaultRecipient;
     address public nitroEnclaveVerifier;
+    address public nitroValidator;
     address public operatorFeeVaultRecipient;
     address public p2pSequencerAddress;
     address public proxyAdminOwner;
@@ -71,6 +72,7 @@ contract DeployConfig is Script {
         finalSystemOwner = _json.readAddress("$.finalSystemOwner");
         l1FeeVaultRecipient = _json.readAddress("$.l1FeeVaultRecipient");
         nitroEnclaveVerifier = _json.readAddress("$.nitroEnclaveVerifier");
+        nitroValidator = _json.readAddress("$.nitroValidator");
         operatorFeeVaultRecipient = _json.readAddress("$.operatorFeeVaultRecipient");
         p2pSequencerAddress = _json.readAddress("$.p2pSequencerAddress");
         proxyAdminOwner = _json.readAddress("$.proxyAdminOwner");

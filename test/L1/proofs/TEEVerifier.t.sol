@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
 import { Test } from "lib/forge-std/src/Test.sol";
 
 import { Proxy } from "src/universal/Proxy.sol";
 
-import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { GameType } from "src/libraries/bridge/Types.sol";
@@ -52,8 +52,9 @@ contract TEEVerifierTest is Test {
         MockDisputeGameFactoryForVerifier mockFactory = new MockDisputeGameFactoryForVerifier(address(mockVerifier));
 
         // DevTEEProverRegistry keeps these tests focused on verifier behavior without Nitro attestation setup.
-        DevTEEProverRegistry impl =
-            new DevTEEProverRegistry(INitroEnclaveVerifier(address(0)), IDisputeGameFactory(address(mockFactory)));
+        DevTEEProverRegistry impl = new DevTEEProverRegistry({
+            nitroValidator: NitroValidator(address(0)), factory: IDisputeGameFactory(address(mockFactory))
+        });
 
         address proxyAdmin = makeAddr("proxy-admin");
         Proxy proxy = new Proxy(proxyAdmin);

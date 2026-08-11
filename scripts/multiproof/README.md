@@ -120,7 +120,37 @@ The deployer address (`finalSystemOwner`) is the owner of `DevTEEProverRegistry`
 
 ## Path 2: WithNitro (Dev — Real Attestation)
 
-> **TODO:** Add deployment and registration guide for `DeployDevWithNitro.s.sol`.
+Deploy the hinted validator stack, using production-controlled owner and revoker addresses:
+
+```bash
+just deploy-nitro-validator <CERT_MANAGER_OWNER> <CERT_MANAGER_REVOKER> \
+  --rpc-url <RPC_URL> --private-key <DEPLOYER_KEY>
+```
+
+Copy the `NitroValidator` address from `deployments/<chain-id>-nitro-validator.json` into the
+deploy config's `nitroValidator` field. Keep `nitroEnclaveVerifier` configured separately as a
+rollback dependency; the hinted Registry does not call it or update its `proofSubmitter`.
+
+Run `DeployDevWithNitro.s.sol`. Before registering a signer, pre-cache every non-root CA and the
+leaf certificate in the validator's `CertManager`. The dependency's call-plan tool can generate
+the ordered certificate calls and hints for development:
+
+```bash
+node lib/nitro-validator/tools/hinted_attestation_calls.js fixture \
+  --cert-manager <CERT_MANAGER> --validator <NITRO_VALIDATOR>
+```
+
+After the certificate chain is cached, submit the signed TBS and attestation-signature hints:
+
+```bash
+cast send <TEE_PROVER_REGISTRY> \
+  "registerSigner(bytes,bytes,bytes)" \
+  <ATTESTATION_TBS> <SIGNATURE> <ATTESTATION_HINTS> \
+  --rpc-url <RPC_URL> --private-key <OWNER_OR_MANAGER_KEY>
+```
+
+The Registry requires a 48-byte PCR0, a 65-byte `0x04 || x || y` secp256k1 `public_key`, and an
+attestation timestamp strictly within the previous 60 minutes.
 
 ---
 
