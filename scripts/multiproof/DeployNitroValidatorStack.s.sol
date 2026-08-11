@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 import { VmSafe } from "lib/forge-std/src/Vm.sol";
-import { console2 as console } from "lib/forge-std/src/console2.sol";
 
 import { CertManager } from "lib/nitro-validator/src/CertManager.sol";
 import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
@@ -38,8 +38,10 @@ contract DeployNitroValidatorStack is Script {
         Deployment memory deployment;
         vm.startBroadcast();
         deployment.p384Verifier = new P384Verifier();
-        deployment.certManager = new CertManager(deployment.p384Verifier, _owner, _revoker);
-        deployment.nitroValidator = new NitroValidator(deployment.certManager, deployment.p384Verifier);
+        deployment.certManager =
+            new CertManager({ p384Verifier_: deployment.p384Verifier, initialOwner: _owner, initialRevoker: _revoker });
+        deployment.nitroValidator =
+            new NitroValidator({ _certManager: deployment.certManager, _p384Verifier: deployment.p384Verifier });
         vm.stopBroadcast();
 
         console.log("P384Verifier:", address(deployment.p384Verifier));
