@@ -329,6 +329,11 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             "nitro proof submitter"
         );
         assertEq(
+            address(teeProverRegistry.NITRO_VERIFIER()),
+            _input.implementationsInput.nitroEnclaveVerifier,
+            "tee registry nitro verifier"
+        );
+        assertEq(
             address(teeProverRegistry.DISPUTE_GAME_FACTORY()),
             address(_output.opChain.disputeGameFactoryProxy),
             "tee registry dgf"

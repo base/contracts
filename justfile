@@ -189,6 +189,11 @@ genesis:
 deploy:
   ./scripts/deploy/deploy.sh
 
+# Deploys the hinted Nitro validator stack. Requires RPC and signer arguments.
+deploy-nitro-validator *ARGS:
+  forge script scripts/multiproof/DeployNitroValidatorStack.s.sol:DeployNitroValidatorStack \
+    --sig "run(address,address)" {{ARGS}} --broadcast
+
 
 ########################################################
 #                       SNAPSHOTS                      #
