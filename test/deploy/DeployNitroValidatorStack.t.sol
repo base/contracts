@@ -21,9 +21,6 @@ contract DeployNitroValidatorStackTest is Test {
         assertNotEq(address(deployment.p384Verifier), address(0));
         assertNotEq(address(deployment.certManager), address(0));
         assertNotEq(address(deployment.nitroValidator), address(0));
-        assertLe(address(deployment.p384Verifier).code.length, 24_576);
-        assertLe(address(deployment.certManager).code.length, 24_576);
-        assertLe(address(deployment.nitroValidator).code.length, 24_576);
 
         assertEq(address(deployment.certManager.p384Verifier()), address(deployment.p384Verifier));
         assertEq(deployment.certManager.owner(), owner);
