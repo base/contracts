@@ -123,8 +123,9 @@ The deployer address (`finalSystemOwner`) is the owner of `DevTEEProverRegistry`
 Deploy the hinted validator stack, using production-controlled owner and revoker addresses:
 
 ```bash
-just deploy-nitro-validator <CERT_MANAGER_OWNER> <CERT_MANAGER_REVOKER> \
-  --rpc-url <RPC_URL> --private-key <DEPLOYER_KEY>
+forge script scripts/multiproof/DeployNitroValidatorStack.s.sol:DeployNitroValidatorStack \
+  --sig "run(address,address)" <CERT_MANAGER_OWNER> <CERT_MANAGER_REVOKER> \
+  --broadcast --rpc-url <RPC_URL> --private-key <DEPLOYER_KEY>
 ```
 
 Copy the `NitroValidator` address from `deployments/<chain-id>-nitro-validator.json` into the
