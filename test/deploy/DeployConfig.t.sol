@@ -35,7 +35,10 @@ contract DeployConfig_ResourceConfigMinimumBaseFee_Test is Test {
         vm.removeFile(overrideConfigPath);
     }
 
-    function _withResourceConfigMinimumBaseFee(string memory _json, uint256 _value)
+    function _withResourceConfigMinimumBaseFee(
+        string memory _json,
+        uint256 _value
+    )
         internal
         pure
         returns (string memory json_)
