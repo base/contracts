@@ -27,7 +27,6 @@ import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
-import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
@@ -78,7 +77,6 @@ contract SystemDeploy is Script {
         bytes32 zkAggregationHash;
         bytes32 multiproofConfigHash;
         uint256 multiproofGameType;
-        address nitroEnclaveVerifier;
         address nitroValidator;
         AggregateVerifier.ScheduleConfig scheduleConfig;
         uint256 multiproofBlockInterval;
@@ -267,7 +265,6 @@ contract SystemDeploy is Script {
             zkAggregationHash: cfg.zkAggregationHash(),
             multiproofConfigHash: cfg.multiproofConfigHash(),
             multiproofGameType: cfg.multiproofGameType(),
-            nitroEnclaveVerifier: cfg.nitroEnclaveVerifier(),
             nitroValidator: cfg.nitroValidator(),
             scheduleConfig: _configuredScheduleConfig(),
             multiproofBlockInterval: cfg.multiproofBlockInterval(),
@@ -565,7 +562,6 @@ contract SystemDeploy is Script {
             output_.teeProverRegistryProxy = ITEEProverRegistry(address(multiproof.teeProverRegistryProxy));
             output_.teeVerifier = multiproof.teeVerifier;
             output_.zkVerifier = multiproof.zkVerifier;
-            output_.nitroEnclaveVerifier = INitroEnclaveVerifier(_implementationsInput.nitroEnclaveVerifier);
             output_.sp1Verifier = _implementationsInput.sp1Verifier;
             output_.nitroValidator = INitroValidator(_implementationsInput.nitroValidator);
         }
@@ -1114,10 +1110,8 @@ contract SystemDeploy is Script {
         require(_input.multiproofGameType != 0, "SystemDeploy: multiproofGameType not set");
         require(_input.scheduleConfig.blockTime != 0, "SystemDeploy: L2 block time not set");
         require(_input.scheduleConfig.genesisTimestamp != 0, "SystemDeploy: L2 genesis timestamp not set");
-        require(_input.nitroEnclaveVerifier != address(0), "SystemDeploy: nitroEnclaveVerifier not set");
         require(_input.nitroValidator != address(0), "SystemDeploy: nitroValidator not set");
         require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
-        DeployUtils.assertValidContractAddress(_input.nitroEnclaveVerifier);
         DeployUtils.assertValidContractAddress(_input.nitroValidator);
         DeployUtils.assertValidContractAddress(address(_input.sp1Verifier));
         require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
@@ -1179,7 +1173,6 @@ contract SystemDeploy is Script {
         artifacts.save("OptimismPortal2Proxy", address(chain.optimismPortalProxy));
         _saveIfSet("TEEProverRegistryProxy", address(chain.teeProverRegistryProxy));
         _saveIfSet("TEEProverRegistry", address(chain.teeProverRegistryProxy));
-        _saveIfSet("NitroEnclaveVerifier", address(chain.nitroEnclaveVerifier));
         _saveIfSet("NitroValidator", address(chain.nitroValidator));
         _saveIfSet("SP1Verifier", address(chain.sp1Verifier));
     }

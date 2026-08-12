@@ -22,14 +22,6 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { MockNitroValidator } from "test/mocks/MockNitroValidator.sol";
 
-contract MockNitroEnclaveVerifier {
-    address public proofSubmitter;
-
-    function setProofSubmitter(address _proofSubmitter) external {
-        proofSubmitter = _proofSubmitter;
-    }
-}
-
 contract MockLegacyTEEProverRegistry is DevTEEProverRegistry {
     constructor(
         INitroValidator nitroValidator,
@@ -59,7 +51,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     address internal unsafeBlockSigner = makeAddr("unsafeBlockSigner");
     address internal proposer = makeAddr("proposer");
     address internal challenger = makeAddr("challenger");
-    MockNitroEnclaveVerifier internal nitroEnclaveVerifier;
     MockNitroValidator internal nitroValidator;
     MockSP1Verifier internal sp1Verifier;
 
@@ -67,7 +58,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
 
     function setUp() public {
         systemDeploy = new SystemDeploy();
-        nitroEnclaveVerifier = new MockNitroEnclaveVerifier();
         nitroValidator = new MockNitroValidator();
         sp1Verifier = new MockSP1Verifier();
     }
@@ -349,7 +339,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             zkAggregationHash: bytes32(uint256(3)),
             multiproofConfigHash: bytes32(uint256(4)),
             multiproofGameType: 621,
-            nitroEnclaveVerifier: address(nitroEnclaveVerifier),
             nitroValidator: address(nitroValidator),
             scheduleConfig: AggregateVerifier.ScheduleConfig({
                 protocolVersions: IProtocolVersions(address(0)),
@@ -399,11 +388,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertEq(impls.aggregateVerifierImpl, address(_output.opChain.aggregateVerifier), "aggregate verifier impl");
         assertEq(impls.teeVerifierImpl, teeVerifierAddr, "tee verifier impl");
         assertEq(impls.zkVerifierImpl, zkVerifierAddr, "zk verifier impl");
-        assertEq(
-            address(_output.opChain.nitroEnclaveVerifier),
-            _input.implementationsInput.nitroEnclaveVerifier,
-            "nitro enclave verifier"
-        );
         assertEq(address(_output.opChain.nitroValidator), _input.implementationsInput.nitroValidator, "nitro validator");
         assertEq(address(_output.opChain.sp1Verifier), address(_input.implementationsInput.sp1Verifier), "sp1 verifier");
         assertEq(
@@ -417,11 +401,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertEq(teeProverRegistry.manager(), _input.opChainInput.roles.opChainProxyAdminOwner, "tee registry manager");
         assertTrue(teeProverRegistry.isValidProposer(_input.implementationsInput.teeProposer), "tee proposer");
         assertTrue(teeProverRegistry.isValidProposer(_input.implementationsInput.teeChallenger), "tee challenger");
-        assertEq(
-            MockNitroEnclaveVerifier(_input.implementationsInput.nitroEnclaveVerifier).proofSubmitter(),
-            address(0),
-            "legacy nitro proof submitter"
-        );
         assertEq(
             address(teeProverRegistry.NITRO_VALIDATOR()),
             _input.implementationsInput.nitroValidator,

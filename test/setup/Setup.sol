@@ -35,7 +35,6 @@ import { IOptimismMintableERC721Factory } from "interfaces/L2/IOptimismMintableE
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { IL2CrossDomainMessenger } from "interfaces/L2/IL2CrossDomainMessenger.sol";
 import { IL2StandardBridge } from "interfaces/L2/IL2StandardBridge.sol";
@@ -125,7 +124,6 @@ abstract contract Setup is FeatureFlags {
     IGasPriceOracle gasPriceOracle = IGasPriceOracle(Predeploys.GAS_PRICE_ORACLE);
     IL1Block l1Block = IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES);
     IWETH98 weth = IWETH98(payable(Predeploys.WETH));
-    INitroEnclaveVerifier nitroEnclaveVerifier;
     INitroValidator nitroValidator;
     TEEProverRegistry teeProverRegistry;
 
@@ -243,7 +241,6 @@ abstract contract Setup is FeatureFlags {
         proxyAdminOwner = proxyAdmin.owner();
         superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
         superchainProxyAdminOwner = superchainProxyAdmin.owner();
-        nitroEnclaveVerifier = INitroEnclaveVerifier(artifacts.getAddress("NitroEnclaveVerifier"));
         nitroValidator = INitroValidator(artifacts.getAddress("NitroValidator"));
         teeProverRegistry = TEEProverRegistry(artifacts.getAddress("TEEProverRegistry"));
 

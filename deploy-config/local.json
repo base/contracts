@@ -23,7 +23,6 @@
   "multiproofGenesisBlockNumber": 0,
   "multiproofIntermediateBlockInterval": 10,
   "multiproofGenesisOutputRoot": "0x0000000000000000000000000000000000000000000000000000000000000001",
-  "nitroEnclaveVerifier": "0x0000000000000000000000000000000000000000",
   "nitroValidator": "0x0000000000000000000000000000000000000000",
   "operatorFeeVaultMinimumWithdrawalAmount": "0x8ac7230489e80000",
   "operatorFeeVaultRecipient": "0x1CBd3b2770909D4e10f157cABC84C7264073C9Ec",

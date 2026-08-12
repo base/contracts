@@ -21,7 +21,6 @@ contract DeployDevWithNitro is DeployDevBase {
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
     uint256 public constant INIT_BOND = 0.00001 ether;
 
-    address public nitroEnclaveVerifierAddr;
     address public nitroValidatorAddr;
 
     function _blockInterval() internal pure override returns (uint256) {
@@ -42,7 +41,6 @@ contract DeployDevWithNitro is DeployDevBase {
 
     function _preflight() internal override {
         super._preflight();
-        nitroEnclaveVerifierAddr = cfg.nitroEnclaveVerifier();
         nitroValidatorAddr = cfg.nitroValidator();
         require(
             nitroValidatorAddr != address(0),
@@ -59,7 +57,6 @@ contract DeployDevWithNitro is DeployDevBase {
     }
 
     function _serializeExtra(string memory key) internal override {
-        vm.serializeAddress(key, "NitroEnclaveVerifier", nitroEnclaveVerifierAddr);
         vm.serializeAddress(key, "NitroValidator", nitroValidatorAddr);
     }
 
@@ -71,7 +68,6 @@ contract DeployDevWithNitro is DeployDevBase {
         console.log("TEE Challenger:", cfg.teeChallenger());
         console.log("Game Type:", cfg.multiproofGameType());
         console.log("NitroValidator:", nitroValidatorAddr);
-        console.log("NitroEnclaveVerifier (rollback):", nitroEnclaveVerifierAddr);
         console.log("");
         console.log("NOTE: Using REAL TEEProverRegistry - hinted attestation REQUIRED.");
     }
@@ -82,7 +78,6 @@ contract DeployDevWithNitro is DeployDevBase {
         console.log("========================================");
         console.log("\nTEE Contracts:");
         console.log("  NitroValidator:", nitroValidatorAddr);
-        console.log("  NitroEnclaveVerifier (rollback):", nitroEnclaveVerifierAddr);
         console.log("  TEEProverRegistry:", teeProverRegistryProxy);
         console.log("  TEEVerifier:", teeVerifier);
         console.log("\nInfrastructure:");

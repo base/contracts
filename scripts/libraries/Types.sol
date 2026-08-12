@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
-import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
 import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
@@ -61,7 +60,6 @@ library Types {
         ITEEProverRegistry teeProverRegistryProxy;
         IVerifier teeVerifier;
         IVerifier zkVerifier;
-        INitroEnclaveVerifier nitroEnclaveVerifier;
         ISP1Verifier sp1Verifier;
         INitroValidator nitroValidator;
     }
