@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
-
 import { EnumerableSetLib } from "src/vendor/EnumerableSetLib.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
 /// @title DevTEEProverRegistry
@@ -13,7 +12,10 @@ import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 contract DevTEEProverRegistry is TEEProverRegistry {
     using EnumerableSetLib for EnumerableSetLib.AddressSet;
 
-    constructor(NitroValidator nitroValidator, IDisputeGameFactory factory)
+    constructor(
+        INitroValidator nitroValidator,
+        IDisputeGameFactory factory
+    )
         TEEProverRegistry(nitroValidator, factory)
     { }
 

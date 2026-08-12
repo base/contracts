@@ -2,10 +2,10 @@
 pragma solidity 0.8.15;
 
 import { CborDecode, CborElement, LibCborElement } from "lib/nitro-validator/src/CborDecode.sol";
-import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
 
 import { EnumerableSetLib } from "src/vendor/EnumerableSetLib.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { OwnableManagedUpgradeable } from "src/universal/OwnableManagedUpgradeable.sol";
 import { GameType } from "src/libraries/bridge/Types.sol";
@@ -35,7 +35,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     bytes32 private constant DEBUG_MODE_PCR0_HASH = 0xc980e59163ce244bb4bb6211f48c7b46f88a4f40943e84eb99bdc41e129bd293;
 
     /// @notice The external NitroValidator contract used for hinted attestation validation.
-    NitroValidator public immutable NITRO_VALIDATOR;
+    INitroValidator public immutable NITRO_VALIDATOR;
 
     /// @notice The DisputeGameFactory used to look up the current AggregateVerifier and its TEE_IMAGE_HASH.
     IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
@@ -99,7 +99,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Thrown when setting a game type whose AggregateVerifier has no TEE_IMAGE_HASH.
     error InvalidGameType();
 
-    constructor(NitroValidator nitroValidator, IDisputeGameFactory factory) {
+    constructor(INitroValidator nitroValidator, IDisputeGameFactory factory) {
         if (address(factory) == address(0)) revert DisputeGameFactoryNotSet();
         NITRO_VALIDATOR = nitroValidator;
         DISPUTE_GAME_FACTORY = factory;
@@ -155,8 +155,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         external
         onlyOwnerOrManager
     {
+        // The validator returns offsets into the TBS; copy it once for the memory-only CBOR helpers below.
         bytes memory tbs = attestationTbs;
-        NitroValidator.Ptrs memory ptrs = NITRO_VALIDATOR.validateAttestationWithHints(tbs, signature, hints);
+        INitroValidator.Ptrs memory ptrs = NITRO_VALIDATOR.validateAttestationWithHints(tbs, signature, hints);
 
         uint256 attestationTimestamp = ptrs.timestamp / MS_PER_SECOND;
         if (attestationTimestamp + MAX_AGE <= block.timestamp) revert AttestationTooOld();

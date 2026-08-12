@@ -2,9 +2,9 @@
 pragma solidity 0.8.15;
 
 import { console2 as console } from "lib/forge-std/src/console2.sol";
-import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
 
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
 import { DeployDevBase } from "./DeployDevBase.s.sol";
@@ -53,7 +53,7 @@ contract DeployDevWithNitro is DeployDevBase {
     function _deployTEERegistryImpl() internal override returns (address) {
         return address(
             new TEEProverRegistry({
-                nitroValidator: NitroValidator(nitroValidatorAddr), factory: IDisputeGameFactory(disputeGameFactory)
+                nitroValidator: INitroValidator(nitroValidatorAddr), factory: IDisputeGameFactory(disputeGameFactory)
             })
         );
     }

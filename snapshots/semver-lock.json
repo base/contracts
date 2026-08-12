@@ -49,7 +49,7 @@
   },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
     "initCodeHash": "0xef50e4cd4734c5a7137c9071334fc159a36869744ec2fa25d320c172999c4b3b",
-    "sourceCodeHash": "0x1dcb8c004c0f8a492b98c48ddc981d45eb468db483201b8424093e74debade61"
+    "sourceCodeHash": "0xd7aef97975588bb749c24b69f83055f329da06ce1b6b7634e51d0080557fb98e"
   },
   "src/L1/proofs/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0x655576cc21cc5c603d55fb4dd2a2f0ef57b11deeaabd3e539b0a70a5f7e2c9af",

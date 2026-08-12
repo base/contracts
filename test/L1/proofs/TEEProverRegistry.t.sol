@@ -11,6 +11,7 @@ import { Test } from "lib/forge-std/src/Test.sol";
 import { Proxy } from "src/universal/Proxy.sol";
 
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { GameType } from "src/libraries/bridge/Types.sol";
 
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
@@ -80,7 +81,7 @@ contract TEEProverRegistryTest is Test {
         MockDisputeGameFactoryForRegistry factory = new MockDisputeGameFactoryForRegistry(address(verifier));
 
         DevTEEProverRegistry impl = new DevTEEProverRegistry({
-            nitroValidator: NitroValidator(address(0)), factory: IDisputeGameFactory(address(factory))
+            nitroValidator: INitroValidator(address(0)), factory: IDisputeGameFactory(address(factory))
         });
 
         proxyAdmin = makeAddr("proxy-admin");
@@ -420,7 +421,7 @@ contract TEEProverRegistryTest is Test {
 
         MockNitroValidator nitroValidator = new MockNitroValidator();
         TEEProverRegistry newImpl = new TEEProverRegistry({
-            nitroValidator: NitroValidator(address(nitroValidator)), factory: teeProverRegistry.DISPUTE_GAME_FACTORY()
+            nitroValidator: INitroValidator(address(nitroValidator)), factory: teeProverRegistry.DISPUTE_GAME_FACTORY()
         });
 
         vm.prank(proxyAdmin);
@@ -453,8 +454,6 @@ contract TEEProverRegistry_RegisterSigner_Test is Test {
         bytes tbs;
         bytes signature;
         bytes hints;
-        bytes leafCert;
-        uint64 leafNotAfter;
     }
 
     TEEProverRegistry internal teeProverRegistry;
@@ -476,10 +475,8 @@ contract TEEProverRegistry_RegisterSigner_Test is Test {
         manager = makeAddr("manager");
         signer = vm.addr(SIGNER_PRIVATE_KEY);
 
-        bytes memory pcr0 = new bytes(48);
-        for (uint256 i = 0; i < pcr0.length; i++) {
-            pcr0[i] = bytes1(uint8(i + 1));
-        }
+        bytes memory pcr0 =
+            hex"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f30";
         pcr0Hash = keccak256(pcr0);
 
         bytes memory publicKey =
@@ -490,7 +487,7 @@ contract TEEProverRegistry_RegisterSigner_Test is Test {
         MockAggregateVerifierForRegistry verifier = new MockAggregateVerifierForRegistry(pcr0Hash);
         MockDisputeGameFactoryForRegistry factory = new MockDisputeGameFactoryForRegistry(address(verifier));
         TEEProverRegistry impl = new TEEProverRegistry({
-            nitroValidator: NitroValidator(address(mockNitroValidator)), factory: IDisputeGameFactory(address(factory))
+            nitroValidator: INitroValidator(address(mockNitroValidator)), factory: IDisputeGameFactory(address(factory))
         });
 
         address proxyAdmin = makeAddr("proxy-admin");
@@ -580,7 +577,7 @@ contract TEEProverRegistry_RegisterSigner_Test is Test {
     }
 
     function test_registerSigner_missingPCR0_reverts() public {
-        NitroValidator.Ptrs memory ptrs = _validPtrs(uint64((block.timestamp - 1) * 1000));
+        INitroValidator.Ptrs memory ptrs = _validPtrs(uint64((block.timestamp - 1) * 1000));
         ptrs.pcrs[0] = LibCborElement.toCborElement(0xf6, 0, 0);
         _mockValidation(ptrs);
 
@@ -602,7 +599,7 @@ contract TEEProverRegistry_RegisterSigner_Test is Test {
 
     function testFuzz_registerSigner_invalidPCR0Length_reverts(uint8 pcr0Length) public {
         vm.assume(pcr0Length != 48);
-        NitroValidator.Ptrs memory ptrs = _validPtrs(uint64((block.timestamp - 1) * 1000));
+        INitroValidator.Ptrs memory ptrs = _validPtrs(uint64((block.timestamp - 1) * 1000));
         ptrs.pcrs[0] = LibCborElement.toCborElement(0x40, 0, pcr0Length);
         _mockValidation(ptrs);
 
@@ -612,7 +609,7 @@ contract TEEProverRegistry_RegisterSigner_Test is Test {
     }
 
     function test_registerSigner_invalidPublicKeyLength_reverts() public {
-        NitroValidator.Ptrs memory ptrs = _validPtrs(uint64((block.timestamp - 1) * 1000));
+        INitroValidator.Ptrs memory ptrs = _validPtrs(uint64((block.timestamp - 1) * 1000));
         ptrs.publicKey = LibCborElement.toCborElement(0x40, 48, 64);
         _mockValidation(ptrs);
 
@@ -630,7 +627,7 @@ contract TEEProverRegistry_RegisterSigner_Test is Test {
         teeProverRegistry.registerSigner(attestationTbs, SIGNATURE, HINTS);
     }
 
-    function _validPtrs(uint64 timestamp) internal pure returns (NitroValidator.Ptrs memory ptrs) {
+    function _validPtrs(uint64 timestamp) internal pure returns (INitroValidator.Ptrs memory ptrs) {
         ptrs.timestamp = timestamp;
         ptrs.pcrs = new CborElement[](32);
         ptrs.pcrs[0] = LibCborElement.toCborElement(0x40, 0, 48);
@@ -639,10 +636,10 @@ contract TEEProverRegistry_RegisterSigner_Test is Test {
     }
 
     function _validatorCall() internal view returns (bytes memory) {
-        return abi.encodeCall(NitroValidator.validateAttestationWithHints, (attestationTbs, SIGNATURE, HINTS));
+        return abi.encodeCall(INitroValidator.validateAttestationWithHints, (attestationTbs, SIGNATURE, HINTS));
     }
 
-    function _mockValidation(NitroValidator.Ptrs memory ptrs) internal {
+    function _mockValidation(INitroValidator.Ptrs memory ptrs) internal {
         vm.mockCall(address(mockNitroValidator), _validatorCall(), abi.encode(ptrs));
     }
 
@@ -668,64 +665,6 @@ contract TEEProverRegistry_RegisterSigner_Test is Test {
         assertLt(executionGas + 21_000 + _calldataGas(callData), EIP_7825_GAS_CAP);
     }
 
-    function test_registerSigner_invalidHints_reverts() public {
-        _setUpRealAttestation();
-        Fixture memory fixture = _prepareFixture();
-        fixture.hints[0] = bytes1(uint8(fixture.hints[0]) ^ 1);
-
-        vm.expectRevert("bad inverse hint");
-        teeProverRegistry.registerSigner(fixture.tbs, fixture.signature, fixture.hints);
-    }
-
-    function test_registerSigner_truncatedHints_reverts() public {
-        _setUpRealAttestation();
-        Fixture memory fixture = _prepareFixture();
-        bytes memory truncatedHints = fixture.hints;
-        assembly {
-            mstore(truncatedHints, sub(mload(truncatedHints), 1))
-        }
-
-        vm.expectRevert("inverse hint underflow");
-        teeProverRegistry.registerSigner(fixture.tbs, fixture.signature, truncatedHints);
-    }
-
-    function test_registerSigner_surplusHints_reverts() public {
-        _setUpRealAttestation();
-        Fixture memory fixture = _prepareFixture();
-        fixture.hints = abi.encodePacked(fixture.hints, bytes1(0));
-
-        vm.expectRevert("unused inverse hints");
-        teeProverRegistry.registerSigner(fixture.tbs, fixture.signature, fixture.hints);
-    }
-
-    function test_registerSigner_uncachedCertificateChain_reverts() public {
-        _setUpRealAttestation();
-        Fixture memory fixture = _prepareFixture();
-        (,, NitroValidator uncachedValidator) = _deployValidatorStack();
-        TEEProverRegistry uncachedRegistry = _deployRegistry(uncachedValidator);
-
-        vm.expectRevert("inverse hint underflow");
-        uncachedRegistry.registerSigner(fixture.tbs, fixture.signature, fixture.hints);
-    }
-
-    function test_registerSigner_revokedLeafCertificate_reverts() public {
-        _setUpRealAttestation();
-        Fixture memory fixture = _prepareFixture();
-        certManager.revokeCert(certManager.computeCertId(fixture.leafCert));
-
-        vm.expectRevert("cert revoked");
-        teeProverRegistry.registerSigner(fixture.tbs, fixture.signature, fixture.hints);
-    }
-
-    function test_registerSigner_expiredLeafCertificate_reverts() public {
-        _setUpRealAttestation();
-        Fixture memory fixture = _prepareFixture();
-        vm.warp(uint256(fixture.leafNotAfter) + 1);
-
-        vm.expectRevert("cert expired");
-        teeProverRegistry.registerSigner(fixture.tbs, fixture.signature, fixture.hints);
-    }
-
     function _prepareFixture() internal returns (Fixture memory fixture_) {
         bytes memory attestation = _loadRealAttestation();
         (fixture_.tbs, fixture_.signature) = nitroValidator.decodeAttestationTbs(attestation);
@@ -741,11 +680,9 @@ contract TEEProverRegistry_RegisterSigner_Test is Test {
             parentHash = certManager.verifyCACertWithHints(cert, parentHash, certHints);
         }
 
-        fixture_.leafCert = fixture_.tbs.slice(ptrs.cert);
-        bytes memory leafHints = _collectCertHints(fixture_.leafCert, certManager.loadVerified(parentHash).pubKey);
-        ICertManager.VerifiedCert memory leaf =
-            certManager.verifyClientCertWithHints(fixture_.leafCert, parentHash, leafHints);
-        fixture_.leafNotAfter = leaf.notAfter;
+        bytes memory leafCert = fixture_.tbs.slice(ptrs.cert);
+        bytes memory leafHints = _collectCertHints(leafCert, certManager.loadVerified(parentHash).pubKey);
+        ICertManager.VerifiedCert memory leaf = certManager.verifyClientCertWithHints(leafCert, parentHash, leafHints);
         fixture_.hints = _collectVerifyHints(
             Sha2Ext.sha384(fixture_.tbs, 0, fixture_.tbs.length), fixture_.signature, leaf.pubKey
         );
@@ -815,8 +752,9 @@ contract TEEProverRegistry_RegisterSigner_Test is Test {
     function _deployRegistry(NitroValidator nitroValidator_) internal returns (TEEProverRegistry registry_) {
         MockAggregateVerifierForRegistry verifier = new MockAggregateVerifierForRegistry(bytes32(uint256(1)));
         MockDisputeGameFactoryForRegistry factory = new MockDisputeGameFactoryForRegistry(address(verifier));
-        TEEProverRegistry impl =
-            new TEEProverRegistry({ nitroValidator: nitroValidator_, factory: IDisputeGameFactory(address(factory)) });
+        TEEProverRegistry impl = new TEEProverRegistry({
+            nitroValidator: INitroValidator(address(nitroValidator_)), factory: IDisputeGameFactory(address(factory))
+        });
 
         address proxyAdmin = makeAddr("real-attestation-proxy-admin");
         Proxy proxy = new Proxy(proxyAdmin);

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
-
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
@@ -64,7 +63,7 @@ library Types {
         IVerifier zkVerifier;
         INitroEnclaveVerifier nitroEnclaveVerifier;
         ISP1Verifier sp1Verifier;
-        NitroValidator nitroValidator;
+        INitroValidator nitroValidator;
     }
 
     /// @notice The latest implementation contracts for the OP Stack.

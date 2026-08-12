@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
-
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { GameType } from "src/libraries/bridge/Types.sol";
 
 interface ITEEProverRegistry {
-    function NITRO_VALIDATOR() external view returns (NitroValidator);
+    function NITRO_VALIDATOR() external view returns (INitroValidator);
     function DISPUTE_GAME_FACTORY() external view returns (IDisputeGameFactory);
     function gameType() external view returns (GameType);
     function isRegisteredSigner(address signer) external view returns (bool);

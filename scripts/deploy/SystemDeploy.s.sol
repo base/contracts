@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import { console2 as console } from "lib/forge-std/src/console2.sol";
-import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 import { VmSafe } from "lib/forge-std/src/Vm.sol";
 
@@ -29,6 +28,7 @@ import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
@@ -212,7 +212,7 @@ contract SystemDeploy is Script {
         returns (TEEProverRegistry output_)
     {
         DeployUtils.assertValidContractAddress(address(_systemConfigProxy));
-        NitroValidator nitroValidator = NitroValidator(cfg.nitroValidator());
+        INitroValidator nitroValidator = INitroValidator(cfg.nitroValidator());
         DeployUtils.assertValidContractAddress(address(nitroValidator));
         IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(_systemConfigProxy.disputeGameFactory());
         DeployUtils.assertValidContractAddress(address(disputeGameFactory));
@@ -590,7 +590,7 @@ contract SystemDeploy is Script {
             output_.zkVerifier = multiproof.zkVerifier;
             output_.nitroEnclaveVerifier = INitroEnclaveVerifier(_implementationsInput.nitroEnclaveVerifier);
             output_.sp1Verifier = _implementationsInput.sp1Verifier;
-            output_.nitroValidator = NitroValidator(_implementationsInput.nitroValidator);
+            output_.nitroValidator = INitroValidator(_implementationsInput.nitroValidator);
         }
 
         _transferOwnership(address(output_.disputeGameFactoryProxy), _input.roles.opChainProxyAdminOwner);
@@ -737,8 +737,6 @@ contract SystemDeploy is Script {
 
         if (_impls.teeProverRegistryImpl != address(0)) {
             TEEProverRegistry newTEEProverRegistry = TEEProverRegistry(_impls.teeProverRegistryImpl);
-            DeployUtils.assertValidContractAddress(address(newTEEProverRegistry));
-            DeployUtils.assertValidContractAddress(address(newTEEProverRegistry.NITRO_VALIDATOR()));
             require(
                 address(newTEEProverRegistry.DISPUTE_GAME_FACTORY()) == address(_disputeGameFactory),
                 "SystemDeploy: TEEProverRegistry factory mismatch"
@@ -1028,7 +1026,7 @@ contract SystemDeploy is Script {
 
         vm.broadcast(msg.sender);
         output_.teeProverRegistryImpl = new TEEProverRegistry({
-            nitroValidator: NitroValidator(_input.nitroValidator), factory: _output.disputeGameFactoryProxy
+            nitroValidator: INitroValidator(_input.nitroValidator), factory: _output.disputeGameFactoryProxy
         });
 
         output_.teeProverRegistryProxy =
@@ -1170,6 +1168,11 @@ contract SystemDeploy is Script {
         DeployUtils.assertValidContractAddress(_impls.anchorStateRegistryImpl);
         DeployUtils.assertValidContractAddress(_impls.delayedWETHImpl);
         DeployUtils.assertValidContractAddress(_impls.protocolVersionsImpl);
+        if (_impls.teeProverRegistryImpl != address(0)) {
+            TEEProverRegistry teeProverRegistryImpl = TEEProverRegistry(_impls.teeProverRegistryImpl);
+            DeployUtils.assertValidContractAddress(address(teeProverRegistryImpl));
+            DeployUtils.assertValidContractAddress(address(teeProverRegistryImpl.NITRO_VALIDATOR()));
+        }
     }
 
     function _implementationsEmpty(Types.Implementations memory _impls) internal pure returns (bool) {

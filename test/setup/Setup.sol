@@ -3,7 +3,6 @@ pragma solidity 0.8.15;
 
 // Testing
 import { console2 as console } from "lib/forge-std/src/console2.sol";
-import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
 import { Vm, VmSafe } from "lib/forge-std/src/Vm.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
@@ -37,6 +36,7 @@ import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.so
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { IL2CrossDomainMessenger } from "interfaces/L2/IL2CrossDomainMessenger.sol";
 import { IL2StandardBridge } from "interfaces/L2/IL2StandardBridge.sol";
 import { IL2ToL1MessagePasser } from "interfaces/L2/IL2ToL1MessagePasser.sol";
@@ -126,7 +126,7 @@ abstract contract Setup is FeatureFlags {
     IL1Block l1Block = IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES);
     IWETH98 weth = IWETH98(payable(Predeploys.WETH));
     INitroEnclaveVerifier nitroEnclaveVerifier;
-    NitroValidator nitroValidator;
+    INitroValidator nitroValidator;
     TEEProverRegistry teeProverRegistry;
 
     /// @notice Indicates whether a test is running against a forked production network.
@@ -244,7 +244,7 @@ abstract contract Setup is FeatureFlags {
         superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
         superchainProxyAdminOwner = superchainProxyAdmin.owner();
         nitroEnclaveVerifier = INitroEnclaveVerifier(artifacts.getAddress("NitroEnclaveVerifier"));
-        nitroValidator = NitroValidator(artifacts.getAddress("NitroValidator"));
+        nitroValidator = INitroValidator(artifacts.getAddress("NitroValidator"));
         teeProverRegistry = TEEProverRegistry(artifacts.getAddress("TEEProverRegistry"));
 
         console.log("Setup: registered L1 deployments");

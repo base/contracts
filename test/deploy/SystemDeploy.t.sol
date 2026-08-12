@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import { NitroValidator } from "lib/nitro-validator/src/NitroValidator.sol";
 import { Test } from "lib/forge-std/src/Test.sol";
 
 import { Artifacts } from "scripts/Artifacts.s.sol";
@@ -11,6 +10,7 @@ import { SystemDeployAssertions } from "test/deploy/SystemDeployAssertions.sol";
 
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
@@ -32,7 +32,7 @@ contract MockNitroEnclaveVerifier {
 
 contract MockLegacyTEEProverRegistry is DevTEEProverRegistry {
     constructor(
-        NitroValidator nitroValidator,
+        INitroValidator nitroValidator,
         IDisputeGameFactory factory
     )
         DevTEEProverRegistry(nitroValidator, factory)
@@ -189,6 +189,27 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         systemDeploy.deploy(input);
     }
 
+    function test_upgrade_registryWithInvalidNitroValidator_reverts() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+        TEEProverRegistry invalidRegistryImpl = new TEEProverRegistry({
+            nitroValidator: INitroValidator(address(0)), factory: output.opChain.disputeGameFactoryProxy
+        });
+        Types.Implementations memory implementations = output.impls;
+        implementations.teeProverRegistryImpl = address(invalidRegistryImpl);
+
+        vm.expectRevert("DeployUtils: zero address");
+        systemDeploy.upgrade(
+            SystemDeploy.UpgradeInput({
+                saveArtifacts: false,
+                superchainConfigProxy: output.superchain.superchainConfigProxy,
+                implementations: implementations,
+                systemConfigProxy: output.opChain.systemConfigProxy,
+                protocolVersionsProxy: output.opChain.protocolVersionsProxy
+            })
+        );
+    }
+
     function test_upgrade_withoutManagerDelegatecall_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
@@ -227,7 +248,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
         TEEProverRegistry registry = TEEProverRegistry(address(output.opChain.teeProverRegistryProxy));
         MockLegacyTEEProverRegistry legacyImpl = new MockLegacyTEEProverRegistry({
-            nitroValidator: NitroValidator(address(nitroValidator)), factory: registry.DISPUTE_GAME_FACTORY()
+            nitroValidator: INitroValidator(address(nitroValidator)), factory: registry.DISPUTE_GAME_FACTORY()
         });
         output.opChain.opChainProxyAdmin.upgrade(payable(address(registry)), address(legacyImpl));
 
