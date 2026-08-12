@@ -43,7 +43,6 @@ evm_version = 'cancun'
 
 remappings = [
   '@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts',
-  'openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/',
 ]
 
 fs_permissions = [

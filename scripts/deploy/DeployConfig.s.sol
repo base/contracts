@@ -14,7 +14,6 @@ contract DeployConfig is Script {
     address public batchSenderAddress;
     address public finalSystemOwner;
     address public l1FeeVaultRecipient;
-    address public nitroEnclaveVerifier;
     address public nitroValidator;
     address public operatorFeeVaultRecipient;
     address public p2pSequencerAddress;
@@ -71,7 +70,6 @@ contract DeployConfig is Script {
         batchSenderAddress = _json.readAddress("$.batchSenderAddress");
         finalSystemOwner = _json.readAddress("$.finalSystemOwner");
         l1FeeVaultRecipient = _json.readAddress("$.l1FeeVaultRecipient");
-        nitroEnclaveVerifier = _json.readAddress("$.nitroEnclaveVerifier");
         nitroValidator = _json.readAddress("$.nitroValidator");
         operatorFeeVaultRecipient = _json.readAddress("$.operatorFeeVaultRecipient");
         p2pSequencerAddress = _json.readAddress("$.p2pSequencerAddress");

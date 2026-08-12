@@ -129,8 +129,7 @@ forge script scripts/multiproof/DeployNitroValidatorStack.s.sol:DeployNitroValid
 ```
 
 Copy the `NitroValidator` address from `deployments/<chain-id>-nitro-validator.json` into the
-deploy config's `nitroValidator` field. Keep `nitroEnclaveVerifier` configured separately as a
-rollback dependency; the hinted Registry does not call it or update its `proofSubmitter`.
+deploy config's `nitroValidator` field.
 
 Run `DeployDevWithNitro.s.sol`. Before registering a signer, pre-cache every non-root CA and the
 leaf certificate in the validator's `CertManager`. The dependency's call-plan tool can generate
