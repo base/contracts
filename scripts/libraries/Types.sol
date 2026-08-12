@@ -40,6 +40,7 @@ library Types {
         Proposal startingAnchorRoot;
         string saltMixer;
         uint64 gasLimit;
+        uint32 resourceConfigMinimumBaseFee;
     }
 
     /// @notice The full set of outputs from deploying a new OP Stack chain.

@@ -427,7 +427,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             l2ChainId: l2ChainId,
             startingAnchorRoot: Proposal({ root: Hash.wrap(bytes32(uint256(1))), l2SequenceNumber: 0 }),
             saltMixer: "system-deploy-test",
-            gasLimit: 60_000_000
+            gasLimit: 60_000_000,
+            resourceConfigMinimumBaseFee: uint32(1 gwei)
         });
     }
 
@@ -765,7 +766,8 @@ contract ZKBricking_Test is Test {
             l2ChainId: l2ChainId,
             startingAnchorRoot: Proposal({ root: Hash.wrap(bytes32(uint256(1))), l2SequenceNumber: 0 }),
             saltMixer: "zk-bricking-test",
-            gasLimit: 60_000_000
+            gasLimit: 60_000_000,
+            resourceConfigMinimumBaseFee: uint32(1 gwei)
         });
     }
 }

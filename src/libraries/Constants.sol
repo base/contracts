@@ -45,11 +45,20 @@ library Constants {
     /// @notice Returns the default values for the ResourceConfig. These are the recommended values
     ///         for a production network.
     function DEFAULT_RESOURCE_CONFIG() internal pure returns (IResourceMetering.ResourceConfig memory) {
+        return resourceConfigWithMinimumBaseFee(1 gwei);
+    }
+
+    /// @notice Returns the default resource config with a custom minimum base fee.
+    function resourceConfigWithMinimumBaseFee(uint32 _minimumBaseFee)
+        internal
+        pure
+        returns (IResourceMetering.ResourceConfig memory)
+    {
         IResourceMetering.ResourceConfig memory config = IResourceMetering.ResourceConfig({
             maxResourceLimit: 20_000_000,
             elasticityMultiplier: 10,
             baseFeeMaxChangeDenominator: 8,
-            minimumBaseFee: 1 gwei,
+            minimumBaseFee: _minimumBaseFee,
             systemTxMaxGas: 1_000_000,
             maximumBaseFee: type(uint128).max
         });

@@ -21,8 +21,8 @@ contract MeterUser is ResourceMetering {
     ResourceMetering.ResourceConfig public innerConfig;
 
     constructor() {
-        initialize();
         innerConfig = defaultResourceConfig();
+        initialize();
     }
 
     function initialize() public initializer {
@@ -85,6 +85,12 @@ contract ResourceMetering_Metered_Test is ResourceMetering_TestInit {
         assertEq(postBaseFee, prevBaseFee);
         assertEq(postBoughtGas, prevBoughtGas);
         assertEq(postBlockNum, prevBlockNum);
+    }
+
+    /// @notice Tests that initialization sets prevBaseFee to the configured minimum base fee.
+    function test_initialize_prevBaseFee_matchesMinimumBaseFee_succeeds() external view {
+        (uint128 prevBaseFee,,) = meter.params();
+        assertEq(prevBaseFee, meter.resourceConfig().minimumBaseFee);
     }
 
     /// @notice Tests that updating after multiple empty blocks maintains correct base fee.

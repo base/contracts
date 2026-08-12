@@ -167,7 +167,10 @@ abstract contract ResourceMetering is Initializable {
     ///         child contract.
     function __ResourceMetering_init() internal onlyInitializing {
         if (params.prevBlockNum == 0) {
-            params = ResourceParams({ prevBaseFee: 1 gwei, prevBoughtGas: 0, prevBlockNum: uint64(block.number) });
+            ResourceConfig memory config = _resourceConfig();
+            params = ResourceParams({
+                prevBaseFee: config.minimumBaseFee, prevBoughtGas: 0, prevBlockNum: uint64(block.number)
+            });
         }
     }
 }
