@@ -132,15 +132,6 @@ Copy the `NitroValidator` address from `deployments/<chain-id>-nitro-validator.j
 deploy config's `nitroValidator` field. Keep `nitroEnclaveVerifier` configured separately as a
 rollback dependency; the hinted Registry does not call it or update its `proofSubmitter`.
 
-For an existing OP Chain, deploy and save the chain-specific Registry implementation without
-upgrading its proxy:
-
-```bash
-forge script scripts/deploy/SystemDeploy.s.sol:SystemDeploy \
-  --sig "deployTEEProverRegistryImplementation(address)" <SYSTEM_CONFIG_PROXY> \
-  --broadcast --rpc-url <RPC_URL> --private-key <DEPLOYER_KEY>
-```
-
 Run `DeployDevWithNitro.s.sol`. Before registering a signer, pre-cache every non-root CA and the
 leaf certificate in the validator's `CertManager`. The dependency's call-plan tool can generate
 the ordered certificate calls and hints for development:

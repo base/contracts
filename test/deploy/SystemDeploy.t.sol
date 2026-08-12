@@ -243,7 +243,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertValidStandardSystem(_expected(output, input));
     }
 
-    function test_deployTEEProverRegistryImplementation_upgradeExistingProxy_succeeds() public {
+    function test_upgrade_predeployedTEEProverRegistryImplementation_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
         TEEProverRegistry registry = TEEProverRegistry(address(output.opChain.teeProverRegistryProxy));
@@ -255,16 +255,10 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         address signer = makeAddr("existing-signer");
         bytes32 imageHash = keccak256("existing-image");
         DevTEEProverRegistry(address(registry)).addDevSigner(signer, imageHash);
-        vm.etch(address(artifacts), vm.getDeployedCode("Artifacts.s.sol:Artifacts"));
-        artifacts.setUp();
-        _saveArtifact("TEEProverRegistryImpl", address(legacyImpl));
-        vm.mockCall(
-            address(systemDeploy.cfg()),
-            abi.encodeWithSignature("nitroValidator()"),
-            abi.encode(address(nitroValidator))
-        );
 
-        TEEProverRegistry newImpl = systemDeploy.deployTEEProverRegistryImplementation(output.opChain.systemConfigProxy);
+        TEEProverRegistry newImpl = new TEEProverRegistry({
+            nitroValidator: INitroValidator(address(nitroValidator)), factory: registry.DISPUTE_GAME_FACTORY()
+        });
         Types.Implementations memory implementations = output.impls;
         implementations.teeProverRegistryImpl = address(newImpl);
         systemDeploy.upgrade(
@@ -282,8 +276,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             address(newImpl),
             "tee registry impl"
         );
-        assertEq(artifacts.getAddress("TEEProverRegistryLegacyImpl"), address(legacyImpl), "legacy artifact");
-        assertEq(artifacts.getAddress("TEEProverRegistryImpl"), address(newImpl), "implementation artifact");
         assertEq(registry.version(), "0.6.0");
         assertEq(registry.owner(), owner);
         assertEq(registry.manager(), owner);

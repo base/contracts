@@ -204,29 +204,6 @@ contract SystemDeploy is Script {
         _saveUpgradeArtifacts(output_);
     }
 
-    /// @notice Deploys and saves a TEEProverRegistry implementation for an existing OP Chain.
-    /// @param _systemConfigProxy The existing chain's SystemConfig proxy.
-    /// @return output_ The deployed TEEProverRegistry implementation.
-    function deployTEEProverRegistryImplementation(ISystemConfig _systemConfigProxy)
-        public
-        returns (TEEProverRegistry output_)
-    {
-        DeployUtils.assertValidContractAddress(address(_systemConfigProxy));
-        INitroValidator nitroValidator = INitroValidator(cfg.nitroValidator());
-        DeployUtils.assertValidContractAddress(address(nitroValidator));
-        IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(_systemConfigProxy.disputeGameFactory());
-        DeployUtils.assertValidContractAddress(address(disputeGameFactory));
-
-        vm.broadcast(msg.sender);
-        output_ = new TEEProverRegistry({ nitroValidator: nitroValidator, factory: disputeGameFactory });
-
-        address currentImplementation = artifacts.getAddress("TEEProverRegistryImpl");
-        if (currentImplementation != address(0) && artifacts.getAddress("TEEProverRegistryLegacyImpl") == address(0)) {
-            artifacts.save("TEEProverRegistryLegacyImpl", currentImplementation);
-        }
-        artifacts.save("TEEProverRegistryImpl", address(output_));
-    }
-
     /// @notice Deploys the shared Superchain proxy admin and SuperchainConfig proxy.
     function deploySuperchain(SuperchainInput memory _input) public returns (SuperchainOutput memory output_) {
         output_ = _deploySuperchain(_input);
