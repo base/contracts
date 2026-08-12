@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /**
  * @title DeployRiscZeroStack
- * @notice Deploys a RiscZeroSetVerifier and NitroEnclaveVerifier that work with
+ * @notice Deploys the legacy rollback RiscZeroSetVerifier and NitroEnclaveVerifier that work with
  *         an existing RISC Zero verifier router (e.g. the Boundless-deployed
  *         Router on Sepolia).
  *
@@ -39,9 +39,9 @@ pragma solidity ^0.8.20;
  *   - RiscZeroSetVerifier (delegates to existing Router for root verification)
  *   - NitroEnclaveVerifier with route wired to the local SetVerifier
  *
- * POST-DEPLOY:
- *   After deploying TEEProverRegistry via DeployDevWithNitro.s.sol, update the
- *   proofSubmitter on NitroEnclaveVerifier to the TEEProverRegistry address:
+ * ROLLBACK PREPARATION:
+ *   The hinted TEEProverRegistry does not call this verifier. Before rolling back to the
+ *   legacy Registry implementation, point proofSubmitter at the existing Registry proxy:
  *
  *     cast send <NITRO_ENCLAVE_VERIFIER> "setProofSubmitter(address)" <TEE_PROVER_REGISTRY> \
  *       --rpc-url <RPC_URL> --private-key <OWNER_KEY>
@@ -102,8 +102,8 @@ contract DeployRiscZeroStack is Script {
         console.log("Nitro Root Cert:", vm.toString(nitroRootCert));
         console.log("Nitro Verifier ID:", vm.toString(nitroVerifierId));
         console.log("");
-        console.log("NOTE: proofSubmitter is set to owner as placeholder.");
-        console.log("      Update it to TEEProverRegistry after deploying via setProofSubmitter().");
+        console.log("NOTE: This is the legacy rollback verifier stack.");
+        console.log("      Set proofSubmitter to the Registry proxy before a legacy rollback.");
         console.log("");
 
         vm.startBroadcast();
@@ -154,9 +154,8 @@ contract DeployRiscZeroStack is Script {
         console.log("NitroEnclaveVerifier:", nitroEnclaveVerifier);
         console.log("RISC Zero Router (external):", risc0VerifierRouter);
         console.log("");
-        console.log(">>> Set nitroEnclaveVerifier in deploy config to:", nitroEnclaveVerifier);
-        console.log(">>> Then run DeployDevWithNitro.s.sol <<<");
-        console.log(">>> Then call setProofSubmitter(TEEProverRegistry) on NitroEnclaveVerifier <<<");
+        console.log(">>> Retain NitroEnclaveVerifier for rollback:", nitroEnclaveVerifier);
+        console.log(">>> The active hinted Registry uses NitroValidator instead <<<");
         console.log("========================================");
 
         string memory key = "deployment";

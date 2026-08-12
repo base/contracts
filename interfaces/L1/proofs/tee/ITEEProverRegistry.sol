@@ -2,11 +2,11 @@
 pragma solidity ^0.8.0;
 
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { INitroEnclaveVerifier } from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
+import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { GameType } from "src/libraries/bridge/Types.sol";
 
 interface ITEEProverRegistry {
-    function NITRO_VERIFIER() external view returns (INitroEnclaveVerifier);
+    function NITRO_VALIDATOR() external view returns (INitroValidator);
     function DISPUTE_GAME_FACTORY() external view returns (IDisputeGameFactory);
     function gameType() external view returns (GameType);
     function isRegisteredSigner(address signer) external view returns (bool);
@@ -17,7 +17,7 @@ interface ITEEProverRegistry {
 
     function setProposer(address proposer, bool isValid) external;
     function setGameType(GameType gameType_) external;
-    function registerSigner(bytes calldata output, bytes calldata proofBytes) external;
+    function registerSigner(bytes calldata attestationTbs, bytes calldata signature, bytes calldata hints) external;
     function deregisterSigner(address signer) external;
     function isValidSigner(address signer) external view returns (bool);
     function getRegisteredSigners() external view returns (address[] memory);

@@ -1,30 +1,28 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {
-    INitroEnclaveVerifier,
-    ZkCoProcessorType,
-    VerifierJournal,
-    VerificationResult,
-    Pcr,
-    Bytes48
-} from "interfaces/L1/proofs/tee/INitroEnclaveVerifier.sol";
-import { ISemver } from "interfaces/universal/ISemver.sol";
-import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { OwnableManagedUpgradeable } from "src/universal/OwnableManagedUpgradeable.sol";
+import { CborDecode, CborElement, LibCborElement } from "lib/nitro-validator/src/CborDecode.sol";
+
 import { EnumerableSetLib } from "src/vendor/EnumerableSetLib.sol";
+import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
+import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
+import { ISemver } from "interfaces/universal/ISemver.sol";
+import { OwnableManagedUpgradeable } from "src/universal/OwnableManagedUpgradeable.sol";
 import { GameType } from "src/libraries/bridge/Types.sol";
 
 /// @title TEEProverRegistry
-/// @notice Manages TEE signer registration via ZK-verified AWS Nitro attestation.
-/// @dev Signers are registered by providing a ZK proof of a valid AWS Nitro attestation document,
-///      verified through an external NitroEnclaveVerifier contract (Risc0).
+/// @notice Manages TEE signer registration via hinted AWS Nitro attestation validation.
+/// @dev Signers are registered by providing an AWS Nitro attestation and P-384 verification hints.
+///      The attestation's certificate chain must already be cached in the NitroValidator's CertManager.
 ///      Registration is PCR0-agnostic: any enclave with a valid attestation can register,
 ///      enabling pre-registration before hardforks. PCR0 enforcement happens at proof-submission
 ///      time in TEEVerifier, which checks signerImageHash against the AggregateVerifier's
 ///      TEE_IMAGE_HASH.
 contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
+    using CborDecode for bytes;
     using EnumerableSetLib for EnumerableSetLib.AddressSet;
+    using LibCborElement for CborElement;
+
     /// @notice Maximum age of an attestation document (60 minutes), in seconds.
     uint256 public constant MAX_AGE = 60 minutes;
 
@@ -33,8 +31,11 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     ///      but block.timestamp is in seconds.
     uint256 private constant MS_PER_SECOND = 1000;
 
-    /// @notice The external NitroEnclaveVerifier contract used for ZK attestation verification.
-    INitroEnclaveVerifier public immutable NITRO_VERIFIER;
+    /// @notice The hash of the all-zero PCR0 emitted by debug-mode Nitro enclaves.
+    bytes32 private constant DEBUG_MODE_PCR0_HASH = 0xc980e59163ce244bb4bb6211f48c7b46f88a4f40943e84eb99bdc41e129bd293;
+
+    /// @notice The external NitroValidator contract used for hinted attestation validation.
+    INitroValidator public immutable NITRO_VALIDATOR;
 
     /// @notice The DisputeGameFactory used to look up the current AggregateVerifier and its TEE_IMAGE_HASH.
     IDisputeGameFactory public immutable DISPUTE_GAME_FACTORY;
@@ -47,7 +48,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     mapping(address => bool) public isRegisteredSigner;
 
     /// @notice Mapping of signer address to the PCR0 image hash from their attestation.
-    /// @dev Stored at registration time from the ZK-verified attestation document.
+    /// @dev Stored at registration time from the validated attestation document.
     ///      TEEVerifier checks this against the AggregateVerifier's TEE_IMAGE_HASH at
     ///      proof-submission time, so signers automatically become unusable when the
     ///      AggregateVerifier upgrades to a new image hash. isValidSigner also uses
@@ -77,14 +78,17 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Thrown when the attestation document is too old.
     error AttestationTooOld();
 
-    /// @notice Thrown when the ZK attestation verification fails.
-    error AttestationVerificationFailed();
+    /// @notice Thrown when the attestation document is dated in the future.
+    error AttestationFromFuture();
 
-    /// @notice Thrown when the attestation's public key is too short to derive a signer address.
+    /// @notice Thrown when the attestation's public key is not an uncompressed secp256k1 key.
     error InvalidPublicKey();
 
     /// @notice Thrown when PCR0 (index 0) is not found in the attestation's PCR list.
     error PCR0NotFound();
+
+    /// @notice Thrown when PCR0 is not a 48-byte SHA-384 measurement.
+    error InvalidPCR0();
 
     /// @notice Thrown when the dispute game factory is not configured.
     error DisputeGameFactoryNotSet();
@@ -95,9 +99,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Thrown when setting a game type whose AggregateVerifier has no TEE_IMAGE_HASH.
     error InvalidGameType();
 
-    constructor(INitroEnclaveVerifier nitroVerifier, IDisputeGameFactory factory) {
+    constructor(INitroValidator nitroValidator, IDisputeGameFactory factory) {
         if (address(factory) == address(0)) revert DisputeGameFactoryNotSet();
-        NITRO_VERIFIER = nitroVerifier;
+        NITRO_VALIDATOR = nitroValidator;
         DISPUTE_GAME_FACTORY = factory;
         initialize({
             initialOwner: address(0xdEaD),
@@ -130,9 +134,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         emit GameTypeUpdated(gameType_);
     }
 
-    /// @notice Registers a signer using a ZK proof of an AWS Nitro attestation document.
-    /// @dev The ZK proof must verify a valid attestation that:
-    ///      1. Has a valid AWS Nitro certificate chain (verified offchain via ZK)
+    /// @notice Registers a signer using a hinted AWS Nitro attestation document.
+    /// @dev The NitroValidator must verify an attestation that:
+    ///      1. Has a valid, pre-cached AWS Nitro certificate chain
     ///      2. Is less than MAX_AGE old
     ///      Registration is PCR0-agnostic: any enclave with a valid attestation can register.
     ///      This enables pre-registration of new-PCR0 enclaves before a hardfork, eliminating
@@ -140,26 +144,37 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     ///      enforces PCR0 correctness at proof-submission time by checking signerImageHash
     ///      against the AggregateVerifier's TEE_IMAGE_HASH, so pre-registered enclaves cannot
     ///      produce accepted proofs until the hardfork activates.
-    /// @param output The ABI-encoded VerifierJournal from the ZK proof.
-    /// @param proofBytes The Risc0 ZK proof bytes.
-    function registerSigner(bytes calldata output, bytes calldata proofBytes) external onlyOwnerOrManager {
-        VerifierJournal memory journal = NITRO_VERIFIER.verify(output, ZkCoProcessorType.RiscZero, proofBytes);
+    /// @param attestationTbs The COSE Sign1 to-be-signed bytes.
+    /// @param signature The 96-byte P-384 attestation signature.
+    /// @param hints Offchain inverse hints for the attestation signature.
+    function registerSigner(
+        bytes calldata attestationTbs,
+        bytes calldata signature,
+        bytes calldata hints
+    )
+        external
+        onlyOwnerOrManager
+    {
+        // The validator returns offsets into the TBS; copy it once for the memory-only CBOR helpers below.
+        bytes memory tbs = attestationTbs;
+        INitroValidator.Ptrs memory ptrs = NITRO_VALIDATOR.validateAttestationWithHints(tbs, signature, hints);
 
-        if (journal.result != VerificationResult.Success) revert AttestationVerificationFailed();
-
-        // We allow attestations up to MAX_AGE old. This means a cert may be expired between when
-        // the attestation is generated and when it is submitted to this contract.
-        if (journal.timestamp / MS_PER_SECOND + MAX_AGE <= block.timestamp) revert AttestationTooOld();
+        uint256 attestationTimestamp = ptrs.timestamp / MS_PER_SECOND;
+        if (attestationTimestamp + MAX_AGE <= block.timestamp) revert AttestationTooOld();
+        if (attestationTimestamp >= block.timestamp) revert AttestationFromFuture();
 
         // Extract the attestation's PCR0 and store it for TEEVerifier to check at
         // proof-submission time. No comparison against the current TEE_IMAGE_HASH
         // here — the registry accepts any valid attestation.
-        bytes32 pcr0Hash = _extractPCR0Hash(journal.pcrs);
+        if (ptrs.pcrs.length == 0 || ptrs.pcrs[0].isNull()) revert PCR0NotFound();
+        if (ptrs.pcrs[0].length() != 48) revert InvalidPCR0();
+        bytes32 pcr0Hash = tbs.keccak(ptrs.pcrs[0]);
+        if (pcr0Hash == DEBUG_MODE_PCR0_HASH) revert InvalidPCR0();
 
         // The publicKey is encoded in ANSI X9.62 format: 0x04 || x || y (65 bytes).
         // We skip the first byte (0x04 prefix) when hashing to derive the address.
-        bytes memory pubKey = journal.publicKey;
-        if (pubKey.length != 65) revert InvalidPublicKey();
+        bytes memory pubKey = tbs.slice(ptrs.publicKey);
+        if (pubKey.length != 65 || pubKey[0] != 0x04) revert InvalidPublicKey();
         bytes32 publicKeyHash;
         assembly {
             // Length is hardcoded to 64 to skip the 0x04 prefix and hash only the x and y coordinates
@@ -233,9 +248,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.5.0
+    /// @custom:semver 0.6.0
     function version() public pure virtual returns (string memory) {
-        return "0.5.0";
+        return "0.6.0";
     }
 
     /// @dev Reads TEE_IMAGE_HASH from the AggregateVerifier registered in the factory.
@@ -245,16 +260,5 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         (bool success, bytes memory data) = impl.staticcall(abi.encodeWithSignature("TEE_IMAGE_HASH()"));
         if (!success || data.length != 32) revert ImageHashReadFailed();
         return abi.decode(data, (bytes32));
-    }
-
-    /// @dev Finds PCR0 (index 0) in the PCR array and returns its keccak256 hash.
-    function _extractPCR0Hash(Pcr[] memory pcrs) internal pure returns (bytes32) {
-        for (uint256 i = 0; i < pcrs.length; i++) {
-            if (pcrs[i].index == 0) {
-                Bytes48 memory value = pcrs[i].value;
-                return keccak256(abi.encodePacked(value.first, value.second));
-            }
-        }
-        revert PCR0NotFound();
     }
 }
