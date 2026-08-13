@@ -19,6 +19,7 @@ import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPort
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
+import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IL1ChugSplashProxy } from "interfaces/legacy/IL1ChugSplashProxy.sol";
 import { IResolvedDelegateProxy } from "interfaces/legacy/IResolvedDelegateProxy.sol";
@@ -395,7 +396,8 @@ contract SystemDeploy is Script {
                 root: Hash.wrap(cfg.multiproofGenesisOutputRoot()), l2SequenceNumber: cfg.multiproofGenesisBlockNumber()
             }),
             saltMixer: cfg.saltMixer(),
-            gasLimit: uint64(cfg.l2GenesisBlockGasLimit())
+            gasLimit: uint64(cfg.l2GenesisBlockGasLimit()),
+            resourceConfigMinimumBaseFee: cfg.resourceConfigMinimumBaseFee()
         });
     }
 
@@ -842,6 +844,11 @@ contract SystemDeploy is Script {
             delayedWETH: address(_output.delayedWETHProxy)
         });
 
+        uint32 minimumBaseFee =
+            _input.resourceConfigMinimumBaseFee == 0 ? uint32(1 gwei) : _input.resourceConfigMinimumBaseFee;
+        IResourceMetering.ResourceConfig memory resourceConfig =
+            Constants.resourceConfigWithMinimumBaseFee(minimumBaseFee);
+
         return abi.encodeCall(
             ISystemConfig.initialize,
             (
@@ -851,7 +858,7 @@ contract SystemDeploy is Script {
                 bytes32(uint256(uint160(_input.roles.batcher))),
                 _input.gasLimit,
                 _input.roles.unsafeBlockSigner,
-                Constants.DEFAULT_RESOURCE_CONFIG(),
+                resourceConfig,
                 Types.chainIdToBatchInboxAddress(_input.l2ChainId),
                 opChainAddrs,
                 _input.l2ChainId,

@@ -37,6 +37,7 @@ contract DeployConfig is Script {
 
     uint32 public basefeeScalar;
     uint32 public blobbasefeeScalar;
+    uint32 public resourceConfigMinimumBaseFee;
 
     string public saltMixer;
 
@@ -98,6 +99,7 @@ contract DeployConfig is Script {
 
         basefeeScalar = uint32(_json.readUint("$.gasPriceOracleBaseFeeScalar"));
         blobbasefeeScalar = uint32(_json.readUint("$.gasPriceOracleBlobBaseFeeScalar"));
+        resourceConfigMinimumBaseFee = uint32(_json.readUintOr("$.resourceConfigMinimumBaseFee", 1 gwei));
 
         baseFeeVaultMinimumWithdrawalAmount = _json.readUint("$.baseFeeVaultMinimumWithdrawalAmount");
         baseFeeVaultWithdrawalNetwork = _json.readUint("$.baseFeeVaultWithdrawalNetwork");

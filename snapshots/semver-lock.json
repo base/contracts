@@ -12,7 +12,7 @@
     "sourceCodeHash": "0xd9f576a79e97bc541b3d7a2ee928f34223edaaecb074eeb9e6e2ecee857ce6a0"
   },
   "src/L1/OptimismPortal2.sol:OptimismPortal2": {
-    "initCodeHash": "0xdaeac3fae27dc1c5924100d06eb337c60010d88b638d6703c5ec25d750810495",
+    "initCodeHash": "0x3223d48d63cc9e4a6796f2eb343c82c88c1add5289fa66ab72fa2fa4d83d0790",
     "sourceCodeHash": "0x15cef97e2598ac2ed83fd8662c2f31e61a33e89d9f618b97fdeaa142cf6f9262"
   },
   "src/L1/ProtocolVersions.sol:ProtocolVersions": {
