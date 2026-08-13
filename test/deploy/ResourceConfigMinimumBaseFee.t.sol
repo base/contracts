@@ -29,6 +29,7 @@ contract ResourceConfigMinimumBaseFee_Test is Test {
 
     uint256 internal l2ChainId = 901;
     uint32 internal constant L3_MINIMUM_BASE_FEE = 10_000_000;
+    /// @dev The Fusaka EIP-7825 transaction gas cap. Chains may not enable it and future forks may change it.
     uint256 internal constant BASE_TX_GAS_CAP = 16_777_216;
 
     function setUp() public {
@@ -66,21 +67,35 @@ contract ResourceConfigMinimumBaseFee_Test is Test {
 
         vm.fee(L3_MINIMUM_BASE_FEE);
 
+        uint256 gasUsed = _depositETHAndMeasureGas(l1StandardBridge);
+        assertLt(gasUsed, BASE_TX_GAS_CAP);
+
+        (uint128 prevBaseFee, uint64 prevBoughtGas,) = optimismPortal.params();
+        assertEq(prevBaseFee, L3_MINIMUM_BASE_FEE);
+        assertGt(prevBoughtGas, 0);
+    }
+
+    function test_depositETH_defaultMinimum_lowParentBaseFee_exceedsFusakaTxGasCap_succeeds() public {
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(_deployInput(uint32(1 gwei)));
+        IL1StandardBridge l1StandardBridge =
+            IL1StandardBridge(payable(output.opChain.systemConfigProxy.l1StandardBridge()));
+
+        vm.fee(L3_MINIMUM_BASE_FEE);
+
+        uint256 gasUsed = _depositETHAndMeasureGas(l1StandardBridge);
+        assertGe(gasUsed, BASE_TX_GAS_CAP);
+    }
+
+    function _depositETHAndMeasureGas(IL1StandardBridge _l1StandardBridge) internal returns (uint256 gasUsed_) {
         uint256 depositorKey = 0xBEEF;
         address depositor = vm.addr(depositorKey);
         vm.deal(depositor, 10 ether);
 
         vm.startBroadcast(depositorKey);
         uint256 gasBefore = gasleft();
-        l1StandardBridge.depositETH{ value: 1 ether }(200_000, hex"");
-        uint256 gasUsed = gasBefore - gasleft();
+        _l1StandardBridge.depositETH{ value: 1 ether }(200_000, hex"");
+        gasUsed_ = gasBefore - gasleft();
         vm.stopBroadcast();
-
-        assertLt(gasUsed, BASE_TX_GAS_CAP);
-
-        (uint128 prevBaseFee, uint64 prevBoughtGas,) = optimismPortal.params();
-        assertEq(prevBaseFee, L3_MINIMUM_BASE_FEE);
-        assertGt(prevBoughtGas, 0);
     }
 
     function _deployInput(uint32 _resourceConfigMinimumBaseFee)
