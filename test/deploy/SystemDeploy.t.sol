@@ -193,6 +193,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
         Types.Implementations memory implementations = output.impls;
+        vm.store(address(output.opChain.optimismPortalProxy), bytes32(uint256(64)), bytes32(0));
         ProtocolVersions protocolVersionsImpl = new ProtocolVersions();
         implementations.protocolVersionsImpl = address(protocolVersionsImpl);
 
@@ -208,6 +209,11 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
 
         assertFalse(upgradeOutput.superchainConfigUpgraded, "superchain already current");
         assertTrue(upgradeOutput.chainUpgraded, "chain upgraded");
+        assertEq(
+            address(output.opChain.optimismPortalProxy.teeProverRegistry()),
+            address(output.opChain.teeProverRegistryProxy),
+            "portal tee registry"
+        );
         assertEq(
             output.superchain.superchainProxyAdmin
                 .getProxyImplementation(address(output.superchain.superchainConfigProxy)),

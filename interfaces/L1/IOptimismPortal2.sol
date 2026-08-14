@@ -9,6 +9,7 @@ import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
+import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.sol";
 
 interface IOptimismPortal2 is IProxyAdminOwnedBase {
     error ContentLengthMismatch();
@@ -33,6 +34,11 @@ interface IOptimismPortal2 is IProxyAdminOwnedBase {
     error OptimismPortal_ProofNotOldEnough();
     error OptimismPortal_Unproven();
     error OptimismPortal_ImmediateFinalityNotEnabled();
+    error OptimismPortal_AttestedWithdrawalAlreadyRedeemed();
+    error OptimismPortal_InvalidAttestedWithdrawalSignature();
+    error OptimismPortal_InvalidAttestedWithdrawalSigner(address signer);
+    error OptimismPortal_TEEProverRegistryAlreadySet();
+    error OptimismPortal_AttestedWithdrawalTransferFailed();
     error OutOfGas();
     error UnexpectedList();
     error UnexpectedString();
@@ -42,10 +48,14 @@ interface IOptimismPortal2 is IProxyAdminOwnedBase {
     event WithdrawalFinalized(bytes32 indexed withdrawalHash, bool success);
     event WithdrawalProven(bytes32 indexed withdrawalHash, address indexed from, address indexed to);
     event WithdrawalProvenExtension1(bytes32 indexed withdrawalHash, address indexed proofSubmitter);
+    event AttestedWithdrawalRedeemed(
+        bytes32 indexed authHash, address indexed recipient, uint256 amount, uint256 nonce, address signer
+    );
 
     receive() external payable;
 
     function anchorStateRegistry() external view returns (IAnchorStateRegistry);
+    function attestRedeemed(bytes32) external view returns (bool);
     function checkWithdrawal(bytes32 _withdrawalHash, address _proofSubmitter) external view;
     function depositTransaction(
         address _to,
@@ -106,9 +116,14 @@ interface IOptimismPortal2 is IProxyAdminOwnedBase {
         external
         view
         returns (IDisputeGame disputeGameProxy, uint64 timestamp);
+    function redeemAttestedWithdrawal(
+        address _recipient, uint256 _amount, uint256 _nonce, bytes calldata _sig
+    ) external;
     function respectedGameType() external view returns (GameType);
     function respectedGameTypeUpdatedAt() external view returns (uint64);
+    function setTEEProverRegistry(ITEEProverRegistry _teeProverRegistry) external;
     function systemConfig() external view returns (ISystemConfig);
+    function teeProverRegistry() external view returns (ITEEProverRegistry);
     function version() external pure returns (string memory);
 
     function __constructor__(uint256 _proofMaturityDelaySeconds) external;

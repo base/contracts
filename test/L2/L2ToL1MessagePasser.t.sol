@@ -184,3 +184,28 @@ contract L2ToL1MessagePasser_MessageNonce_Test is L2ToL1MessagePasser_TestInit {
         assertEq(version, l2ToL1MessagePasser.MESSAGE_VERSION());
     }
 }
+
+/// @title L2ToL1MessagePasser_AttestedWithdraw_Test
+/// @notice Tests for `attestedWithdraw`.
+contract L2ToL1MessagePasser_AttestedWithdraw_Test is L2ToL1MessagePasser_TestInit {
+    event AttestedWithdrawalInitiated(
+        bytes32 indexed authHash, address indexed recipient, address indexed token, uint256 amount, uint256 nonce
+    );
+
+    function test_attestedWithdraw_succeeds() external {
+        address recipient = makeAddr("recipient");
+        uint256 amount = 1 ether;
+        uint256 nonce = l2ToL1MessagePasser.attestNonce();
+        bytes32 authHash = keccak256(abi.encode(block.chainid, recipient, address(0), amount, nonce));
+
+        vm.expectEmit(true, true, true, true, address(l2ToL1MessagePasser));
+        emit AttestedWithdrawalInitiated(authHash, recipient, address(0), amount, nonce);
+
+        vm.deal(address(this), amount);
+        l2ToL1MessagePasser.attestedWithdraw{ value: amount }(recipient);
+
+        assertTrue(l2ToL1MessagePasser.attestedWithdrawals(authHash));
+        assertEq(l2ToL1MessagePasser.attestNonce(), nonce + 1);
+        assertEq(address(l2ToL1MessagePasser).balance, amount);
+    }
+}

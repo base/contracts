@@ -33,6 +33,7 @@ import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.sol";
 
 abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
     address depositor;
@@ -2102,5 +2103,92 @@ contract OptimismPortal2_Params_Test is CommonTest {
         bytes32 slot21After = vm.load(address(optimismPortal2), bytes32(uint256(21)));
         bytes32 slot21Expected = NextImpl(address(optimismPortal2)).slot21Init();
         assertEq(slot21Expected, slot21After);
+    }
+}
+
+/// @title OptimismPortal2_RedeemAttestedWithdrawal_Test
+/// @notice Tests for `redeemAttestedWithdrawal`.
+contract OptimismPortal2_RedeemAttestedWithdrawal_Test is OptimismPortal2_TestInit {
+    uint256 internal constant SIGNER_PRIVATE_KEY = 0xA11CE;
+
+    event AttestedWithdrawalRedeemed(
+        bytes32 indexed authHash, address indexed recipient, uint256 amount, uint256 nonce, address signer
+    );
+
+    function setUp() public override {
+        super.setUp();
+        if (address(optimismPortal2.teeProverRegistry()) == address(0)) {
+            vm.prank(proxyAdminOwner);
+            optimismPortal2.setTEEProverRegistry(ITEEProverRegistry(address(teeProverRegistry)));
+        }
+    }
+
+    function test_redeemAttestedWithdrawal_succeeds() external {
+        address recipient = makeAddr("attested recipient");
+        uint256 amount = 1 gwei;
+        uint256 nonce = 7;
+        address signer = vm.addr(SIGNER_PRIVATE_KEY);
+        bytes32 authHash = keccak256(abi.encode(deploy.cfg().l2ChainId(), recipient, address(0), amount, nonce));
+        bytes32 journal = keccak256(abi.encodePacked(keccak256("BASE_ATTESTED_WITHDRAWAL_V1"), authHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        vm.mockCall(
+            address(teeProverRegistry), abi.encodeCall(teeProverRegistry.isValidSigner, (signer)), abi.encode(true)
+        );
+        vm.expectEmit(true, true, false, true, address(optimismPortal2));
+        emit AttestedWithdrawalRedeemed(authHash, recipient, amount, nonce, signer);
+
+        uint256 balanceBefore = recipient.balance;
+        optimismPortal2.redeemAttestedWithdrawal(recipient, amount, nonce, signature);
+
+        assertEq(recipient.balance, balanceBefore + amount);
+        assertTrue(optimismPortal2.attestRedeemed(authHash));
+    }
+
+    function test_redeemAttestedWithdrawal_replay_reverts() external {
+        address recipient = makeAddr("attested recipient");
+        uint256 amount = 1 gwei;
+        uint256 nonce = 7;
+        address signer = vm.addr(SIGNER_PRIVATE_KEY);
+        bytes32 authHash = keccak256(abi.encode(deploy.cfg().l2ChainId(), recipient, address(0), amount, nonce));
+        bytes32 journal = keccak256(abi.encodePacked(keccak256("BASE_ATTESTED_WITHDRAWAL_V1"), authHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
+        bytes memory signature = abi.encodePacked(r, s, v);
+        vm.mockCall(
+            address(teeProverRegistry), abi.encodeCall(teeProverRegistry.isValidSigner, (signer)), abi.encode(true)
+        );
+
+        optimismPortal2.redeemAttestedWithdrawal(recipient, amount, nonce, signature);
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_AttestedWithdrawalAlreadyRedeemed.selector);
+        optimismPortal2.redeemAttestedWithdrawal(recipient, amount, nonce, signature);
+    }
+
+    function test_redeemAttestedWithdrawal_paused_reverts() external {
+        vm.prank(optimismPortal2.guardian());
+        superchainConfig.pause(address(0));
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_CallPaused.selector);
+        optimismPortal2.redeemAttestedWithdrawal(makeAddr("attested recipient"), 1 gwei, 7, hex"");
+    }
+
+    function test_redeemAttestedWithdrawal_invalidSigner_reverts() external {
+        address recipient = makeAddr("attested recipient");
+        uint256 amount = 1 gwei;
+        uint256 nonce = 7;
+        address signer = vm.addr(SIGNER_PRIVATE_KEY);
+        bytes32 authHash = keccak256(abi.encode(deploy.cfg().l2ChainId(), recipient, address(0), amount, nonce));
+        bytes32 journal = keccak256(abi.encodePacked(keccak256("BASE_ATTESTED_WITHDRAWAL_V1"), authHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
+        bytes memory signature = abi.encodePacked(r, s, v);
+        vm.mockCall(
+            address(teeProverRegistry), abi.encodeCall(teeProverRegistry.isValidSigner, (signer)), abi.encode(false)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IOptimismPortal.OptimismPortal_InvalidAttestedWithdrawalSigner.selector, signer)
+        );
+        optimismPortal2.redeemAttestedWithdrawal(recipient, amount, nonce, signature);
     }
 }
