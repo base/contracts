@@ -6,6 +6,7 @@ import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
+import { MockNitroValidator } from "test/mocks/MockNitroValidator.sol";
 
 import { DeployDevBase } from "./DeployDevBase.s.sol";
 
@@ -34,9 +35,11 @@ contract DeployDevNoNitro is DeployDevBase {
     }
 
     function _deployTEERegistryImpl() internal override returns (address) {
+        MockNitroValidator mockNitroValidator = new MockNitroValidator();
         return address(
             new DevTEEProverRegistry({
-                nitroValidator: INitroValidator(address(0)), factory: IDisputeGameFactory(disputeGameFactory)
+                nitroValidator: INitroValidator(address(mockNitroValidator)),
+                factory: IDisputeGameFactory(disputeGameFactory)
             })
         );
     }

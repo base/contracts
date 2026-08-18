@@ -90,6 +90,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     /// @notice Thrown when PCR0 is not a 48-byte SHA-384 measurement.
     error InvalidPCR0();
 
+    /// @notice Thrown when the Nitro validator is not configured.
+    error NitroValidatorNotSet();
+
     /// @notice Thrown when the dispute game factory is not configured.
     error DisputeGameFactoryNotSet();
 
@@ -100,6 +103,7 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     error InvalidGameType();
 
     constructor(INitroValidator nitroValidator, IDisputeGameFactory factory) {
+        if (address(nitroValidator) == address(0)) revert NitroValidatorNotSet();
         if (address(factory) == address(0)) revert DisputeGameFactoryNotSet();
         NITRO_VALIDATOR = nitroValidator;
         DISPUTE_GAME_FACTORY = factory;
@@ -248,9 +252,9 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.6.0
+    /// @custom:semver 0.6.1
     function version() public pure virtual returns (string memory) {
-        return "0.6.0";
+        return "0.6.1";
     }
 
     /// @dev Reads TEE_IMAGE_HASH from the AggregateVerifier registered in the factory.

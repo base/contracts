@@ -79,9 +79,10 @@ contract TEEProverRegistryTest is Test {
     function _deployRegistry(address[] memory proposers, GameType gameType) internal returns (DevTEEProverRegistry) {
         MockAggregateVerifierForRegistry verifier = new MockAggregateVerifierForRegistry(TEST_IMAGE_HASH);
         MockDisputeGameFactoryForRegistry factory = new MockDisputeGameFactoryForRegistry(address(verifier));
+        MockNitroValidator nitroValidator = new MockNitroValidator();
 
         DevTEEProverRegistry impl = new DevTEEProverRegistry({
-            nitroValidator: INitroValidator(address(0)), factory: IDisputeGameFactory(address(factory))
+            nitroValidator: INitroValidator(address(nitroValidator)), factory: IDisputeGameFactory(address(factory))
         });
 
         proxyAdmin = makeAddr("proxy-admin");
@@ -125,10 +126,16 @@ contract TEEProverRegistryTest is Test {
         fail();
     }
 
+    function test_constructor_zeroNitroValidator_reverts() public {
+        IDisputeGameFactory factory = teeProverRegistry.DISPUTE_GAME_FACTORY();
+        vm.expectRevert(TEEProverRegistry.NitroValidatorNotSet.selector);
+        new TEEProverRegistry({ nitroValidator: INitroValidator(address(0)), factory: factory });
+    }
+
     function testInitialization() public view {
         assertEq(teeProverRegistry.owner(), owner);
         assertEq(teeProverRegistry.manager(), manager);
-        assertEq(teeProverRegistry.version(), "0.6.0");
+        assertEq(teeProverRegistry.version(), "0.6.1");
     }
 
     function testInitializationWithProposers() public {

@@ -13,6 +13,7 @@ import { GameType } from "src/libraries/bridge/Types.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { MockAnchorStateRegistry } from "scripts/multiproof/mocks/MockAnchorStateRegistry.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
+import { MockNitroValidator } from "test/mocks/MockNitroValidator.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 
@@ -50,10 +51,12 @@ contract TEEVerifierTest is Test {
         address signerAddress = vm.addr(SIGNER_PRIVATE_KEY);
         MockAggregateVerifierForVerifier mockVerifier = new MockAggregateVerifierForVerifier(IMAGE_ID);
         MockDisputeGameFactoryForVerifier mockFactory = new MockDisputeGameFactoryForVerifier(address(mockVerifier));
+        MockNitroValidator mockNitroValidator = new MockNitroValidator();
 
         // DevTEEProverRegistry keeps these tests focused on verifier behavior without Nitro attestation setup.
         DevTEEProverRegistry impl = new DevTEEProverRegistry({
-            nitroValidator: INitroValidator(address(0)), factory: IDisputeGameFactory(address(mockFactory))
+            nitroValidator: INitroValidator(address(mockNitroValidator)),
+            factory: IDisputeGameFactory(address(mockFactory))
         });
 
         address proxyAdmin = makeAddr("proxy-admin");

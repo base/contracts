@@ -44,8 +44,8 @@
     "sourceCodeHash": "0x62ff0209cffa08e5aaaaac47e0f22d89ea1fa6a0ea8773a162ab7230e50806ee"
   },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0xef50e4cd4734c5a7137c9071334fc159a36869744ec2fa25d320c172999c4b3b",
-    "sourceCodeHash": "0xd7aef97975588bb749c24b69f83055f329da06ce1b6b7634e51d0080557fb98e"
+    "initCodeHash": "0x380af47d78626bd0af4bb45769a9c184d6ea22adf60877ea9765129a28a3ffd6",
+    "sourceCodeHash": "0x463d71d1cd9a4e912a936d2e329959c89a2f37e76b8cf9e759a2457f12909c1b"
   },
   "src/L1/proofs/tee/TEEVerifier.sol:TEEVerifier": {
     "initCodeHash": "0x655576cc21cc5c603d55fb4dd2a2f0ef57b11deeaabd3e539b0a70a5f7e2c9af",
