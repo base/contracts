@@ -189,23 +189,40 @@ contract L2ToL1MessagePasser_MessageNonce_Test is L2ToL1MessagePasser_TestInit {
 /// @notice Tests for `attestedWithdraw`.
 contract L2ToL1MessagePasser_AttestedWithdraw_Test is L2ToL1MessagePasser_TestInit {
     event AttestedWithdrawalInitiated(
-        bytes32 indexed authHash, address indexed recipient, address indexed token, uint256 amount, uint256 nonce
+        bytes32 indexed authHash,
+        address indexed recipient,
+        address indexed token,
+        uint256 amount,
+        uint256 nonce,
+        bytes data
     );
 
     function test_attestedWithdraw_succeeds() external {
         address recipient = makeAddr("recipient");
         uint256 amount = 1 ether;
         uint256 nonce = l2ToL1MessagePasser.attestNonce();
-        bytes32 authHash = keccak256(abi.encode(block.chainid, recipient, address(0), amount, nonce));
+        bytes memory data = hex"1234";
+        bytes32 authHash = keccak256(abi.encode(block.chainid, recipient, address(0), amount, nonce, data));
 
         vm.expectEmit(true, true, true, true, address(l2ToL1MessagePasser));
-        emit AttestedWithdrawalInitiated(authHash, recipient, address(0), amount, nonce);
+        emit AttestedWithdrawalInitiated(authHash, recipient, address(0), amount, nonce, data);
 
         vm.deal(address(this), amount);
-        l2ToL1MessagePasser.attestedWithdraw{ value: amount }(recipient);
+        l2ToL1MessagePasser.attestedWithdraw{ value: amount }(recipient, data);
 
         assertTrue(l2ToL1MessagePasser.attestedWithdrawals(authHash));
         assertEq(l2ToL1MessagePasser.attestNonce(), nonce + 1);
         assertEq(address(l2ToL1MessagePasser).balance, amount);
+    }
+
+    function test_attestedWithdraw_calldataChangesAuthorizationHash_succeeds() external {
+        address recipient = makeAddr("recipient");
+        uint256 amount = 1 ether;
+        uint256 nonce = l2ToL1MessagePasser.attestNonce();
+
+        bytes32 firstHash = keccak256(abi.encode(block.chainid, recipient, address(0), amount, nonce, hex"1234"));
+        bytes32 secondHash = keccak256(abi.encode(block.chainid, recipient, address(0), amount, nonce, hex"5678"));
+
+        assertNotEq(firstHash, secondHash);
     }
 }

@@ -59,7 +59,12 @@ contract L2ToL1MessagePasser is ISemver {
 
     /// @notice Emitted when an attested withdrawal is initiated.
     event AttestedWithdrawalInitiated(
-        bytes32 indexed authHash, address indexed recipient, address indexed token, uint256 amount, uint256 nonce
+        bytes32 indexed authHash,
+        address indexed recipient,
+        address indexed token,
+        uint256 amount,
+        uint256 nonce,
+        bytes data
     );
 
     /// @custom:semver 1.3.0
@@ -107,13 +112,14 @@ contract L2ToL1MessagePasser is ISemver {
         }
     }
 
-    /// @notice Initiates an ETH withdrawal that an authorized enclave may attest for L1 redemption.
-    function attestedWithdraw(address _recipient) external payable {
+    /// @notice Initiates an ETH withdrawal with an L1 call authorized for enclave attestation.
+    function attestedWithdraw(address _recipient, bytes calldata _data) external payable {
         uint256 nonce = attestNonce;
-        bytes32 authHash = keccak256(abi.encode(uint256(block.chainid), _recipient, address(0), msg.value, nonce));
+        bytes32 authHash =
+            keccak256(abi.encode(uint256(block.chainid), _recipient, address(0), msg.value, nonce, _data));
 
         attestedWithdrawals[authHash] = true;
-        emit AttestedWithdrawalInitiated(authHash, _recipient, address(0), msg.value, nonce);
+        emit AttestedWithdrawalInitiated(authHash, _recipient, address(0), msg.value, nonce, _data);
 
         unchecked {
             ++attestNonce;

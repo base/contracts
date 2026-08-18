@@ -167,7 +167,7 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
 
     /// @notice Emitted when an attested withdrawal is redeemed.
     event AttestedWithdrawalRedeemed(
-        bytes32 indexed authHash, address indexed recipient, uint256 amount, uint256 nonce, address signer
+        bytes32 indexed authHash, address indexed recipient, uint256 amount, uint256 nonce, address signer, bytes data
     );
 
     /// @notice Thrown when a withdrawal has already been finalized.
@@ -235,7 +235,7 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     error OptimismPortal_TEEProverRegistryAlreadySet();
 
     /// @notice Thrown when an attested withdrawal payout fails.
-    error OptimismPortal_AttestedWithdrawalTransferFailed();
+    error OptimismPortal_AttestedWithdrawalCallFailed();
 
     /// @notice Semantic version.
     /// @custom:semver 5.3.0
@@ -256,11 +256,12 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         teeProverRegistry = _teeProverRegistry;
     }
 
-    /// @notice Redeems an ETH withdrawal authorized by a registered enclave signer.
+    /// @notice Executes an ETH-plus-calldata call authorized by a registered enclave signer.
     function redeemAttestedWithdrawal(
         address _recipient,
         uint256 _amount,
         uint256 _nonce,
+        bytes calldata _data,
         bytes calldata _sig
     )
         external
@@ -268,7 +269,7 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         _assertNotPaused();
 
         bytes32 authHash =
-            keccak256(abi.encode(uint256(systemConfig.l2ChainId()), _recipient, address(0), _amount, _nonce));
+            keccak256(abi.encode(uint256(systemConfig.l2ChainId()), _recipient, address(0), _amount, _nonce, _data));
         if (attestRedeemed[authHash]) revert OptimismPortal_AttestedWithdrawalAlreadyRedeemed();
 
         bytes32 journal = keccak256(abi.encodePacked(ATTESTED_WITHDRAWAL_DOMAIN_TAG, authHash));
@@ -277,11 +278,11 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         if (!teeProverRegistry.isValidSigner(signer)) revert OptimismPortal_InvalidAttestedWithdrawalSigner(signer);
 
         attestRedeemed[authHash] = true;
-        if (!SafeCall.call(_recipient, gasleft(), _amount, hex"")) {
-            revert OptimismPortal_AttestedWithdrawalTransferFailed();
+        if (!SafeCall.call(_recipient, gasleft(), _amount, _data)) {
+            revert OptimismPortal_AttestedWithdrawalCallFailed();
         }
 
-        emit AttestedWithdrawalRedeemed(authHash, _recipient, _amount, _nonce, signer);
+        emit AttestedWithdrawalRedeemed(authHash, _recipient, _amount, _nonce, signer, _data);
     }
 
     /// @notice Initializer.

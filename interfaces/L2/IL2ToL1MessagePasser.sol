@@ -13,14 +13,19 @@ interface IL2ToL1MessagePasser {
     );
     event WithdrawerBalanceBurnt(uint256 indexed amount);
     event AttestedWithdrawalInitiated(
-        bytes32 indexed authHash, address indexed recipient, address indexed token, uint256 amount, uint256 nonce
+        bytes32 indexed authHash,
+        address indexed recipient,
+        address indexed token,
+        uint256 amount,
+        uint256 nonce,
+        bytes data
     );
 
     receive() external payable;
 
     function MESSAGE_VERSION() external view returns (uint16);
     function attestNonce() external view returns (uint256);
-    function attestedWithdraw(address _recipient) external payable;
+    function attestedWithdraw(address _recipient, bytes calldata _data) external payable;
     function attestedWithdrawals(bytes32) external view returns (bool);
     function burn() external;
     function initiateWithdrawal(address _target, uint256 _gasLimit, bytes memory _data) external payable;

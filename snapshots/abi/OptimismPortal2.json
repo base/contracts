@@ -693,6 +693,11 @@
       },
       {
         "internalType": "bytes",
+        "name": "_data",
+        "type": "bytes"
+      },
+      {
+        "internalType": "bytes",
         "name": "_sig",
         "type": "bytes"
       }
@@ -825,6 +830,12 @@
         "internalType": "address",
         "name": "signer",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "data",
+        "type": "bytes"
       }
     ],
     "name": "AttestedWithdrawalRedeemed",
@@ -969,7 +980,7 @@
   },
   {
     "inputs": [],
-    "name": "OptimismPortal_AttestedWithdrawalTransferFailed",
+    "name": "OptimismPortal_AttestedWithdrawalCallFailed",
     "type": "error"
   },
   {

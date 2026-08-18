@@ -35,6 +35,11 @@
         "internalType": "address",
         "name": "_recipient",
         "type": "address"
+      },
+      {
+        "internalType": "bytes",
+        "name": "_data",
+        "type": "bytes"
       }
     ],
     "name": "attestedWithdraw",
@@ -168,6 +173,12 @@
         "internalType": "uint256",
         "name": "nonce",
         "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "data",
+        "type": "bytes"
       }
     ],
     "name": "AttestedWithdrawalInitiated",

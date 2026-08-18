@@ -38,7 +38,7 @@ interface IOptimismPortal2 is IProxyAdminOwnedBase {
     error OptimismPortal_InvalidAttestedWithdrawalSignature();
     error OptimismPortal_InvalidAttestedWithdrawalSigner(address signer);
     error OptimismPortal_TEEProverRegistryAlreadySet();
-    error OptimismPortal_AttestedWithdrawalTransferFailed();
+    error OptimismPortal_AttestedWithdrawalCallFailed();
     error OutOfGas();
     error UnexpectedList();
     error UnexpectedString();
@@ -49,7 +49,12 @@ interface IOptimismPortal2 is IProxyAdminOwnedBase {
     event WithdrawalProven(bytes32 indexed withdrawalHash, address indexed from, address indexed to);
     event WithdrawalProvenExtension1(bytes32 indexed withdrawalHash, address indexed proofSubmitter);
     event AttestedWithdrawalRedeemed(
-        bytes32 indexed authHash, address indexed recipient, uint256 amount, uint256 nonce, address signer
+        bytes32 indexed authHash,
+        address indexed recipient,
+        uint256 amount,
+        uint256 nonce,
+        address signer,
+        bytes data
     );
 
     receive() external payable;
@@ -117,7 +122,11 @@ interface IOptimismPortal2 is IProxyAdminOwnedBase {
         view
         returns (IDisputeGame disputeGameProxy, uint64 timestamp);
     function redeemAttestedWithdrawal(
-        address _recipient, uint256 _amount, uint256 _nonce, bytes calldata _sig
+        address _recipient,
+        uint256 _amount,
+        uint256 _nonce,
+        bytes calldata _data,
+        bytes calldata _sig
     ) external;
     function respectedGameType() external view returns (GameType);
     function respectedGameTypeUpdatedAt() external view returns (uint64);
