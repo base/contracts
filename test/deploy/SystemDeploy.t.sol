@@ -39,6 +39,12 @@ contract MockSP1Verifier {
     function verifyProof(bytes32, bytes calldata, bytes calldata) external pure { }
 }
 
+contract MockInvalidTEEProverRegistry {
+    function NITRO_VALIDATOR() external pure returns (INitroValidator) {
+        return INitroValidator(address(0));
+    }
+}
+
 contract SystemDeploy_Test is Test, SystemDeployAssertions {
     Artifacts internal constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
@@ -182,11 +188,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     function test_upgrade_registryWithInvalidNitroValidator_reverts() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
-        TEEProverRegistry invalidRegistryImpl = new TEEProverRegistry({
-            nitroValidator: INitroValidator(address(0)), factory: output.opChain.disputeGameFactoryProxy
-        });
         Types.Implementations memory implementations = output.impls;
-        implementations.teeProverRegistryImpl = address(invalidRegistryImpl);
+        implementations.teeProverRegistryImpl = address(new MockInvalidTEEProverRegistry());
 
         vm.expectRevert("DeployUtils: zero address");
         systemDeploy.upgrade(
@@ -266,7 +269,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             address(newImpl),
             "tee registry impl"
         );
-        assertEq(registry.version(), "0.6.0");
+        assertEq(registry.version(), "0.6.1");
         assertEq(registry.owner(), owner);
         assertEq(registry.manager(), owner);
         assertEq(GameType.unwrap(registry.gameType()), uint32(input.implementationsInput.multiproofGameType));

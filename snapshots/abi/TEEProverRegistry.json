@@ -489,6 +489,11 @@
   },
   {
     "inputs": [],
+    "name": "NitroValidatorNotSet",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "PCR0NotFound",
     "type": "error"
   }
