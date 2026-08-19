@@ -1180,6 +1180,22 @@
   {
     "inputs": [
       {
+        "internalType": "uint64",
+        "name": "claimTimestamp",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint256",
+        "name": "l1Timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "L2TimestampInFuture",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "blockNumber",
         "type": "uint256"

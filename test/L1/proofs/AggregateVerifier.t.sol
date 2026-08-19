@@ -93,6 +93,43 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(secondGame.scheduleId(), protocolVersions.activatedScheduleId(400));
     }
 
+    /// @notice A claim whose L2 timestamp L1 has not yet reached cannot open a game, so a game can
+    ///         never pin an activation that the owner is still able to clear or delay.
+    function test_initialize_l2TimestampInFuture_reverts() public {
+        // The first game ends at L2 block 100, whose deterministic timestamp is 200. Scheduling the
+        // upgrade there and leaving the L1 clock short of it is the window the finding exploits.
+        uint64 activationTimestamp = uint64(BLOCK_INTERVAL * L2_BLOCK_TIME);
+        protocolVersions.registerUpgrade(activationTimestamp, 1);
+        assertLt(block.timestamp, activationTimestamp);
+
+        // Created straight through the factory, since the shared helper advances L1 to the claim.
+        Claim rootClaim = _advanceL2BlockAndClaim();
+        bytes memory proof = _generateProof("future-l2", AggregateVerifier.ProofType.TEE);
+        bytes memory extraData =
+            _aggregateVerifierExtraData(rootClaim, currentL2BlockNumber, address(anchorStateRegistry));
+
+        vm.deal(TEE_PROVER, INIT_BOND);
+        vm.prank(TEE_PROVER);
+        vm.expectRevert(
+            abi.encodeWithSelector(AggregateVerifier.L2TimestampInFuture.selector, activationTimestamp, block.timestamp)
+        );
+        factory.createWithInitData{ value: INIT_BOND }(GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, proof);
+
+        // Once L1 reaches the activation, the schedule is frozen and the game becomes creatable.
+        vm.warp(activationTimestamp);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_ActivationAlreadyPassed.selector, 0, activationTimestamp
+            )
+        );
+        protocolVersions.setTimestamp(0, 0);
+
+        AggregateVerifier game = _createAggregateVerifierGame(
+            TEE_PROVER, rootClaim, currentL2BlockNumber, address(anchorStateRegistry), proof
+        );
+        assertEq(game.scheduleId(), protocolVersions.activatedScheduleId(activationTimestamp));
+    }
+
     function test_constructor_zeroL2BlockTime_reverts() public {
         AggregateVerifier.ScheduleConfig memory scheduleConfig = AggregateVerifier.ScheduleConfig({
             protocolVersions: IProtocolVersions(address(protocolVersions)),
@@ -506,6 +543,8 @@ contract AggregateVerifierTest is BaseTest {
         bytes memory extraData = _aggregateVerifierExtraData(rootClaim, l2BlockNumber, parentAddress);
         bytes32 l1Head = blockhash(block.number - 1);
         address clone = address(impl).clone(abi.encodePacked(creator, rootClaim, l1Head, extraData));
+
+        _warpToL2Timestamp(l2BlockNumber);
 
         vm.deal(creator, INIT_BOND);
         vm.prank(creator);

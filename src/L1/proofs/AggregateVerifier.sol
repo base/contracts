@@ -284,6 +284,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice Thrown when an L2 block timestamp cannot be represented as a uint64.
     error L2TimestampOverflow(uint256 blockNumber);
 
+    /// @notice Thrown when the claimed L2 block's timestamp has not yet been reached on L1.
+    error L2TimestampInFuture(uint64 claimTimestamp, uint256 l1Timestamp);
+
     /// @notice Thrown when there are not enough proofs to resolve the game.
     error NotEnoughProofs();
 
@@ -423,6 +426,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         if (blocksSinceGenesis > maxBlocks) revert L2TimestampOverflow(claimBlock);
 
         uint64 claimTimestamp = L2_GENESIS_TIMESTAMP + uint64(blocksSinceGenesis * uint256(L2_BLOCK_TIME));
+
+        // `ProtocolVersions` only freezes an activation once L1 time reaches it, so a claim whose L2
+        // timestamp is still in L1's future would pin a schedule the owner can afterwards clear or
+        // delay. Requiring the claim to have already passed on L1 keeps the pin canonical for life.
+        if (claimTimestamp > block.timestamp) revert L2TimestampInFuture(claimTimestamp, block.timestamp);
+
         scheduleId = PROTOCOL_VERSIONS.activatedScheduleId(claimTimestamp);
 
         // Set the game's starting timestamp.
