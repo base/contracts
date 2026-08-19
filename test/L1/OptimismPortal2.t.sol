@@ -103,8 +103,13 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
 
         depositor = makeAddr("depositor");
 
-        // Warp forward in time to ensure that the game is created after the retirement timestamp.
-        vm.warp(anchorStateRegistry.retirementTimestamp() + 1);
+        // Warp forward in time to ensure that the game is created after the retirement timestamp,
+        // and after the proposed block's deterministic L2 timestamp, which L1 must have reached
+        // before a game claiming that block can be created.
+        uint256 retirementFloor = anchorStateRegistry.retirementTimestamp() + 1;
+        uint256 proposedBlockTimestamp = gameImpl.L2_GENESIS_TIMESTAMP()
+            + (_proposedBlockNumber - gameImpl.L2_GENESIS_BLOCK_NUMBER()) * gameImpl.L2_BLOCK_TIME();
+        vm.warp(retirementFloor > proposedBlockTimestamp ? retirementFloor : proposedBlockTimestamp);
 
         game = _createDisputeGame(Claim.wrap(_outputRoot), 0);
 

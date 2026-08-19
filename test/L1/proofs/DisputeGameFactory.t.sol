@@ -258,6 +258,10 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         uint256 bondAmount = disputeGameFactory.initBonds(GameTypes.AGGREGATE_VERIFIER);
         vm.deal(address(this), bondAmount);
 
+        // The claimed L2 block's deterministic timestamp (block number x blockTime) must have
+        // already passed on L1 for the game to be creatable.
+        vm.warp((startingRoot.l2SequenceNumber + AGGREGATE_BLOCK_INTERVAL) * 2);
+
         uint256 gameCountBefore = disputeGameFactory.gameCount();
         IDisputeGame proxy = disputeGameFactory.createWithInitData{ value: bondAmount }(
             GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, proof

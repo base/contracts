@@ -152,6 +152,8 @@ contract BaseTest is Test {
     {
         bytes memory extraData = _aggregateVerifierExtraData(rootClaim, l2BlockNumber, parentAddress);
 
+        _warpToL2Timestamp(l2BlockNumber);
+
         vm.deal(creator, INIT_BOND);
         vm.prank(creator);
         return AggregateVerifier(
@@ -161,6 +163,13 @@ contract BaseTest is Test {
                 )
             )
         );
+    }
+
+    /// @dev A game is only creatable once L1 has reached the claimed L2 block's deterministic
+    ///      timestamp, which mirrors production: a block is proven well after it is produced.
+    function _warpToL2Timestamp(uint256 l2BlockNumber) internal {
+        uint256 claimTimestamp = L2_GENESIS_TIMESTAMP + (l2BlockNumber - L2_GENESIS_BLOCK_NUMBER) * L2_BLOCK_TIME;
+        if (block.timestamp < claimTimestamp) vm.warp(claimTimestamp);
     }
 
     function _provideProof(AggregateVerifier game, address prover, bytes memory proofBytes) internal {
