@@ -30,7 +30,7 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     error ProtocolVersions_NotInitialized();
     error ProtocolVersions_InsufficientNotice(uint64 timestamp);
 
-    function initialize(address _incidentResponder) external;
+    function initialize(address _incidentResponder, uint64[] calldata _initialSchedule) external;
     function registerUpgrade(uint64 timestamp, uint256 minProtocolVersion) external returns (uint256);
     function setMinimumProtocolVersion(uint256 protocolVersion) external;
     function setTimestamp(uint256 id, uint64 timestamp) external;

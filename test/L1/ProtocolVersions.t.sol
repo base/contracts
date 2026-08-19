@@ -44,6 +44,20 @@ abstract contract ProtocolVersions_TestInit is CommonTest {
         vm.prank(_owner);
         protocolVersions.setTimestamp(CANYON, ts_);
     }
+
+    /// @dev Deploys a fresh uninitialized proxy over the impl produced by SystemDeploy, for the
+    ///      tests that genuinely need one: the initializer edge cases and any schedule that has to
+    ///      be imported rather than registered. proxyAdminOwner() resolves by calling owner() on the
+    ///      ProxyAdmin stored in the proxy slot, so the mock provides one.
+    function _deployUninitializedProxy() internal returns (IProtocolVersions) {
+        address proxyAdmin = makeAddr("proxy-admin");
+        vm.mockCall(proxyAdmin, abi.encodeWithSignature("owner()"), abi.encode(_owner));
+        Proxy proxy = new Proxy(proxyAdmin);
+        address impl = EIP1967Helper.getImplementation(address(protocolVersions));
+        vm.prank(proxyAdmin);
+        proxy.upgradeTo(impl);
+        return IProtocolVersions(address(proxy));
+    }
 }
 
 /// @title ProtocolVersions_Initialize_Test
@@ -66,7 +80,7 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         vm.expectEmit(true, true, false, false, address(uninitialized));
         emit IncidentResponderUpdated(address(0), _incidentResponder);
         vm.prank(EIP1967Helper.getAdmin(address(uninitialized)));
-        uninitialized.initialize(_incidentResponder);
+        uninitialized.initialize(_incidentResponder, new uint64[](0));
         assertEq(uninitialized.incidentResponder(), _incidentResponder);
     }
 
@@ -76,34 +90,66 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         IProtocolVersions uninitialized = _deployUninitializedProxy();
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
         vm.prank(_nonOwner);
-        uninitialized.initialize(_incidentResponder);
+        uninitialized.initialize(_incidentResponder, new uint64[](0));
+    }
+
+    /// @notice Tests that the initializer imports a preexisting schedule, building the same hash
+    ///         chain the equivalent sequence of registrations would have.
+    function test_initialize_importsSchedule_succeeds() external {
+        uint64[] memory schedule = new uint64[](3);
+        schedule[0] = 10;
+        schedule[1] = 0;
+        schedule[2] = 30;
+
+        IProtocolVersions imported = _deployUninitializedProxy();
+        vm.prank(EIP1967Helper.getAdmin(address(imported)));
+        imported.initialize(_incidentResponder, schedule);
+
+        uint64[] memory stored = imported.getSchedule();
+        assertEq(stored.length, schedule.length);
+        assertEq(stored[0], schedule[0]);
+        assertEq(stored[1], schedule[1]);
+        assertEq(stored[2], schedule[2]);
+
+        bytes32 link0 = keccak256(abi.encode(bytes32(0), uint256(0), uint64(10)));
+        bytes32 link1 = keccak256(abi.encode(link0, uint256(1), uint64(0)));
+        bytes32 link2 = keccak256(abi.encode(link1, uint256(2), uint64(30)));
+        assertEq(imported.scheduleId(0), link0);
+        assertEq(imported.scheduleId(), link2);
+    }
+
+    /// @notice Tests that an imported schedule is held to the same ordering rule as registration.
+    function test_initialize_importUnorderedSchedule_reverts() external {
+        uint64[] memory schedule = new uint64[](2);
+        schedule[0] = 30;
+        schedule[1] = 10;
+
+        IProtocolVersions imported = _deployUninitializedProxy();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_TimestampNotAfterPrevious.selector,
+                ECOTONE,
+                CANYON,
+                uint64(30),
+                uint64(10)
+            )
+        );
+        vm.prank(EIP1967Helper.getAdmin(address(imported)));
+        imported.initialize(address(0), schedule);
     }
 
     /// @notice Tests that the contract cannot be initialized twice.
     function test_initialize_alreadyInitialized_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
         vm.prank(EIP1967Helper.getAdmin(address(protocolVersions)));
-        protocolVersions.initialize(address(0));
+        protocolVersions.initialize(address(0), new uint64[](0));
     }
 
     /// @notice Tests that the implementation itself cannot be initialized (initializers disabled).
     function test_initialize_implementationDisabled_reverts() external {
         IProtocolVersions impl = IProtocolVersions(EIP1967Helper.getImplementation(address(protocolVersions)));
         vm.expectRevert("Initializable: contract is already initialized");
-        impl.initialize(address(0));
-    }
-
-    /// @dev Deploys a fresh uninitialized proxy over the impl produced by SystemDeploy for the two
-    ///      initializer tests that genuinely need one. proxyAdminOwner() resolves by calling owner()
-    ///      on the ProxyAdmin stored in the proxy slot, so the mock provides one.
-    function _deployUninitializedProxy() internal returns (IProtocolVersions) {
-        address proxyAdmin = makeAddr("proxy-admin");
-        vm.mockCall(proxyAdmin, abi.encodeWithSignature("owner()"), abi.encode(_owner));
-        Proxy proxy = new Proxy(proxyAdmin);
-        address impl = EIP1967Helper.getImplementation(address(protocolVersions));
-        vm.prank(proxyAdmin);
-        proxy.upgradeTo(impl);
-        return IProtocolVersions(address(proxy));
+        impl.initialize(address(0), new uint64[](0));
     }
 }
 
@@ -176,18 +222,48 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         assertNotEq(protocolVersions.scheduleId(), bytes32(0));
     }
 
-    /// @notice Tests that registering with a timestamp inside the notice window succeeds — the
-    ///         notice period is not enforced at registration, only via `setTimestamp`/`delayTimestamp`.
-    function test_registerUpgrade_shortNotice_succeeds() external {
+    /// @notice Tests that registration is held to the same notice floor as `setTimestamp`. Appending
+    ///         an activation that L1 is already close to would move `activatedScheduleId` for L2
+    ///         timestamps the sequencer may already have produced, which is what FREEZE_WINDOW
+    ///         prevents on the paths that change an existing activation.
+    function test_registerUpgrade_insufficientNotice_reverts() external {
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() - 1;
+        vm.expectRevert(abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, ts));
         vm.prank(_owner);
         protocolVersions.registerUpgrade(ts, 0);
-        assertEq(protocolVersions.getSchedule()[CANYON], ts);
+    }
+
+    /// @notice Tests that registering without a timestamp stays unconstrained: a zero entry is
+    ///         skipped by `activatedScheduleId`, so it cannot move an already-reachable answer.
+    function test_registerUpgrade_zeroTimestampSkipsNotice_succeeds() external {
+        vm.prank(_owner);
+        assertEq(protocolVersions.registerUpgrade(0, 0), CANYON);
+        assertEq(protocolVersions.getSchedule()[CANYON], 0);
+    }
+
+    /// @notice Tests the property the notice floor exists to protect: an append cannot change the
+    ///         commitment for an L2 timestamp the sequencer may already have produced, and an
+    ///         append that clears the floor lands above every such timestamp.
+    function test_registerUpgrade_cannotMoveReachableSchedule_reverts() external {
+        uint64 reachable = uint64(block.timestamp) + protocolVersions.FREEZE_WINDOW();
+        uint64 allowed = uint64(block.timestamp) + protocolVersions.MIN_NOTICE();
+        bytes32 settled = protocolVersions.activatedScheduleId(reachable);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, reachable)
+        );
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(reachable, 0);
+
+        vm.prank(_owner);
+        protocolVersions.registerUpgrade(allowed, 0);
+
+        assertEq(protocolVersions.activatedScheduleId(reachable), settled);
     }
 
     /// @notice Tests that a scheduled registration may share the previous scheduled upgrade's timestamp.
     function test_registerUpgrade_timestampEqualToPrevious_succeeds() external {
-        uint64 first = uint64(block.timestamp) + 100;
+        uint64 first = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         uint64 second = first;
 
         vm.prank(_owner);
@@ -202,7 +278,7 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
 
     /// @notice Tests that zero remains the unscheduled/disabled value and is exempt from ordering.
     function test_registerUpgrade_zeroTimestampAfterScheduledPrevious_succeeds() external {
-        uint64 first = uint64(block.timestamp) + 100;
+        uint64 first = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
 
         vm.prank(_owner);
         assertEq(protocolVersions.registerUpgrade(first, 0), CANYON);
@@ -216,7 +292,7 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
 
     /// @notice Tests that scheduled registration scans past zero holes to the previous timestamp.
     function test_registerUpgrade_timestampAfterPreviousSkipsZeroHoles_succeeds() external {
-        uint64 first = uint64(block.timestamp) + 100;
+        uint64 first = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         uint64 second = first + 1;
 
         vm.startPrank(_owner);
@@ -233,7 +309,7 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
 
     /// @notice Tests that registering a timestamp before the previous scheduled upgrade reverts.
     function test_registerUpgrade_timestampNotAfterPrevious_reverts() external {
-        uint64 first = uint64(block.timestamp) + 100;
+        uint64 first = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
 
         vm.prank(_owner);
         protocolVersions.registerUpgrade(first, 0);
@@ -849,9 +925,10 @@ contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit 
     function test_activatedScheduleId_noneActivated_returnsSeed() external {
         assertEq(protocolVersions.activatedScheduleId(uint64(block.timestamp)), bytes32(0));
 
+        uint64 future = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         vm.startPrank(_owner);
         protocolVersions.registerUpgrade(0, 0);
-        protocolVersions.registerUpgrade(uint64(block.timestamp + 100), 0);
+        protocolVersions.registerUpgrade(future, 0);
         vm.stopPrank();
 
         assertEq(protocolVersions.activatedScheduleId(uint64(block.timestamp)), bytes32(0));
@@ -859,45 +936,46 @@ contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit 
 
     /// @notice Activation is inclusive at the supplied L2 timestamp.
     function test_activatedScheduleId_boundaryInclusive_succeeds() external {
-        vm.prank(_owner);
-        protocolVersions.registerUpgrade(100, 0);
+        uint64[] memory schedule = new uint64[](1);
+        schedule[0] = 100;
+        IProtocolVersions imported = _importSchedule(schedule);
 
-        assertEq(protocolVersions.activatedScheduleId(99), bytes32(0));
-        assertEq(
-            protocolVersions.activatedScheduleId(100), keccak256(abi.encode(bytes32(0), uint256(CANYON), uint64(100)))
-        );
+        assertEq(imported.activatedScheduleId(99), bytes32(0));
+        assertEq(imported.activatedScheduleId(100), keccak256(abi.encode(bytes32(0), uint256(CANYON), uint64(100))));
     }
 
     /// @notice The commitment includes every registered entry through the highest active upgrade,
     ///         including a static zero-valued hole below it.
     function test_activatedScheduleId_commitsPrefixThroughHighestActive_succeeds() external {
-        vm.startPrank(_owner);
-        protocolVersions.registerUpgrade(10, 0);
-        protocolVersions.registerUpgrade(0, 0);
-        protocolVersions.registerUpgrade(30, 0);
-        vm.stopPrank();
+        uint64[] memory schedule = new uint64[](3);
+        schedule[0] = 10;
+        schedule[1] = 0;
+        schedule[2] = 30;
+        IProtocolVersions imported = _importSchedule(schedule);
 
         bytes32 link0 = keccak256(abi.encode(bytes32(0), uint256(0), uint64(10)));
         bytes32 link1 = keccak256(abi.encode(link0, uint256(1), uint64(0)));
         bytes32 link2 = keccak256(abi.encode(link1, uint256(2), uint64(30)));
 
-        assertEq(protocolVersions.activatedScheduleId(30), link2);
+        assertEq(imported.activatedScheduleId(30), link2);
     }
 
     /// @notice Appending unscheduled or future upgrades above the active prefix cannot move the
     ///         activated commitment selected by that prefix.
     function test_activatedScheduleId_stableAcrossAppendsAboveActivePrefix_succeeds() external {
-        vm.prank(_owner);
-        protocolVersions.registerUpgrade(10, 0);
-        bytes32 pinned = protocolVersions.activatedScheduleId(10);
+        uint64[] memory schedule = new uint64[](1);
+        schedule[0] = 10;
+        IProtocolVersions imported = _importSchedule(schedule);
+        bytes32 pinned = imported.activatedScheduleId(10);
 
+        uint64 future = uint64(block.timestamp) + imported.MIN_NOTICE();
         vm.startPrank(_owner);
-        protocolVersions.registerUpgrade(0, 0);
-        protocolVersions.registerUpgrade(100, 0);
+        imported.registerUpgrade(0, 0);
+        imported.registerUpgrade(future, 0);
         vm.stopPrank();
 
-        assertEq(protocolVersions.activatedScheduleId(10), pinned);
-        assertNotEq(protocolVersions.scheduleId(), pinned);
+        assertEq(imported.activatedScheduleId(10), pinned);
+        assertNotEq(imported.scheduleId(), pinned);
     }
 
     /// @notice Cross-implementation golden shared with Base's `ScheduleId` tests for the real Base
@@ -905,10 +983,10 @@ contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit 
     ///         the prefix through id 11, including the static PectraBlobSchedule hole at id 7, and
     ///         excludes the unscheduled Cobalt placeholder at id 12.
     function test_activatedScheduleId_matchesBaseMainnetGoldenValue_succeeds() external {
-        _registerBaseMainnetStaticSchedule();
+        IProtocolVersions mainnet = _importBaseMainnetStaticSchedule();
 
         assertEq(
-            protocolVersions.activatedScheduleId(BASE_MAINNET_BERYL_TIMESTAMP),
+            mainnet.activatedScheduleId(BASE_MAINNET_BERYL_TIMESTAMP),
             0xadd4aa9bd3532969035a9543c16b8c7d71298e15836f0ac731fdd3eea552c6e2
         );
     }
@@ -917,10 +995,10 @@ contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit 
     ///         The live tail commits to all 13 entries, including PectraBlobSchedule and Cobalt as
     ///         unscheduled zero-timestamp entries.
     function test_scheduleId_matchesBaseMainnetFullScheduleGoldenValue_succeeds() external {
-        _registerBaseMainnetStaticSchedule();
+        IProtocolVersions mainnet = _importBaseMainnetStaticSchedule();
 
-        assertEq(protocolVersions.scheduleId(), 0x5ee41f186b0a439783060587cfbb942f6f1d94ecc76376c9782580c943ff2b6d);
-        assertEq(protocolVersions.scheduleId(12), protocolVersions.scheduleId());
+        assertEq(mainnet.scheduleId(), 0x5ee41f186b0a439783060587cfbb942f6f1d94ecc76376c9782580c943ff2b6d);
+        assertEq(mainnet.scheduleId(12), mainnet.scheduleId());
     }
 
     uint64 private constant BASE_MAINNET_GENESIS_TIMESTAMP = 1_686_789_347;
@@ -935,21 +1013,34 @@ contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit 
     uint64 private constant BASE_MAINNET_AZUL_TIMESTAMP = 1_779_991_200;
     uint64 private constant BASE_MAINNET_BERYL_TIMESTAMP = 1_782_410_400;
 
-    function _registerBaseMainnetStaticSchedule() private {
-        vm.startPrank(_owner);
-        protocolVersions.registerUpgrade(BASE_MAINNET_GENESIS_TIMESTAMP, 0);
-        protocolVersions.registerUpgrade(BASE_MAINNET_CANYON_TIMESTAMP, 0);
-        protocolVersions.registerUpgrade(BASE_MAINNET_DELTA_TIMESTAMP, 0);
-        protocolVersions.registerUpgrade(BASE_MAINNET_ECOTONE_TIMESTAMP, 0);
-        protocolVersions.registerUpgrade(BASE_MAINNET_FJORD_TIMESTAMP, 0);
-        protocolVersions.registerUpgrade(BASE_MAINNET_GRANITE_TIMESTAMP, 0);
-        protocolVersions.registerUpgrade(BASE_MAINNET_HOLOCENE_TIMESTAMP, 0);
-        protocolVersions.registerUpgrade(0, 0); // PectraBlobSchedule is unscheduled on Base mainnet.
-        protocolVersions.registerUpgrade(BASE_MAINNET_ISTHMUS_TIMESTAMP, 0);
-        protocolVersions.registerUpgrade(BASE_MAINNET_JOVIAN_TIMESTAMP, 0);
-        protocolVersions.registerUpgrade(BASE_MAINNET_AZUL_TIMESTAMP, 0);
-        protocolVersions.registerUpgrade(BASE_MAINNET_BERYL_TIMESTAMP, 0);
-        protocolVersions.registerUpgrade(0, 0); // Cobalt is unscheduled on Base mainnet.
-        vm.stopPrank();
+    /// @dev The real Base mainnet schedule is entirely in the past, so the initializer's import is
+    ///      the only path that can enter it. The resulting chain must match what the equivalent
+    ///      sequence of `registerUpgrade` calls would have produced, which these goldens pin.
+    function _importBaseMainnetStaticSchedule() private returns (IProtocolVersions) {
+        uint64[] memory schedule = new uint64[](13);
+        schedule[0] = BASE_MAINNET_GENESIS_TIMESTAMP;
+        schedule[1] = BASE_MAINNET_CANYON_TIMESTAMP;
+        schedule[2] = BASE_MAINNET_DELTA_TIMESTAMP;
+        schedule[3] = BASE_MAINNET_ECOTONE_TIMESTAMP;
+        schedule[4] = BASE_MAINNET_FJORD_TIMESTAMP;
+        schedule[5] = BASE_MAINNET_GRANITE_TIMESTAMP;
+        schedule[6] = BASE_MAINNET_HOLOCENE_TIMESTAMP;
+        schedule[7] = 0; // PectraBlobSchedule is unscheduled on Base mainnet.
+        schedule[8] = BASE_MAINNET_ISTHMUS_TIMESTAMP;
+        schedule[9] = BASE_MAINNET_JOVIAN_TIMESTAMP;
+        schedule[10] = BASE_MAINNET_AZUL_TIMESTAMP;
+        schedule[11] = BASE_MAINNET_BERYL_TIMESTAMP;
+        schedule[12] = 0; // Cobalt is unscheduled on Base mainnet.
+
+        return _importSchedule(schedule);
+    }
+
+    /// @dev These cases pin `activatedScheduleId` against activations that are already in the past,
+    ///      which only the initializer's import can produce.
+    function _importSchedule(uint64[] memory schedule) private returns (IProtocolVersions) {
+        IProtocolVersions imported = _deployUninitializedProxy();
+        vm.prank(EIP1967Helper.getAdmin(address(imported)));
+        imported.initialize(address(0), schedule);
+        return imported;
     }
 }

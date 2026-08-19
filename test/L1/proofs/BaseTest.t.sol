@@ -112,7 +112,17 @@ contract BaseTest is Test {
         );
         factory.initialize(address(this));
         delayedWETH.initialize(systemConfig);
-        protocolVersions.initialize(address(0));
+        protocolVersions.initialize(address(0), new uint64[](0));
+    }
+
+    /// @dev Rebuilds the schedule registry around a preset schedule and rebinds the verifier to it.
+    ///      These tests run on a compressed L2 timescale whose activations can never clear
+    ///      MIN_NOTICE, so a schedule has to be imported at initialization rather than registered.
+    ///      Must be called before any game is created, since games pin the registry they see.
+    function _importProtocolVersionsSchedule(uint64[] memory schedule) internal {
+        protocolVersions = ProtocolVersions(_deployProxy(address(new ProtocolVersions())));
+        protocolVersions.initialize(address(0), schedule);
+        _deployAndSetAggregateVerifier();
     }
 
     function _deployAndSetAggregateVerifier() internal {

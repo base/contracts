@@ -636,11 +636,14 @@ contract SystemDeploy is Script {
             _encodeAnchorStateRegistryInitializer(_input, _output)
         );
 
+        // Fresh systems start with no upgrade history. A chain that already has one imports it by
+        // passing its activation timestamps here, which is the only way to enter activations that
+        // cannot clear MIN_NOTICE.
         _upgradeToAndCall(
             _output.opChainProxyAdmin,
             address(_output.protocolVersionsProxy),
             _impls.protocolVersionsImpl,
-            abi.encodeCall(IProtocolVersions.initialize, (_input.roles.incidentResponder))
+            abi.encodeCall(IProtocolVersions.initialize, (_input.roles.incidentResponder, new uint64[](0)))
         );
     }
 
