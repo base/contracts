@@ -6,6 +6,19 @@
   },
   {
     "inputs": [],
+    "name": "FREEZE_WINDOW",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "MIN_NOTICE",
     "outputs": [
       {
@@ -362,6 +375,22 @@
       }
     ],
     "name": "ProtocolVersions_ActivationAlreadyPassed",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "activationTimestamp",
+        "type": "uint64"
+      }
+    ],
+    "name": "ProtocolVersions_ActivationFrozen",
     "type": "error"
   },
   {

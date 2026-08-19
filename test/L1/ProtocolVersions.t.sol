@@ -561,6 +561,32 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         protocolVersions.setTimestamp(CANYON, laterTs);
     }
 
+    /// @notice Tests that a scheduled activation can no longer be cleared once L1 is within
+    ///         FREEZE_WINDOW of it, which is the point from which an L2 block carrying that
+    ///         activation may already exist.
+    function test_setTimestamp_insideFreezeWindow_reverts() external {
+        uint64 ts = _scheduleCanyon(100);
+
+        vm.warp(ts - protocolVersions.FREEZE_WINDOW());
+        vm.expectRevert(
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_ActivationFrozen.selector, CANYON, ts)
+        );
+        vm.prank(_owner);
+        protocolVersions.setTimestamp(CANYON, 0);
+    }
+
+    /// @notice Tests that the freeze boundary is exact: one second before it, the activation is
+    ///         still clearable.
+    function test_setTimestamp_justBeforeFreezeWindow_succeeds() external {
+        uint64 ts = _scheduleCanyon(100);
+
+        vm.warp(ts - protocolVersions.FREEZE_WINDOW() - 1);
+        vm.prank(_owner);
+        protocolVersions.setTimestamp(CANYON, 0);
+
+        assertEq(protocolVersions.getSchedule()[CANYON], 0);
+    }
+
     /// @notice Tests that `setTimestamp` reverts for an unregistered upgrade.
     function test_setTimestamp_unregisteredUpgrade_reverts() external {
         uint64 ts = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
@@ -696,6 +722,22 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
         );
         vm.prank(_incidentResponder);
         protocolVersions.delayTimestamp(CANYON, ts + 100);
+    }
+
+    /// @notice Tests that the incidentResponder also loses the ability to move an activation once
+    ///         L1 is within FREEZE_WINDOW of it.
+    function test_delayTimestamp_insideFreezeWindow_reverts() external {
+        uint64 ts = _scheduleCanyon(100);
+        vm.prank(_owner);
+        protocolVersions.setIncidentResponder(_incidentResponder);
+
+        uint64 later = ts + protocolVersions.MIN_NOTICE();
+        vm.warp(ts - protocolVersions.FREEZE_WINDOW());
+        vm.expectRevert(
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_ActivationFrozen.selector, CANYON, ts)
+        );
+        vm.prank(_incidentResponder);
+        protocolVersions.delayTimestamp(CANYON, later);
     }
 
     /// @notice Tests that `delayTimestamp` reverts for an unregistered upgrade.
