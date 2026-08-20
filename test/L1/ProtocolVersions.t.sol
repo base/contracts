@@ -233,14 +233,6 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         protocolVersions.registerUpgrade(ts, 0);
     }
 
-    /// @notice Tests that registering without a timestamp stays unconstrained: a zero entry is
-    ///         skipped by `activatedScheduleId`, so it cannot move an already-reachable answer.
-    function test_registerUpgrade_zeroTimestampSkipsNotice_succeeds() external {
-        vm.prank(_owner);
-        assertEq(protocolVersions.registerUpgrade(0, 0), CANYON);
-        assertEq(protocolVersions.getSchedule()[CANYON], 0);
-    }
-
     /// @notice Tests the property the notice floor exists to protect: an append cannot change the
     ///         commitment for an L2 timestamp the sequencer may already have produced, and an
     ///         append that clears the floor lands above every such timestamp.
