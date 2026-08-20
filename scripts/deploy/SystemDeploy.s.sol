@@ -654,6 +654,9 @@ contract SystemDeploy is Script {
             output_.zkVerifier = multiproof.zkVerifier;
             output_.nitroEnclaveVerifier = INitroEnclaveVerifier(_implementationsInput.nitroEnclaveVerifier);
             output_.sp1Verifier = _implementationsInput.sp1Verifier;
+
+            vm.broadcast(msg.sender);
+            output_.optimismPortalProxy.setTEEProverRegistry(output_.teeProverRegistryProxy);
         }
 
         _transferOwnership(address(output_.disputeGameFactoryProxy), _input.roles.opChainProxyAdminOwner);
@@ -783,7 +786,7 @@ contract SystemDeploy is Script {
 
         IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(_systemConfigProxy.disputeGameFactory());
         _upgradeTo(proxyAdmin, address(disputeGameFactory), _impls.disputeGameFactoryImpl);
-        _upgradeMultiproofContracts(_systemConfigProxy, disputeGameFactory, _impls);
+        _upgradeMultiproofContracts(_systemConfigProxy, optimismPortal, disputeGameFactory, _impls);
 
         ISystemConfig.Addresses memory opChainAddrs = _systemConfigProxy.getAddresses();
         _upgradeTo(proxyAdmin, opChainAddrs.l1CrossDomainMessenger, _impls.l1CrossDomainMessengerImpl);
@@ -802,6 +805,7 @@ contract SystemDeploy is Script {
 
     function _upgradeMultiproofContracts(
         ISystemConfig _systemConfigProxy,
+        IOptimismPortal _optimismPortal,
         IDisputeGameFactory _disputeGameFactory,
         Types.Implementations memory _impls
     )
@@ -810,10 +814,15 @@ contract SystemDeploy is Script {
         IDisputeGame currentGameImpl = _disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER);
         if (address(currentGameImpl) == address(0)) return;
 
+        AggregateVerifier currentAggregateVerifier = AggregateVerifier(address(currentGameImpl));
+        TEEProverRegistry teeProverRegistry =
+            TEEVerifier(address(currentAggregateVerifier.TEE_VERIFIER())).TEE_PROVER_REGISTRY();
+        if (address(_optimismPortal.teeProverRegistry()) == address(0)) {
+            vm.broadcast(msg.sender);
+            _optimismPortal.setTEEProverRegistry(ITEEProverRegistry(address(teeProverRegistry)));
+        }
+
         if (_impls.teeProverRegistryImpl != address(0)) {
-            AggregateVerifier currentAggregateVerifier = AggregateVerifier(address(currentGameImpl));
-            TEEProverRegistry teeProverRegistry =
-                TEEVerifier(address(currentAggregateVerifier.TEE_VERIFIER())).TEE_PROVER_REGISTRY();
             _upgradeTo(_systemConfigProxy.proxyAdmin(), address(teeProverRegistry), _impls.teeProverRegistryImpl);
         }
 

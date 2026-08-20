@@ -29,6 +29,12 @@ contract L2ToL1MessagePasser is ISemver {
     /// @notice A unique value hashed with each withdrawal.
     uint240 internal msgNonce;
 
+    /// @notice Records withdrawals authorized for TEE-attested L1 redemption.
+    mapping(bytes32 => bool) public attestedWithdrawals;
+
+    /// @notice A unique value hashed with each attested withdrawal.
+    uint256 public attestNonce;
+
     /// @notice Emitted any time a withdrawal is initiated.
     /// @param nonce          Unique value corresponding to each withdrawal.
     /// @param sender         The L2 account address which initiated the withdrawal.
@@ -51,9 +57,19 @@ contract L2ToL1MessagePasser is ISemver {
     /// @param amount Amount of ETH that was burned.
     event WithdrawerBalanceBurnt(uint256 indexed amount);
 
-    /// @custom:semver 1.2.0
+    /// @notice Emitted when an attested withdrawal is initiated.
+    event AttestedWithdrawalInitiated(
+        bytes32 indexed authHash,
+        address indexed recipient,
+        address indexed token,
+        uint256 amount,
+        uint256 nonce,
+        bytes data
+    );
+
+    /// @custom:semver 1.3.0
     function version() public pure virtual returns (string memory) {
-        return "1.2.0";
+        return "1.3.0";
     }
 
     /// @notice Allows users to withdraw ETH by sending directly to this contract.
@@ -93,6 +109,20 @@ contract L2ToL1MessagePasser is ISemver {
 
         unchecked {
             ++msgNonce;
+        }
+    }
+
+    /// @notice Initiates an ETH withdrawal with an L1 call authorized for enclave attestation.
+    function attestedWithdraw(address _recipient, bytes calldata _data) external payable {
+        uint256 nonce = attestNonce;
+        bytes32 authHash =
+            keccak256(abi.encode(uint256(block.chainid), _recipient, address(0), msg.value, nonce, _data));
+
+        attestedWithdrawals[authHash] = true;
+        emit AttestedWithdrawalInitiated(authHash, _recipient, address(0), msg.value, nonce, _data);
+
+        unchecked {
+            ++attestNonce;
         }
     }
 

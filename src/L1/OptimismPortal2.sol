@@ -17,6 +17,7 @@ import { SecureMerkleTrie } from "src/libraries/trie/SecureMerkleTrie.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
 import { GameStatus, GameType } from "src/libraries/bridge/Types.sol";
 import { Features } from "src/libraries/Features.sol";
+import { ECDSA } from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
@@ -26,6 +27,7 @@ import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.so
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
+import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.sol";
 
 /// @custom:proxied true
 /// @title OptimismPortal2
@@ -46,6 +48,9 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
 
     /// @notice Version of the deposit event.
     uint256 internal constant DEPOSIT_VERSION = 0;
+
+    /// @notice Domain separator for attested withdrawal authorizations.
+    bytes32 internal constant ATTESTED_WITHDRAWAL_DOMAIN_TAG = keccak256("BASE_ATTESTED_WITHDRAWAL_V1");
 
     /// @notice The L2 gas limit set when eth is deposited using the receive() function.
     uint64 internal constant RECEIVE_DEFAULT_GAS_LIMIT = 100_000;
@@ -128,6 +133,12 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     /// @custom:spacer superRootsActive
     bool private spacer_63_20_1;
 
+    /// @notice TEE prover registry authorized to attest withdrawals.
+    ITEEProverRegistry public teeProverRegistry;
+
+    /// @notice Tracks attested withdrawals that have been redeemed.
+    mapping(bytes32 => bool) public attestRedeemed;
+
     /// @notice Emitted when a transaction is deposited from L1 to L2. The parameters of this event
     ///         are read by the rollup node and used to derive deposit transactions on L2.
     /// @param from       Address that triggered the deposit transaction.
@@ -153,6 +164,11 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     /// @param withdrawalHash Hash of the withdrawal transaction.
     /// @param success        Whether the withdrawal transaction was successful.
     event WithdrawalFinalized(bytes32 indexed withdrawalHash, bool success);
+
+    /// @notice Emitted when an attested withdrawal is redeemed.
+    event AttestedWithdrawalRedeemed(
+        bytes32 indexed authHash, address indexed recipient, uint256 amount, uint256 nonce, address signer, bytes data
+    );
 
     /// @notice Thrown when a withdrawal has already been finalized.
     error OptimismPortal_AlreadyFinalized();
@@ -206,16 +222,67 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     ///         not been configured for immediate finality (PROOF_MATURITY_DELAY_SECONDS != 0).
     error OptimismPortal_ImmediateFinalityNotEnabled();
 
+    /// @notice Thrown when an attested withdrawal has already been redeemed.
+    error OptimismPortal_AttestedWithdrawalAlreadyRedeemed();
+
+    /// @notice Thrown when an attested withdrawal signature is invalid.
+    error OptimismPortal_InvalidAttestedWithdrawalSignature();
+
+    /// @notice Thrown when an attested withdrawal signer is not registered.
+    error OptimismPortal_InvalidAttestedWithdrawalSigner(address signer);
+
+    /// @notice Thrown when the TEE prover registry has already been configured.
+    error OptimismPortal_TEEProverRegistryAlreadySet();
+
+    /// @notice Thrown when an attested withdrawal payout fails.
+    error OptimismPortal_AttestedWithdrawalCallFailed();
+
     /// @notice Semantic version.
-    /// @custom:semver 5.2.0
+    /// @custom:semver 5.3.0
     function version() public pure virtual returns (string memory) {
-        return "5.2.0";
+        return "5.3.0";
     }
 
     /// @param _proofMaturityDelaySeconds The proof maturity delay in seconds.
     constructor(uint256 _proofMaturityDelaySeconds) ReinitializableBase(3) {
         PROOF_MATURITY_DELAY_SECONDS = _proofMaturityDelaySeconds;
         _disableInitializers();
+    }
+
+    /// @notice Sets the registry authorized to attest withdrawals.
+    function setTEEProverRegistry(ITEEProverRegistry _teeProverRegistry) external {
+        _assertOnlyProxyAdminOwner();
+        if (address(teeProverRegistry) != address(0)) revert OptimismPortal_TEEProverRegistryAlreadySet();
+        teeProverRegistry = _teeProverRegistry;
+    }
+
+    /// @notice Executes an ETH-plus-calldata call authorized by a registered enclave signer.
+    function redeemAttestedWithdrawal(
+        address _recipient,
+        uint256 _amount,
+        uint256 _nonce,
+        bytes calldata _data,
+        bytes calldata _sig
+    )
+        external
+    {
+        _assertNotPaused();
+
+        bytes32 authHash =
+            keccak256(abi.encode(uint256(systemConfig.l2ChainId()), _recipient, address(0), _amount, _nonce, _data));
+        if (attestRedeemed[authHash]) revert OptimismPortal_AttestedWithdrawalAlreadyRedeemed();
+
+        bytes32 journal = keccak256(abi.encodePacked(ATTESTED_WITHDRAWAL_DOMAIN_TAG, authHash));
+        (address signer, ECDSA.RecoverError err) = ECDSA.tryRecover(journal, _sig);
+        if (err != ECDSA.RecoverError.NoError) revert OptimismPortal_InvalidAttestedWithdrawalSignature();
+        if (!teeProverRegistry.isValidSigner(signer)) revert OptimismPortal_InvalidAttestedWithdrawalSigner(signer);
+
+        attestRedeemed[authHash] = true;
+        if (!SafeCall.call(_recipient, gasleft(), _amount, _data)) {
+            revert OptimismPortal_AttestedWithdrawalCallFailed();
+        }
+
+        emit AttestedWithdrawalRedeemed(authHash, _recipient, _amount, _nonce, signer, _data);
     }
 
     /// @notice Initializer.

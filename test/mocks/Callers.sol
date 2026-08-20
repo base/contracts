@@ -19,6 +19,10 @@ contract CallRecorder {
         lastCall.gas = gasleft();
         lastCall.value = msg.value;
     }
+
+    function getLastCall() external view returns (CallInfo memory) {
+        return lastCall;
+    }
 }
 
 /// @dev Any call will revert

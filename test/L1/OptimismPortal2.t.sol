@@ -10,6 +10,7 @@ import { NextImpl } from "test/mocks/NextImpl.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { DisputeGameFactory_TestInit } from "test/L1/proofs/DisputeGameFactory.t.sol";
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
+import { CallRecorder, Reverter } from "test/mocks/Callers.sol";
 
 // Scripts
 import { ForgeArtifacts, StorageSlot } from "scripts/libraries/ForgeArtifacts.sol";
@@ -21,6 +22,7 @@ import { Constants } from "src/libraries/Constants.sol";
 import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
 import { Features } from "src/libraries/Features.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
+import { ECDSA } from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "src/libraries/bridge/Types.sol";
 import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 
@@ -33,6 +35,7 @@ import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IProxy } from "interfaces/universal/IProxy.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
+import { ITEEProverRegistry } from "interfaces/L1/proofs/tee/ITEEProverRegistry.sol";
 
 abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
     address depositor;
@@ -2102,5 +2105,159 @@ contract OptimismPortal2_Params_Test is CommonTest {
         bytes32 slot21After = vm.load(address(optimismPortal2), bytes32(uint256(21)));
         bytes32 slot21Expected = NextImpl(address(optimismPortal2)).slot21Init();
         assertEq(slot21Expected, slot21After);
+    }
+}
+
+/// @title OptimismPortal2_RedeemAttestedWithdrawal_Test
+/// @notice Tests for `redeemAttestedWithdrawal`.
+contract OptimismPortal2_RedeemAttestedWithdrawal_Test is OptimismPortal2_TestInit {
+    uint256 internal constant SIGNER_PRIVATE_KEY = 0xA11CE;
+    bytes32 internal constant DOMAIN_TAG = keccak256("BASE_ATTESTED_WITHDRAWAL_V1");
+
+    event AttestedWithdrawalRedeemed(
+        bytes32 indexed authHash, address indexed recipient, uint256 amount, uint256 nonce, address signer, bytes data
+    );
+
+    function setUp() public override {
+        super.setUp();
+        if (address(optimismPortal2.teeProverRegistry()) == address(0)) {
+            vm.prank(proxyAdminOwner);
+            optimismPortal2.setTEEProverRegistry(ITEEProverRegistry(address(teeProverRegistry)));
+        }
+    }
+
+    function _authHash(
+        address _recipient,
+        uint256 _amount,
+        uint256 _nonce,
+        bytes memory _data
+    )
+        internal
+        view
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(deploy.cfg().l2ChainId(), _recipient, address(0), _amount, _nonce, _data));
+    }
+
+    function _sign(
+        address _recipient,
+        uint256 _amount,
+        uint256 _nonce,
+        bytes memory _data
+    )
+        internal
+        view
+        returns (bytes32 authHash_, bytes memory signature_, address signer_)
+    {
+        authHash_ = _authHash(_recipient, _amount, _nonce, _data);
+        bytes32 journal = keccak256(abi.encodePacked(DOMAIN_TAG, authHash_));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PRIVATE_KEY, journal);
+        signature_ = abi.encodePacked(r, s, v);
+        signer_ = vm.addr(SIGNER_PRIVATE_KEY);
+    }
+
+    function _mockValidSigner(address _signer) internal {
+        vm.mockCall(
+            address(teeProverRegistry), abi.encodeCall(teeProverRegistry.isValidSigner, (_signer)), abi.encode(true)
+        );
+    }
+
+    function test_redeemAttestedWithdrawal_succeeds() external {
+        CallRecorder recipient = new CallRecorder();
+        uint256 amount = 1 gwei;
+        uint256 nonce = 7;
+        bytes memory data = abi.encodeCall(CallRecorder.record, ());
+        (bytes32 authHash, bytes memory signature, address signer) = _sign(address(recipient), amount, nonce, data);
+        _mockValidSigner(signer);
+
+        vm.expectEmit(true, true, false, true, address(optimismPortal2));
+        emit AttestedWithdrawalRedeemed(authHash, address(recipient), amount, nonce, signer, data);
+        optimismPortal2.redeemAttestedWithdrawal(address(recipient), amount, nonce, data, signature);
+
+        CallRecorder.CallInfo memory callInfo = recipient.getLastCall();
+        assertEq(callInfo.sender, address(optimismPortal2));
+        assertEq(callInfo.data, data);
+        assertGt(callInfo.gas, 0);
+        assertEq(callInfo.value, amount);
+        assertTrue(optimismPortal2.attestRedeemed(authHash));
+    }
+
+    function test_redeemAttestedWithdrawal_replay_reverts() external {
+        address recipient = makeAddr("attested recipient");
+        uint256 amount = 1 gwei;
+        uint256 nonce = 7;
+        bytes memory data = hex"1234";
+        (bytes32 authHash, bytes memory signature, address signer) = _sign(recipient, amount, nonce, data);
+        _mockValidSigner(signer);
+
+        optimismPortal2.redeemAttestedWithdrawal(recipient, amount, nonce, data, signature);
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_AttestedWithdrawalAlreadyRedeemed.selector);
+        optimismPortal2.redeemAttestedWithdrawal(recipient, amount, nonce, data, signature);
+        assertTrue(optimismPortal2.attestRedeemed(authHash));
+    }
+
+    function test_redeemAttestedWithdrawal_paused_reverts() external {
+        vm.prank(optimismPortal2.guardian());
+        superchainConfig.pause(address(0));
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_CallPaused.selector);
+        optimismPortal2.redeemAttestedWithdrawal(makeAddr("attested recipient"), 1 gwei, 7, hex"", hex"");
+    }
+
+    function test_redeemAttestedWithdrawal_invalidSigner_reverts() external {
+        address recipient = makeAddr("attested recipient");
+        uint256 amount = 1 gwei;
+        uint256 nonce = 7;
+        bytes memory data = hex"1234";
+        (, bytes memory signature, address signer) = _sign(recipient, amount, nonce, data);
+        vm.mockCall(
+            address(teeProverRegistry), abi.encodeCall(teeProverRegistry.isValidSigner, (signer)), abi.encode(false)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IOptimismPortal.OptimismPortal_InvalidAttestedWithdrawalSigner.selector, signer)
+        );
+        optimismPortal2.redeemAttestedWithdrawal(recipient, amount, nonce, data, signature);
+    }
+
+    function test_redeemAttestedWithdrawal_calldataTampered_reverts() external {
+        address recipient = makeAddr("attested recipient");
+        uint256 amount = 1 gwei;
+        uint256 nonce = 7;
+        bytes memory signedData = hex"1234";
+        bytes memory submittedData = hex"5678";
+        (bytes32 signedAuthHash, bytes memory signature,) = _sign(recipient, amount, nonce, signedData);
+        bytes32 submittedAuthHash = _authHash(recipient, amount, nonce, submittedData);
+        address recoveredSigner = ECDSA.recover(keccak256(abi.encodePacked(DOMAIN_TAG, submittedAuthHash)), signature);
+        vm.mockCall(
+            address(teeProverRegistry),
+            abi.encodeCall(teeProverRegistry.isValidSigner, (recoveredSigner)),
+            abi.encode(false)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IOptimismPortal.OptimismPortal_InvalidAttestedWithdrawalSigner.selector, recoveredSigner
+            )
+        );
+        optimismPortal2.redeemAttestedWithdrawal(recipient, amount, nonce, submittedData, signature);
+
+        assertFalse(optimismPortal2.attestRedeemed(signedAuthHash));
+        assertFalse(optimismPortal2.attestRedeemed(submittedAuthHash));
+    }
+
+    function test_redeemAttestedWithdrawal_targetReverts_reverts() external {
+        Reverter recipient = new Reverter();
+        uint256 amount = 1 gwei;
+        uint256 nonce = 7;
+        bytes memory data = abi.encodeCall(Reverter.doRevert, ());
+        (bytes32 authHash, bytes memory signature, address signer) = _sign(address(recipient), amount, nonce, data);
+        _mockValidSigner(signer);
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_AttestedWithdrawalCallFailed.selector);
+        optimismPortal2.redeemAttestedWithdrawal(address(recipient), amount, nonce, data, signature);
+
+        assertFalse(optimismPortal2.attestRedeemed(authHash));
     }
 }
