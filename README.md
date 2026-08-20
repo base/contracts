@@ -34,11 +34,11 @@ If the `semver-lock` CI check fails, regenerate locally and commit:
 just semver-lock
 ```
 
-If CI still rejects it (Foundry version mismatch), update your local Foundry first:
+If CI still rejects it because of a Foundry version mismatch, install the repository-pinned toolchain:
 
 ```bash
-foundryup
-just semver-lock
+mise install
+mise exec -- just semver-lock
 ```
 
 ### setup and testing
