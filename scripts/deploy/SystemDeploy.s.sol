@@ -307,7 +307,8 @@ contract SystemDeploy is Script {
                 root: Hash.wrap(cfg.multiproofGenesisOutputRoot()), l2SequenceNumber: cfg.multiproofGenesisBlockNumber()
             }),
             saltMixer: "salt mixer",
-            gasLimit: uint64(cfg.l2GenesisBlockGasLimit())
+            gasLimit: uint64(cfg.l2GenesisBlockGasLimit()),
+            initialUpgradeSchedule: cfg.protocolVersionsInitialSchedule()
         });
     }
 
@@ -643,7 +644,9 @@ contract SystemDeploy is Script {
             _output.opChainProxyAdmin,
             address(_output.protocolVersionsProxy),
             _impls.protocolVersionsImpl,
-            abi.encodeCall(IProtocolVersions.initialize, (_input.roles.incidentResponder, new uint64[](0)))
+            abi.encodeCall(
+                IProtocolVersions.initialize, (_input.roles.incidentResponder, _input.initialUpgradeSchedule)
+            )
         );
     }
 

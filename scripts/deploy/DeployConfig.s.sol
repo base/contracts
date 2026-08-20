@@ -62,6 +62,14 @@ contract DeployConfig is Script {
     uint256 public sequencerFeeVaultMinimumWithdrawalAmount;
     uint256 public sequencerFeeVaultWithdrawalNetwork;
 
+    uint64[] internal _protocolVersionsInitialSchedule;
+
+    /// @notice The chain's existing hardfork activation timestamps, used to seed `ProtocolVersions`.
+    /// @dev Chains with no upgrade history leave this unset and start with an empty registry.
+    function protocolVersionsInitialSchedule() public view returns (uint64[] memory) {
+        return _protocolVersionsInitialSchedule;
+    }
+
     function read(string memory _path) public {
         console.log("DeployConfig: reading file %s", _path);
         string memory _json = vm.readFile(_path);
@@ -116,6 +124,20 @@ contract DeployConfig is Script {
         respectedGameType = _json.readUintOr("$.respectedGameType", 0);
         sequencerFeeVaultMinimumWithdrawalAmount = _json.readUint("$.sequencerFeeVaultMinimumWithdrawalAmount");
         sequencerFeeVaultWithdrawalNetwork = _json.readUint("$.sequencerFeeVaultWithdrawalNetwork");
+
+        _readProtocolVersionsInitialSchedule(_json);
+    }
+
+    /// @dev Read separately so a rerun of `read` replaces the previous schedule rather than appending
+    ///      to it, and so an out-of-range timestamp fails loudly instead of silently truncating.
+    function _readProtocolVersionsInitialSchedule(string memory _json) internal {
+        uint256[] memory schedule = _json.readUintArrayOr("$.protocolVersionsInitialSchedule", new uint256[](0));
+
+        delete _protocolVersionsInitialSchedule;
+        for (uint256 i = 0; i < schedule.length; i++) {
+            require(schedule[i] <= type(uint64).max, "DeployConfig: initial schedule timestamp exceeds uint64");
+            _protocolVersionsInitialSchedule.push(uint64(schedule[i]));
+        }
     }
 
     /// @notice Allow the `useUpgradedFork` config to be overridden in testing environments
