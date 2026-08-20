@@ -32,6 +32,10 @@ library Types {
     }
 
     /// @notice The full set of inputs to deploy a new OP Stack chain.
+    /// @custom:field initialUpgradeSchedule The chain's hardfork activation timestamps, one entry per
+    ///              upgrade in the node's fork order, zero for unscheduled ones. Seeds
+    ///              `ProtocolVersions` at initialization, which is the only way to enter
+    ///              activations that are already in the past.
     struct DeployInput {
         Roles roles;
         uint32 basefeeScalar;
@@ -40,6 +44,7 @@ library Types {
         Proposal startingAnchorRoot;
         string saltMixer;
         uint64 gasLimit;
+        uint64[] initialUpgradeSchedule;
     }
 
     /// @notice The full set of outputs from deploying a new OP Stack chain.

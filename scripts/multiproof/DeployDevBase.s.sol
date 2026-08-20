@@ -109,7 +109,8 @@ abstract contract DeployDevBase is Script {
 
         Proxy protocolVersionsProxy = new Proxy(msg.sender);
         protocolVersionsProxy.upgradeToAndCall(
-            address(new ProtocolVersions()), abi.encodeCall(IProtocolVersions.initialize, (address(0)))
+            address(new ProtocolVersions()),
+            abi.encodeCall(IProtocolVersions.initialize, (address(0), cfg.protocolVersionsInitialSchedule()))
         );
         protocolVersionsProxy.changeAdmin(address(proxyAdmin));
 

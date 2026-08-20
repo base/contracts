@@ -18,6 +18,7 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     error ProtocolVersions_UnknownUpgrade(uint256 id);
     error ProtocolVersions_InvalidProtocolVersion();
     error ProtocolVersions_ActivationAlreadyPassed(uint256 id, uint64 activationTimestamp);
+    error ProtocolVersions_ActivationFrozen(uint256 id, uint64 activationTimestamp);
     error ProtocolVersions_NotIncidentResponder();
     error ProtocolVersions_NotScheduled(uint256 id);
     error ProtocolVersions_DelayMustBeLater(uint64 currentTimestamp, uint64 newTimestamp);
@@ -29,7 +30,7 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     error ProtocolVersions_NotInitialized();
     error ProtocolVersions_InsufficientNotice(uint64 timestamp);
 
-    function initialize(address _incidentResponder) external;
+    function initialize(address _incidentResponder, uint64[] calldata _initialSchedule) external;
     function registerUpgrade(uint64 timestamp, uint256 minProtocolVersion) external returns (uint256);
     function setMinimumProtocolVersion(uint256 protocolVersion) external;
     function setTimestamp(uint256 id, uint64 timestamp) external;
@@ -37,6 +38,7 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
     function delayTimestamp(uint256 id, uint64 newTimestamp) external;
 
     function MIN_NOTICE() external view returns (uint64);
+    function FREEZE_WINDOW() external view returns (uint64);
     function minimumProtocolVersion() external view returns (uint256);
     function incidentResponder() external view returns (address);
     function scheduleId() external view returns (bytes32);

@@ -154,6 +154,36 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertValidStandardSystem(_expected(output, input));
     }
 
+    /// @notice A chain that already has a hardfork history has to seed the registry at deploy time.
+    ///         `registerUpgrade` cannot enter activations that are already in the past, and
+    ///         `initialize` runs once, so an empty import here would be permanent.
+    function test_deploy_seedsProtocolVersionsWithInitialSchedule_succeeds() public {
+        vm.warp(1_800_000_000);
+
+        uint64[] memory schedule = new uint64[](4);
+        schedule[0] = 1_686_789_347;
+        schedule[1] = 1_704_992_401;
+        schedule[2] = 0; // Unscheduled on this chain.
+        schedule[3] = 1_710_374_401;
+
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.opChainInput.initialUpgradeSchedule = schedule;
+
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+
+        uint64[] memory imported = output.opChain.protocolVersionsProxy.getSchedule();
+        assertEq(imported.length, schedule.length, "schedule length");
+        for (uint256 i = 0; i < schedule.length; i++) {
+            assertEq(imported[i], schedule[i], "schedule entry");
+        }
+
+        assertEq(
+            address(AggregateVerifier(address(output.opChain.aggregateVerifier)).PROTOCOL_VERSIONS()),
+            address(output.opChain.protocolVersionsProxy),
+            "verifier bound to seeded registry"
+        );
+    }
+
     function test_deploy_multiproofDisabled_allowsUnsetL2BlockTime_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.implementationsInput.multiproofConfigHash = bytes32(0);
@@ -370,7 +400,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             l2ChainId: l2ChainId,
             startingAnchorRoot: Proposal({ root: Hash.wrap(bytes32(uint256(1))), l2SequenceNumber: 0 }),
             saltMixer: "system-deploy-test",
-            gasLimit: 60_000_000
+            gasLimit: 60_000_000,
+            initialUpgradeSchedule: new uint64[](0)
         });
     }
 

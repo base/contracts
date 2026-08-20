@@ -42,10 +42,13 @@ contract AggregateVerifierTest is BaseTest {
     function test_initialize_pinsScheduleId_succeeds() public {
         // The first game ends at L2 block 100, whose deterministic timestamp is 200. The first
         // upgrade is active there; the second is not.
-        protocolVersions.registerUpgrade(200, 1);
+        uint64[] memory schedule = new uint64[](2);
+        schedule[0] = 200;
+        schedule[1] = 300;
+        _importProtocolVersionsSchedule(schedule);
+
         bytes32 pinned = protocolVersions.activatedScheduleId(200);
         assertTrue(pinned != bytes32(0));
-        protocolVersions.registerUpgrade(300, 2);
         assertNotEq(protocolVersions.scheduleId(), pinned);
 
         // Even though the L1 clock has passed the second activation, the game's schedule is
@@ -61,8 +64,10 @@ contract AggregateVerifierTest is BaseTest {
 
         assertEq(game.scheduleId(), pinned);
 
-        // Move the live schedule after creation; the game's snapshot remains pinned.
-        protocolVersions.registerUpgrade(400, 3);
+        // Move the live schedule after creation; the game's snapshot remains pinned. A fresh
+        // registration now has to clear MIN_NOTICE, which is what keeps it clear of the L2
+        // timestamps the sequencer has already reached.
+        protocolVersions.registerUpgrade(uint64(block.timestamp) + protocolVersions.MIN_NOTICE(), 3);
         assertNotEq(protocolVersions.scheduleId(), pinned);
         assertEq(game.scheduleId(), pinned);
     }
@@ -70,7 +75,9 @@ contract AggregateVerifierTest is BaseTest {
     /// @notice Consecutive games on opposite sides of an L2 activation boundary pin different
     ///         schedule commitments.
     function test_initialize_scheduleChangesAtL2ActivationBoundary_succeeds() public {
-        protocolVersions.registerUpgrade(300, 1);
+        uint64[] memory schedule = new uint64[](1);
+        schedule[0] = 300;
+        _importProtocolVersionsSchedule(schedule);
 
         Claim firstClaim = _advanceL2BlockAndClaim();
         AggregateVerifier firstGame = _createAggregateVerifierGame(
@@ -99,7 +106,9 @@ contract AggregateVerifierTest is BaseTest {
         // The first game ends at L2 block 100, whose deterministic timestamp is 200. Scheduling the
         // upgrade there and leaving the L1 clock short of it is the window the finding exploits.
         uint64 activationTimestamp = uint64(BLOCK_INTERVAL * L2_BLOCK_TIME);
-        protocolVersions.registerUpgrade(activationTimestamp, 1);
+        uint64[] memory schedule = new uint64[](1);
+        schedule[0] = activationTimestamp;
+        _importProtocolVersionsSchedule(schedule);
         assertLt(block.timestamp, activationTimestamp);
 
         // Created straight through the factory, since the shared helper advances L1 to the claim.

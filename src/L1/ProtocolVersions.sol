@@ -41,6 +41,14 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @notice Minimum notice period required when changing a preexisting activation timestamp.
     uint64 public constant MIN_NOTICE = 1 hours;
 
+    /// @notice Window before a scheduled activation during which that timestamp can no longer change.
+    /// @dev Sized to the post-Fjord maximum sequencer drift: an L2 block may carry a timestamp up to
+    ///      1800 seconds ahead of its L1 origin, so from L1 time `activation - FREEZE_WINDOW` onwards
+    ///      the sequencer can already have produced the block that activates the upgrade. Freezing at
+    ///      that point makes L1's answer to "was this upgrade active at a given L2 timestamp" final
+    ///      before any L2 block can depend on it, rather than leaving it mutable until activation.
+    uint64 public constant FREEZE_WINDOW = 30 minutes;
+
     /// @notice Activation timestamp for each registered upgrade, indexed by upgrade id (0 = not scheduled).
     ///         An upgrade id is registered iff it is a valid index into this array.
     /// @dev Every loop in this contract iterates this array. Its length is deliberately uncapped: it only
@@ -84,6 +92,8 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     error ProtocolVersions_InvalidProtocolVersion();
     /// @notice Thrown when modifying a timestamp whose activation has already passed.
     error ProtocolVersions_ActivationAlreadyPassed(uint256 id, uint64 activationTimestamp);
+    /// @notice Thrown when modifying a timestamp that is within FREEZE_WINDOW of its activation.
+    error ProtocolVersions_ActivationFrozen(uint256 id, uint64 activationTimestamp);
     /// @notice Thrown when the caller is not the incidentResponder.
     error ProtocolVersions_NotIncidentResponder();
     /// @notice Thrown when delaying an upgrade that has no scheduled activation.
@@ -108,10 +118,26 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         _disableInitializers();
     }
 
-    /// @notice Initializes the registry by seeding the hash chain and appointing the initial
-    ///         incidentResponder. Callable only by the ProxyAdmin or its owner.
+    /// @notice Initializes the registry by seeding the hash chain, importing any preexisting upgrade
+    ///         schedule, and appointing the initial incidentResponder. Callable only by the
+    ///         ProxyAdmin or its owner.
+    /// @dev `_initialSchedule` is the only path that can enter an activation which is not at least
+    ///      MIN_NOTICE in the future. It exists so a chain that already has a hardfork history can be
+    ///      represented faithfully at deployment, while it is still impossible for any proof game to
+    ///      have pinned a commitment from this registry. Every later write goes through
+    ///      `registerUpgrade`, `setTimestamp`, or `delayTimestamp`, which together guarantee that an
+    ///      activation is never created or moved once L1 is within FREEZE_WINDOW of it.
     /// @param _incidentResponder Initial incidentResponder allowed to delay activations, or address(0) to leave unset.
-    function initialize(address _incidentResponder) external reinitializer(initVersion()) {
+    /// @param _initialSchedule   Activation timestamps for already-known upgrades, ordered by ascending
+    ///                           upgrade id, using 0 for an upgrade that is registered but unscheduled.
+    ///                           Pass an empty array for a chain with no upgrade history.
+    function initialize(
+        address _incidentResponder,
+        uint64[] calldata _initialSchedule
+    )
+        external
+        reinitializer(initVersion())
+    {
         // Initialization transactions must come from the ProxyAdmin or its owner.
         _assertOnlyProxyAdminOrProxyAdminOwner();
 
@@ -119,7 +145,20 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         // `scheduleId` and `_refreshScheduleId` avoid an empty-registry special case, and makes a
         // non-empty array double as the "initialized" flag.
         _upgradeScheduleId.push(bytes32(0));
-        emit ScheduleIdUpdated(bytes32(0));
+
+        for (uint256 id = 0; id < _initialSchedule.length; id++) {
+            uint64 timestamp = _initialSchedule[id];
+            // `id` is the index about to be appended, so this reads only the entries already imported.
+            _assertTimestampAfterPrevious(id, timestamp);
+            _timestamps.push(timestamp);
+            _upgradeScheduleId.push();
+            emit UpgradeRegistered(id);
+            if (timestamp != 0) emit TimestampSet(id, timestamp);
+        }
+
+        // Builds the same chain the equivalent sequence of `registerUpgrade` calls would, in one
+        // pass. With an empty import this just re-emits the seed as the current commitment.
+        _refreshScheduleId(0);
 
         incidentResponder = _incidentResponder;
         emit IncidentResponderUpdated(address(0), _incidentResponder);
@@ -129,8 +168,12 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     ///         activation and bumping the minimum protocol version in the same call. ProxyAdmin owner only.
     /// @dev Pass `timestamp` 0 to register without scheduling (schedule later via `setTimestamp`), or
     ///      a non-zero value to register and schedule at once. Either way registration extends the
-    ///      scheduleId chain with the new upgrade's link.
-    /// @param timestamp Unix activation timestamp, or 0 to leave the upgrade unscheduled.
+    ///      scheduleId chain with the new upgrade's link. A non-zero value must clear MIN_NOTICE, the
+    ///      same floor `setTimestamp` applies: appending an activation that L1 is already within
+    ///      FREEZE_WINDOW of would change `activatedScheduleId` for L2 timestamps the sequencer may
+    ///      already have produced, which is exactly what the freeze exists to prevent.
+    /// @param timestamp Unix activation timestamp (must be >= block.timestamp + MIN_NOTICE), or 0 to
+    ///                  leave the upgrade unscheduled.
     /// @param minProtocolVersion New minimum protocol version to set at registration, or 0 to leave
     ///                  the current minimum unchanged. Must fit in 128 bits if non-zero.
     /// @return The ascending id assigned to the newly registered upgrade.
@@ -138,6 +181,9 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         _assertOnlyProxyAdminOwner();
         if (_upgradeScheduleId.length == 0) revert ProtocolVersions_NotInitialized();
         uint256 id = _timestamps.length;
+        if (timestamp != 0 && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
+            revert ProtocolVersions_InsufficientNotice(timestamp);
+        }
         _assertTimestampAfterPrevious(id, timestamp);
         _timestamps.push(0);
         // Reserve the link slot for this upgrade at index id + 1.
@@ -171,9 +217,10 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     }
 
     /// @notice Sets the activation timestamp for one upgrade by id. Pass 0 to clear.
-    /// @dev The activation timestamp must be at least MIN_NOTICE seconds in the future and the
-    ///      upgrade must not have already activated. Pass 0 to remove a not-yet-activated scheduled
-    ///      timestamp; reverts if the upgrade has already passed its activation time.
+    /// @dev The activation timestamp must be at least MIN_NOTICE seconds in the future, and any
+    ///      preexisting activation must still be more than FREEZE_WINDOW away. Pass 0 to remove a
+    ///      scheduled timestamp; reverts if the upgrade has already activated or is inside its
+    ///      freeze window.
     /// @param id         The upgrade to schedule.
     /// @param timestamp  Future Unix timestamp for L2 activation (must be >= block.timestamp + MIN_NOTICE), or 0 to
     /// clear.
@@ -182,9 +229,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         _assertRegistered(id);
         uint64 current = _timestamps[id];
         if (current == timestamp) return;
-        if (current != 0 && uint64(block.timestamp) >= current) {
-            revert ProtocolVersions_ActivationAlreadyPassed(id, current);
-        }
+        if (current != 0) _assertNotFrozen(id, current);
         if (timestamp != 0 && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
             revert ProtocolVersions_InsufficientNotice(timestamp);
         }
@@ -206,11 +251,11 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
 
     /// @notice Pushes an already-scheduled upgrade's activation timestamp further into the future.
     ///         Can only be called by the incidentResponder.
-    /// @dev The upgrade must already have a non-zero activation timestamp that has not yet passed,
-    ///      and `newTimestamp` must be strictly later than the current value. This role can only
-    ///      delay an activation; it cannot pull one earlier, clear it, or schedule a new one — use
-    ///      the owner's `setTimestamp` for those. Because `current` is in the future and `newTimestamp`
-    ///      is later still, the new value is always in the future.
+    /// @dev The upgrade must already have a non-zero activation timestamp that is still more than
+    ///      FREEZE_WINDOW away, and `newTimestamp` must be strictly later than the current value.
+    ///      This role can only delay an activation; it cannot pull one earlier, clear it, or schedule
+    ///      a new one — use the owner's `setTimestamp` for those. Because `current` is in the future
+    ///      and `newTimestamp` is later still, the new value is always in the future.
     /// @param id            The upgrade whose activation to delay.
     /// @param newTimestamp  New activation timestamp, must be strictly later than the current one.
     function delayTimestamp(uint256 id, uint64 newTimestamp) external {
@@ -220,8 +265,8 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
 
         // The upgrade must already have a scheduled activation to delay.
         if (current == 0) revert ProtocolVersions_NotScheduled(id);
-        // Cannot delay an activation that has already passed.
-        if (uint64(block.timestamp) >= current) revert ProtocolVersions_ActivationAlreadyPassed(id, current);
+        // Cannot delay an activation that has passed or is already inside its freeze window.
+        _assertNotFrozen(id, current);
         // The role can only push the activation later, never to the same time or earlier.
         if (newTimestamp <= current) revert ProtocolVersions_DelayMustBeLater(current, newTimestamp);
         // The new timestamp must also provide at least MIN_NOTICE seconds of notice from now.
@@ -314,6 +359,13 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         }
 
         emit ScheduleIdUpdated(prev);
+    }
+
+    /// @dev Requires upgrade `id`'s scheduled activation to still be more than FREEZE_WINDOW away,
+    ///      which is the point past which an L2 block carrying that activation may already exist.
+    function _assertNotFrozen(uint256 id, uint64 current) private view {
+        if (uint64(block.timestamp) >= current) revert ProtocolVersions_ActivationAlreadyPassed(id, current);
+        if (uint64(block.timestamp) + FREEZE_WINDOW >= current) revert ProtocolVersions_ActivationFrozen(id, current);
     }
 
     /// @dev Prevents scheduling a zero-valued hole once a later upgrade has a timestamp.

@@ -47,6 +47,7 @@ Other relevant fields:
 | `multiproofGameType`           | Game type ID for the dispute game                                                 |
 | `multiproofGenesisOutputRoot`  | Initial anchor output root                                                        |
 | `multiproofGenesisBlockNumber` | Initial anchor L2 block number                                                    |
+| `protocolVersionsInitialSchedule` | Hardfork activation timestamps in the node's fork order, `0` for unscheduled forks. Omit for a chain with no history; past activations cannot be added after deployment |
 
 ### Step 2: Deploy contracts
 
