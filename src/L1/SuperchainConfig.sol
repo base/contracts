@@ -119,8 +119,9 @@ contract SuperchainConfig is ProxyAdminOwnedBase, ISemver {
         // Only the Guardian can extend the pause.
         _assertOnlyGuardian();
 
-        // Cannot extend the pause if not already paused.
-        if (pauseTimestamps[_identifier] == 0) {
+        // An expired pause retains its timestamp but is no longer active. Requiring
+        // paused() here prevents extend() from re-activating it without unpause().
+        if (!paused(_identifier)) {
             revert SuperchainConfig_NotAlreadyPaused(_identifier);
         }
 
