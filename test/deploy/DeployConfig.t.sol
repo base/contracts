@@ -6,6 +6,10 @@ import { Test } from "lib/forge-std/src/Test.sol";
 import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
 
 contract DeployConfigHarness is DeployConfig {
+    function readMinimumVersion(string memory _json) public {
+        _readProtocolVersionsInitialMinimumVersion(_json);
+    }
+
     function readSchedule(string memory _json) public {
         _readProtocolVersionsInitialSchedule(_json);
     }
@@ -53,11 +57,29 @@ contract DeployConfig_Test is Test {
         cfg.readSchedule('{"protocolVersionsInitialSchedule":[18446744073709551616]}');
     }
 
-    /// @notice The shipped configs describe chains without a recorded history, so they must keep
-    ///         producing an empty registry.
-    function test_read_localConfig_leavesScheduleEmpty_succeeds() public {
+    function test_readMinimumVersion_parsesValue_succeeds() public {
+        cfg.readMinimumVersion('{"protocolVersionsInitialMinimumVersion":42}');
+
+        assertEq(cfg.protocolVersionsInitialMinimumVersion(), 42);
+    }
+
+    function test_readMinimumVersion_omitted_defaultsToZero_succeeds() public {
+        cfg.readMinimumVersion('{"l1ChainId":1}');
+
+        assertEq(cfg.protocolVersionsInitialMinimumVersion(), 0);
+    }
+
+    function test_readMinimumVersion_aboveUint128_reverts() public {
+        vm.expectRevert("DeployConfig: initial minimum protocol version exceeds uint128");
+        cfg.readMinimumVersion('{"protocolVersionsInitialMinimumVersion":340282366920938463463374607431768211456}');
+    }
+
+    /// @notice The shipped configs describe chains without a recorded history, so they must keep the initial registry
+    /// state empty.
+    function test_read_localConfig_leavesProtocolVersionsStateEmpty_succeeds() public {
         cfg.read("deploy-config/local.json");
 
         assertEq(cfg.protocolVersionsInitialSchedule().length, 0);
+        assertEq(cfg.protocolVersionsInitialMinimumVersion(), 0);
     }
 }

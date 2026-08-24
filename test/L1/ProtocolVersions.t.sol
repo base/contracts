@@ -70,6 +70,7 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         // responder from config and seeds the hash chain (scheduleId == the bytes32(0) seed).
         assertEq(protocolVersions.proxyAdminOwner(), proxyAdminOwner);
         assertEq(protocolVersions.incidentResponder(), deploy.cfg().superchainConfigIncidentResponder());
+        assertEq(protocolVersions.minimumProtocolVersion(), deploy.cfg().protocolVersionsInitialMinimumVersion());
         assertEq(protocolVersions.scheduleId(), bytes32(0));
     }
 
@@ -80,7 +81,7 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         vm.expectEmit(true, true, false, false, address(uninitialized));
         emit IncidentResponderUpdated(address(0), _incidentResponder);
         vm.prank(EIP1967Helper.getAdmin(address(uninitialized)));
-        uninitialized.initialize(_incidentResponder, new uint64[](0));
+        uninitialized.initialize(_incidentResponder, new uint64[](0), 0);
         assertEq(uninitialized.incidentResponder(), _incidentResponder);
     }
 
@@ -90,7 +91,7 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         IProtocolVersions uninitialized = _deployUninitializedProxy();
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
         vm.prank(_nonOwner);
-        uninitialized.initialize(_incidentResponder, new uint64[](0));
+        uninitialized.initialize(_incidentResponder, new uint64[](0), 0);
     }
 
     /// @notice Tests that the initializer imports a preexisting schedule, building the same hash
@@ -103,13 +104,14 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
 
         IProtocolVersions imported = _deployUninitializedProxy();
         vm.prank(EIP1967Helper.getAdmin(address(imported)));
-        imported.initialize(_incidentResponder, schedule);
+        imported.initialize(_incidentResponder, schedule, 42);
 
         uint64[] memory stored = imported.getSchedule();
         assertEq(stored.length, schedule.length);
         assertEq(stored[0], schedule[0]);
         assertEq(stored[1], schedule[1]);
         assertEq(stored[2], schedule[2]);
+        assertEq(imported.minimumProtocolVersion(), 42);
 
         bytes32 link0 = keccak256(abi.encode(bytes32(0), uint256(0), uint64(10)));
         bytes32 link1 = keccak256(abi.encode(link0, uint256(1), uint64(0)));
@@ -135,21 +137,52 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
             )
         );
         vm.prank(EIP1967Helper.getAdmin(address(imported)));
-        imported.initialize(address(0), schedule);
+        imported.initialize(address(0), schedule, 42);
+    }
+
+    /// @notice Tests that an imported activation cannot omit the minimum protocol version required by nodes.
+    function test_initialize_importWithoutMinimumProtocolVersion_reverts() external {
+        uint64[] memory schedule = new uint64[](1);
+        schedule[0] = 1;
+
+        IProtocolVersions imported = _deployUninitializedProxy();
+        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
+        vm.prank(EIP1967Helper.getAdmin(address(imported)));
+        imported.initialize(address(0), schedule, 0);
+    }
+
+    /// @notice Tests that zero-only imports may leave the minimum protocol version unset.
+    function test_initialize_zeroOnlyScheduleWithoutMinimumProtocolVersion_succeeds() external {
+        uint64[] memory schedule = new uint64[](1);
+
+        IProtocolVersions imported = _deployUninitializedProxy();
+        vm.prank(EIP1967Helper.getAdmin(address(imported)));
+        imported.initialize(address(0), schedule, 0);
+
+        assertEq(imported.getSchedule().length, 1);
+        assertEq(imported.minimumProtocolVersion(), 0);
+    }
+
+    /// @notice Tests that the initial minimum protocol version must fit in the node's 128-bit packed semver layout.
+    function test_initialize_minimumProtocolVersionTooLarge_reverts() external {
+        IProtocolVersions imported = _deployUninitializedProxy();
+        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
+        vm.prank(EIP1967Helper.getAdmin(address(imported)));
+        imported.initialize(address(0), new uint64[](0), uint256(type(uint128).max) + 1);
     }
 
     /// @notice Tests that the contract cannot be initialized twice.
     function test_initialize_alreadyInitialized_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
         vm.prank(EIP1967Helper.getAdmin(address(protocolVersions)));
-        protocolVersions.initialize(address(0), new uint64[](0));
+        protocolVersions.initialize(address(0), new uint64[](0), 0);
     }
 
     /// @notice Tests that the implementation itself cannot be initialized (initializers disabled).
     function test_initialize_implementationDisabled_reverts() external {
         IProtocolVersions impl = IProtocolVersions(EIP1967Helper.getImplementation(address(protocolVersions)));
         vm.expectRevert("Initializable: contract is already initialized");
-        impl.initialize(address(0), new uint64[](0));
+        impl.initialize(address(0), new uint64[](0), 0);
     }
 }
 
@@ -1090,7 +1123,7 @@ contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit 
     function _importSchedule(uint64[] memory schedule) private returns (IProtocolVersions) {
         IProtocolVersions imported = _deployUninitializedProxy();
         vm.prank(EIP1967Helper.getAdmin(address(imported)));
-        imported.initialize(address(0), schedule);
+        imported.initialize(address(0), schedule, 1);
         return imported;
     }
 }

@@ -58,6 +58,7 @@ contract DeployConfig is Script {
     uint256 public operatorFeeVaultMinimumWithdrawalAmount;
     uint256 public operatorFeeVaultWithdrawalNetwork;
     uint256 public proofMaturityDelaySeconds;
+    uint256 public protocolVersionsInitialMinimumVersion;
     uint256 public respectedGameType;
     uint256 public sequencerFeeVaultMinimumWithdrawalAmount;
     uint256 public sequencerFeeVaultWithdrawalNetwork;
@@ -121,11 +122,18 @@ contract DeployConfig is Script {
         operatorFeeVaultMinimumWithdrawalAmount = _json.readUint("$.operatorFeeVaultMinimumWithdrawalAmount");
         operatorFeeVaultWithdrawalNetwork = _json.readUint("$.operatorFeeVaultWithdrawalNetwork");
         proofMaturityDelaySeconds = _json.readUintOr("$.proofMaturityDelaySeconds", 0);
+        _readProtocolVersionsInitialMinimumVersion(_json);
         respectedGameType = _json.readUintOr("$.respectedGameType", 0);
         sequencerFeeVaultMinimumWithdrawalAmount = _json.readUint("$.sequencerFeeVaultMinimumWithdrawalAmount");
         sequencerFeeVaultWithdrawalNetwork = _json.readUint("$.sequencerFeeVaultWithdrawalNetwork");
 
         _readProtocolVersionsInitialSchedule(_json);
+    }
+
+    function _readProtocolVersionsInitialMinimumVersion(string memory _json) internal {
+        uint256 minimumVersion = _json.readUintOr("$.protocolVersionsInitialMinimumVersion", 0);
+        require(minimumVersion <= type(uint128).max, "DeployConfig: initial minimum protocol version exceeds uint128");
+        protocolVersionsInitialMinimumVersion = minimumVersion;
     }
 
     /// @dev Read separately so a rerun of `read` replaces the previous schedule rather than appending
