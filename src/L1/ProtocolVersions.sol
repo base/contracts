@@ -224,7 +224,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @dev The activation timestamp must be at least MIN_NOTICE seconds in the future, and any
     ///      preexisting activation must still be more than FREEZE_WINDOW away. Pass 0 to remove a
     ///      scheduled timestamp; reverts if the upgrade has already activated or is inside its
-    ///      freeze window.
+    ///      freeze window, or if a later upgrade remains scheduled.
     /// @param id         The upgrade to schedule.
     /// @param timestamp  Future Unix timestamp for L2 activation (must be >= block.timestamp + MIN_NOTICE), or 0 to
     /// clear.
@@ -237,8 +237,8 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         if (timestamp != 0 && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
             revert ProtocolVersions_InsufficientNotice(timestamp);
         }
+        if (timestamp == 0 || current == 0) _assertNoScheduledSuccessor(id);
         if (timestamp != 0) {
-            if (current == 0) _assertNoScheduledSuccessor(id);
             _assertTimestampAfterPrevious(id, timestamp);
             _assertTimestampBeforeNext(id, timestamp);
         }
@@ -372,7 +372,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         if (uint64(block.timestamp) + FREEZE_WINDOW >= current) revert ProtocolVersions_ActivationFrozen(id, current);
     }
 
-    /// @dev Prevents scheduling a zero-valued hole once a later upgrade has a timestamp.
+    /// @dev Prevents creating or filling a zero-valued hole below a scheduled successor.
     function _assertNoScheduledSuccessor(uint256 id) private view {
         for (uint256 i = id + 1; i < _timestamps.length; i++) {
             if (_timestamps[i] != 0) revert ProtocolVersions_StaticScheduleHole(id, i);
