@@ -345,9 +345,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Initializes the contract.
-    /// @param proof The proof, encoded as proof type || L1 origin hash || L1 origin number || verifier payload.
+    /// @param proof Encoding: uint8 proofType || bytes32 l1OriginHash || uint256 l1OriginNumber || verifier payload.
     /// @dev This function may only be called once.
-    /// @dev First byte of the proof is the proof type.
     /// @dev The proof-supplied L1 origin hash is verified against the supplied block number and journaled. It need not
     /// equal `l1Head()`, which the factory captures at game creation for proofs submitted after initialization.
     function initializeWithInitData(bytes calldata proof) external payable virtual {
