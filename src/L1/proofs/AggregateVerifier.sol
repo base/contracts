@@ -427,9 +427,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         uint64 claimTimestamp = L2_GENESIS_TIMESTAMP + uint64(blocksSinceGenesis * uint256(L2_BLOCK_TIME));
 
-        // `ProtocolVersions` only freezes an activation once L1 time reaches it, so a claim whose L2
-        // timestamp is still in L1's future would pin a schedule the owner can afterwards clear or
-        // delay. Requiring the claim to have already passed on L1 keeps the pin canonical for life.
+        // `ProtocolVersions` freezes mutations to an activation `FREEZE_WINDOW` before it takes
+        // effect. Requiring the claim timestamp to have been reached on L1 additionally ensures the
+        // game's L2 time is not still in L1's future when its active schedule is pinned.
         if (claimTimestamp > block.timestamp) revert L2TimestampInFuture(claimTimestamp, block.timestamp);
 
         scheduleId = PROTOCOL_VERSIONS.activatedScheduleId(claimTimestamp);
