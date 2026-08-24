@@ -30,10 +30,14 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 ///      Changing any upgrade's timestamp recomputes its link and all subsequent links, making
 ///      scheduleId fully reproducible from (upgrade count, current timestamps). Keeping the seed as
 ///      the array's first element lets both `scheduleId` and the refresh loop avoid an
-///      empty-registry special case. Proof journals bind to `scheduleId`, pinning every proof in a
-///      dispute game to the schedule in effect at the game's L1 origin block; cross-chain domain
-///      separation is provided by the journal itself, which commits the L2 chain id and registry
-///      address alongside `scheduleId`.
+///      empty-registry special case.
+///
+///      `AggregateVerifier` pins `activatedScheduleId` at game initialization using the ending L2 claim
+///      timestamp. Every proof journal commits to that pinned value.
+///
+///      `scheduleId` commits only to registry contents. `AggregateVerifier` journals pair it with
+///      `CONFIG_HASH`; they do not separately encode `L2_CHAIN_ID` or the `PROTOCOL_VERSIONS` address.
+///      Any deployment-level domain separation must therefore be part of `CONFIG_HASH`.
 ///
 ///      The contract is deployed behind an OP proxy: the implementation constructor disables
 ///      initializers, and `initialize` (run through the proxy) seeds the hash chain.
