@@ -29,7 +29,7 @@
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0x84c6bf00e337c889993c409f18b17986f9d9546ac6754f7730962459d301c21d",
-    "sourceCodeHash": "0xab669e0a55462740b4c1c06fe94aa709044146e3eeec4a0123fbc67dd7f35c28"
+    "sourceCodeHash": "0x57938108a4aae689564e15c96e46b8ab0908725fd7cb0431112e601acdab9988"
   },
   "src/L1/proofs/AnchorStateRegistry.sol:AnchorStateRegistry": {
     "initCodeHash": "0x6f3afd2d0ef97a82ca3111976322b99343a270e54cd4a405028f2f29c75f7fb1",
