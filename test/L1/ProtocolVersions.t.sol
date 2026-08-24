@@ -610,10 +610,27 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         protocolVersions.setTimestamp(ECOTONE, previous - 1);
     }
 
-    /// @notice Tests that `setTimestamp` reverts when the timestamp is not before the next one.
-    function test_setTimestamp_timestampNotBeforeNext_reverts() external {
+    /// @notice Tests that `setTimestamp` may share the next scheduled upgrade's timestamp.
+    function test_setTimestamp_timestampEqualToNext_succeeds() external {
         uint64 current = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         uint64 next = current + 100;
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(current, 0);
+        protocolVersions.registerUpgrade(next, 0);
+        protocolVersions.setTimestamp(CANYON, next);
+        vm.stopPrank();
+
+        uint64[] memory schedule = protocolVersions.getSchedule();
+        assertEq(schedule[CANYON], next);
+        assertEq(schedule[ECOTONE], next);
+    }
+
+    /// @notice Tests that `setTimestamp` reverts when the timestamp is after the next one.
+    function test_setTimestamp_timestampAfterNext_reverts() external {
+        uint64 current = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+        uint64 next = current + 100;
+        uint64 afterNext = next + 1;
 
         vm.startPrank(_owner);
         protocolVersions.registerUpgrade(current, 0);
@@ -622,11 +639,11 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IProtocolVersions.ProtocolVersions_TimestampNotBeforeNext.selector, CANYON, ECOTONE, next, next
+                IProtocolVersions.ProtocolVersions_TimestampNotBeforeNext.selector, CANYON, ECOTONE, afterNext, next
             )
         );
         vm.prank(_owner);
-        protocolVersions.setTimestamp(CANYON, next);
+        protocolVersions.setTimestamp(CANYON, afterNext);
     }
 
     /// @notice Tests that `setTimestamp` reverts when the upgrade has already activated.
@@ -766,8 +783,8 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
         protocolVersions.delayTimestamp(CANYON, ts);
     }
 
-    /// @notice Tests that `delayTimestamp` cannot move an upgrade to or beyond its next scheduled successor.
-    function test_delayTimestamp_timestampNotBeforeNext_reverts() external {
+    /// @notice Tests that `delayTimestamp` may share the next scheduled upgrade's timestamp.
+    function test_delayTimestamp_timestampEqualToNext_succeeds() external {
         uint64 current = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
         uint64 next = current + 100;
 
@@ -777,13 +794,33 @@ contract ProtocolVersions_DelayTimestamp_Test is ProtocolVersions_TestInit {
         protocolVersions.setIncidentResponder(_incidentResponder);
         vm.stopPrank();
 
+        vm.prank(_incidentResponder);
+        protocolVersions.delayTimestamp(CANYON, next);
+
+        uint64[] memory schedule = protocolVersions.getSchedule();
+        assertEq(schedule[CANYON], next);
+        assertEq(schedule[ECOTONE], next);
+    }
+
+    /// @notice Tests that `delayTimestamp` cannot move an upgrade after its next scheduled successor.
+    function test_delayTimestamp_timestampAfterNext_reverts() external {
+        uint64 current = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+        uint64 next = current + 100;
+        uint64 afterNext = next + 1;
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(current, 0);
+        protocolVersions.registerUpgrade(next, 0);
+        protocolVersions.setIncidentResponder(_incidentResponder);
+        vm.stopPrank();
+
         vm.expectRevert(
             abi.encodeWithSelector(
-                IProtocolVersions.ProtocolVersions_TimestampNotBeforeNext.selector, CANYON, ECOTONE, next, next
+                IProtocolVersions.ProtocolVersions_TimestampNotBeforeNext.selector, CANYON, ECOTONE, afterNext, next
             )
         );
         vm.prank(_incidentResponder);
-        protocolVersions.delayTimestamp(CANYON, next);
+        protocolVersions.delayTimestamp(CANYON, afterNext);
     }
 
     /// @notice Tests that `delayTimestamp` reverts when the upgrade has no scheduled timestamp.

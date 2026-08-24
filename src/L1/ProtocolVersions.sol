@@ -110,7 +110,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     error ProtocolVersions_TimestampNotAfterPrevious(
         uint256 id, uint256 previousId, uint64 previousTimestamp, uint64 timestamp
     );
-    /// @notice Thrown when a non-zero timestamp is not less than the next scheduled upgrade.
+    /// @notice Thrown when a non-zero timestamp is greater than the next scheduled upgrade.
     error ProtocolVersions_TimestampNotBeforeNext(uint256 id, uint256 nextId, uint64 timestamp, uint64 nextTimestamp);
     /// @notice Thrown when scheduleId is read before initialize has been called.
     error ProtocolVersions_NotInitialized();
@@ -394,14 +394,14 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         }
     }
 
-    /// @dev Requires `timestamp` to be less than the closest higher-id scheduled upgrade.
+    /// @dev Requires `timestamp` to be less than or equal to the closest higher-id scheduled upgrade.
     function _assertTimestampBeforeNext(uint256 id, uint64 timestamp) private view {
         if (timestamp == 0) return;
 
         for (uint256 i = id + 1; i < _timestamps.length; i++) {
             uint64 next = _timestamps[i];
             if (next != 0) {
-                if (timestamp >= next) revert ProtocolVersions_TimestampNotBeforeNext(id, i, timestamp, next);
+                if (timestamp > next) revert ProtocolVersions_TimestampNotBeforeNext(id, i, timestamp, next);
                 return;
             }
         }
