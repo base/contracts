@@ -470,6 +470,27 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         assertEq(protocolVersions.scheduleId(), scheduleIdAfterRegister);
     }
 
+    /// @notice Tests that clearing an upgrade below a scheduled successor cannot create a static hole.
+    function test_setTimestamp_clearBeforeScheduledSuccessor_reverts() external {
+        uint64 current = uint64(block.timestamp) + protocolVersions.MIN_NOTICE() + 100;
+        uint64 successor = current + 100;
+
+        vm.startPrank(_owner);
+        protocolVersions.registerUpgrade(current, 0);
+        protocolVersions.registerUpgrade(successor, 0);
+        vm.stopPrank();
+
+        bytes32 scheduleIdBeforeClear = protocolVersions.scheduleId();
+        vm.expectRevert(
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_StaticScheduleHole.selector, CANYON, ECOTONE)
+        );
+        vm.prank(_owner);
+        protocolVersions.setTimestamp(CANYON, 0);
+
+        assertEq(protocolVersions.getSchedule()[CANYON], current);
+        assertEq(protocolVersions.scheduleId(), scheduleIdBeforeClear);
+    }
+
     /// @notice Tests that `setTimestamp` emits a `TimestampSet` event.
     function test_setTimestamp_emitsEvent_succeeds() external {
         vm.prank(_owner);
