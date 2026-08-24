@@ -186,6 +186,29 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         );
     }
 
+    /// @notice Pins ProtocolVersions input validation before superchain deployment can broadcast.
+    function test_deploy_initialScheduleWithoutMinimumProtocolVersion_reverts() public {
+        uint64[] memory schedule = new uint64[](1);
+        schedule[0] = 1;
+
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.opChainInput.initialUpgradeSchedule = schedule;
+        input.superchainInput.superchainProxyAdminOwner = address(0);
+
+        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
+        systemDeploy.deploy(input);
+    }
+
+    /// @notice Pins the packed-version bound check before superchain deployment can broadcast.
+    function test_deploy_initialMinimumProtocolVersionTooLarge_reverts() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.opChainInput.initialMinimumProtocolVersion = uint256(type(uint128).max) + 1;
+        input.superchainInput.superchainProxyAdminOwner = address(0);
+
+        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
+        systemDeploy.deploy(input);
+    }
+
     function test_deploy_multiproofDisabled_allowsUnsetL2BlockTime_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.implementationsInput.multiproofConfigHash = bytes32(0);

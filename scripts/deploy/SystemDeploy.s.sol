@@ -314,6 +314,10 @@ contract SystemDeploy is Script {
     }
 
     function deploy(DeployInput memory _input) public returns (DeployOutput memory output_) {
+        // Validate before any broadcast because a later revert cannot roll back transactions already sent by the
+        // script.
+        _assertValidOPChainInput(_input.opChainInput);
+
         output_.superchain = _deployOrLoadSuperchain(_input);
         if (_implementationsEmpty(_input.implementations)) {
             output_.impls = _deployImplementations(_input.implementationsInput);
@@ -484,7 +488,6 @@ contract SystemDeploy is Script {
         internal
         returns (Types.DeployOutput memory output_, Types.Implementations memory impls_)
     {
-        _assertValidOPChainInput(_input);
         impls_ = _impls;
 
         output_.opChainProxyAdmin = IProxyAdmin(
@@ -1095,6 +1098,16 @@ contract SystemDeploy is Script {
         if (_input.roles.systemConfigOwner == address(0)) revert InvalidRoleAddress("systemConfigOwner");
         if (_input.roles.batcher == address(0)) revert InvalidRoleAddress("batcher");
         if (_input.roles.unsafeBlockSigner == address(0)) revert InvalidRoleAddress("unsafeBlockSigner");
+        if (_input.initialMinimumProtocolVersion > type(uint128).max) {
+            revert IProtocolVersions.ProtocolVersions_InvalidProtocolVersion();
+        }
+        if (_input.initialMinimumProtocolVersion == 0) {
+            for (uint256 i = 0; i < _input.initialUpgradeSchedule.length; i++) {
+                if (_input.initialUpgradeSchedule[i] != 0) {
+                    revert IProtocolVersions.ProtocolVersions_InvalidProtocolVersion();
+                }
+            }
+        }
         if (Hash.unwrap(_input.startingAnchorRoot.root) == bytes32(0)) {
             revert InvalidStartingAnchorRoot();
         }
