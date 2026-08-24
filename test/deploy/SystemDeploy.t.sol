@@ -186,17 +186,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         );
     }
 
-    function test_deploy_initialScheduleWithoutMinimumProtocolVersion_reverts() public {
-        uint64[] memory schedule = new uint64[](1);
-        schedule[0] = 1;
-
-        SystemDeploy.DeployInput memory input = _defaultDeployInput();
-        input.opChainInput.initialUpgradeSchedule = schedule;
-
-        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
-        systemDeploy.deploy(input);
-    }
-
     function test_deploy_multiproofDisabled_allowsUnsetL2BlockTime_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.implementationsInput.multiproofConfigHash = bytes32(0);

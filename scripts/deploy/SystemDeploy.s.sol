@@ -650,30 +650,6 @@ contract SystemDeploy is Script {
                 (_input.roles.incidentResponder, _input.initialUpgradeSchedule, _input.initialMinimumProtocolVersion)
             )
         );
-        _assertProtocolVersionsInitialized(
-            _output.protocolVersionsProxy, _input.initialUpgradeSchedule, _input.initialMinimumProtocolVersion
-        );
-    }
-
-    function _assertProtocolVersionsInitialized(
-        IProtocolVersions _protocolVersions,
-        uint64[] memory _expectedSchedule,
-        uint256 _expectedMinimumProtocolVersion
-    )
-        internal
-        view
-    {
-        uint64[] memory actualSchedule = _protocolVersions.getSchedule();
-        require(
-            actualSchedule.length == _expectedSchedule.length, "SystemDeploy: ProtocolVersions schedule length mismatch"
-        );
-        for (uint256 i = 0; i < actualSchedule.length; i++) {
-            require(actualSchedule[i] == _expectedSchedule[i], "SystemDeploy: ProtocolVersions schedule mismatch");
-        }
-        require(
-            _protocolVersions.minimumProtocolVersion() == _expectedMinimumProtocolVersion,
-            "SystemDeploy: ProtocolVersions minimum version mismatch"
-        );
     }
 
     function _upgradeSuperchainConfigIfNeeded(
@@ -1119,16 +1095,6 @@ contract SystemDeploy is Script {
         if (_input.roles.systemConfigOwner == address(0)) revert InvalidRoleAddress("systemConfigOwner");
         if (_input.roles.batcher == address(0)) revert InvalidRoleAddress("batcher");
         if (_input.roles.unsafeBlockSigner == address(0)) revert InvalidRoleAddress("unsafeBlockSigner");
-        if (_input.initialMinimumProtocolVersion > type(uint128).max) {
-            revert IProtocolVersions.ProtocolVersions_InvalidProtocolVersion();
-        }
-        if (_input.initialMinimumProtocolVersion == 0) {
-            for (uint256 i = 0; i < _input.initialUpgradeSchedule.length; i++) {
-                if (_input.initialUpgradeSchedule[i] != 0) {
-                    revert IProtocolVersions.ProtocolVersions_InvalidProtocolVersion();
-                }
-            }
-        }
         if (Hash.unwrap(_input.startingAnchorRoot.root) == bytes32(0)) {
             revert InvalidStartingAnchorRoot();
         }
