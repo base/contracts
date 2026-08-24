@@ -345,9 +345,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Initializes the contract.
-    /// @param proof The proof.
+    /// @param proof Encoding: uint8 proofType || bytes32 l1OriginHash || uint256 l1OriginNumber || verifier payload.
     /// @dev This function may only be called once.
-    /// @dev First byte of the proof is the proof type.
+    /// @dev The proof-supplied L1 origin hash is verified against the supplied block number and journaled. It need not
+    /// equal `l1Head()`, which the factory captures at game creation for proofs submitted after initialization.
     function initializeWithInitData(bytes calldata proof) external payable virtual {
         // The game must not have already been initialized.
         if (initialized) revert AlreadyInitialized();
@@ -807,6 +808,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Getter for the parent hash of the L1 block when the dispute game was created.
+    /// @dev Proofs submitted through `verifyProposalProof`, `challenge`, and `nullify` journal this factory-captured
+    /// hash. Initialization instead journals the independently verified L1 origin hash supplied to
+    /// `initializeWithInitData`.
     function l1Head() public pure returns (Hash) {
         return Hash.wrap(_getArgBytes32(0x34));
     }
