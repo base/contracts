@@ -19,6 +19,19 @@
   },
   {
     "inputs": [],
+    "name": "INITIAL_UPGRADE_COUNT",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "MIN_NOTICE",
     "outputs": [
       {
@@ -423,6 +436,22 @@
       }
     ],
     "name": "ProtocolVersions_InsufficientNotice",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "providedLength",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "expectedLength",
+        "type": "uint256"
+      }
+    ],
+    "name": "ProtocolVersions_InvalidInitialScheduleLength",
     "type": "error"
   },
   {

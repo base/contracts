@@ -17,6 +17,7 @@ import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
+import { ProtocolVersionsConfig } from "src/libraries/ProtocolVersionsConfig.sol";
 import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
@@ -160,7 +161,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     function test_deploy_seedsProtocolVersionsWithInitialSchedule_succeeds() public {
         vm.warp(1_800_000_000);
 
-        uint64[] memory schedule = new uint64[](4);
+        uint64[] memory schedule = new uint64[](ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT);
         schedule[0] = 1_686_789_347;
         schedule[1] = 1_704_992_401;
         schedule[2] = 0; // Unscheduled on this chain.

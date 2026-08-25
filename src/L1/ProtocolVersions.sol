@@ -5,6 +5,7 @@ pragma solidity 0.8.15;
 import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 import { ReinitializableBase } from "src/universal/ReinitializableBase.sol";
 import { Initializable } from "lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
+import { ProtocolVersionsConfig } from "src/libraries/ProtocolVersionsConfig.sol";
 
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
@@ -122,6 +123,11 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         _disableInitializers();
     }
 
+    /// @notice Number of contract-backed upgrades a non-empty initial schedule must contain.
+    function INITIAL_UPGRADE_COUNT() public pure returns (uint256) {
+        return ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT;
+    }
+
     /// @notice Initializes the registry by seeding the hash chain, importing any preexisting upgrade
     ///         schedule, and appointing the initial incidentResponder. Callable only by the
     ///         ProxyAdmin or its owner.
@@ -134,7 +140,8 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @param _incidentResponder Initial incidentResponder allowed to delay activations, or address(0) to leave unset.
     /// @param _initialSchedule   Activation timestamps for already-known upgrades, ordered by ascending
     ///                           upgrade id, using 0 for an upgrade that is registered but unscheduled.
-    ///                           Pass an empty array for a chain with no upgrade history.
+    ///                           Pass an empty array for a chain with no upgrade history; otherwise the
+    ///                           array must contain exactly INITIAL_UPGRADE_COUNT entries.
     function initialize(
         address _incidentResponder,
         uint64[] calldata _initialSchedule
@@ -144,6 +151,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     {
         // Initialization transactions must come from the ProxyAdmin or its owner.
         _assertOnlyProxyAdminOrProxyAdminOwner();
+        ProtocolVersionsConfig.assertValidInitialScheduleLength(_initialSchedule.length);
 
         // Seed the hash chain at index 0. Keeping the seed as the first array element lets
         // `scheduleId` and `_refreshScheduleId` avoid an empty-registry special case, and makes a

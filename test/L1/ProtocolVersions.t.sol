@@ -8,6 +8,7 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 // Contracts
 import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 import { Proxy } from "src/universal/Proxy.sol";
+import { ProtocolVersionsConfig } from "src/libraries/ProtocolVersionsConfig.sol";
 
 // Interfaces
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
@@ -58,6 +59,14 @@ abstract contract ProtocolVersions_TestInit is CommonTest {
         proxy.upgradeTo(impl);
         return IProtocolVersions(address(proxy));
     }
+
+    /// @dev Pads a test prefix with explicit unscheduled entries through the complete known upgrade ladder.
+    function _completeSchedule(uint64[] memory _prefix) internal pure returns (uint64[] memory schedule_) {
+        schedule_ = new uint64[](ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT);
+        for (uint256 i = 0; i < _prefix.length; i++) {
+            schedule_[i] = _prefix[i];
+        }
+    }
 }
 
 /// @title ProtocolVersions_Initialize_Test
@@ -71,6 +80,11 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         assertEq(protocolVersions.proxyAdminOwner(), proxyAdminOwner);
         assertEq(protocolVersions.incidentResponder(), deploy.cfg().superchainConfigIncidentResponder());
         assertEq(protocolVersions.scheduleId(), bytes32(0));
+    }
+
+    /// @notice Pins the contract's positional schedule length to the current node upgrade ladder.
+    function test_initialUpgradeCount_matchesNodeSchedule_succeeds() external view {
+        assertEq(protocolVersions.INITIAL_UPGRADE_COUNT(), 14);
     }
 
     /// @notice Tests that initialization appoints the provided incidentResponder and emits the event.
@@ -96,10 +110,11 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
     /// @notice Tests that the initializer imports a preexisting schedule, building the same hash
     ///         chain the equivalent sequence of registrations would have.
     function test_initialize_importsSchedule_succeeds() external {
-        uint64[] memory schedule = new uint64[](3);
-        schedule[0] = 10;
-        schedule[1] = 0;
-        schedule[2] = 30;
+        uint64[] memory prefix = new uint64[](3);
+        prefix[0] = 10;
+        prefix[1] = 0;
+        prefix[2] = 30;
+        uint64[] memory schedule = _completeSchedule(prefix);
 
         IProtocolVersions imported = _deployUninitializedProxy();
         vm.prank(EIP1967Helper.getAdmin(address(imported)));
@@ -111,18 +126,20 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         assertEq(stored[1], schedule[1]);
         assertEq(stored[2], schedule[2]);
 
-        bytes32 link0 = keccak256(abi.encode(bytes32(0), uint256(0), uint64(10)));
-        bytes32 link1 = keccak256(abi.encode(link0, uint256(1), uint64(0)));
-        bytes32 link2 = keccak256(abi.encode(link1, uint256(2), uint64(30)));
-        assertEq(imported.scheduleId(0), link0);
-        assertEq(imported.scheduleId(), link2);
+        bytes32 expected;
+        for (uint256 i = 0; i < schedule.length; i++) {
+            expected = keccak256(abi.encode(expected, i, schedule[i]));
+            assertEq(imported.scheduleId(i), expected);
+        }
+        assertEq(imported.scheduleId(), expected);
     }
 
     /// @notice Tests that an imported schedule is held to the same ordering rule as registration.
     function test_initialize_importUnorderedSchedule_reverts() external {
-        uint64[] memory schedule = new uint64[](2);
-        schedule[0] = 30;
-        schedule[1] = 10;
+        uint64[] memory prefix = new uint64[](2);
+        prefix[0] = 30;
+        prefix[1] = 10;
+        uint64[] memory schedule = _completeSchedule(prefix);
 
         IProtocolVersions imported = _deployUninitializedProxy();
         vm.expectRevert(
@@ -132,6 +149,42 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
                 CANYON,
                 uint64(30),
                 uint64(10)
+            )
+        );
+        vm.prank(EIP1967Helper.getAdmin(address(imported)));
+        imported.initialize(address(0), schedule);
+    }
+
+    /// @notice Tests that a non-empty proper prefix cannot initialize a schedule that diverges from the node.
+    function test_initialize_truncatedInitialSchedule_reverts() external {
+        uint64[] memory prefix = new uint64[](4);
+        prefix[0] = 1_686_789_347;
+        prefix[1] = 1_704_992_401;
+        prefix[2] = 1_708_560_000;
+        prefix[3] = 1_710_374_401;
+
+        IProtocolVersions imported = _deployUninitializedProxy();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_InvalidInitialScheduleLength.selector,
+                prefix.length,
+                ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT
+            )
+        );
+        vm.prank(EIP1967Helper.getAdmin(address(imported)));
+        imported.initialize(address(0), prefix);
+    }
+
+    /// @notice Tests that entries unknown to the node cannot make the contract commit to a longer schedule.
+    function test_initialize_overlongInitialSchedule_reverts() external {
+        uint64[] memory schedule = new uint64[](ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT + 1);
+
+        IProtocolVersions imported = _deployUninitializedProxy();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_InvalidInitialScheduleLength.selector,
+                schedule.length,
+                ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT
             )
         );
         vm.prank(EIP1967Helper.getAdmin(address(imported)));
@@ -1042,13 +1095,13 @@ contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit 
     }
 
     /// @notice Cross-implementation golden for the full real Base mainnet contract-backed schedule.
-    ///         The live tail commits to all 13 entries, including PectraBlobSchedule and Cobalt as
+    ///         The live tail commits to all 14 entries, including PectraBlobSchedule, Cobalt, and Denim as
     ///         unscheduled zero-timestamp entries.
     function test_scheduleId_matchesBaseMainnetFullScheduleGoldenValue_succeeds() external {
         IProtocolVersions mainnet = _importBaseMainnetStaticSchedule();
 
-        assertEq(mainnet.scheduleId(), 0x5ee41f186b0a439783060587cfbb942f6f1d94ecc76376c9782580c943ff2b6d);
-        assertEq(mainnet.scheduleId(12), mainnet.scheduleId());
+        assertEq(mainnet.scheduleId(), 0xd06078191f7b4b687750aa46ae2ad31ed105d09868a38f7ab557039c0899ffc5);
+        assertEq(mainnet.scheduleId(13), mainnet.scheduleId());
     }
 
     uint64 private constant BASE_MAINNET_GENESIS_TIMESTAMP = 1_686_789_347;
@@ -1067,7 +1120,7 @@ contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit 
     ///      the only path that can enter it. The resulting chain must match what the equivalent
     ///      sequence of `registerUpgrade` calls would have produced, which these goldens pin.
     function _importBaseMainnetStaticSchedule() private returns (IProtocolVersions) {
-        uint64[] memory schedule = new uint64[](13);
+        uint64[] memory schedule = new uint64[](ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT);
         schedule[0] = BASE_MAINNET_GENESIS_TIMESTAMP;
         schedule[1] = BASE_MAINNET_CANYON_TIMESTAMP;
         schedule[2] = BASE_MAINNET_DELTA_TIMESTAMP;
@@ -1081,6 +1134,7 @@ contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit 
         schedule[10] = BASE_MAINNET_AZUL_TIMESTAMP;
         schedule[11] = BASE_MAINNET_BERYL_TIMESTAMP;
         schedule[12] = 0; // Cobalt is unscheduled on Base mainnet.
+        schedule[13] = 0; // Denim is unscheduled on Base mainnet.
 
         return _importSchedule(schedule);
     }
@@ -1090,7 +1144,7 @@ contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit 
     function _importSchedule(uint64[] memory schedule) private returns (IProtocolVersions) {
         IProtocolVersions imported = _deployUninitializedProxy();
         vm.prank(EIP1967Helper.getAdmin(address(imported)));
-        imported.initialize(address(0), schedule);
+        imported.initialize(address(0), _completeSchedule(schedule));
         return imported;
     }
 }

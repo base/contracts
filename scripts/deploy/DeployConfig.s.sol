@@ -5,6 +5,8 @@ import { console } from "lib/forge-std/src/console.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 import { stdJson } from "lib/forge-std/src/StdJson.sol";
 
+import { ProtocolVersionsConfig } from "src/libraries/ProtocolVersionsConfig.sol";
+
 /// @title DeployConfig
 /// @notice Represents the configuration required to deploy the system, read from a JSON file.
 contract DeployConfig is Script {
@@ -65,7 +67,8 @@ contract DeployConfig is Script {
     uint64[] internal _protocolVersionsInitialSchedule;
 
     /// @notice The chain's existing hardfork activation timestamps, used to seed `ProtocolVersions`.
-    /// @dev Chains with no upgrade history leave this unset and start with an empty registry.
+    /// @dev Chains with no upgrade history leave this unset. Otherwise the schedule must contain one entry per known
+    /// contract-backed upgrade, including zero for unscheduled upgrades.
     function protocolVersionsInitialSchedule() public view returns (uint64[] memory) {
         return _protocolVersionsInitialSchedule;
     }
@@ -138,6 +141,7 @@ contract DeployConfig is Script {
             require(schedule[i] <= type(uint64).max, "DeployConfig: initial schedule timestamp exceeds uint64");
             _protocolVersionsInitialSchedule.push(uint64(schedule[i]));
         }
+        ProtocolVersionsConfig.assertValidInitialScheduleLength(schedule.length);
     }
 
     /// @notice Allow the `useUpgradedFork` config to be overridden in testing environments

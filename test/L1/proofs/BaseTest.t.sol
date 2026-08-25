@@ -21,6 +21,7 @@ import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
 import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
+import { ProtocolVersionsConfig } from "src/libraries/ProtocolVersionsConfig.sol";
 
 import { MockVerifier } from "test/mocks/MockVerifier.sol";
 
@@ -121,7 +122,11 @@ contract BaseTest is Test {
     ///      Must be called before any game is created, since games pin the registry they see.
     function _importProtocolVersionsSchedule(uint64[] memory schedule) internal {
         protocolVersions = ProtocolVersions(_deployProxy(address(new ProtocolVersions())));
-        protocolVersions.initialize(address(0), schedule);
+        uint64[] memory completeSchedule = new uint64[](ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT);
+        for (uint256 i = 0; i < schedule.length; i++) {
+            completeSchedule[i] = schedule[i];
+        }
+        protocolVersions.initialize(address(0), completeSchedule);
         _deployAndSetAggregateVerifier();
     }
 

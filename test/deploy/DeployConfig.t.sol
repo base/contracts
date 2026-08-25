@@ -3,7 +3,9 @@ pragma solidity 0.8.15;
 
 import { Test } from "lib/forge-std/src/Test.sol";
 
+import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
+import { ProtocolVersionsConfig } from "src/libraries/ProtocolVersionsConfig.sol";
 
 contract DeployConfigHarness is DeployConfig {
     function readSchedule(string memory _json) public {
@@ -22,10 +24,10 @@ contract DeployConfig_Test is Test {
     ///         `ProtocolVersions.initialize`, so a key that silently fails to parse would leave that
     ///         chain permanently stuck with an empty registry.
     function test_readSchedule_parsesTimestampsInOrder_succeeds() public {
-        cfg.readSchedule('{"protocolVersionsInitialSchedule":[1686789347,1704992401,0,1710374401]}');
+        cfg.readSchedule('{"protocolVersionsInitialSchedule":[1686789347,1704992401,0,1710374401,0,0,0,0,0,0,0,0,0,0]}');
 
         uint64[] memory schedule = cfg.protocolVersionsInitialSchedule();
-        assertEq(schedule.length, 4);
+        assertEq(schedule.length, ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT);
         assertEq(schedule[0], 1_686_789_347);
         assertEq(schedule[1], 1_704_992_401);
         assertEq(schedule[2], 0);
@@ -40,12 +42,24 @@ contract DeployConfig_Test is Test {
 
     /// @dev Config state is reused across reads, so a second read must replace rather than append.
     function test_readSchedule_twice_replacesSchedule_succeeds() public {
-        cfg.readSchedule('{"protocolVersionsInitialSchedule":[1686789347,1704992401]}');
-        cfg.readSchedule('{"protocolVersionsInitialSchedule":[1710374401]}');
+        cfg.readSchedule('{"protocolVersionsInitialSchedule":[1686789347,1704992401,0,0,0,0,0,0,0,0,0,0,0,0]}');
+        cfg.readSchedule('{"protocolVersionsInitialSchedule":[1710374401,0,0,0,0,0,0,0,0,0,0,0,0,0]}');
 
         uint64[] memory schedule = cfg.protocolVersionsInitialSchedule();
-        assertEq(schedule.length, 1);
+        assertEq(schedule.length, ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT);
         assertEq(schedule[0], 1_710_374_401);
+        assertEq(schedule[1], 0);
+    }
+
+    function test_readSchedule_truncatedSchedule_reverts() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_InvalidInitialScheduleLength.selector,
+                uint256(4),
+                ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT
+            )
+        );
+        cfg.readSchedule('{"protocolVersionsInitialSchedule":[1686789347,1704992401,1708560000,1710374401]}');
     }
 
     function test_readSchedule_timestampAboveUint64_reverts() public {
