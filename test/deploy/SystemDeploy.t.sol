@@ -185,6 +185,22 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         );
     }
 
+    /// @notice Pins initial schedule validation before superchain deployment can broadcast.
+    function test_deploy_truncatedInitialSchedule_reverts() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.opChainInput.initialUpgradeSchedule = new uint64[](ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT - 1);
+        input.superchainInput.superchainProxyAdminOwner = address(0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_InvalidInitialScheduleLength.selector,
+                ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT - 1,
+                ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT
+            )
+        );
+        systemDeploy.deploy(input);
+    }
+
     function test_deploy_multiproofDisabled_allowsUnsetL2BlockTime_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.implementationsInput.multiproofConfigHash = bytes32(0);

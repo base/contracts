@@ -40,7 +40,7 @@ interface IProtocolVersions is IProxyAdminOwnedBase, ISemver, IReinitializableBa
 
     function MIN_NOTICE() external view returns (uint64);
     function FREEZE_WINDOW() external view returns (uint64);
-    function INITIAL_UPGRADE_COUNT() external view returns (uint256);
+    function INITIAL_UPGRADE_COUNT() external pure returns (uint256);
     function minimumProtocolVersion() external view returns (uint256);
     function incidentResponder() external view returns (address);
     function scheduleId() external view returns (bytes32);

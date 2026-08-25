@@ -40,6 +40,7 @@ import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { Constants } from "src/libraries/Constants.sol";
+import { ProtocolVersionsConfig } from "src/libraries/ProtocolVersionsConfig.sol";
 import { SemverComp } from "src/libraries/SemverComp.sol";
 import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
@@ -313,6 +314,10 @@ contract SystemDeploy is Script {
     }
 
     function deploy(DeployInput memory _input) public returns (DeployOutput memory output_) {
+        // Validate before any broadcast because a later revert cannot roll back transactions already sent by the
+        // script.
+        _assertValidOPChainInput(_input.opChainInput);
+
         output_.superchain = _deployOrLoadSuperchain(_input);
         if (_implementationsEmpty(_input.implementations)) {
             output_.impls = _deployImplementations(_input.implementationsInput);
@@ -483,7 +488,6 @@ contract SystemDeploy is Script {
         internal
         returns (Types.DeployOutput memory output_, Types.Implementations memory impls_)
     {
-        _assertValidOPChainInput(_input);
         impls_ = _impls;
 
         output_.opChainProxyAdmin = IProxyAdmin(
@@ -1093,6 +1097,7 @@ contract SystemDeploy is Script {
         if (_input.roles.systemConfigOwner == address(0)) revert InvalidRoleAddress("systemConfigOwner");
         if (_input.roles.batcher == address(0)) revert InvalidRoleAddress("batcher");
         if (_input.roles.unsafeBlockSigner == address(0)) revert InvalidRoleAddress("unsafeBlockSigner");
+        ProtocolVersionsConfig.assertValidInitialScheduleLength(_input.initialUpgradeSchedule.length);
         if (Hash.unwrap(_input.startingAnchorRoot.root) == bytes32(0)) {
             revert InvalidStartingAnchorRoot();
         }
