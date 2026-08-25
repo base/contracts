@@ -27,7 +27,7 @@ import { MockVerifier } from "test/mocks/MockVerifier.sol";
 contract BaseTest is Test {
     uint256 internal constant L2_CHAIN_ID = 8453;
     uint256 internal constant L2_GENESIS_BLOCK_NUMBER = 0;
-    uint64 internal constant L2_GENESIS_TIMESTAMP = 0;
+    uint64 internal constant L2_GENESIS_TIMESTAMP = 1 days;
     uint64 internal constant L2_BLOCK_TIME = 2;
 
     // AggregateVerifier expects evenly spaced intermediate roots.
@@ -116,8 +116,8 @@ contract BaseTest is Test {
     }
 
     /// @dev Rebuilds the schedule registry around a preset schedule and rebinds the verifier to it.
-    ///      These tests run on a compressed L2 timescale whose activations can never clear
-    ///      MIN_NOTICE, so a schedule has to be imported at initialization rather than registered.
+    ///      Future test activations derive from L2_GENESIS_TIMESTAMP, which is far enough ahead of
+    ///      the initial L1 clock to clear MIN_NOTICE.
     ///      Must be called before any game is created, since games pin the registry they see.
     function _importProtocolVersionsSchedule(uint64[] memory schedule) internal {
         protocolVersions = ProtocolVersions(_deployProxy(address(new ProtocolVersions())));
@@ -175,10 +175,14 @@ contract BaseTest is Test {
         );
     }
 
+    function _l2Timestamp(uint256 l2BlockNumber) internal pure returns (uint64) {
+        return L2_GENESIS_TIMESTAMP + uint64((l2BlockNumber - L2_GENESIS_BLOCK_NUMBER) * L2_BLOCK_TIME);
+    }
+
     /// @dev A game is only creatable once L1 has reached the claimed L2 block's deterministic
     ///      timestamp, which mirrors production: a block is proven well after it is produced.
     function _warpToL2Timestamp(uint256 l2BlockNumber) internal {
-        uint256 claimTimestamp = L2_GENESIS_TIMESTAMP + (l2BlockNumber - L2_GENESIS_BLOCK_NUMBER) * L2_BLOCK_TIME;
+        uint64 claimTimestamp = _l2Timestamp(l2BlockNumber);
         if (block.timestamp < claimTimestamp) vm.warp(claimTimestamp);
     }
 
