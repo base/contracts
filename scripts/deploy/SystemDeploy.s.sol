@@ -9,7 +9,6 @@ import { Artifacts } from "scripts/Artifacts.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
-import { ProtocolVersionsDeployUtils } from "scripts/libraries/ProtocolVersionsDeployUtils.sol";
 import { StateDiff } from "scripts/libraries/StateDiff.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
@@ -1099,7 +1098,7 @@ contract SystemDeploy is Script {
         if (_input.roles.systemConfigOwner == address(0)) revert InvalidRoleAddress("systemConfigOwner");
         if (_input.roles.batcher == address(0)) revert InvalidRoleAddress("batcher");
         if (_input.roles.unsafeBlockSigner == address(0)) revert InvalidRoleAddress("unsafeBlockSigner");
-        ProtocolVersionsDeployUtils.assertValidInitialState(
+        DeployUtils.assertValidProtocolVersionsInitialState(
             _input.initialUpgradeSchedule, _input.initialMinimumProtocolVersion
         );
         if (Hash.unwrap(_input.startingAnchorRoot.root) == bytes32(0)) {
