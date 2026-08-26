@@ -110,6 +110,7 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
     /// @notice Tests that the initializer imports a preexisting schedule, building the same hash
     ///         chain the equivalent sequence of registrations would have.
     function test_initialize_importsSchedule_succeeds() external {
+        vm.warp(31);
         uint64[] memory prefix = new uint64[](3);
         prefix[0] = 10;
         prefix[1] = 0;
@@ -134,8 +135,36 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         assertEq(imported.scheduleId(), expected);
     }
 
+    /// @notice Tests that initialization rejects a future activation already inside its freeze window.
+    function test_initialize_importFutureActivationInsufficientNotice_reverts() external {
+        uint64 activation = uint64(block.timestamp) + protocolVersions.FREEZE_WINDOW();
+        uint64[] memory schedule = new uint64[](ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT);
+        schedule[0] = activation;
+
+        IProtocolVersions imported = _deployUninitializedProxy();
+        vm.expectRevert(
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, activation)
+        );
+        vm.prank(EIP1967Helper.getAdmin(address(imported)));
+        imported.initialize(_incidentResponder, schedule);
+    }
+
+    /// @notice Tests that the initializer uses the same inclusive MIN_NOTICE floor as later write paths.
+    function test_initialize_importFutureActivationWithMinimumNotice_succeeds() external {
+        uint64 activation = uint64(block.timestamp) + protocolVersions.MIN_NOTICE();
+        uint64[] memory schedule = new uint64[](ProtocolVersionsConfig.INITIAL_UPGRADE_COUNT);
+        schedule[0] = activation;
+
+        IProtocolVersions imported = _deployUninitializedProxy();
+        vm.prank(EIP1967Helper.getAdmin(address(imported)));
+        imported.initialize(_incidentResponder, schedule);
+
+        assertEq(imported.getSchedule()[0], activation);
+    }
+
     /// @notice Tests that an imported schedule is held to the same ordering rule as registration.
     function test_initialize_importUnorderedSchedule_reverts() external {
+        vm.warp(31);
         uint64[] memory prefix = new uint64[](2);
         prefix[0] = 30;
         prefix[1] = 10;
@@ -1142,6 +1171,12 @@ contract ProtocolVersions_ActivatedScheduleId_Test is ProtocolVersions_TestInit 
     /// @dev These cases pin `activatedScheduleId` against activations that are already in the past,
     ///      which only the initializer's import can produce.
     function _importSchedule(uint64[] memory schedule) private returns (IProtocolVersions) {
+        uint64 latest;
+        for (uint256 i = 0; i < schedule.length; i++) {
+            if (schedule[i] > latest) latest = schedule[i];
+        }
+        vm.warp(uint256(latest) + 1);
+
         IProtocolVersions imported = _deployUninitializedProxy();
         vm.prank(EIP1967Helper.getAdmin(address(imported)));
         imported.initialize(address(0), _completeSchedule(schedule));

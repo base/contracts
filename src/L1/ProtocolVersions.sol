@@ -131,15 +131,16 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @notice Initializes the registry by seeding the hash chain, importing any preexisting upgrade
     ///         schedule, and appointing the initial incidentResponder. Callable only by the
     ///         ProxyAdmin or its owner.
-    /// @dev `_initialSchedule` is the only path that can enter an activation which is not at least
-    ///      MIN_NOTICE in the future. It exists so a chain that already has a hardfork history can be
-    ///      represented faithfully at deployment, while it is still impossible for any proof game to
-    ///      have pinned a commitment from this registry. Every later write goes through
-    ///      `registerUpgrade`, `setTimestamp`, or `delayTimestamp`, which together guarantee that an
-    ///      activation is never created or moved once L1 is within FREEZE_WINDOW of it.
+    ///
+    /// @dev `_initialSchedule` may import historical activations without MIN_NOTICE so a chain that
+    ///      already has a hardfork history can be represented faithfully at deployment, while it is
+    ///      still impossible for any proof game to have pinned a commitment from this registry.
+    ///      Future activations must provide MIN_NOTICE, matching every post-initialization write path.
+    ///
     /// @param _incidentResponder Initial incidentResponder allowed to delay activations, or address(0) to leave unset.
     /// @param _initialSchedule   Activation timestamps for already-known upgrades, ordered by ascending
     ///                           upgrade id, using 0 for an upgrade that is registered but unscheduled.
+    ///                           Future timestamps must be at least MIN_NOTICE from block.timestamp.
     ///                           Pass an empty array for a chain with no upgrade history; otherwise the
     ///                           array must contain exactly INITIAL_UPGRADE_COUNT entries.
     function initialize(
@@ -160,6 +161,9 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
 
         for (uint256 id = 0; id < _initialSchedule.length; id++) {
             uint64 timestamp = _initialSchedule[id];
+            if (timestamp > uint64(block.timestamp) && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
+                revert ProtocolVersions_InsufficientNotice(timestamp);
+            }
             // `id` is the index about to be appended, so this reads only the entries already imported.
             _assertTimestampAfterPrevious(id, timestamp);
             _timestamps.push(timestamp);
