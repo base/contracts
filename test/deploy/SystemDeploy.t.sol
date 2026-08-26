@@ -233,9 +233,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         systemDeploy.deploy(input);
     }
 
-    /// @notice Pins future activation notice validation before superchain deployment can broadcast.
-    function test_deploy_initialFutureActivationWithInsufficientNotice_reverts() public {
-        uint64 activation = uint64(block.timestamp) + 1 hours - 1;
+    /// @notice Pins a deployment buffer beyond the initializer's minimum notice before any broadcast.
+    function test_deploy_initialFutureActivationWithoutDeploymentBuffer_reverts() public {
+        uint64 activation = uint64(block.timestamp) + 1 hours;
         uint64[] memory schedule = new uint64[](1);
         schedule[0] = activation;
 
@@ -248,6 +248,21 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, activation)
         );
         systemDeploy.deploy(input);
+    }
+
+    /// @notice Pins the inclusive future activation boundary after the deployment notice buffer.
+    function test_deploy_initialFutureActivationAtDeploymentBuffer_succeeds() public {
+        uint64 activation = uint64(block.timestamp) + 2 hours;
+        uint64[] memory schedule = new uint64[](1);
+        schedule[0] = activation;
+
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.opChainInput.initialUpgradeSchedule = schedule;
+        input.opChainInput.initialMinimumProtocolVersion = 42;
+
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+
+        assertEq(output.opChain.protocolVersionsProxy.getSchedule()[0], activation);
     }
 
     function test_deploy_multiproofDisabled_allowsUnsetL2BlockTime_succeeds() public {
