@@ -40,20 +40,22 @@ contract AggregateVerifierTest is BaseTest {
     /// @notice Initialization pins the upgrades active at the claimed L2 block, independently of
     ///         the L1 game-creation timestamp, and later schedule changes cannot alter the pin.
     function test_initialize_pinsScheduleId_succeeds() public {
-        // The first game ends at L2 block 100, whose deterministic timestamp is 200. The first
-        // upgrade is active there; the second is not.
+        uint64 firstGameTimestamp = _l2Timestamp(BLOCK_INTERVAL);
+        uint64 secondActivationTimestamp = _l2Timestamp(BLOCK_INTERVAL + BLOCK_INTERVAL / 2);
+
+        // The first upgrade is active at the first game's L2 timestamp; the second is not.
         uint64[] memory schedule = new uint64[](2);
-        schedule[0] = 200;
-        schedule[1] = 300;
+        schedule[0] = firstGameTimestamp;
+        schedule[1] = secondActivationTimestamp;
         _importProtocolVersionsSchedule(schedule);
 
-        bytes32 pinned = protocolVersions.activatedScheduleId(200);
+        bytes32 pinned = protocolVersions.activatedScheduleId(firstGameTimestamp);
         assertTrue(pinned != bytes32(0));
         assertNotEq(protocolVersions.scheduleId(), pinned);
 
         // Even though the L1 clock has passed the second activation, the game's schedule is
         // selected by its claimed L2 block timestamp.
-        vm.warp(300);
+        vm.warp(secondActivationTimestamp);
 
         Claim rootClaim = _advanceL2BlockAndClaim();
         bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
@@ -75,8 +77,9 @@ contract AggregateVerifierTest is BaseTest {
     /// @notice Consecutive games on opposite sides of an L2 activation boundary pin different
     ///         schedule commitments.
     function test_initialize_scheduleChangesAtL2ActivationBoundary_succeeds() public {
+        uint64 activationTimestamp = _l2Timestamp(BLOCK_INTERVAL + BLOCK_INTERVAL / 2);
         uint64[] memory schedule = new uint64[](1);
-        schedule[0] = 300;
+        schedule[0] = activationTimestamp;
         _importProtocolVersionsSchedule(schedule);
 
         Claim firstClaim = _advanceL2BlockAndClaim();
@@ -97,15 +100,15 @@ contract AggregateVerifierTest is BaseTest {
             address(firstGame),
             _generateProof("second", AggregateVerifier.ProofType.TEE)
         );
-        assertEq(secondGame.scheduleId(), protocolVersions.activatedScheduleId(400));
+        assertEq(secondGame.scheduleId(), protocolVersions.activatedScheduleId(_l2Timestamp(currentL2BlockNumber)));
     }
 
     /// @notice A claim whose L2 timestamp L1 has not yet reached cannot open a game, so a game can
     ///         never pin an activation that the owner is still able to clear or delay.
     function test_initialize_l2TimestampInFuture_reverts() public {
-        // The first game ends at L2 block 100, whose deterministic timestamp is 200. Scheduling the
-        // upgrade there and leaving the L1 clock short of it is the window the finding exploits.
-        uint64 activationTimestamp = uint64(BLOCK_INTERVAL * L2_BLOCK_TIME);
+        // Scheduling the upgrade at the first game's deterministic L2 timestamp and leaving the L1
+        // clock short of it is the window the finding exploits.
+        uint64 activationTimestamp = _l2Timestamp(BLOCK_INTERVAL);
         uint64[] memory schedule = new uint64[](1);
         schedule[0] = activationTimestamp;
         _importProtocolVersionsSchedule(schedule);
