@@ -209,6 +209,47 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         systemDeploy.deploy(input);
     }
 
+    /// @notice Pins imported schedule ordering validation before superchain deployment can broadcast.
+    function test_deploy_unorderedInitialSchedule_reverts() public {
+        vm.warp(31);
+        uint64[] memory schedule = new uint64[](3);
+        schedule[0] = 30;
+        schedule[2] = 10;
+
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.opChainInput.initialUpgradeSchedule = schedule;
+        input.opChainInput.initialMinimumProtocolVersion = 42;
+        input.superchainInput.superchainProxyAdminOwner = address(0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_TimestampNotAfterPrevious.selector,
+                uint256(2),
+                uint256(0),
+                uint64(30),
+                uint64(10)
+            )
+        );
+        systemDeploy.deploy(input);
+    }
+
+    /// @notice Pins future activation notice validation before superchain deployment can broadcast.
+    function test_deploy_initialFutureActivationWithInsufficientNotice_reverts() public {
+        uint64 activation = uint64(block.timestamp) + 1 hours - 1;
+        uint64[] memory schedule = new uint64[](1);
+        schedule[0] = activation;
+
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.opChainInput.initialUpgradeSchedule = schedule;
+        input.opChainInput.initialMinimumProtocolVersion = 42;
+        input.superchainInput.superchainProxyAdminOwner = address(0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, activation)
+        );
+        systemDeploy.deploy(input);
+    }
+
     function test_deploy_multiproofDisabled_allowsUnsetL2BlockTime_succeeds() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.implementationsInput.multiproofConfigHash = bytes32(0);

@@ -13,6 +13,7 @@ import { GameType, Hash } from "src/libraries/bridge/Types.sol";
 import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
 import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
+import { ProtocolVersionsDeployUtils } from "scripts/libraries/ProtocolVersionsDeployUtils.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { IVerifier } from "interfaces/L1/proofs/IVerifier.sol";
@@ -170,6 +171,9 @@ abstract contract DeployDevBase is Script {
     function _preflight() internal virtual {
         require(cfg.l2BlockTime() != 0, "l2BlockTime must be set in config");
         require(cfg.l2GenesisTimestamp() != 0, "l2GenesisTimestamp must be set in config");
+        ProtocolVersionsDeployUtils.assertValidInitialState(
+            cfg.protocolVersionsInitialSchedule(), cfg.protocolVersionsInitialMinimumVersion()
+        );
     }
 
     function _serializeExtra(string memory key) internal virtual { }
