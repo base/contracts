@@ -117,6 +117,11 @@
         "internalType": "uint64[]",
         "name": "_initialSchedule",
         "type": "uint64[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_initialMinimumProtocolVersion",
+        "type": "uint256"
       }
     ],
     "name": "initialize",

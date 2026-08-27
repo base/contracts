@@ -48,6 +48,7 @@ Other relevant fields:
 | `multiproofGenesisOutputRoot`  | Initial anchor output root                                                        |
 | `multiproofGenesisBlockNumber` | Initial anchor L2 block number                                                    |
 | `protocolVersionsInitialSchedule` | Hardfork activation timestamps in the node's fork order, `0` for unscheduled forks. Omit for a chain with no history; past activations cannot be added after deployment |
+| `protocolVersionsInitialMinimumVersion` | Packed semver required by every non-zero initial schedule timestamp. Must be non-zero when the initial schedule contains an activation |
 
 ### Step 2: Deploy contracts
 

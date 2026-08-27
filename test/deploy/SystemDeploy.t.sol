@@ -154,10 +154,10 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertValidStandardSystem(_expected(output, input));
     }
 
-    /// @notice A chain that already has a hardfork history has to seed the registry at deploy time.
-    ///         `registerUpgrade` cannot enter activations that are already in the past, and
-    ///         `initialize` runs once, so an empty import here would be permanent.
-    function test_deploy_seedsProtocolVersionsWithInitialSchedule_succeeds() public {
+    /// @notice A chain that already has a hardfork history has to seed the registry and minimum protocol version at
+    /// deploy time. `registerUpgrade` cannot enter activations that are already in the past, and `initialize` runs
+    /// once, so an empty import here would be permanent.
+    function test_deploy_seedsProtocolVersionsWithInitialState_succeeds() public {
         vm.warp(1_800_000_000);
 
         uint64[] memory schedule = new uint64[](4);
@@ -168,6 +168,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
 
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.opChainInput.initialUpgradeSchedule = schedule;
+        input.opChainInput.initialMinimumProtocolVersion = 42;
 
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
 
@@ -176,12 +177,92 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         for (uint256 i = 0; i < schedule.length; i++) {
             assertEq(imported[i], schedule[i], "schedule entry");
         }
+        assertEq(output.opChain.protocolVersionsProxy.minimumProtocolVersion(), 42, "minimum protocol version");
 
         assertEq(
             address(AggregateVerifier(address(output.opChain.aggregateVerifier)).PROTOCOL_VERSIONS()),
             address(output.opChain.protocolVersionsProxy),
             "verifier bound to seeded registry"
         );
+    }
+
+    /// @notice Pins ProtocolVersions input validation before superchain deployment can broadcast.
+    function test_deploy_initialScheduleWithoutMinimumProtocolVersion_reverts() public {
+        uint64[] memory schedule = new uint64[](1);
+        schedule[0] = 1;
+
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.opChainInput.initialUpgradeSchedule = schedule;
+        input.superchainInput.superchainProxyAdminOwner = address(0);
+
+        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
+        systemDeploy.deploy(input);
+    }
+
+    /// @notice Pins the packed-version bound check before superchain deployment can broadcast.
+    function test_deploy_initialMinimumProtocolVersionTooLarge_reverts() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.opChainInput.initialMinimumProtocolVersion = uint256(type(uint128).max) + 1;
+        input.superchainInput.superchainProxyAdminOwner = address(0);
+
+        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
+        systemDeploy.deploy(input);
+    }
+
+    /// @notice Pins imported schedule ordering validation before superchain deployment can broadcast.
+    function test_deploy_unorderedInitialSchedule_reverts() public {
+        vm.warp(31);
+        uint64[] memory schedule = new uint64[](3);
+        schedule[0] = 30;
+        schedule[2] = 10;
+
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.opChainInput.initialUpgradeSchedule = schedule;
+        input.opChainInput.initialMinimumProtocolVersion = 42;
+        input.superchainInput.superchainProxyAdminOwner = address(0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IProtocolVersions.ProtocolVersions_TimestampNotAfterPrevious.selector,
+                uint256(2),
+                uint256(0),
+                uint64(30),
+                uint64(10)
+            )
+        );
+        systemDeploy.deploy(input);
+    }
+
+    /// @notice Pins a deployment buffer beyond the initializer's minimum notice before any broadcast.
+    function test_deploy_initialFutureActivationWithoutDeploymentBuffer_reverts() public {
+        uint64 activation = uint64(block.timestamp) + 1 hours;
+        uint64[] memory schedule = new uint64[](1);
+        schedule[0] = activation;
+
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.opChainInput.initialUpgradeSchedule = schedule;
+        input.opChainInput.initialMinimumProtocolVersion = 42;
+        input.superchainInput.superchainProxyAdminOwner = address(0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, activation)
+        );
+        systemDeploy.deploy(input);
+    }
+
+    /// @notice Pins the inclusive future activation boundary after the deployment notice buffer.
+    function test_deploy_initialFutureActivationAtDeploymentBuffer_succeeds() public {
+        uint64 activation = uint64(block.timestamp) + 2 hours;
+        uint64[] memory schedule = new uint64[](1);
+        schedule[0] = activation;
+
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.opChainInput.initialUpgradeSchedule = schedule;
+        input.opChainInput.initialMinimumProtocolVersion = 42;
+
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+
+        assertEq(output.opChain.protocolVersionsProxy.getSchedule()[0], activation);
     }
 
     function test_deploy_multiproofDisabled_allowsUnsetL2BlockTime_succeeds() public {
@@ -401,7 +482,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             startingAnchorRoot: Proposal({ root: Hash.wrap(bytes32(uint256(1))), l2SequenceNumber: 0 }),
             saltMixer: "system-deploy-test",
             gasLimit: 60_000_000,
-            initialUpgradeSchedule: new uint64[](0)
+            initialUpgradeSchedule: new uint64[](0),
+            initialMinimumProtocolVersion: 0
         });
     }
 

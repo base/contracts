@@ -308,11 +308,16 @@ contract SystemDeploy is Script {
             }),
             saltMixer: "salt mixer",
             gasLimit: uint64(cfg.l2GenesisBlockGasLimit()),
-            initialUpgradeSchedule: cfg.protocolVersionsInitialSchedule()
+            initialUpgradeSchedule: cfg.protocolVersionsInitialSchedule(),
+            initialMinimumProtocolVersion: cfg.protocolVersionsInitialMinimumVersion()
         });
     }
 
     function deploy(DeployInput memory _input) public returns (DeployOutput memory output_) {
+        // Validate before any broadcast because a later revert cannot roll back transactions already sent by the
+        // script.
+        _assertValidOPChainInput(_input.opChainInput);
+
         output_.superchain = _deployOrLoadSuperchain(_input);
         if (_implementationsEmpty(_input.implementations)) {
             output_.impls = _deployImplementations(_input.implementationsInput);
@@ -483,7 +488,6 @@ contract SystemDeploy is Script {
         internal
         returns (Types.DeployOutput memory output_, Types.Implementations memory impls_)
     {
-        _assertValidOPChainInput(_input);
         impls_ = _impls;
 
         output_.opChainProxyAdmin = IProxyAdmin(
@@ -645,7 +649,8 @@ contract SystemDeploy is Script {
             address(_output.protocolVersionsProxy),
             _impls.protocolVersionsImpl,
             abi.encodeCall(
-                IProtocolVersions.initialize, (_input.roles.incidentResponder, _input.initialUpgradeSchedule)
+                IProtocolVersions.initialize,
+                (_input.roles.incidentResponder, _input.initialUpgradeSchedule, _input.initialMinimumProtocolVersion)
             )
         );
     }
@@ -1093,6 +1098,9 @@ contract SystemDeploy is Script {
         if (_input.roles.systemConfigOwner == address(0)) revert InvalidRoleAddress("systemConfigOwner");
         if (_input.roles.batcher == address(0)) revert InvalidRoleAddress("batcher");
         if (_input.roles.unsafeBlockSigner == address(0)) revert InvalidRoleAddress("unsafeBlockSigner");
+        DeployUtils.assertValidProtocolVersionsInitialState(
+            _input.initialUpgradeSchedule, _input.initialMinimumProtocolVersion
+        );
         if (Hash.unwrap(_input.startingAnchorRoot.root) == bytes32(0)) {
             revert InvalidStartingAnchorRoot();
         }

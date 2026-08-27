@@ -110,7 +110,10 @@ abstract contract DeployDevBase is Script {
         Proxy protocolVersionsProxy = new Proxy(msg.sender);
         protocolVersionsProxy.upgradeToAndCall(
             address(new ProtocolVersions()),
-            abi.encodeCall(IProtocolVersions.initialize, (address(0), cfg.protocolVersionsInitialSchedule()))
+            abi.encodeCall(
+                IProtocolVersions.initialize,
+                (address(0), cfg.protocolVersionsInitialSchedule(), cfg.protocolVersionsInitialMinimumVersion())
+            )
         );
         protocolVersionsProxy.changeAdmin(address(proxyAdmin));
 
@@ -167,6 +170,9 @@ abstract contract DeployDevBase is Script {
     function _preflight() internal virtual {
         require(cfg.l2BlockTime() != 0, "l2BlockTime must be set in config");
         require(cfg.l2GenesisTimestamp() != 0, "l2GenesisTimestamp must be set in config");
+        DeployUtils.assertValidProtocolVersionsInitialState(
+            cfg.protocolVersionsInitialSchedule(), cfg.protocolVersionsInitialMinimumVersion()
+        );
     }
 
     function _serializeExtra(string memory key) internal virtual { }
