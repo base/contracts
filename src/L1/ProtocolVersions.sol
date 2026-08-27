@@ -46,12 +46,10 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     uint64 public constant MIN_NOTICE = 1 hours;
 
     /// @notice Window before a scheduled activation during which that timestamp can no longer change.
-    /// @dev Sized to the post-Fjord maximum sequencer drift: an L2 block may carry a timestamp up to
-    ///      1800 seconds ahead of its L1 origin, so from L1 time `activation - FREEZE_WINDOW` onwards
-    ///      the sequencer can already have produced the block that activates the upgrade. Freezing at
-    ///      that point makes L1's answer to "was this upgrade active at a given L2 timestamp" final
-    ///      before any L2 block can depend on it, rather than leaving it mutable until activation.
-    uint64 public constant FREEZE_WINDOW = 30 minutes;
+    /// @dev One hour covers the post-Fjord 30-minute maximum sequencer drift plus the default finalized reader's
+    /// nominal 27m48s observation latency, leaving a 2m12s margin. This finite bound cannot cover unbounded finality or
+    /// delivery delays; consumers must reject stale changes that alter fork rules for existing L2 blocks.
+    uint64 public constant FREEZE_WINDOW = 1 hours;
 
     /// @notice Activation timestamp for each registered upgrade, indexed by upgrade id (0 = not scheduled).
     ///         An upgrade id is registered iff it is a valid index into this array.
