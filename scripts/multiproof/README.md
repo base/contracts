@@ -27,13 +27,21 @@ just deps
 
 Use this when you don't have access to an AWS Nitro enclave and want to quickly test the prover without attestation overhead.
 
-### Step 1: Configure `deploy-config/sepolia.json`
+### Step 1: Create and configure a local Sepolia deploy config
 
-Ensure `finalSystemOwner` is set to the address you will deploy from (i.e. the address on your Ledger at the HD path you intend to use). This address becomes the owner of all deployed contracts and must sign all subsequent admin calls.
+Use the tracked local config as a schema template. The copied file is ignored by Git:
+
+```bash
+cp deploy-config/local.json deploy-config/sepolia.local.json
+```
+
+Replace every local-network value with the current Sepolia deployment values before running the script. The local template omits `l2BlockTime` and `l2GenesisTimestamp`; add the non-zero Base Sepolia values shown below because deployment preflight requires both. Ensure `finalSystemOwner` is set to the address you will deploy from (i.e. the address on your Ledger at the HD path you intend to use). This address becomes the owner of all deployed contracts and must sign all subsequent admin calls.
 
 ```json
 {
   "finalSystemOwner": "0xYOUR_DEPLOYER_ADDRESS",
+  "l2BlockTime": 2,
+  "l2GenesisTimestamp": 1691802540,
   ...
 }
 ```
@@ -53,7 +61,7 @@ Other relevant fields:
 ### Step 2: Deploy contracts
 
 ```bash
-DEPLOY_CONFIG_PATH=deploy-config/sepolia.json forge script scripts/multiproof/DeployDevNoNitro.s.sol --rpc-url https://sepolia.base.org --broadcast --ledger --hd-paths "m/44'/60'/1'/0/0"
+DEPLOY_CONFIG_PATH=deploy-config/sepolia.local.json forge script scripts/multiproof/DeployDevNoNitro.s.sol --rpc-url https://sepolia.base.org --broadcast --ledger --hd-paths "m/44'/60'/1'/0/0"
 ```
 
 On success, deployed addresses are printed to the console and saved to `deployments/<chainId>-dev-no-nitro.json`. You will need the `AnchorStateRegistry` and `TEEProverRegistry` addresses for the steps below.
