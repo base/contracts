@@ -31,8 +31,9 @@ deployments/1337
 deployments/31337-deploy.json
 deployments/1-deploy.json
 
-# Getting Started guide deploy config
+# Local deploy configs
 deploy-config/getting-started.json
+deploy-config/*.local.json
 
 # IDE
 /.idea/
