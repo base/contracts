@@ -25,6 +25,7 @@ abstract contract ProtocolVersions_TestInit is CommonTest {
     /// @dev Ascending ids assigned by registration order in these tests.
     uint256 internal constant CANYON = 0;
     uint256 internal constant ECOTONE = 1;
+    uint64 internal constant MAX_SEQUENCER_DRIFT = 30 minutes;
 
     address internal _owner;
     address internal _nonOwner = makeAddr("non-owner");
@@ -123,7 +124,7 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
 
     /// @notice Tests that initialization rejects a future activation already inside its freeze window.
     function test_initialize_importFutureActivationInsufficientNotice_reverts() external {
-        uint64 activation = uint64(block.timestamp) + protocolVersions.FREEZE_WINDOW();
+        uint64 activation = uint64(block.timestamp) + protocolVersions.FREEZE_WINDOW() - 1;
         uint64[] memory schedule = new uint64[](1);
         schedule[0] = activation;
 
@@ -299,7 +300,7 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
     ///         commitment for an L2 timestamp the sequencer may already have produced, and an
     ///         append that clears the floor lands above every such timestamp.
     function test_registerUpgrade_cannotMoveReachableSchedule_reverts() external {
-        uint64 reachable = uint64(block.timestamp) + protocolVersions.FREEZE_WINDOW();
+        uint64 reachable = uint64(block.timestamp) + MAX_SEQUENCER_DRIFT;
         uint64 allowed = uint64(block.timestamp) + protocolVersions.MIN_NOTICE();
         bytes32 settled = protocolVersions.activatedScheduleId(reachable);
 
@@ -736,6 +737,19 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         uint64 ts = _scheduleCanyon(100);
 
         vm.warp(ts - protocolVersions.FREEZE_WINDOW());
+        vm.expectRevert(
+            abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_ActivationFrozen.selector, CANYON, ts)
+        );
+        vm.prank(_owner);
+        protocolVersions.setTimestamp(CANYON, 0);
+    }
+
+    /// @notice Tests that schedule changes freeze before the sequencer-drift horizon, leaving time for finalized
+    /// readers to observe them before an L2 block can activate.
+    function test_setTimestamp_duringFinalizedReadBuffer_reverts() external {
+        uint64 ts = _scheduleCanyon(100);
+
+        vm.warp(ts - MAX_SEQUENCER_DRIFT - 1);
         vm.expectRevert(
             abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_ActivationFrozen.selector, CANYON, ts)
         );
