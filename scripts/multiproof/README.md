@@ -35,11 +35,13 @@ Use the tracked local config as a schema template. The copied file is ignored by
 cp deploy-config/local.json deploy-config/sepolia.local.json
 ```
 
-Replace every local-network value with the current Sepolia deployment values before running the script. Ensure `finalSystemOwner` is set to the address you will deploy from (i.e. the address on your Ledger at the HD path you intend to use). This address becomes the owner of all deployed contracts and must sign all subsequent admin calls.
+Replace every local-network value with the current Sepolia deployment values before running the script. The local template omits `l2BlockTime` and `l2GenesisTimestamp`; add the non-zero Base Sepolia values shown below because deployment preflight requires both. Ensure `finalSystemOwner` is set to the address you will deploy from (i.e. the address on your Ledger at the HD path you intend to use). This address becomes the owner of all deployed contracts and must sign all subsequent admin calls.
 
 ```json
 {
   "finalSystemOwner": "0xYOUR_DEPLOYER_ADDRESS",
+  "l2BlockTime": 2,
+  "l2GenesisTimestamp": 1691802540,
   ...
 }
 ```
