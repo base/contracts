@@ -49,7 +49,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @dev One hour covers the post-Fjord 30-minute maximum sequencer drift plus the default finalized reader's
     /// nominal 27m48s observation latency, leaving a 2m12s margin. This finite bound cannot cover unbounded finality or
     /// delivery delays; consumers must reject stale changes that alter fork rules for existing L2 blocks.
-    uint64 public constant FREEZE_WINDOW = MIN_NOTICE;
+    uint64 public constant FREEZE_WINDOW = 1 hours;
 
     /// @notice Activation timestamp for each registered upgrade, indexed by upgrade id (0 = not scheduled).
     ///         An upgrade id is registered iff it is a valid index into this array.
