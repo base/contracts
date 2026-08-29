@@ -195,6 +195,23 @@ contract SuperchainConfig_Extend_Test is SuperchainConfig_TestInit {
         );
         superchainConfig.extend(_identifier);
     }
+
+    /// @notice Tests that `extend` cannot re-activate an expired pause.
+    function test_extend_expiredPause_reverts() external {
+        _pauseAsGuardian(address(this));
+        vm.warp(block.timestamp + PAUSE_EXPIRY + 1);
+
+        assertFalse(superchainConfig.paused(address(this)));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISuperchainConfig.SuperchainConfig_NotAlreadyPaused.selector,
+                address(this)
+            )
+        );
+        vm.prank(superchainConfig.guardian());
+        superchainConfig.extend(address(this));
+    }
 }
 
 /// @title SuperchainConfig_Pausable_Test
