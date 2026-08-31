@@ -20,6 +20,9 @@ import { BaseTest } from "./BaseTest.t.sol";
 contract AggregateVerifierTest is BaseTest {
     using LibClone for address;
 
+    uint256 private constant DENIM_UPGRADE_INDEX = 13;
+    uint256 private constant DENIM_BLOCKS_PER_SECOND = 5;
+
     AggregateVerifier private aggregateVerifierImpl;
 
     function setUp() public override {
@@ -101,6 +104,55 @@ contract AggregateVerifierTest is BaseTest {
             _generateProof("second", AggregateVerifier.ProofType.TEE)
         );
         assertEq(secondGame.scheduleId(), protocolVersions.activatedScheduleId(_l2Timestamp(currentL2BlockNumber)));
+    }
+
+    function test_initialize_denimBlockTimestamps_succeeds() public {
+        uint64 denimActivationTimestamp = L2_GENESIS_TIMESTAMP + 1;
+        uint64 denimBlockTimestamp = L2_GENESIS_TIMESTAMP + L2_BLOCK_TIME;
+        uint64[] memory schedule = new uint64[](DENIM_UPGRADE_INDEX + 2);
+        for (uint256 i; i < DENIM_UPGRADE_INDEX; i++) {
+            schedule[i] = L2_GENESIS_TIMESTAMP;
+        }
+        schedule[DENIM_UPGRADE_INDEX] = denimActivationTimestamp;
+        schedule[DENIM_UPGRADE_INDEX + 1] = denimBlockTimestamp + 1;
+        _importProtocolVersionsSchedule(schedule);
+
+        _setSingleBlockAggregateVerifier(L2_GENESIS_TIMESTAMP);
+
+        bytes32 denimScheduleId = protocolVersions.scheduleId(DENIM_UPGRADE_INDEX);
+        bytes32 postDenimScheduleId = protocolVersions.scheduleId(DENIM_UPGRADE_INDEX + 1);
+        address parent = address(anchorStateRegistry);
+
+        for (uint256 l2BlockNumber = 1; l2BlockNumber <= DENIM_BLOCKS_PER_SECOND + 1; l2BlockNumber++) {
+            vm.warp(denimBlockTimestamp + (l2BlockNumber - 1) / DENIM_BLOCKS_PER_SECOND);
+            AggregateVerifier game = _createSingleBlockGame(l2BlockNumber, parent);
+            assertEq(
+                game.scheduleId(), l2BlockNumber <= DENIM_BLOCKS_PER_SECOND ? denimScheduleId : postDenimScheduleId
+            );
+            parent = address(game);
+        }
+    }
+
+    function test_initialize_unscheduledDenimUsesLegacyTimestamp_succeeds() public {
+        uint64[] memory schedule = new uint64[](DENIM_UPGRADE_INDEX + 1);
+        for (uint256 i; i < DENIM_UPGRADE_INDEX; i++) {
+            schedule[i] = L2_GENESIS_TIMESTAMP;
+        }
+        _importProtocolVersionsSchedule(schedule);
+        _setSingleBlockAggregateVerifier(L2_GENESIS_TIMESTAMP);
+
+        uint64 legacyBlockTimestamp = L2_GENESIS_TIMESTAMP + L2_BLOCK_TIME;
+        vm.warp(legacyBlockTimestamp - 1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AggregateVerifier.L2TimestampInFuture.selector, legacyBlockTimestamp, legacyBlockTimestamp - 1
+            )
+        );
+        _createSingleBlockGame(1, address(anchorStateRegistry));
+
+        vm.warp(legacyBlockTimestamp);
+        AggregateVerifier game = _createSingleBlockGame(1, address(anchorStateRegistry));
+        assertEq(game.scheduleId(), protocolVersions.scheduleId(DENIM_UPGRADE_INDEX - 1));
     }
 
     /// @notice A claim whose L2 timestamp L1 has not yet reached cannot open a game, so a game can
@@ -198,6 +250,27 @@ contract AggregateVerifierTest is BaseTest {
             address(anchorStateRegistry),
             _generateProof("timestamp-overflow", AggregateVerifier.ProofType.TEE)
         );
+    }
+
+    function test_initialize_denimTimestampOverflow_reverts() public {
+        uint64 genesisTimestamp = type(uint64).max - L2_BLOCK_TIME;
+        uint64[] memory schedule = new uint64[](DENIM_UPGRADE_INDEX + 1);
+        for (uint256 i; i < DENIM_UPGRADE_INDEX; i++) {
+            schedule[i] = genesisTimestamp;
+        }
+        schedule[DENIM_UPGRADE_INDEX] = genesisTimestamp + 1;
+        _importProtocolVersionsSchedule(schedule);
+        _setSingleBlockAggregateVerifier(genesisTimestamp);
+
+        vm.warp(uint256(type(uint64).max) + 3);
+        address parent = address(anchorStateRegistry);
+        for (uint256 l2BlockNumber = 1; l2BlockNumber <= DENIM_BLOCKS_PER_SECOND; l2BlockNumber++) {
+            parent = address(_createSingleBlockGame(l2BlockNumber, parent));
+        }
+
+        uint256 overflowingBlock = DENIM_BLOCKS_PER_SECOND + 1;
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L2TimestampOverflow.selector, overflowingBlock));
+        _createSingleBlockGame(overflowingBlock, parent);
     }
 
     function testInitializeFailsIfInvalidCallDataSize() public {
@@ -431,6 +504,36 @@ contract AggregateVerifierTest is BaseTest {
     function _advanceL2BlockAndClaim() private returns (Claim rootClaim) {
         currentL2BlockNumber += BLOCK_INTERVAL;
         return Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
+    }
+
+    function _createSingleBlockGame(uint256 l2BlockNumber, address parent) private returns (AggregateVerifier) {
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(l2BlockNumber)));
+        bytes memory extraData = abi.encodePacked(l2BlockNumber, parent, rootClaim.raw());
+        bytes memory proof = _generateProof(abi.encode(l2BlockNumber), AggregateVerifier.ProofType.TEE);
+
+        vm.deal(TEE_PROVER, INIT_BOND);
+        vm.prank(TEE_PROVER);
+        return AggregateVerifier(
+            address(
+                factory.createWithInitData{ value: INIT_BOND }(
+                    GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, proof
+                )
+            )
+        );
+    }
+
+    function _setSingleBlockAggregateVerifier(uint64 genesisTimestamp) private {
+        AggregateVerifier implementation = _deployAggregateVerifier(
+            1,
+            1,
+            AggregateVerifier.ScheduleConfig({
+                protocolVersions: IProtocolVersions(address(protocolVersions)),
+                genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
+                genesisTimestamp: genesisTimestamp,
+                blockTime: L2_BLOCK_TIME
+            })
+        );
+        factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(implementation)));
     }
 
     function _createAndAssertInitializedGame(
