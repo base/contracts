@@ -75,6 +75,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The minimum number of proofs required to resolve the game.
     uint256 public constant PROOF_THRESHOLD = 1;
+
+    /// @notice The ProtocolVersions upgrade index for Denim.
+    uint256 private constant DENIM_UPGRADE_INDEX = 13;
+
+    /// @notice The number of whole Denim blocks produced per second.
+    uint256 private constant DENIM_BLOCKS_PER_SECOND = 5;
     ////////////////////////////////////////////////////////////////
     //                         Immutables                         //
     ////////////////////////////////////////////////////////////////
@@ -114,10 +120,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The timestamp of the L2 genesis block.
     uint64 public immutable L2_GENESIS_TIMESTAMP;
 
-    /// @notice The fixed number of seconds between consecutive L2 blocks.
-    /// @dev    This verifier derives L2 timestamps linearly from the configured genesis anchor. If
-    ///         the chain changes block time, deploy a new verifier anchored at the transition block
-    ///         and migrate to that game type for post-transition claims.
+    /// @notice The legacy number of seconds between consecutive L2 blocks.
     uint64 public immutable L2_BLOCK_TIME;
 
     /// @notice The block interval between each proposal.
@@ -414,19 +417,14 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         // Set the game as initialized.
         initialized = true;
 
-        // L2 timestamps are fixed by the rollup genesis and block time. Pinning the upgrades active
-        // at the ending L2 block makes the schedule independent of both the proof's L1 head and the
-        // L1 block in which this game is created.
+        // Pinning the upgrades active at the ending L2 block makes the schedule independent of both
+        // the proof's L1 head and the L1 block in which this game is created.
         uint256 claimBlock = l2SequenceNumber();
         if (claimBlock < L2_GENESIS_BLOCK_NUMBER) {
             revert L2BlockBeforeGenesis(claimBlock, L2_GENESIS_BLOCK_NUMBER);
         }
 
-        uint256 blocksSinceGenesis = claimBlock - L2_GENESIS_BLOCK_NUMBER;
-        uint256 maxBlocks = (type(uint64).max - L2_GENESIS_TIMESTAMP) / L2_BLOCK_TIME;
-        if (blocksSinceGenesis > maxBlocks) revert L2TimestampOverflow(claimBlock);
-
-        uint64 claimTimestamp = L2_GENESIS_TIMESTAMP + uint64(blocksSinceGenesis * uint256(L2_BLOCK_TIME));
+        uint64 claimTimestamp = _l2Timestamp(claimBlock);
 
         // `ProtocolVersions` freezes mutations to an activation `FREEZE_WINDOW` before it takes
         // effect. Requiring the claim timestamp to have been reached on L1 additionally ensures the
@@ -1113,5 +1111,36 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @custom:semver 0.1.0
     function version() public pure virtual returns (string memory) {
         return "0.1.0";
+    }
+
+    /// @notice Derives an L2 block timestamp using the legacy cadence before Denim and whole-second groups after it.
+    function _l2Timestamp(uint256 claimBlock) private view returns (uint64) {
+        uint64[] memory schedule = PROTOCOL_VERSIONS.getSchedule();
+        if (schedule.length <= DENIM_UPGRADE_INDEX) return _legacyL2Timestamp(claimBlock);
+
+        uint64 denimActivationTimestamp = schedule[DENIM_UPGRADE_INDEX];
+        if (denimActivationTimestamp == 0) return _legacyL2Timestamp(claimBlock);
+
+        uint256 blocksUntilDenim;
+        if (denimActivationTimestamp > L2_GENESIS_TIMESTAMP) {
+            blocksUntilDenim = FixedPointMathLib.divUp(denimActivationTimestamp - L2_GENESIS_TIMESTAMP, L2_BLOCK_TIME);
+        }
+
+        uint256 blocksSinceGenesis = claimBlock - L2_GENESIS_BLOCK_NUMBER;
+        if (blocksSinceGenesis < blocksUntilDenim) return _legacyL2Timestamp(claimBlock);
+
+        uint256 denimBlock = L2_GENESIS_BLOCK_NUMBER + blocksUntilDenim;
+        uint256 claimTimestamp =
+            uint256(_legacyL2Timestamp(denimBlock)) + (claimBlock - denimBlock) / DENIM_BLOCKS_PER_SECOND;
+        if (claimTimestamp > type(uint64).max) revert L2TimestampOverflow(claimBlock);
+        return uint64(claimTimestamp);
+    }
+
+    /// @notice Derives an L2 block timestamp using the pre-Denim block cadence.
+    function _legacyL2Timestamp(uint256 claimBlock) private view returns (uint64) {
+        uint256 blocksSinceGenesis = claimBlock - L2_GENESIS_BLOCK_NUMBER;
+        uint256 maxBlocks = (type(uint64).max - L2_GENESIS_TIMESTAMP) / L2_BLOCK_TIME;
+        if (blocksSinceGenesis > maxBlocks) revert L2TimestampOverflow(claimBlock);
+        return L2_GENESIS_TIMESTAMP + uint64(blocksSinceGenesis * uint256(L2_BLOCK_TIME));
     }
 }
