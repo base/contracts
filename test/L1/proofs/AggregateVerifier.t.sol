@@ -6,7 +6,7 @@ import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.
 import { IDelayedWETH } from "interfaces/L1/proofs/IDelayedWETH.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
-import { GameStatus, GameTypes, Hash } from "src/libraries/bridge/Types.sol";
+import { GameStatus, GameType, GameTypes, Hash } from "src/libraries/bridge/Types.sol";
 import { Claim, Timestamp } from "src/libraries/bridge/LibUDT.sol";
 
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
@@ -22,6 +22,9 @@ contract AggregateVerifierTest is BaseTest {
 
     uint256 private constant DENIM_UPGRADE_INDEX = 13;
     uint256 private constant DENIM_BLOCKS_PER_SECOND = 5;
+    uint256 private constant DENIM_BLOCK_INTERVAL = 6000;
+    uint256 private constant DENIM_INTERMEDIATE_BLOCK_INTERVAL = 300;
+    GameType private constant DENIM_GAME_TYPE = GameType.wrap(622);
 
     AggregateVerifier private aggregateVerifierImpl;
 
@@ -131,6 +134,110 @@ contract AggregateVerifierTest is BaseTest {
             );
             parent = address(game);
         }
+    }
+
+    function test_initialize_denimCrossingSixThousandBlockRange_succeeds() public {
+        uint64 denimActivationTimestamp = L2_GENESIS_TIMESTAMP + L2_BLOCK_TIME;
+        uint64[] memory schedule = new uint64[](DENIM_UPGRADE_INDEX + 1);
+        for (uint256 i; i < DENIM_UPGRADE_INDEX; i++) {
+            schedule[i] = L2_GENESIS_TIMESTAMP;
+        }
+        schedule[DENIM_UPGRADE_INDEX] = denimActivationTimestamp;
+        _importProtocolVersionsSchedule(schedule);
+
+        AggregateVerifier implementation = _deployAggregateVerifier(
+            DENIM_BLOCK_INTERVAL,
+            DENIM_INTERMEDIATE_BLOCK_INTERVAL,
+            AggregateVerifier.ScheduleConfig({
+                protocolVersions: IProtocolVersions(address(protocolVersions)),
+                genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
+                genesisTimestamp: L2_GENESIS_TIMESTAMP,
+                blockTime: L2_BLOCK_TIME
+            })
+        );
+        factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(implementation)));
+
+        uint256 claimBlock = L2_GENESIS_BLOCK_NUMBER + DENIM_BLOCK_INTERVAL;
+        uint64 claimTimestamp = denimActivationTimestamp + uint64((DENIM_BLOCK_INTERVAL - 1) / DENIM_BLOCKS_PER_SECOND);
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(claimBlock)));
+        bytes memory extraData = _aggregateVerifierExtraDataForIntervals(
+            rootClaim, claimBlock, address(anchorStateRegistry), DENIM_BLOCK_INTERVAL, DENIM_INTERMEDIATE_BLOCK_INTERVAL
+        );
+        bytes memory proof = _generateProof("denim-crossing", AggregateVerifier.ProofType.TEE);
+
+        vm.warp(claimTimestamp - 1);
+        vm.deal(TEE_PROVER, INIT_BOND);
+        vm.prank(TEE_PROVER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AggregateVerifier.L2TimestampInFuture.selector, claimTimestamp, uint256(claimTimestamp - 1)
+            )
+        );
+        factory.createWithInitData{ value: INIT_BOND }(GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, proof);
+
+        vm.warp(claimTimestamp);
+        vm.prank(TEE_PROVER);
+        AggregateVerifier game = AggregateVerifier(
+            address(
+                factory.createWithInitData{ value: INIT_BOND }(
+                    GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, proof
+                )
+            )
+        );
+
+        (, uint256 startingBlock) = game.startingOutputRoot();
+        assertEq(game.scheduleId(), protocolVersions.scheduleId(DENIM_UPGRADE_INDEX));
+        assertEq(startingBlock, L2_GENESIS_BLOCK_NUMBER);
+        assertEq(game.BLOCK_INTERVAL(), DENIM_BLOCK_INTERVAL);
+        assertEq(game.INTERMEDIATE_BLOCK_INTERVAL(), DENIM_INTERMEDIATE_BLOCK_INTERVAL);
+        assertEq(game.intermediateOutputRootsCount(), 20);
+    }
+
+    function test_initialize_newGameTypeCanParentPreviouslyRespectedGame_succeeds() public {
+        Claim oldClaim = _advanceL2BlockAndClaim();
+        AggregateVerifier oldGame = _createAggregateVerifierGame(
+            TEE_PROVER,
+            oldClaim,
+            currentL2BlockNumber,
+            address(anchorStateRegistry),
+            _generateProof("old-game", AggregateVerifier.ProofType.TEE)
+        );
+        assertTrue(oldGame.wasRespectedGameTypeWhenCreated());
+
+        AggregateVerifier implementation = _deployAggregateVerifier(
+            DENIM_GAME_TYPE,
+            DENIM_BLOCK_INTERVAL,
+            DENIM_INTERMEDIATE_BLOCK_INTERVAL,
+            AggregateVerifier.ScheduleConfig({
+                protocolVersions: IProtocolVersions(address(protocolVersions)),
+                genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
+                genesisTimestamp: L2_GENESIS_TIMESTAMP,
+                blockTime: L2_BLOCK_TIME
+            })
+        );
+        factory.setImplementation(DENIM_GAME_TYPE, IDisputeGame(address(implementation)));
+        factory.setInitBond(DENIM_GAME_TYPE, INIT_BOND);
+        anchorStateRegistry.setRespectedGameType(DENIM_GAME_TYPE);
+
+        uint256 claimBlock = oldGame.l2SequenceNumber() + DENIM_BLOCK_INTERVAL;
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(claimBlock)));
+        bytes memory extraData = _aggregateVerifierExtraDataForIntervals(
+            rootClaim, claimBlock, address(oldGame), DENIM_BLOCK_INTERVAL, DENIM_INTERMEDIATE_BLOCK_INTERVAL
+        );
+        bytes memory proof = _generateProof("new-game", AggregateVerifier.ProofType.TEE);
+
+        _warpToL2Timestamp(claimBlock);
+        vm.deal(TEE_PROVER, INIT_BOND);
+        vm.prank(TEE_PROVER);
+        AggregateVerifier game = AggregateVerifier(
+            address(factory.createWithInitData{ value: INIT_BOND }(DENIM_GAME_TYPE, rootClaim, extraData, proof))
+        );
+
+        (Hash startingRoot, uint256 startingBlock) = game.startingOutputRoot();
+        assertEq(game.parentAddress(), address(oldGame));
+        assertEq(startingRoot.raw(), oldClaim.raw());
+        assertEq(startingBlock, oldGame.l2SequenceNumber());
+        assertTrue(game.wasRespectedGameTypeWhenCreated());
     }
 
     function test_initialize_unscheduledDenimUsesLegacyTimestamp_succeeds() public {
@@ -702,8 +809,22 @@ contract AggregateVerifierTest is BaseTest {
         private
         returns (AggregateVerifier)
     {
+        return _deployAggregateVerifier(
+            GameTypes.AGGREGATE_VERIFIER, blockInterval, intermediateBlockInterval, scheduleConfig
+        );
+    }
+
+    function _deployAggregateVerifier(
+        GameType gameType,
+        uint256 blockInterval,
+        uint256 intermediateBlockInterval,
+        AggregateVerifier.ScheduleConfig memory scheduleConfig
+    )
+        private
+        returns (AggregateVerifier)
+    {
         return new AggregateVerifier(
-            GameTypes.AGGREGATE_VERIFIER,
+            gameType,
             IAnchorStateRegistry(address(anchorStateRegistry)),
             IDelayedWETH(payable(address(delayedWETH))),
             IVerifier(address(teeVerifier)),
@@ -716,5 +837,26 @@ contract AggregateVerifierTest is BaseTest {
             intermediateBlockInterval,
             scheduleConfig
         );
+    }
+
+    function _aggregateVerifierExtraDataForIntervals(
+        Claim rootClaim,
+        uint256 l2BlockNumber,
+        address parentAddress,
+        uint256 blockInterval,
+        uint256 intermediateBlockInterval
+    )
+        private
+        pure
+        returns (bytes memory)
+    {
+        uint256 rootsCount = blockInterval / intermediateBlockInterval;
+        bytes32[] memory intermediateRoots = new bytes32[](rootsCount);
+        uint256 startingL2BlockNumber = l2BlockNumber - blockInterval;
+        for (uint256 i = 1; i < rootsCount; i++) {
+            intermediateRoots[i - 1] = keccak256(abi.encode(startingL2BlockNumber + intermediateBlockInterval * i));
+        }
+        intermediateRoots[rootsCount - 1] = rootClaim.raw();
+        return abi.encodePacked(l2BlockNumber, parentAddress, intermediateRoots);
     }
 }
