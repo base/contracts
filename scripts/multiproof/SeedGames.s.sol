@@ -34,7 +34,7 @@ contract SeedGames is Script {
         GameType gameType;
         uint256 initBond;
         uint256 anchorBlock;
-        uint256 blockInterval;
+        uint256 slowBlockInterval;
         uint256 intermediateRootsCount;
         bytes32[] roots;
         bytes proof;
@@ -54,7 +54,7 @@ contract SeedGames is Script {
         console.log("Roots file:", rootsPath);
         console.log("Game count:", gameCount);
         console.log("Game type:", uint256(GAME_TYPE_ID));
-        console.log("Block interval:", ctx.blockInterval);
+        console.log("Block interval:", ctx.slowBlockInterval);
         console.log("Intermediate roots per game:", ctx.intermediateRootsCount);
         console.log("Init bond per game:", ctx.initBond);
         console.log("Anchor block:", ctx.anchorBlock);
@@ -64,8 +64,8 @@ contract SeedGames is Script {
         (address firstGame, address lastGame) = _createGames(ctx, asrAddr);
         vm.stopBroadcast();
 
-        uint256 l2Start = ctx.anchorBlock + ctx.blockInterval;
-        uint256 l2End = ctx.anchorBlock + ctx.blockInterval * gameCount;
+        uint256 l2Start = ctx.anchorBlock + ctx.slowBlockInterval;
+        uint256 l2End = ctx.anchorBlock + ctx.slowBlockInterval * gameCount;
 
         console.log("");
         console.log("=== Seeding Complete ===");
@@ -94,13 +94,13 @@ contract SeedGames is Script {
         (, ctx.anchorBlock) = MockAnchorStateRegistry(asrAddr).getAnchorRoot();
 
         // Read the proposal geometry off the deployment rather than restating it. AggregateVerifier
-        // carries both sides of the Denim activation and picks per game, so a hardcoded pair here
+        // carries both the slow- and fast-block pairs and picks per game, so a hardcoded pair here
         // would silently seed unopenable games on a devnet with Denim scheduled.
         // ponytail: resolved once from the anchor, so a chain seeded straight across the activation
         // would be wrong for its later games. Seed before scheduling Denim, or seed each side
         // separately; per-game resolution only matters if a devnet ever needs a straddling chain.
         AggregateVerifier gameImpl = AggregateVerifier(address(ctx.factory.gameImpls(ctx.gameType)));
-        (ctx.blockInterval,) = gameImpl.intervalsForStartingBlock(ctx.anchorBlock);
+        (ctx.slowBlockInterval,) = gameImpl.intervalsForStartingBlock(ctx.anchorBlock);
         ctx.intermediateRootsCount = gameImpl.intermediateOutputRootsCount();
 
         string memory rootsJson = vm.readFile(rootsPath);
@@ -114,8 +114,8 @@ contract SeedGames is Script {
                 vm.toString(ctx.roots.length),
                 ", expected ",
                 vm.toString(expectedRoots),
-                ". Re-run generate-roots.sh with matching game count and BLOCK_INTERVAL=",
-                vm.toString(ctx.blockInterval),
+                ". Re-run generate-roots.sh with matching game count and SLOW_BLOCK_INTERVAL=",
+                vm.toString(ctx.slowBlockInterval),
                 "."
             )
         );
@@ -145,7 +145,7 @@ contract SeedGames is Script {
     }
 
     function _createSingleGame(SeedCtx memory ctx, uint256 index, address parentAddr) internal returns (address) {
-        uint256 l2Block = ctx.anchorBlock + ctx.blockInterval * (index + 1);
+        uint256 l2Block = ctx.anchorBlock + ctx.slowBlockInterval * (index + 1);
         uint256 rootsOffset = index * ctx.intermediateRootsCount;
         bytes32 rootClaimHash = ctx.roots[rootsOffset + ctx.intermediateRootsCount - 1];
 

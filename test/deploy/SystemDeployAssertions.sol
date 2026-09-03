@@ -44,10 +44,10 @@ abstract contract SystemDeployAssertions is Test {
         uint256 l2GenesisBlockNumber;
         uint64 l2GenesisTimestamp;
         uint64 l2BlockTime;
-        uint256 multiproofBlockInterval;
-        uint256 multiproofIntermediateBlockInterval;
-        uint256 multiproofDenimBlockInterval;
-        uint256 multiproofDenimIntermediateBlockInterval;
+        uint256 multiproofSlowBlockInterval;
+        uint256 multiproofSlowIntermediateBlockInterval;
+        uint256 multiproofFastBlockInterval;
+        uint256 multiproofFastIntermediateBlockInterval;
         uint256 withdrawalDelaySeconds;
     }
 
@@ -259,14 +259,16 @@ abstract contract SystemDeployAssertions is Test {
         assertEq(_aggregateVerifier.L2_GENESIS_BLOCK_NUMBER(), _expected.l2GenesisBlockNumber, "AV-132");
         assertEq(_aggregateVerifier.L2_GENESIS_TIMESTAMP(), _expected.l2GenesisTimestamp, "AV-134");
         assertEq(_aggregateVerifier.L2_BLOCK_TIME(), _expected.l2BlockTime, "AV-136");
-        assertEq(_aggregateVerifier.BLOCK_INTERVAL(), _expected.multiproofBlockInterval, "AV-140");
+        assertEq(_aggregateVerifier.SLOW_BLOCK_INTERVAL(), _expected.multiproofSlowBlockInterval, "AV-140");
         assertEq(
-            _aggregateVerifier.INTERMEDIATE_BLOCK_INTERVAL(), _expected.multiproofIntermediateBlockInterval, "AV-150"
+            _aggregateVerifier.SLOW_INTERMEDIATE_BLOCK_INTERVAL(),
+            _expected.multiproofSlowIntermediateBlockInterval,
+            "AV-150"
         );
-        assertEq(_aggregateVerifier.DENIM_BLOCK_INTERVAL(), _expected.multiproofDenimBlockInterval, "AV-160");
+        assertEq(_aggregateVerifier.FAST_BLOCK_INTERVAL(), _expected.multiproofFastBlockInterval, "AV-160");
         assertEq(
-            _aggregateVerifier.DENIM_INTERMEDIATE_BLOCK_INTERVAL(),
-            _expected.multiproofDenimIntermediateBlockInterval,
+            _aggregateVerifier.FAST_INTERMEDIATE_BLOCK_INTERVAL(),
+            _expected.multiproofFastIntermediateBlockInterval,
             "AV-170"
         );
     }

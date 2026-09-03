@@ -33,7 +33,7 @@ PARALLELISM="${4:-20}"
 OUTPUT_FILE="${5:-roots.json}"
 
 # Must match the intervals the deployed AggregateVerifier selects for these games. The contract
-# carries both sides of the Denim activation, so override these when seeding a devnet on which Denim
+# carries both the slow- and fast-block pairs, so override these when seeding a devnet on which Denim
 # is already active: BLOCK_INTERVAL=6000 INTERMEDIATE_BLOCK_INTERVAL=300 ./generate-roots.sh ...
 # SeedGames.s.sol reads the live values off the deployment and will refuse a mismatched roots file.
 BLOCK_INTERVAL="${BLOCK_INTERVAL:-600}"

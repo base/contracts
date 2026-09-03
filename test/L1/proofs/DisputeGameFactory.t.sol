@@ -45,10 +45,10 @@ contract DisputeGameFactory_FakeClone_Harness {
 abstract contract DisputeGameFactory_TestInit is CommonTest {
     uint256 internal constant DEFAULT_INIT_BOND = 0.08 ether;
     uint256 internal constant L2_CHAIN_ID = 111;
-    uint256 internal constant AGGREGATE_BLOCK_INTERVAL = 100;
-    uint256 internal constant AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL = 10;
-    uint256 internal constant AGGREGATE_DENIM_BLOCK_INTERVAL = 1000;
-    uint256 internal constant AGGREGATE_DENIM_INTERMEDIATE_BLOCK_INTERVAL = 100;
+    uint256 internal constant AGGREGATE_SLOW_BLOCK_INTERVAL = 100;
+    uint256 internal constant AGGREGATE_SLOW_INTERMEDIATE_BLOCK_INTERVAL = 10;
+    uint256 internal constant AGGREGATE_FAST_BLOCK_INTERVAL = 1000;
+    uint256 internal constant AGGREGATE_FAST_INTERMEDIATE_BLOCK_INTERVAL = 100;
     uint32 internal constant MAX_GAME_TYPE = 8;
     address internal constant NON_OWNER = address(0xBEEF);
 
@@ -232,10 +232,10 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
             bytes32(uint256(4)),
             L2_CHAIN_ID,
             AggregateVerifier.IntervalConfig({
-                blockInterval: AGGREGATE_BLOCK_INTERVAL,
-                intermediateBlockInterval: AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL,
-                denimBlockInterval: AGGREGATE_DENIM_BLOCK_INTERVAL,
-                denimIntermediateBlockInterval: AGGREGATE_DENIM_INTERMEDIATE_BLOCK_INTERVAL
+                slowBlockInterval: AGGREGATE_SLOW_BLOCK_INTERVAL,
+                slowIntermediateBlockInterval: AGGREGATE_SLOW_INTERMEDIATE_BLOCK_INTERVAL,
+                fastBlockInterval: AGGREGATE_FAST_BLOCK_INTERVAL,
+                fastIntermediateBlockInterval: AGGREGATE_FAST_INTERMEDIATE_BLOCK_INTERVAL
             }),
             AggregateVerifier.ScheduleConfig({
                 protocolVersions: protocolVersions, genesisBlockNumber: 0, genesisTimestamp: 0, blockTime: 2
@@ -250,12 +250,14 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         for (uint256 i = 1; i < intermediateRootsCount; i++) {
             intermediateRoots = abi.encodePacked(
                 intermediateRoots,
-                keccak256(abi.encode(startingRoot.l2SequenceNumber + AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL * i))
+                keccak256(abi.encode(startingRoot.l2SequenceNumber + AGGREGATE_SLOW_INTERMEDIATE_BLOCK_INTERVAL * i))
             );
         }
         intermediateRoots = abi.encodePacked(intermediateRoots, rootClaim.raw());
         bytes memory extraData = abi.encodePacked(
-            startingRoot.l2SequenceNumber + AGGREGATE_BLOCK_INTERVAL, address(anchorStateRegistry), intermediateRoots
+            startingRoot.l2SequenceNumber + AGGREGATE_SLOW_BLOCK_INTERVAL,
+            address(anchorStateRegistry),
+            intermediateRoots
         );
         bytes memory proof = abi.encodePacked(
             uint8(AggregateVerifier.ProofType.TEE), blockhash(block.number - 1), block.number - 1, bytes32(0)
@@ -266,7 +268,7 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
 
         // The claimed L2 block's deterministic timestamp (block number x blockTime) must have
         // already passed on L1 for the game to be creatable.
-        vm.warp((startingRoot.l2SequenceNumber + AGGREGATE_BLOCK_INTERVAL) * 2);
+        vm.warp((startingRoot.l2SequenceNumber + AGGREGATE_SLOW_BLOCK_INTERVAL) * 2);
 
         uint256 gameCountBefore = disputeGameFactory.gameCount();
         IDisputeGame proxy = disputeGameFactory.createWithInitData{ value: bondAmount }(
@@ -281,13 +283,13 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
         assertEq(gameV2.extraData(), extraData);
         assertEq(gameV2.L2_CHAIN_ID(), L2_CHAIN_ID);
         assertEq(address(gameV2.gameCreator()), address(this));
-        assertEq(gameV2.l2SequenceNumber(), startingRoot.l2SequenceNumber + AGGREGATE_BLOCK_INTERVAL);
+        assertEq(gameV2.l2SequenceNumber(), startingRoot.l2SequenceNumber + AGGREGATE_SLOW_BLOCK_INTERVAL);
         assertEq(gameV2.parentAddress(), address(anchorStateRegistry));
         assertEq(address(gameV2.DELAYED_WETH()), address(delayedWeth));
         assertEq(address(gameV2.anchorStateRegistry()), address(anchorStateRegistry));
         assertEq(GameType.unwrap(gameV2.gameType()), GameType.unwrap(GameTypes.AGGREGATE_VERIFIER));
-        assertEq(gameV2.BLOCK_INTERVAL(), AGGREGATE_BLOCK_INTERVAL);
-        assertEq(gameV2.INTERMEDIATE_BLOCK_INTERVAL(), AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL);
+        assertEq(gameV2.SLOW_BLOCK_INTERVAL(), AGGREGATE_SLOW_BLOCK_INTERVAL);
+        assertEq(gameV2.SLOW_INTERMEDIATE_BLOCK_INTERVAL(), AGGREGATE_SLOW_INTERMEDIATE_BLOCK_INTERVAL);
     }
 }
 

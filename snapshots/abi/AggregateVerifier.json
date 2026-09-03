@@ -62,22 +62,22 @@
         "components": [
           {
             "internalType": "uint256",
-            "name": "blockInterval",
+            "name": "slowBlockInterval",
             "type": "uint256"
           },
           {
             "internalType": "uint256",
-            "name": "intermediateBlockInterval",
+            "name": "slowIntermediateBlockInterval",
             "type": "uint256"
           },
           {
             "internalType": "uint256",
-            "name": "denimBlockInterval",
+            "name": "fastBlockInterval",
             "type": "uint256"
           },
           {
             "internalType": "uint256",
-            "name": "denimIntermediateBlockInterval",
+            "name": "fastIntermediateBlockInterval",
             "type": "uint256"
           }
         ],
@@ -131,19 +131,6 @@
   },
   {
     "inputs": [],
-    "name": "BLOCK_INTERVAL",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "CONFIG_HASH",
     "outputs": [
       {
@@ -163,32 +150,6 @@
         "internalType": "contract IDelayedWETH",
         "name": "",
         "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "DENIM_BLOCK_INTERVAL",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "DENIM_INTERMEDIATE_BLOCK_INTERVAL",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -235,6 +196,19 @@
   },
   {
     "inputs": [],
+    "name": "FAST_BLOCK_INTERVAL",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "FAST_FINALIZATION_DELAY",
     "outputs": [
       {
@@ -248,7 +222,7 @@
   },
   {
     "inputs": [],
-    "name": "INTERMEDIATE_BLOCK_INTERVAL",
+    "name": "FAST_INTERMEDIATE_BLOCK_INTERVAL",
     "outputs": [
       {
         "internalType": "uint256",
@@ -339,12 +313,38 @@
   },
   {
     "inputs": [],
+    "name": "SLOW_BLOCK_INTERVAL",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "SLOW_FINALIZATION_DELAY",
     "outputs": [
       {
         "internalType": "uint64",
         "name": "",
         "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "SLOW_INTERMEDIATE_BLOCK_INTERVAL",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -1138,12 +1138,12 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "blockInterval",
+        "name": "slowBlockInterval",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "intermediateBlockInterval",
+        "name": "slowIntermediateBlockInterval",
         "type": "uint256"
       }
     ],
@@ -1275,12 +1275,12 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "preDenimCount",
+        "name": "slowCount",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "denimCount",
+        "name": "fastCount",
         "type": "uint256"
       }
     ],

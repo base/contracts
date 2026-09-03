@@ -19,20 +19,20 @@ import { DeployDevBase } from "./DeployDevBase.s.sol";
 ///      then set `nitroValidator` in the deploy config. AWS Nitro attestations are only valid
 ///      for 60 minutes, and the certificate chain must be cached before registerSigner() is called.
 contract DeployDevWithNitro is DeployDevBase {
-    uint256 public constant BLOCK_INTERVAL = 600;
-    uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
-    uint256 public constant DENIM_BLOCK_INTERVAL = 6000;
-    uint256 public constant DENIM_INTERMEDIATE_BLOCK_INTERVAL = 300;
+    uint256 public constant SLOW_BLOCK_INTERVAL = 600;
+    uint256 public constant SLOW_INTERMEDIATE_BLOCK_INTERVAL = 30;
+    uint256 public constant FAST_BLOCK_INTERVAL = 6000;
+    uint256 public constant FAST_INTERMEDIATE_BLOCK_INTERVAL = 300;
     uint256 public constant INIT_BOND = 0.00001 ether;
 
     address public nitroValidatorAddr;
 
     function _intervalConfig() internal pure override returns (AggregateVerifier.IntervalConfig memory) {
         return AggregateVerifier.IntervalConfig({
-            blockInterval: BLOCK_INTERVAL,
-            intermediateBlockInterval: INTERMEDIATE_BLOCK_INTERVAL,
-            denimBlockInterval: DENIM_BLOCK_INTERVAL,
-            denimIntermediateBlockInterval: DENIM_INTERMEDIATE_BLOCK_INTERVAL
+            slowBlockInterval: SLOW_BLOCK_INTERVAL,
+            slowIntermediateBlockInterval: SLOW_INTERMEDIATE_BLOCK_INTERVAL,
+            fastBlockInterval: FAST_BLOCK_INTERVAL,
+            fastIntermediateBlockInterval: FAST_INTERMEDIATE_BLOCK_INTERVAL
         });
     }
 

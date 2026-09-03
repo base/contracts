@@ -31,11 +31,11 @@ contract BaseTest is Test {
     uint64 internal constant L2_BLOCK_TIME = 2;
 
     // AggregateVerifier expects evenly spaced intermediate roots.
-    uint256 internal constant BLOCK_INTERVAL = 100;
-    uint256 internal constant INTERMEDIATE_BLOCK_INTERVAL = 10;
-    uint256 internal constant DENIM_BLOCK_INTERVAL = 1000;
-    uint256 internal constant DENIM_INTERMEDIATE_BLOCK_INTERVAL = 100;
-    uint256 private constant INTERMEDIATE_ROOTS_COUNT = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;
+    uint256 internal constant SLOW_BLOCK_INTERVAL = 100;
+    uint256 internal constant SLOW_INTERMEDIATE_BLOCK_INTERVAL = 10;
+    uint256 internal constant FAST_BLOCK_INTERVAL = 1000;
+    uint256 internal constant FAST_INTERMEDIATE_BLOCK_INTERVAL = 100;
+    uint256 private constant INTERMEDIATE_ROOTS_COUNT = SLOW_BLOCK_INTERVAL / SLOW_INTERMEDIATE_BLOCK_INTERVAL;
 
     uint256 internal constant INIT_BOND = 1 ether;
     uint256 internal constant DELAYED_WETH_DELAY = 1 days;
@@ -139,10 +139,10 @@ contract BaseTest is Test {
             CONFIG_HASH,
             L2_CHAIN_ID,
             AggregateVerifier.IntervalConfig({
-                blockInterval: BLOCK_INTERVAL,
-                intermediateBlockInterval: INTERMEDIATE_BLOCK_INTERVAL,
-                denimBlockInterval: DENIM_BLOCK_INTERVAL,
-                denimIntermediateBlockInterval: DENIM_INTERMEDIATE_BLOCK_INTERVAL
+                slowBlockInterval: SLOW_BLOCK_INTERVAL,
+                slowIntermediateBlockInterval: SLOW_INTERMEDIATE_BLOCK_INTERVAL,
+                fastBlockInterval: FAST_BLOCK_INTERVAL,
+                fastIntermediateBlockInterval: FAST_INTERMEDIATE_BLOCK_INTERVAL
             }),
             AggregateVerifier.ScheduleConfig({
                 protocolVersions: IProtocolVersions(address(protocolVersions)),
@@ -226,9 +226,10 @@ contract BaseTest is Test {
 
     function _generateIntermediateRoots(uint256 l2BlockNumber, Claim rootClaim) internal pure returns (bytes memory) {
         bytes32[] memory intermediateRoots = new bytes32[](INTERMEDIATE_ROOTS_COUNT);
-        uint256 startingL2BlockNumber = l2BlockNumber - BLOCK_INTERVAL;
+        uint256 startingL2BlockNumber = l2BlockNumber - SLOW_BLOCK_INTERVAL;
         for (uint256 i = 1; i < INTERMEDIATE_ROOTS_COUNT; i++) {
-            intermediateRoots[i - 1] = keccak256(abi.encode(startingL2BlockNumber + INTERMEDIATE_BLOCK_INTERVAL * i));
+            intermediateRoots[i - 1] =
+                keccak256(abi.encode(startingL2BlockNumber + SLOW_INTERMEDIATE_BLOCK_INTERVAL * i));
         }
         intermediateRoots[INTERMEDIATE_ROOTS_COUNT - 1] = rootClaim.raw();
 

@@ -16,18 +16,18 @@ import { DeployDevBase } from "./DeployDevBase.s.sol";
 /// @notice Development deployment using DevTEEProverRegistry, which bypasses AWS Nitro attestation
 ///         validation. See scripts/multiproof/README.md for usage. Not for production.
 contract DeployDevNoNitro is DeployDevBase {
-    uint256 public constant BLOCK_INTERVAL = 100;
-    uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 10;
-    uint256 public constant DENIM_BLOCK_INTERVAL = 1000;
-    uint256 public constant DENIM_INTERMEDIATE_BLOCK_INTERVAL = 100;
+    uint256 public constant SLOW_BLOCK_INTERVAL = 100;
+    uint256 public constant SLOW_INTERMEDIATE_BLOCK_INTERVAL = 10;
+    uint256 public constant FAST_BLOCK_INTERVAL = 1000;
+    uint256 public constant FAST_INTERMEDIATE_BLOCK_INTERVAL = 100;
     uint256 public constant INIT_BOND = 0.001 ether;
 
     function _intervalConfig() internal pure override returns (AggregateVerifier.IntervalConfig memory) {
         return AggregateVerifier.IntervalConfig({
-            blockInterval: BLOCK_INTERVAL,
-            intermediateBlockInterval: INTERMEDIATE_BLOCK_INTERVAL,
-            denimBlockInterval: DENIM_BLOCK_INTERVAL,
-            denimIntermediateBlockInterval: DENIM_INTERMEDIATE_BLOCK_INTERVAL
+            slowBlockInterval: SLOW_BLOCK_INTERVAL,
+            slowIntermediateBlockInterval: SLOW_INTERMEDIATE_BLOCK_INTERVAL,
+            fastBlockInterval: FAST_BLOCK_INTERVAL,
+            fastIntermediateBlockInterval: FAST_INTERMEDIATE_BLOCK_INTERVAL
         });
     }
 
