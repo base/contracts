@@ -59,14 +59,31 @@
         "type": "uint256"
       },
       {
-        "internalType": "uint256",
-        "name": "blockInterval",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "intermediateBlockInterval",
-        "type": "uint256"
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "slowBlockInterval",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "slowIntermediateBlockInterval",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "fastBlockInterval",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "fastIntermediateBlockInterval",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct AggregateVerifier.IntervalConfig",
+        "name": "intervalConfig",
+        "type": "tuple"
       },
       {
         "components": [
@@ -102,19 +119,6 @@
   {
     "inputs": [],
     "name": "BLOCKHASH_WINDOW",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "BLOCK_INTERVAL",
     "outputs": [
       {
         "internalType": "uint256",
@@ -192,6 +196,19 @@
   },
   {
     "inputs": [],
+    "name": "FAST_BLOCK_INTERVAL",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "FAST_FINALIZATION_DELAY",
     "outputs": [
       {
@@ -205,7 +222,7 @@
   },
   {
     "inputs": [],
-    "name": "INTERMEDIATE_BLOCK_INTERVAL",
+    "name": "FAST_INTERMEDIATE_BLOCK_INTERVAL",
     "outputs": [
       {
         "internalType": "uint256",
@@ -296,12 +313,38 @@
   },
   {
     "inputs": [],
+    "name": "SLOW_BLOCK_INTERVAL",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "SLOW_FINALIZATION_DELAY",
     "outputs": [
       {
         "internalType": "uint64",
         "name": "",
         "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "SLOW_INTERMEDIATE_BLOCK_INTERVAL",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -637,6 +680,30 @@
     "inputs": [],
     "name": "intermediateOutputRootsCount",
     "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "startingBlock",
+        "type": "uint256"
+      }
+    ],
+    "name": "intervalsForStartingBlock",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
       {
         "internalType": "uint256",
         "name": "",
@@ -1071,12 +1138,12 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "blockInterval",
+        "name": "slowBlockInterval",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "intermediateBlockInterval",
+        "name": "slowIntermediateBlockInterval",
         "type": "uint256"
       }
     ],
@@ -1202,6 +1269,22 @@
       }
     ],
     "name": "L2TimestampOverflow",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "slowCount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "fastCount",
+        "type": "uint256"
+      }
+    ],
+    "name": "MismatchedIntermediateRootCount",
     "type": "error"
   },
   {

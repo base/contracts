@@ -172,7 +172,9 @@ Games are created using `ProofType.ZK` with the `MockVerifier` (deployed by both
 
 ### Step 1: Set the anchor state
 
-Pick an anchor block far enough behind the L2 tip to cover all the games you want to create. Each game covers `BLOCK_INTERVAL` (600) L2 blocks, so for 500 games you need 300,000 blocks of headroom.
+Pick an anchor block far enough behind the L2 tip to cover all the games you want to create. Each game covers one block interval of L2 blocks — 600 on slow (pre-Denim) blocks, 6,000 on fast (post-Denim) ones — so for 500 slow-block games you need 300,000 blocks of headroom.
+
+`SeedGames.s.sol` reads the interval off the deployed `AggregateVerifier` and picks the side that matches the anchor block, so nothing needs changing here for Denim. The contract exposes the two pairs as `SLOW_BLOCK_INTERVAL` / `SLOW_INTERMEDIATE_BLOCK_INTERVAL` and `FAST_BLOCK_INTERVAL` / `FAST_INTERMEDIATE_BLOCK_INTERVAL`. `generate-roots.sh` cannot see the chain, so pass `BLOCK_INTERVAL=6000 INTERMEDIATE_BLOCK_INTERVAL=300` when seeding a devnet on which Denim is already active; seeding will abort on a mismatched roots file rather than create bad games.
 
 ```bash
 # Calculate an anchor block 300,000 blocks behind the L2 tip

@@ -20,8 +20,8 @@ import { BaseTest } from "./BaseTest.t.sol";
 contract AggregateVerifierTest is BaseTest {
     using LibClone for address;
 
-    uint256 private constant DENIM_UPGRADE_INDEX = 13;
-    uint256 private constant DENIM_BLOCKS_PER_SECOND = 5;
+    uint256 private constant FAST_BLOCK_UPGRADE_INDEX = 13;
+    uint256 private constant FAST_BLOCKS_PER_SECOND = 5;
 
     AggregateVerifier private aggregateVerifierImpl;
 
@@ -43,8 +43,8 @@ contract AggregateVerifierTest is BaseTest {
     /// @notice Initialization pins the upgrades active at the claimed L2 block, independently of
     ///         the L1 game-creation timestamp, and later schedule changes cannot alter the pin.
     function test_initialize_pinsScheduleId_succeeds() public {
-        uint64 firstGameTimestamp = _l2Timestamp(BLOCK_INTERVAL);
-        uint64 secondActivationTimestamp = _l2Timestamp(BLOCK_INTERVAL + BLOCK_INTERVAL / 2);
+        uint64 firstGameTimestamp = _l2Timestamp(SLOW_BLOCK_INTERVAL);
+        uint64 secondActivationTimestamp = _l2Timestamp(SLOW_BLOCK_INTERVAL + SLOW_BLOCK_INTERVAL / 2);
 
         // The first upgrade is active at the first game's L2 timestamp; the second is not.
         uint64[] memory schedule = new uint64[](2);
@@ -80,7 +80,7 @@ contract AggregateVerifierTest is BaseTest {
     /// @notice Consecutive games on opposite sides of an L2 activation boundary pin different
     ///         schedule commitments.
     function test_initialize_scheduleChangesAtL2ActivationBoundary_succeeds() public {
-        uint64 activationTimestamp = _l2Timestamp(BLOCK_INTERVAL + BLOCK_INTERVAL / 2);
+        uint64 activationTimestamp = _l2Timestamp(SLOW_BLOCK_INTERVAL + SLOW_BLOCK_INTERVAL / 2);
         uint64[] memory schedule = new uint64[](1);
         schedule[0] = activationTimestamp;
         _importProtocolVersionsSchedule(schedule);
@@ -106,36 +106,36 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(secondGame.scheduleId(), protocolVersions.activatedScheduleId(_l2Timestamp(currentL2BlockNumber)));
     }
 
-    function test_initialize_denimBlockTimestamps_succeeds() public {
-        uint64 denimActivationTimestamp = L2_GENESIS_TIMESTAMP + 1;
-        uint64 denimBlockTimestamp = L2_GENESIS_TIMESTAMP + L2_BLOCK_TIME;
-        uint64[] memory schedule = new uint64[](DENIM_UPGRADE_INDEX + 2);
-        for (uint256 i; i < DENIM_UPGRADE_INDEX; i++) {
+    function test_initialize_fastBlockTimestamps_succeeds() public {
+        uint64 fastActivationTimestamp = L2_GENESIS_TIMESTAMP + 1;
+        uint64 firstFastBlockTimestamp = L2_GENESIS_TIMESTAMP + L2_BLOCK_TIME;
+        uint64[] memory schedule = new uint64[](FAST_BLOCK_UPGRADE_INDEX + 2);
+        for (uint256 i; i < FAST_BLOCK_UPGRADE_INDEX; i++) {
             schedule[i] = L2_GENESIS_TIMESTAMP;
         }
-        schedule[DENIM_UPGRADE_INDEX] = denimActivationTimestamp;
-        schedule[DENIM_UPGRADE_INDEX + 1] = denimBlockTimestamp + 1;
+        schedule[FAST_BLOCK_UPGRADE_INDEX] = fastActivationTimestamp;
+        schedule[FAST_BLOCK_UPGRADE_INDEX + 1] = firstFastBlockTimestamp + 1;
         _importProtocolVersionsSchedule(schedule);
 
         _setSingleBlockAggregateVerifier(L2_GENESIS_TIMESTAMP);
 
-        bytes32 denimScheduleId = protocolVersions.scheduleId(DENIM_UPGRADE_INDEX);
-        bytes32 postDenimScheduleId = protocolVersions.scheduleId(DENIM_UPGRADE_INDEX + 1);
+        bytes32 speedupScheduleId = protocolVersions.scheduleId(FAST_BLOCK_UPGRADE_INDEX);
+        bytes32 postSpeedupScheduleId = protocolVersions.scheduleId(FAST_BLOCK_UPGRADE_INDEX + 1);
         address parent = address(anchorStateRegistry);
 
-        for (uint256 l2BlockNumber = 1; l2BlockNumber <= DENIM_BLOCKS_PER_SECOND + 1; l2BlockNumber++) {
-            vm.warp(denimBlockTimestamp + (l2BlockNumber - 1) / DENIM_BLOCKS_PER_SECOND);
+        for (uint256 l2BlockNumber = 1; l2BlockNumber <= FAST_BLOCKS_PER_SECOND + 1; l2BlockNumber++) {
+            vm.warp(firstFastBlockTimestamp + (l2BlockNumber - 1) / FAST_BLOCKS_PER_SECOND);
             AggregateVerifier game = _createSingleBlockGame(l2BlockNumber, parent);
             assertEq(
-                game.scheduleId(), l2BlockNumber <= DENIM_BLOCKS_PER_SECOND ? denimScheduleId : postDenimScheduleId
+                game.scheduleId(), l2BlockNumber <= FAST_BLOCKS_PER_SECOND ? speedupScheduleId : postSpeedupScheduleId
             );
             parent = address(game);
         }
     }
 
-    function test_initialize_unscheduledDenimUsesLegacyTimestamp_succeeds() public {
-        uint64[] memory schedule = new uint64[](DENIM_UPGRADE_INDEX + 1);
-        for (uint256 i; i < DENIM_UPGRADE_INDEX; i++) {
+    function test_initialize_unscheduledSpeedupUsesSlowTimestamp_succeeds() public {
+        uint64[] memory schedule = new uint64[](FAST_BLOCK_UPGRADE_INDEX + 1);
+        for (uint256 i; i < FAST_BLOCK_UPGRADE_INDEX; i++) {
             schedule[i] = L2_GENESIS_TIMESTAMP;
         }
         _importProtocolVersionsSchedule(schedule);
@@ -152,7 +152,103 @@ contract AggregateVerifierTest is BaseTest {
 
         vm.warp(legacyBlockTimestamp);
         AggregateVerifier game = _createSingleBlockGame(1, address(anchorStateRegistry));
-        assertEq(game.scheduleId(), protocolVersions.scheduleId(DENIM_UPGRADE_INDEX - 1));
+        assertEq(game.scheduleId(), protocolVersions.scheduleId(FAST_BLOCK_UPGRADE_INDEX - 1));
+    }
+
+    /// @notice Intervals are selected on the game's starting block relative to the first fast block,
+    ///         so the chain of games stays contiguous across the fork.
+    function test_intervalsForStartingBlock_selectsOnFirstFastBlock_succeeds() public {
+        // divUp(86500 - L2_GENESIS_TIMESTAMP, L2_BLOCK_TIME) == 50.
+        _importSpeedupSchedule(L2_GENESIS_TIMESTAMP + 100);
+        uint256 firstFastBlock = 50;
+
+        _assertIntervals(firstFastBlock - 1, SLOW_BLOCK_INTERVAL, SLOW_INTERMEDIATE_BLOCK_INTERVAL);
+        _assertIntervals(firstFastBlock, FAST_BLOCK_INTERVAL, FAST_INTERMEDIATE_BLOCK_INTERVAL);
+        _assertIntervals(firstFastBlock + 1, FAST_BLOCK_INTERVAL, FAST_INTERMEDIATE_BLOCK_INTERVAL);
+    }
+
+    function test_intervalsForStartingBlock_speedupUnscheduled_succeeds() public view {
+        _assertIntervals(0, SLOW_BLOCK_INTERVAL, SLOW_INTERMEDIATE_BLOCK_INTERVAL);
+        _assertIntervals(type(uint64).max, SLOW_BLOCK_INTERVAL, SLOW_INTERMEDIATE_BLOCK_INTERVAL);
+    }
+
+    /// @notice A game starting at or after the first fast block must span FAST_BLOCK_INTERVAL.
+    function test_initialize_fastIntervals_succeeds() public {
+        // The activation timestamp equals genesis, so every block including the anchor is fast.
+        _importSpeedupSchedule(L2_GENESIS_TIMESTAMP);
+        _assertIntervals(0, FAST_BLOCK_INTERVAL, FAST_INTERMEDIATE_BLOCK_INTERVAL);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AggregateVerifier.UnexpectedBlockNumber.selector, FAST_BLOCK_INTERVAL, SLOW_BLOCK_INTERVAL
+            )
+        );
+        _createGameEndingAt(SLOW_BLOCK_INTERVAL);
+
+        AggregateVerifier game = _createGameEndingAt(FAST_BLOCK_INTERVAL);
+        assertEq(game.l2SequenceNumber(), FAST_BLOCK_INTERVAL);
+    }
+
+    /// @notice The one game whose range contains the activation block starts before it, so it is
+    ///         proven under the slow-block interval.
+    function test_initialize_straddlingGame_usesSlowInterval_succeeds() public {
+        // Activation block 50 falls inside the first game's [0, 100) range.
+        _importSpeedupSchedule(L2_GENESIS_TIMESTAMP + 100);
+        _assertIntervals(0, SLOW_BLOCK_INTERVAL, SLOW_INTERMEDIATE_BLOCK_INTERVAL);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AggregateVerifier.UnexpectedBlockNumber.selector, SLOW_BLOCK_INTERVAL, FAST_BLOCK_INTERVAL
+            )
+        );
+        _createGameEndingAt(FAST_BLOCK_INTERVAL);
+
+        AggregateVerifier game = _createGameEndingAt(SLOW_BLOCK_INTERVAL);
+        assertEq(game.l2SequenceNumber(), SLOW_BLOCK_INTERVAL);
+    }
+
+    /// @notice `challenge` derives the intermediate sub-range from the interval the game's starting
+    ///         block selects. This is the second fork-sensitive call site, and unlike the block
+    ///         number check its output goes into the journal the prover signs, so a stale interval
+    ///         here makes a valid challenge unconstructable rather than reverting loudly.
+    function test_challenge_fastIntermediateInterval_succeeds() public {
+        _importSpeedupSchedule(L2_GENESIS_TIMESTAMP);
+        _assertChallengeIntermediateRange(FAST_BLOCK_INTERVAL, FAST_INTERMEDIATE_BLOCK_INTERVAL);
+    }
+
+    /// @notice The straddling game's sub-ranges stay slow-block sized, matching the interval its own
+    ///         starting block selects.
+    function test_challenge_straddlingGameUsesSlowIntermediateInterval_succeeds() public {
+        // Activation block 50 falls inside the first game's [0, 100) range.
+        _importSpeedupSchedule(L2_GENESIS_TIMESTAMP + 100);
+        _assertChallengeIntermediateRange(SLOW_BLOCK_INTERVAL, SLOW_INTERMEDIATE_BLOCK_INTERVAL);
+    }
+
+    function test_constructor_mismatchedIntermediateRootCount_reverts() public {
+        // 100 / 10 == 10 intermediate roots, but 1000 / 200 == 5.
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.MismatchedIntermediateRootCount.selector, 10, 5));
+        _deployAggregateVerifier(
+            AggregateVerifier.IntervalConfig({
+                slowBlockInterval: SLOW_BLOCK_INTERVAL,
+                slowIntermediateBlockInterval: SLOW_INTERMEDIATE_BLOCK_INTERVAL,
+                fastBlockInterval: FAST_BLOCK_INTERVAL,
+                fastIntermediateBlockInterval: 200
+            }),
+            _defaultScheduleConfig()
+        );
+    }
+
+    function test_constructor_invalidFastBlockIntervals_reverts() public {
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, 1000, 0));
+        _deployAggregateVerifier(
+            AggregateVerifier.IntervalConfig({
+                slowBlockInterval: SLOW_BLOCK_INTERVAL,
+                slowIntermediateBlockInterval: SLOW_INTERMEDIATE_BLOCK_INTERVAL,
+                fastBlockInterval: FAST_BLOCK_INTERVAL,
+                fastIntermediateBlockInterval: 0
+            }),
+            _defaultScheduleConfig()
+        );
     }
 
     /// @notice A claim whose L2 timestamp L1 has not yet reached cannot open a game, so a game can
@@ -160,7 +256,7 @@ contract AggregateVerifierTest is BaseTest {
     function test_initialize_l2TimestampInFuture_reverts() public {
         // Scheduling the upgrade at the first game's deterministic L2 timestamp and leaving the L1
         // clock short of it is the window the finding exploits.
-        uint64 activationTimestamp = _l2Timestamp(BLOCK_INTERVAL);
+        uint64 activationTimestamp = _l2Timestamp(SLOW_BLOCK_INTERVAL);
         uint64[] memory schedule = new uint64[](1);
         schedule[0] = activationTimestamp;
         _importProtocolVersionsSchedule(schedule);
@@ -209,7 +305,7 @@ contract AggregateVerifierTest is BaseTest {
     function test_initialize_l2BlockBeforeGenesis_reverts() public {
         AggregateVerifier.ScheduleConfig memory scheduleConfig = AggregateVerifier.ScheduleConfig({
             protocolVersions: IProtocolVersions(address(protocolVersions)),
-            genesisBlockNumber: BLOCK_INTERVAL + 1,
+            genesisBlockNumber: SLOW_BLOCK_INTERVAL + 1,
             genesisTimestamp: 0,
             blockTime: L2_BLOCK_TIME
         });
@@ -219,7 +315,7 @@ contract AggregateVerifierTest is BaseTest {
         Claim rootClaim = _advanceL2BlockAndClaim();
         vm.expectRevert(
             abi.encodeWithSelector(
-                AggregateVerifier.L2BlockBeforeGenesis.selector, currentL2BlockNumber, BLOCK_INTERVAL + 1
+                AggregateVerifier.L2BlockBeforeGenesis.selector, currentL2BlockNumber, SLOW_BLOCK_INTERVAL + 1
             )
         );
         _createAggregateVerifierGame(
@@ -252,23 +348,23 @@ contract AggregateVerifierTest is BaseTest {
         );
     }
 
-    function test_initialize_denimTimestampOverflow_reverts() public {
+    function test_initialize_fastTimestampOverflow_reverts() public {
         uint64 genesisTimestamp = type(uint64).max - L2_BLOCK_TIME;
-        uint64[] memory schedule = new uint64[](DENIM_UPGRADE_INDEX + 1);
-        for (uint256 i; i < DENIM_UPGRADE_INDEX; i++) {
+        uint64[] memory schedule = new uint64[](FAST_BLOCK_UPGRADE_INDEX + 1);
+        for (uint256 i; i < FAST_BLOCK_UPGRADE_INDEX; i++) {
             schedule[i] = genesisTimestamp;
         }
-        schedule[DENIM_UPGRADE_INDEX] = genesisTimestamp + 1;
+        schedule[FAST_BLOCK_UPGRADE_INDEX] = genesisTimestamp + 1;
         _importProtocolVersionsSchedule(schedule);
         _setSingleBlockAggregateVerifier(genesisTimestamp);
 
         vm.warp(uint256(type(uint64).max) + 3);
         address parent = address(anchorStateRegistry);
-        for (uint256 l2BlockNumber = 1; l2BlockNumber <= DENIM_BLOCKS_PER_SECOND; l2BlockNumber++) {
+        for (uint256 l2BlockNumber = 1; l2BlockNumber <= FAST_BLOCKS_PER_SECOND; l2BlockNumber++) {
             parent = address(_createSingleBlockGame(l2BlockNumber, parent));
         }
 
-        uint256 overflowingBlock = DENIM_BLOCKS_PER_SECOND + 1;
+        uint256 overflowingBlock = FAST_BLOCKS_PER_SECOND + 1;
         vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.L2TimestampOverflow.selector, overflowingBlock));
         _createSingleBlockGame(overflowingBlock, parent);
     }
@@ -393,7 +489,7 @@ contract AggregateVerifierTest is BaseTest {
     /// @dev Parent is a real `AggregateVerifier` clone initialized like a factory game, but deployed without
     ///      `_finalizeGameCreation`, so the factory UUID mapping has no entry.
     function testInitializeFailsIfParentGameNotFactoryRegistered() public {
-        currentL2BlockNumber += BLOCK_INTERVAL;
+        currentL2BlockNumber += SLOW_BLOCK_INTERVAL;
 
         Claim parentRootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "parent")));
         AggregateVerifier unregisteredParent = _deployAggregateVerifierCloneWithoutFactoryRegistration(
@@ -404,7 +500,7 @@ contract AggregateVerifierTest is BaseTest {
             _generateProof("parent-tee", AggregateVerifier.ProofType.TEE)
         );
 
-        currentL2BlockNumber += BLOCK_INTERVAL;
+        currentL2BlockNumber += SLOW_BLOCK_INTERVAL;
         Claim childRootClaim = Claim.wrap(keccak256(abi.encode(currentL2BlockNumber, "child")));
 
         vm.expectRevert(AggregateVerifier.InvalidParentGame.selector);
@@ -496,13 +592,13 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function testDeployWithInvalidBlockIntervals() public {
-        _expectDeployWithInvalidBlockIntervalsReverts(0, INTERMEDIATE_BLOCK_INTERVAL);
-        _expectDeployWithInvalidBlockIntervalsReverts(BLOCK_INTERVAL, 0);
+        _expectDeployWithInvalidBlockIntervalsReverts(0, SLOW_INTERMEDIATE_BLOCK_INTERVAL);
+        _expectDeployWithInvalidBlockIntervalsReverts(SLOW_BLOCK_INTERVAL, 0);
         _expectDeployWithInvalidBlockIntervalsReverts(3, 2);
     }
 
     function _advanceL2BlockAndClaim() private returns (Claim rootClaim) {
-        currentL2BlockNumber += BLOCK_INTERVAL;
+        currentL2BlockNumber += SLOW_BLOCK_INTERVAL;
         return Claim.wrap(keccak256(abi.encode(currentL2BlockNumber)));
     }
 
@@ -524,8 +620,12 @@ contract AggregateVerifierTest is BaseTest {
 
     function _setSingleBlockAggregateVerifier(uint64 genesisTimestamp) private {
         AggregateVerifier implementation = _deployAggregateVerifier(
-            1,
-            1,
+            AggregateVerifier.IntervalConfig({
+                slowBlockInterval: 1,
+                slowIntermediateBlockInterval: 1,
+                fastBlockInterval: 1,
+                fastIntermediateBlockInterval: 1
+            }),
             AggregateVerifier.ScheduleConfig({
                 protocolVersions: IProtocolVersions(address(protocolVersions)),
                 genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
@@ -630,17 +730,17 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function _expectDeployWithInvalidBlockIntervalsReverts(
-        uint256 blockInterval,
-        uint256 intermediateBlockInterval
+        uint256 slowBlockInterval,
+        uint256 slowIntermediateBlockInterval
     )
         private
     {
         vm.expectRevert(
             abi.encodeWithSelector(
-                AggregateVerifier.InvalidBlockInterval.selector, blockInterval, intermediateBlockInterval
+                AggregateVerifier.InvalidBlockInterval.selector, slowBlockInterval, slowIntermediateBlockInterval
             )
         );
-        _deployAggregateVerifierWithIntervals(blockInterval, intermediateBlockInterval);
+        _deployAggregateVerifierWithIntervals(slowBlockInterval, slowIntermediateBlockInterval);
     }
 
     /// @notice Clones the implementation like the factory, but skips `_finalizeGameCreation`.
@@ -669,15 +769,19 @@ contract AggregateVerifierTest is BaseTest {
     }
 
     function _deployAggregateVerifierWithIntervals(
-        uint256 blockInterval,
-        uint256 intermediateBlockInterval
+        uint256 slowBlockInterval,
+        uint256 slowIntermediateBlockInterval
     )
         private
         returns (AggregateVerifier)
     {
         return _deployAggregateVerifier(
-            blockInterval,
-            intermediateBlockInterval,
+            AggregateVerifier.IntervalConfig({
+                slowBlockInterval: slowBlockInterval,
+                slowIntermediateBlockInterval: slowIntermediateBlockInterval,
+                fastBlockInterval: slowBlockInterval,
+                fastIntermediateBlockInterval: slowIntermediateBlockInterval
+            }),
             AggregateVerifier.ScheduleConfig({
                 protocolVersions: IProtocolVersions(address(protocolVersions)),
                 genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
@@ -691,12 +795,118 @@ contract AggregateVerifierTest is BaseTest {
         private
         returns (AggregateVerifier)
     {
-        return _deployAggregateVerifier(BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL, scheduleConfig);
+        return _deployAggregateVerifier(_defaultIntervalConfig(), scheduleConfig);
+    }
+
+    /// @dev Registers a schedule whose only meaningful entry is the speedup activation, and rebinds
+    ///      the implementation to it.
+    function _importSpeedupSchedule(uint64 fastActivationTimestamp) private {
+        uint64[] memory schedule = new uint64[](FAST_BLOCK_UPGRADE_INDEX + 1);
+        for (uint256 i; i < FAST_BLOCK_UPGRADE_INDEX; i++) {
+            schedule[i] = L2_GENESIS_TIMESTAMP;
+        }
+        schedule[FAST_BLOCK_UPGRADE_INDEX] = fastActivationTimestamp;
+        _importProtocolVersionsSchedule(schedule);
+        aggregateVerifierImpl = AggregateVerifier(address(factory.gameImpls(GameTypes.AGGREGATE_VERIFIER)));
+    }
+
+    function _assertIntervals(
+        uint256 startingBlock,
+        uint256 expectedBlockInterval,
+        uint256 expectedIntermediateBlockInterval
+    )
+        private
+        view
+    {
+        (uint256 slowBlockInterval, uint256 slowIntermediateBlockInterval) =
+            aggregateVerifierImpl.intervalsForStartingBlock(startingBlock);
+        assertEq(slowBlockInterval, expectedBlockInterval);
+        assertEq(slowIntermediateBlockInterval, expectedIntermediateBlockInterval);
+    }
+
+    /// @dev Challenges intermediate root 0 of a game ending at `endingBlock` and asserts the range
+    ///      handed to the ZK verifier is `[0, expectedIntermediateBlockInterval)`. The mock verifier
+    ///      accepts anything, so the journal is checked by matching the call rather than by reverting.
+    function _assertChallengeIntermediateRange(uint256 endingBlock, uint256 expectedIntermediateBlockInterval) private {
+        AggregateVerifier game = _createGameEndingAt(endingBlock);
+        (Hash startingRoot,) = game.startingOutputRoot();
+
+        bytes32 counterRoot = keccak256("counter");
+        bytes memory zkProof = abi.encodePacked(uint8(AggregateVerifier.ProofType.ZK), bytes1(0));
+
+        bytes32 expectedJournal = keccak256(
+            abi.encodePacked(
+                ZK_PROVER,
+                game.l1Head().raw(),
+                startingRoot.raw(),
+                uint64(0),
+                counterRoot,
+                uint64(expectedIntermediateBlockInterval),
+                abi.encodePacked(counterRoot),
+                CONFIG_HASH,
+                ZK_RANGE_HASH,
+                game.scheduleId()
+            )
+        );
+
+        // `zkProof[1:]` is the single trailing zero byte.
+        vm.expectCall(
+            address(zkVerifier), abi.encodeCall(IVerifier.verify, (hex"00", ZK_AGGREGATE_HASH, expectedJournal))
+        );
+        vm.prank(ZK_PROVER);
+        game.challenge(zkProof, 0, counterRoot);
+    }
+
+    /// @dev Creates a game off the anchor root. Intermediate root values are unchecked by the mock
+    ///      verifiers, so only their count has to match the implementation.
+    function _createGameEndingAt(uint256 endingBlock) private returns (AggregateVerifier) {
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(endingBlock)));
+        // Both interval pairs are constructor-checked to yield the same count, so the slow-block ratio
+        // is the count on either side. Reading it off the implementation instead would put a
+        // staticcall between a caller's `vm.expectRevert` and the call it is meant to apply to.
+        uint256 count = SLOW_BLOCK_INTERVAL / SLOW_INTERMEDIATE_BLOCK_INTERVAL;
+        bytes32[] memory intermediateRoots = new bytes32[](count);
+        for (uint256 i; i < count - 1; i++) {
+            intermediateRoots[i] = keccak256(abi.encode(endingBlock, i));
+        }
+        intermediateRoots[count - 1] = rootClaim.raw();
+
+        bytes memory extraData =
+            abi.encodePacked(endingBlock, address(anchorStateRegistry), abi.encodePacked(intermediateRoots));
+        bytes memory proof = _generateProof(abi.encode(endingBlock), AggregateVerifier.ProofType.TEE);
+
+        _warpToL2Timestamp(endingBlock);
+        vm.deal(TEE_PROVER, INIT_BOND);
+        vm.prank(TEE_PROVER);
+        return AggregateVerifier(
+            address(
+                factory.createWithInitData{ value: INIT_BOND }(
+                    GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, proof
+                )
+            )
+        );
+    }
+
+    function _defaultScheduleConfig() private view returns (AggregateVerifier.ScheduleConfig memory) {
+        return AggregateVerifier.ScheduleConfig({
+            protocolVersions: IProtocolVersions(address(protocolVersions)),
+            genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
+            genesisTimestamp: L2_GENESIS_TIMESTAMP,
+            blockTime: L2_BLOCK_TIME
+        });
+    }
+
+    function _defaultIntervalConfig() private pure returns (AggregateVerifier.IntervalConfig memory) {
+        return AggregateVerifier.IntervalConfig({
+            slowBlockInterval: SLOW_BLOCK_INTERVAL,
+            slowIntermediateBlockInterval: SLOW_INTERMEDIATE_BLOCK_INTERVAL,
+            fastBlockInterval: FAST_BLOCK_INTERVAL,
+            fastIntermediateBlockInterval: FAST_INTERMEDIATE_BLOCK_INTERVAL
+        });
     }
 
     function _deployAggregateVerifier(
-        uint256 blockInterval,
-        uint256 intermediateBlockInterval,
+        AggregateVerifier.IntervalConfig memory intervalConfig,
         AggregateVerifier.ScheduleConfig memory scheduleConfig
     )
         private
@@ -712,8 +922,7 @@ contract AggregateVerifierTest is BaseTest {
             AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
             CONFIG_HASH,
             L2_CHAIN_ID,
-            blockInterval,
-            intermediateBlockInterval,
+            intervalConfig,
             scheduleConfig
         );
     }

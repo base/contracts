@@ -10,7 +10,7 @@ import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { BaseTest } from "./BaseTest.t.sol";
 
 contract NullifyTest is BaseTest {
-    uint256 private constant LAST_INTERMEDIATE_ROOT_INDEX = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1;
+    uint256 private constant LAST_INTERMEDIATE_ROOT_INDEX = SLOW_BLOCK_INTERVAL / SLOW_INTERMEDIATE_BLOCK_INTERVAL - 1;
     uint256 private constant NO_PROOF_CREDIT_CLAIM_DELAY = 14 days;
 
     function testNullifyWithTEEProof() public {
@@ -142,7 +142,7 @@ contract NullifyTest is BaseTest {
         private
         returns (AggregateVerifier)
     {
-        currentL2BlockNumber += BLOCK_INTERVAL;
+        currentL2BlockNumber += SLOW_BLOCK_INTERVAL;
         return _createAggregateVerifierGame(
             prover, _claim(claimSalt), currentL2BlockNumber, parent, _generateProof(proofSalt, proofType)
         );

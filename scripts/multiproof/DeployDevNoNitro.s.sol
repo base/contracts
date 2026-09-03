@@ -8,22 +8,27 @@ import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { MockNitroValidator } from "test/mocks/MockNitroValidator.sol";
 
+import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
+
 import { DeployDevBase } from "./DeployDevBase.s.sol";
 
 /// @title DeployDevNoNitro
 /// @notice Development deployment using DevTEEProverRegistry, which bypasses AWS Nitro attestation
 ///         validation. See scripts/multiproof/README.md for usage. Not for production.
 contract DeployDevNoNitro is DeployDevBase {
-    uint256 public constant BLOCK_INTERVAL = 100;
-    uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 10;
+    uint256 public constant SLOW_BLOCK_INTERVAL = 100;
+    uint256 public constant SLOW_INTERMEDIATE_BLOCK_INTERVAL = 10;
+    uint256 public constant FAST_BLOCK_INTERVAL = 1000;
+    uint256 public constant FAST_INTERMEDIATE_BLOCK_INTERVAL = 100;
     uint256 public constant INIT_BOND = 0.001 ether;
 
-    function _blockInterval() internal pure override returns (uint256) {
-        return BLOCK_INTERVAL;
-    }
-
-    function _intermediateBlockInterval() internal pure override returns (uint256) {
-        return INTERMEDIATE_BLOCK_INTERVAL;
+    function _intervalConfig() internal pure override returns (AggregateVerifier.IntervalConfig memory) {
+        return AggregateVerifier.IntervalConfig({
+            slowBlockInterval: SLOW_BLOCK_INTERVAL,
+            slowIntermediateBlockInterval: SLOW_INTERMEDIATE_BLOCK_INTERVAL,
+            fastBlockInterval: FAST_BLOCK_INTERVAL,
+            fastIntermediateBlockInterval: FAST_INTERMEDIATE_BLOCK_INTERVAL
+        });
     }
 
     function _initBond() internal pure override returns (uint256) {
