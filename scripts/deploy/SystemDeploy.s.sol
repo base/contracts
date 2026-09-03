@@ -1148,15 +1148,6 @@ contract SystemDeploy is Script {
             _input.multiproofBlockInterval % _input.multiproofIntermediateBlockInterval == 0,
             "SystemDeploy: invalid multiproof block intervals"
         );
-        require(_input.multiproofDenimBlockInterval != 0, "SystemDeploy: multiproof Denim block interval not set");
-        require(
-            _input.multiproofDenimIntermediateBlockInterval != 0,
-            "SystemDeploy: multiproof Denim intermediate interval not set"
-        );
-        require(
-            _input.multiproofDenimBlockInterval % _input.multiproofDenimIntermediateBlockInterval == 0,
-            "SystemDeploy: invalid multiproof Denim block intervals"
-        );
         require(_input.teeProposer != address(0), "SystemDeploy: teeProposer not set");
         require(_input.teeChallenger != address(0), "SystemDeploy: teeChallenger not set");
     }

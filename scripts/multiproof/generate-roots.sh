@@ -32,9 +32,12 @@ GAME_COUNT="${3:-500}"
 PARALLELISM="${4:-20}"
 OUTPUT_FILE="${5:-roots.json}"
 
-# Must match AggregateVerifier / SeedGames constants
-BLOCK_INTERVAL=600
-INTERMEDIATE_BLOCK_INTERVAL=30
+# Must match the intervals the deployed AggregateVerifier selects for these games. The contract
+# carries both sides of the Denim activation, so override these when seeding a devnet on which Denim
+# is already active: BLOCK_INTERVAL=6000 INTERMEDIATE_BLOCK_INTERVAL=300 ./generate-roots.sh ...
+# SeedGames.s.sol reads the live values off the deployment and will refuse a mismatched roots file.
+BLOCK_INTERVAL="${BLOCK_INTERVAL:-600}"
+INTERMEDIATE_BLOCK_INTERVAL="${INTERMEDIATE_BLOCK_INTERVAL:-30}"
 ROOTS_PER_GAME=$((BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL))
 TOTAL_ROOTS=$((GAME_COUNT * ROOTS_PER_GAME))
 
@@ -43,6 +46,7 @@ LAST_BLOCK=$((ANCHOR_BLOCK + GAME_COUNT * BLOCK_INTERVAL))
 echo "=== Generating Output Roots ==="
 echo "Anchor block:     $ANCHOR_BLOCK"
 echo "Game count:       $GAME_COUNT"
+echo "Block interval:   $BLOCK_INTERVAL"
 echo "Roots per game:   $ROOTS_PER_GAME"
 echo "Total roots:      $TOTAL_ROOTS"
 echo "L2 block range:   [$((ANCHOR_BLOCK + INTERMEDIATE_BLOCK_INTERVAL)), $LAST_BLOCK]"

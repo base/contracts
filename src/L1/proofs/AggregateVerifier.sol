@@ -427,9 +427,13 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             startingOutputRoot = ANCHOR_STATE_REGISTRY.getStartingAnchorRoot();
         }
 
+        // Resolved once and threaded through both fork-sensitive decisions below, which would
+        // otherwise re-read the schedule from `PROTOCOL_VERSIONS` a second time.
+        uint256 denimBlock = _denimActivationBlock();
+
         // The block number must be one block interval after the starting block number. The interval
         // is selected on the starting block so the game chain stays contiguous across Denim.
-        (uint256 blockInterval,) = _intervals(startingOutputRoot.l2SequenceNumber);
+        (uint256 blockInterval,) = _intervalsAt(startingOutputRoot.l2SequenceNumber, denimBlock);
         if (l2SequenceNumber() != startingOutputRoot.l2SequenceNumber + blockInterval) {
             revert UnexpectedBlockNumber(startingOutputRoot.l2SequenceNumber + blockInterval, l2SequenceNumber());
         }
@@ -439,12 +443,17 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         // Pinning the upgrades active at the ending L2 block makes the schedule independent of both
         // the proof's L1 head and the L1 block in which this game is created.
+        //
+        // Note that this anchors on the *ending* block while the interval selection above anchors on
+        // the *starting* block. That is deliberate, and it is what makes the straddling game work: it
+        // spans the pre-Denim interval its start selects, while pinning the post-Denim schedule its
+        // end falls under, so the prover knows Denim is active for the blocks past the boundary.
         uint256 claimBlock = l2SequenceNumber();
         if (claimBlock < L2_GENESIS_BLOCK_NUMBER) {
             revert L2BlockBeforeGenesis(claimBlock, L2_GENESIS_BLOCK_NUMBER);
         }
 
-        uint64 claimTimestamp = _l2Timestamp(claimBlock);
+        uint64 claimTimestamp = _l2Timestamp(claimBlock, denimBlock);
 
         // `ProtocolVersions` freezes mutations to an activation `FREEZE_WINDOW` before it takes
         // effect. Requiring the claim timestamp to have been reached on L1 additionally ensures the
@@ -791,10 +800,15 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @dev    Offchain proposers and challengers must resolve intervals per game through this getter
     ///         rather than reading `BLOCK_INTERVAL` / `INTERMEDIATE_BLOCK_INTERVAL`, which describe
     ///         only games starting before Denim.
+    /// @dev    Selection is on the starting block rather than the ending block so the game chain stays
+    ///         contiguous across the activation: every game satisfies
+    ///         `end == parent.end + blockInterval` for the interval its own start selects. Exactly one
+    ///         game straddles the activation and is proven under the pre-Denim interval, which is
+    ///         correct because provers apply fork rules per block by timestamp.
     /// @param startingBlock The starting L2 block number of the game.
     /// @return The block interval and the intermediate block interval governing that game.
     function intervalsForStartingBlock(uint256 startingBlock) public view returns (uint256, uint256) {
-        return _intervals(startingBlock);
+        return _intervalsAt(startingBlock, _denimActivationBlock());
     }
 
     /// @notice The number of intermediate output roots.
@@ -1133,7 +1147,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 startingRoot = intermediateRootIndex == 0
             ? startingOutputRoot.root.raw()
             : intermediateOutputRoot(intermediateRootIndex - 1);
-        (, uint256 intermediateBlockInterval) = _intervals(startingOutputRoot.l2SequenceNumber);
+        (, uint256 intermediateBlockInterval) = intervalsForStartingBlock(startingOutputRoot.l2SequenceNumber);
         uint64 startingL2SequenceNumber =
             uint64(startingOutputRoot.l2SequenceNumber + intermediateRootIndex * intermediateBlockInterval);
         uint64 endingL2SequenceNumber = startingL2SequenceNumber + uint64(intermediateBlockInterval);
@@ -1147,8 +1161,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Derives an L2 block timestamp using the legacy cadence before Denim and whole-second groups after it.
-    function _l2Timestamp(uint256 claimBlock) private view returns (uint64) {
-        uint256 denimBlock = _denimActivationBlock();
+    /// @param claimBlock The L2 block number to derive a timestamp for.
+    /// @param denimBlock The Denim activation block, as returned by `_denimActivationBlock()`.
+    function _l2Timestamp(uint256 claimBlock, uint256 denimBlock) private view returns (uint64) {
         if (claimBlock < denimBlock) return _legacyL2Timestamp(claimBlock);
 
         uint256 claimTimestamp =
@@ -1184,12 +1199,18 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice Returns the first L2 block number governed by Denim, or `type(uint256).max` when Denim
     ///         is not scheduled.
-    /// @dev    Reading the live schedule is safe despite it being mutable. `initializeWithInitData`
-    ///         rejects a game whose ending L2 timestamp has not yet been reached on L1, and
-    ///         `ProtocolVersions` requires any new activation to be at least `MIN_NOTICE` in the future
-    ///         and freezes one that has passed. A Denim timestamp that can still move is therefore
-    ///         always later than the ending timestamp of every initialized game, so no game can have
-    ///         its intervals reselected after creation.
+    /// @dev    Reading the live schedule is safe despite it being mutable, in both directions:
+    ///
+    ///         - A game that selected the Denim intervals has a starting block at or past the
+    ///           activation, so the activation is in the past. `ProtocolVersions._assertNotFrozen`
+    ///           rejects every mutation of a passed activation, from `setTimestamp` and
+    ///           `delayTimestamp` alike, so that game's selection can never be revoked.
+    ///         - A game that selected the pre-Denim intervals cannot be pulled across the boundary
+    ///           either, including by the owner moving the activation *earlier* rather than later.
+    ///           `initializeWithInitData` rejects a game whose ending L2 timestamp L1 has not yet
+    ///           reached, so every initialized game satisfies `startingTimestamp < endingTimestamp <=
+    ///           block.timestamp`, while any new activation must clear `block.timestamp + MIN_NOTICE`.
+    ///           The activation therefore always lands after the game's starting block.
     function _denimActivationBlock() private view returns (uint256) {
         uint64[] memory schedule = PROTOCOL_VERSIONS.getSchedule();
         if (schedule.length <= DENIM_UPGRADE_INDEX) return type(uint256).max;
@@ -1204,14 +1225,12 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         return L2_GENESIS_BLOCK_NUMBER + blocksUntilDenim;
     }
 
-    /// @notice Selects the proposal intervals governing a game, from its starting block number.
-    /// @dev    Selection is on the starting block rather than the ending block so the game chain stays
-    ///         contiguous across the activation: every game satisfies
-    ///         `end == parent.end + blockInterval` for the interval its own start selects. Exactly one
-    ///         game straddles the activation and is proven under the pre-Denim interval, which is
-    ///         correct because provers apply fork rules per block by timestamp.
-    function _intervals(uint256 startingBlock) private view returns (uint256, uint256) {
-        if (startingBlock < _denimActivationBlock()) return (BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
+    /// @notice Selects the proposal intervals governing a game, from its starting block number and an
+    ///         already-resolved Denim activation block.
+    /// @dev    Takes `denimBlock` rather than resolving it so a caller making more than one
+    ///         fork-sensitive decision pays for `PROTOCOL_VERSIONS.getSchedule()` once.
+    function _intervalsAt(uint256 startingBlock, uint256 denimBlock) private view returns (uint256, uint256) {
+        if (startingBlock < denimBlock) return (BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
         return (DENIM_BLOCK_INTERVAL, DENIM_INTERMEDIATE_BLOCK_INTERVAL);
     }
 

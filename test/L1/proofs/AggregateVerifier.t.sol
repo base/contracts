@@ -207,6 +207,23 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(game.l2SequenceNumber(), BLOCK_INTERVAL);
     }
 
+    /// @notice `challenge` derives the intermediate sub-range from the interval the game's starting
+    ///         block selects. This is the second fork-sensitive call site, and unlike the block
+    ///         number check its output goes into the journal the prover signs, so a stale interval
+    ///         here makes a valid challenge unconstructable rather than reverting loudly.
+    function test_challenge_denimIntermediateInterval_succeeds() public {
+        _importDenimSchedule(L2_GENESIS_TIMESTAMP);
+        _assertChallengeIntermediateRange(DENIM_BLOCK_INTERVAL, DENIM_INTERMEDIATE_BLOCK_INTERVAL);
+    }
+
+    /// @notice The straddling game's sub-ranges stay pre-Denim sized, matching the interval its own
+    ///         starting block selects.
+    function test_challenge_straddlingGameUsesPreDenimIntermediateInterval_succeeds() public {
+        // Activation block 50 falls inside the first game's [0, 100) range.
+        _importDenimSchedule(L2_GENESIS_TIMESTAMP + 100);
+        _assertChallengeIntermediateRange(BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
+    }
+
     function test_constructor_mismatchedIntermediateRootCount_reverts() public {
         // 100 / 10 == 10 intermediate roots, but 1000 / 200 == 5.
         vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.MismatchedIntermediateRootCount.selector, 10, 5));
@@ -804,10 +821,46 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(intermediateBlockInterval, expectedIntermediateBlockInterval);
     }
 
+    /// @dev Challenges intermediate root 0 of a game ending at `endingBlock` and asserts the range
+    ///      handed to the ZK verifier is `[0, expectedIntermediateBlockInterval)`. The mock verifier
+    ///      accepts anything, so the journal is checked by matching the call rather than by reverting.
+    function _assertChallengeIntermediateRange(uint256 endingBlock, uint256 expectedIntermediateBlockInterval) private {
+        AggregateVerifier game = _createGameEndingAt(endingBlock);
+        (Hash startingRoot,) = game.startingOutputRoot();
+
+        bytes32 counterRoot = keccak256("counter");
+        bytes memory zkProof = abi.encodePacked(uint8(AggregateVerifier.ProofType.ZK), bytes1(0));
+
+        bytes32 expectedJournal = keccak256(
+            abi.encodePacked(
+                ZK_PROVER,
+                game.l1Head().raw(),
+                startingRoot.raw(),
+                uint64(0),
+                counterRoot,
+                uint64(expectedIntermediateBlockInterval),
+                abi.encodePacked(counterRoot),
+                CONFIG_HASH,
+                ZK_RANGE_HASH,
+                game.scheduleId()
+            )
+        );
+
+        // `zkProof[1:]` is the single trailing zero byte.
+        vm.expectCall(
+            address(zkVerifier), abi.encodeCall(IVerifier.verify, (hex"00", ZK_AGGREGATE_HASH, expectedJournal))
+        );
+        vm.prank(ZK_PROVER);
+        game.challenge(zkProof, 0, counterRoot);
+    }
+
     /// @dev Creates a game off the anchor root. Intermediate root values are unchecked by the mock
     ///      verifiers, so only their count has to match the implementation.
     function _createGameEndingAt(uint256 endingBlock) private returns (AggregateVerifier) {
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(endingBlock)));
+        // Both interval pairs are constructor-checked to yield the same count, so the pre-Denim ratio
+        // is the count on either side. Reading it off the implementation instead would put a
+        // staticcall between a caller's `vm.expectRevert` and the call it is meant to apply to.
         uint256 count = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;
         bytes32[] memory intermediateRoots = new bytes32[](count);
         for (uint256 i; i < count - 1; i++) {

@@ -103,7 +103,8 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
         disputeGameFactory.setInitBond(respectedGameType, 0);
 
         Proposal memory startingRoot = anchorStateRegistry.getStartingAnchorRoot();
-        _proposedBlockNumber = startingRoot.l2SequenceNumber + gameImpl.BLOCK_INTERVAL();
+        (uint256 blockInterval,) = gameImpl.intervalsForStartingBlock(startingRoot.l2SequenceNumber);
+        _proposedBlockNumber = startingRoot.l2SequenceNumber + blockInterval;
 
         depositor = makeAddr("depositor");
 
