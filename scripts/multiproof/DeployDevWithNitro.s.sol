@@ -7,6 +7,8 @@ import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.so
 import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
+import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
+
 import { DeployDevBase } from "./DeployDevBase.s.sol";
 
 /// @title DeployDevWithNitro
@@ -19,16 +21,19 @@ import { DeployDevBase } from "./DeployDevBase.s.sol";
 contract DeployDevWithNitro is DeployDevBase {
     uint256 public constant BLOCK_INTERVAL = 600;
     uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
+    uint256 public constant DENIM_BLOCK_INTERVAL = 6000;
+    uint256 public constant DENIM_INTERMEDIATE_BLOCK_INTERVAL = 300;
     uint256 public constant INIT_BOND = 0.00001 ether;
 
     address public nitroValidatorAddr;
 
-    function _blockInterval() internal pure override returns (uint256) {
-        return BLOCK_INTERVAL;
-    }
-
-    function _intermediateBlockInterval() internal pure override returns (uint256) {
-        return INTERMEDIATE_BLOCK_INTERVAL;
+    function _intervalConfig() internal pure override returns (AggregateVerifier.IntervalConfig memory) {
+        return AggregateVerifier.IntervalConfig({
+            blockInterval: BLOCK_INTERVAL,
+            intermediateBlockInterval: INTERMEDIATE_BLOCK_INTERVAL,
+            denimBlockInterval: DENIM_BLOCK_INTERVAL,
+            denimIntermediateBlockInterval: DENIM_INTERMEDIATE_BLOCK_INTERVAL
+        });
     }
 
     function _initBond() internal pure override returns (uint256) {

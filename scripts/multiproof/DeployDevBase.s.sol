@@ -128,8 +128,7 @@ abstract contract DeployDevBase is Script {
                 zkHashes,
                 cfg.multiproofConfigHash(),
                 cfg.l2ChainId(),
-                _blockInterval(),
-                _intermediateBlockInterval(),
+                _intervalConfig(),
                 AggregateVerifier.ScheduleConfig({
                     protocolVersions: IProtocolVersions(address(protocolVersionsProxy)),
                     genesisBlockNumber: cfg.l2GenesisBlockNumber(),
@@ -159,8 +158,7 @@ abstract contract DeployDevBase is Script {
         console.log("Deployment saved to:", outPath);
     }
 
-    function _blockInterval() internal pure virtual returns (uint256);
-    function _intermediateBlockInterval() internal pure virtual returns (uint256);
+    function _intervalConfig() internal pure virtual returns (AggregateVerifier.IntervalConfig memory);
     function _initBond() internal pure virtual returns (uint256);
     function _outputSuffix() internal pure virtual returns (string memory);
     function _deployTEERegistryImpl() internal virtual returns (address);

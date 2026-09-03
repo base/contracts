@@ -462,6 +462,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             }),
             multiproofBlockInterval: 100,
             multiproofIntermediateBlockInterval: 10,
+            multiproofDenimBlockInterval: 1000,
+            multiproofDenimIntermediateBlockInterval: 100,
             sp1Verifier: ISP1Verifier(address(sp1Verifier)),
             teeProposer: proposer,
             teeChallenger: challenger,
@@ -573,6 +575,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             l2BlockTime: _input.implementationsInput.scheduleConfig.blockTime,
             multiproofBlockInterval: _input.implementationsInput.multiproofBlockInterval,
             multiproofIntermediateBlockInterval: _input.implementationsInput.multiproofIntermediateBlockInterval,
+            multiproofDenimBlockInterval: _input.implementationsInput.multiproofDenimBlockInterval,
+            multiproofDenimIntermediateBlockInterval: _input.implementationsInput
+            .multiproofDenimIntermediateBlockInterval,
             withdrawalDelaySeconds: _input.implementationsInput.withdrawalDelaySeconds
         });
     }

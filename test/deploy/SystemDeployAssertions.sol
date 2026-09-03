@@ -46,6 +46,8 @@ abstract contract SystemDeployAssertions is Test {
         uint64 l2BlockTime;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+        uint256 multiproofDenimBlockInterval;
+        uint256 multiproofDenimIntermediateBlockInterval;
         uint256 withdrawalDelaySeconds;
     }
 
@@ -260,6 +262,12 @@ abstract contract SystemDeployAssertions is Test {
         assertEq(_aggregateVerifier.BLOCK_INTERVAL(), _expected.multiproofBlockInterval, "AV-140");
         assertEq(
             _aggregateVerifier.INTERMEDIATE_BLOCK_INTERVAL(), _expected.multiproofIntermediateBlockInterval, "AV-150"
+        );
+        assertEq(_aggregateVerifier.DENIM_BLOCK_INTERVAL(), _expected.multiproofDenimBlockInterval, "AV-160");
+        assertEq(
+            _aggregateVerifier.DENIM_INTERMEDIATE_BLOCK_INTERVAL(),
+            _expected.multiproofDenimIntermediateBlockInterval,
+            "AV-170"
         );
     }
 

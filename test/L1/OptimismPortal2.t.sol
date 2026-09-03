@@ -89,8 +89,12 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
             AggregateVerifier.ZkHashes(bytes32(uint256(2)), bytes32(uint256(3))),
             bytes32(uint256(4)),
             deploy.cfg().l2ChainId(),
-            100,
-            10,
+            AggregateVerifier.IntervalConfig({
+                blockInterval: 100,
+                intermediateBlockInterval: 10,
+                denimBlockInterval: 1000,
+                denimIntermediateBlockInterval: 100
+            }),
             AggregateVerifier.ScheduleConfig({
                 protocolVersions: protocolVersions, genesisBlockNumber: 0, genesisTimestamp: 1, blockTime: 2
             })

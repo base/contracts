@@ -81,6 +81,8 @@ contract SystemDeploy is Script {
         AggregateVerifier.ScheduleConfig scheduleConfig;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+        uint256 multiproofDenimBlockInterval;
+        uint256 multiproofDenimIntermediateBlockInterval;
         ISP1Verifier sp1Verifier;
         address teeProposer;
         address teeChallenger;
@@ -130,6 +132,8 @@ contract SystemDeploy is Script {
         AggregateVerifier.ScheduleConfig scheduleConfig;
         uint256 multiproofBlockInterval;
         uint256 multiproofIntermediateBlockInterval;
+        uint256 multiproofDenimBlockInterval;
+        uint256 multiproofDenimIntermediateBlockInterval;
     }
 
     struct MultiproofOutput {
@@ -269,6 +273,8 @@ contract SystemDeploy is Script {
             scheduleConfig: _configuredScheduleConfig(),
             multiproofBlockInterval: cfg.multiproofBlockInterval(),
             multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
+            multiproofDenimBlockInterval: cfg.multiproofDenimBlockInterval(),
+            multiproofDenimIntermediateBlockInterval: cfg.multiproofDenimIntermediateBlockInterval(),
             sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
             teeProposer: cfg.teeProposer(),
             teeChallenger: cfg.teeChallenger(),
@@ -1056,7 +1062,9 @@ contract SystemDeploy is Script {
                 l2ChainId: _opChainInput.l2ChainId,
                 scheduleConfig: scheduleConfig,
                 multiproofBlockInterval: _input.multiproofBlockInterval,
-                multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval
+                multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval,
+                multiproofDenimBlockInterval: _input.multiproofDenimBlockInterval,
+                multiproofDenimIntermediateBlockInterval: _input.multiproofDenimIntermediateBlockInterval
             })
         );
 
@@ -1084,8 +1092,12 @@ contract SystemDeploy is Script {
                     AggregateVerifier.ZkHashes(_input.zkRangeHash, _input.zkAggregationHash),
                     _input.multiproofConfigHash,
                     _input.l2ChainId,
-                    _input.multiproofBlockInterval,
-                    _input.multiproofIntermediateBlockInterval,
+                    AggregateVerifier.IntervalConfig({
+                        blockInterval: _input.multiproofBlockInterval,
+                        intermediateBlockInterval: _input.multiproofIntermediateBlockInterval,
+                        denimBlockInterval: _input.multiproofDenimBlockInterval,
+                        denimIntermediateBlockInterval: _input.multiproofDenimIntermediateBlockInterval
+                    }),
                     _input.scheduleConfig
                 )
             )
@@ -1135,6 +1147,15 @@ contract SystemDeploy is Script {
         require(
             _input.multiproofBlockInterval % _input.multiproofIntermediateBlockInterval == 0,
             "SystemDeploy: invalid multiproof block intervals"
+        );
+        require(_input.multiproofDenimBlockInterval != 0, "SystemDeploy: multiproof Denim block interval not set");
+        require(
+            _input.multiproofDenimIntermediateBlockInterval != 0,
+            "SystemDeploy: multiproof Denim intermediate interval not set"
+        );
+        require(
+            _input.multiproofDenimBlockInterval % _input.multiproofDenimIntermediateBlockInterval == 0,
+            "SystemDeploy: invalid multiproof Denim block intervals"
         );
         require(_input.teeProposer != address(0), "SystemDeploy: teeProposer not set");
         require(_input.teeChallenger != address(0), "SystemDeploy: teeChallenger not set");

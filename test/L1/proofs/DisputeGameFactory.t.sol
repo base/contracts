@@ -47,6 +47,8 @@ abstract contract DisputeGameFactory_TestInit is CommonTest {
     uint256 internal constant L2_CHAIN_ID = 111;
     uint256 internal constant AGGREGATE_BLOCK_INTERVAL = 100;
     uint256 internal constant AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL = 10;
+    uint256 internal constant AGGREGATE_DENIM_BLOCK_INTERVAL = 1000;
+    uint256 internal constant AGGREGATE_DENIM_INTERMEDIATE_BLOCK_INTERVAL = 100;
     uint32 internal constant MAX_GAME_TYPE = 8;
     address internal constant NON_OWNER = address(0xBEEF);
 
@@ -229,8 +231,12 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
             AggregateVerifier.ZkHashes(bytes32(uint256(2)), bytes32(uint256(3))),
             bytes32(uint256(4)),
             L2_CHAIN_ID,
-            AGGREGATE_BLOCK_INTERVAL,
-            AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL,
+            AggregateVerifier.IntervalConfig({
+                blockInterval: AGGREGATE_BLOCK_INTERVAL,
+                intermediateBlockInterval: AGGREGATE_INTERMEDIATE_BLOCK_INTERVAL,
+                denimBlockInterval: AGGREGATE_DENIM_BLOCK_INTERVAL,
+                denimIntermediateBlockInterval: AGGREGATE_DENIM_INTERMEDIATE_BLOCK_INTERVAL
+            }),
             AggregateVerifier.ScheduleConfig({
                 protocolVersions: protocolVersions, genesisBlockNumber: 0, genesisTimestamp: 0, blockTime: 2
             })

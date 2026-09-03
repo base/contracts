@@ -155,6 +155,85 @@ contract AggregateVerifierTest is BaseTest {
         assertEq(game.scheduleId(), protocolVersions.scheduleId(DENIM_UPGRADE_INDEX - 1));
     }
 
+    /// @notice Intervals are selected on the game's starting block relative to the Denim activation
+    ///         block, so the chain of games stays contiguous across the fork.
+    function test_intervalsForStartingBlock_selectsOnDenimActivationBlock_succeeds() public {
+        // divUp(86500 - L2_GENESIS_TIMESTAMP, L2_BLOCK_TIME) == 50.
+        _importDenimSchedule(L2_GENESIS_TIMESTAMP + 100);
+        uint256 denimActivationBlock = 50;
+
+        _assertIntervals(denimActivationBlock - 1, BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
+        _assertIntervals(denimActivationBlock, DENIM_BLOCK_INTERVAL, DENIM_INTERMEDIATE_BLOCK_INTERVAL);
+        _assertIntervals(denimActivationBlock + 1, DENIM_BLOCK_INTERVAL, DENIM_INTERMEDIATE_BLOCK_INTERVAL);
+    }
+
+    function test_intervalsForStartingBlock_denimUnscheduled_succeeds() public view {
+        _assertIntervals(0, BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
+        _assertIntervals(type(uint64).max, BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
+    }
+
+    /// @notice A game starting at or after the Denim activation block must span DENIM_BLOCK_INTERVAL.
+    function test_initialize_denimIntervals_succeeds() public {
+        // The activation timestamp equals genesis, so every block including the anchor is Denim.
+        _importDenimSchedule(L2_GENESIS_TIMESTAMP);
+        _assertIntervals(0, DENIM_BLOCK_INTERVAL, DENIM_INTERMEDIATE_BLOCK_INTERVAL);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AggregateVerifier.UnexpectedBlockNumber.selector, DENIM_BLOCK_INTERVAL, BLOCK_INTERVAL
+            )
+        );
+        _createGameEndingAt(BLOCK_INTERVAL);
+
+        AggregateVerifier game = _createGameEndingAt(DENIM_BLOCK_INTERVAL);
+        assertEq(game.l2SequenceNumber(), DENIM_BLOCK_INTERVAL);
+    }
+
+    /// @notice The one game whose range contains the activation block starts before it, so it is
+    ///         proven under the pre-Denim interval.
+    function test_initialize_straddlingGame_usesPreDenimInterval_succeeds() public {
+        // Activation block 50 falls inside the first game's [0, 100) range.
+        _importDenimSchedule(L2_GENESIS_TIMESTAMP + 100);
+        _assertIntervals(0, BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AggregateVerifier.UnexpectedBlockNumber.selector, BLOCK_INTERVAL, DENIM_BLOCK_INTERVAL
+            )
+        );
+        _createGameEndingAt(DENIM_BLOCK_INTERVAL);
+
+        AggregateVerifier game = _createGameEndingAt(BLOCK_INTERVAL);
+        assertEq(game.l2SequenceNumber(), BLOCK_INTERVAL);
+    }
+
+    function test_constructor_mismatchedIntermediateRootCount_reverts() public {
+        // 100 / 10 == 10 intermediate roots, but 1000 / 200 == 5.
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.MismatchedIntermediateRootCount.selector, 10, 5));
+        _deployAggregateVerifier(
+            AggregateVerifier.IntervalConfig({
+                blockInterval: BLOCK_INTERVAL,
+                intermediateBlockInterval: INTERMEDIATE_BLOCK_INTERVAL,
+                denimBlockInterval: DENIM_BLOCK_INTERVAL,
+                denimIntermediateBlockInterval: 200
+            }),
+            _defaultScheduleConfig()
+        );
+    }
+
+    function test_constructor_invalidDenimBlockIntervals_reverts() public {
+        vm.expectRevert(abi.encodeWithSelector(AggregateVerifier.InvalidBlockInterval.selector, 1000, 0));
+        _deployAggregateVerifier(
+            AggregateVerifier.IntervalConfig({
+                blockInterval: BLOCK_INTERVAL,
+                intermediateBlockInterval: INTERMEDIATE_BLOCK_INTERVAL,
+                denimBlockInterval: DENIM_BLOCK_INTERVAL,
+                denimIntermediateBlockInterval: 0
+            }),
+            _defaultScheduleConfig()
+        );
+    }
+
     /// @notice A claim whose L2 timestamp L1 has not yet reached cannot open a game, so a game can
     ///         never pin an activation that the owner is still able to clear or delay.
     function test_initialize_l2TimestampInFuture_reverts() public {
@@ -524,8 +603,9 @@ contract AggregateVerifierTest is BaseTest {
 
     function _setSingleBlockAggregateVerifier(uint64 genesisTimestamp) private {
         AggregateVerifier implementation = _deployAggregateVerifier(
-            1,
-            1,
+            AggregateVerifier.IntervalConfig({
+                blockInterval: 1, intermediateBlockInterval: 1, denimBlockInterval: 1, denimIntermediateBlockInterval: 1
+            }),
             AggregateVerifier.ScheduleConfig({
                 protocolVersions: IProtocolVersions(address(protocolVersions)),
                 genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
@@ -676,8 +756,12 @@ contract AggregateVerifierTest is BaseTest {
         returns (AggregateVerifier)
     {
         return _deployAggregateVerifier(
-            blockInterval,
-            intermediateBlockInterval,
+            AggregateVerifier.IntervalConfig({
+                blockInterval: blockInterval,
+                intermediateBlockInterval: intermediateBlockInterval,
+                denimBlockInterval: blockInterval,
+                denimIntermediateBlockInterval: intermediateBlockInterval
+            }),
             AggregateVerifier.ScheduleConfig({
                 protocolVersions: IProtocolVersions(address(protocolVersions)),
                 genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
@@ -691,12 +775,82 @@ contract AggregateVerifierTest is BaseTest {
         private
         returns (AggregateVerifier)
     {
-        return _deployAggregateVerifier(BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL, scheduleConfig);
+        return _deployAggregateVerifier(_defaultIntervalConfig(), scheduleConfig);
+    }
+
+    /// @dev Registers a schedule whose only meaningful entry is the Denim activation, and rebinds
+    ///      the implementation to it.
+    function _importDenimSchedule(uint64 denimActivationTimestamp) private {
+        uint64[] memory schedule = new uint64[](DENIM_UPGRADE_INDEX + 1);
+        for (uint256 i; i < DENIM_UPGRADE_INDEX; i++) {
+            schedule[i] = L2_GENESIS_TIMESTAMP;
+        }
+        schedule[DENIM_UPGRADE_INDEX] = denimActivationTimestamp;
+        _importProtocolVersionsSchedule(schedule);
+        aggregateVerifierImpl = AggregateVerifier(address(factory.gameImpls(GameTypes.AGGREGATE_VERIFIER)));
+    }
+
+    function _assertIntervals(
+        uint256 startingBlock,
+        uint256 expectedBlockInterval,
+        uint256 expectedIntermediateBlockInterval
+    )
+        private
+        view
+    {
+        (uint256 blockInterval, uint256 intermediateBlockInterval) =
+            aggregateVerifierImpl.intervalsForStartingBlock(startingBlock);
+        assertEq(blockInterval, expectedBlockInterval);
+        assertEq(intermediateBlockInterval, expectedIntermediateBlockInterval);
+    }
+
+    /// @dev Creates a game off the anchor root. Intermediate root values are unchecked by the mock
+    ///      verifiers, so only their count has to match the implementation.
+    function _createGameEndingAt(uint256 endingBlock) private returns (AggregateVerifier) {
+        Claim rootClaim = Claim.wrap(keccak256(abi.encode(endingBlock)));
+        uint256 count = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;
+        bytes32[] memory intermediateRoots = new bytes32[](count);
+        for (uint256 i; i < count - 1; i++) {
+            intermediateRoots[i] = keccak256(abi.encode(endingBlock, i));
+        }
+        intermediateRoots[count - 1] = rootClaim.raw();
+
+        bytes memory extraData =
+            abi.encodePacked(endingBlock, address(anchorStateRegistry), abi.encodePacked(intermediateRoots));
+        bytes memory proof = _generateProof(abi.encode(endingBlock), AggregateVerifier.ProofType.TEE);
+
+        _warpToL2Timestamp(endingBlock);
+        vm.deal(TEE_PROVER, INIT_BOND);
+        vm.prank(TEE_PROVER);
+        return AggregateVerifier(
+            address(
+                factory.createWithInitData{ value: INIT_BOND }(
+                    GameTypes.AGGREGATE_VERIFIER, rootClaim, extraData, proof
+                )
+            )
+        );
+    }
+
+    function _defaultScheduleConfig() private view returns (AggregateVerifier.ScheduleConfig memory) {
+        return AggregateVerifier.ScheduleConfig({
+            protocolVersions: IProtocolVersions(address(protocolVersions)),
+            genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
+            genesisTimestamp: L2_GENESIS_TIMESTAMP,
+            blockTime: L2_BLOCK_TIME
+        });
+    }
+
+    function _defaultIntervalConfig() private pure returns (AggregateVerifier.IntervalConfig memory) {
+        return AggregateVerifier.IntervalConfig({
+            blockInterval: BLOCK_INTERVAL,
+            intermediateBlockInterval: INTERMEDIATE_BLOCK_INTERVAL,
+            denimBlockInterval: DENIM_BLOCK_INTERVAL,
+            denimIntermediateBlockInterval: DENIM_INTERMEDIATE_BLOCK_INTERVAL
+        });
     }
 
     function _deployAggregateVerifier(
-        uint256 blockInterval,
-        uint256 intermediateBlockInterval,
+        AggregateVerifier.IntervalConfig memory intervalConfig,
         AggregateVerifier.ScheduleConfig memory scheduleConfig
     )
         private
@@ -712,8 +866,7 @@ contract AggregateVerifierTest is BaseTest {
             AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
             CONFIG_HASH,
             L2_CHAIN_ID,
-            blockInterval,
-            intermediateBlockInterval,
+            intervalConfig,
             scheduleConfig
         );
     }

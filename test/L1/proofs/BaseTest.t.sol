@@ -33,6 +33,8 @@ contract BaseTest is Test {
     // AggregateVerifier expects evenly spaced intermediate roots.
     uint256 internal constant BLOCK_INTERVAL = 100;
     uint256 internal constant INTERMEDIATE_BLOCK_INTERVAL = 10;
+    uint256 internal constant DENIM_BLOCK_INTERVAL = 1000;
+    uint256 internal constant DENIM_INTERMEDIATE_BLOCK_INTERVAL = 100;
     uint256 private constant INTERMEDIATE_ROOTS_COUNT = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL;
 
     uint256 internal constant INIT_BOND = 1 ether;
@@ -136,8 +138,12 @@ contract BaseTest is Test {
             AggregateVerifier.ZkHashes(ZK_RANGE_HASH, ZK_AGGREGATE_HASH),
             CONFIG_HASH,
             L2_CHAIN_ID,
-            BLOCK_INTERVAL,
-            INTERMEDIATE_BLOCK_INTERVAL,
+            AggregateVerifier.IntervalConfig({
+                blockInterval: BLOCK_INTERVAL,
+                intermediateBlockInterval: INTERMEDIATE_BLOCK_INTERVAL,
+                denimBlockInterval: DENIM_BLOCK_INTERVAL,
+                denimIntermediateBlockInterval: DENIM_INTERMEDIATE_BLOCK_INTERVAL
+            }),
             AggregateVerifier.ScheduleConfig({
                 protocolVersions: IProtocolVersions(address(protocolVersions)),
                 genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,

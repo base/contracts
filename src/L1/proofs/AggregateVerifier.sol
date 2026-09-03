@@ -53,6 +53,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         uint64 blockTime;
     }
 
+    /// @notice Proposal block intervals for each side of the Denim activation.
+    /// @dev    Both pairs must yield the same intermediate root count, so the CWIA `extraData` layout
+    ///         and `INITIALIZE_CALLDATA_SIZE` are identical on both sides of the fork.
+    struct IntervalConfig {
+        uint256 blockInterval;
+        uint256 intermediateBlockInterval;
+        uint256 denimBlockInterval;
+        uint256 denimIntermediateBlockInterval;
+    }
+
     ////////////////////////////////////////////////////////////////
     //                         Constants                          //
     ////////////////////////////////////////////////////////////////
@@ -123,13 +133,21 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice The legacy number of seconds between consecutive L2 blocks.
     uint64 public immutable L2_BLOCK_TIME;
 
-    /// @notice The block interval between each proposal.
+    /// @notice The block interval between each proposal, for games starting before Denim.
     /// @dev    The parent's block number + BLOCK_INTERVAL = this proposal's block number.
     uint256 public immutable BLOCK_INTERVAL;
 
-    /// @notice The block interval for intermediate proposals.
+    /// @notice The block interval for intermediate proposals, for games starting before Denim.
     /// @dev    BLOCK_INTERVAL must be divisible by INTERMEDIATE_BLOCK_INTERVAL.
     uint256 public immutable INTERMEDIATE_BLOCK_INTERVAL;
+
+    /// @notice The block interval between each proposal, for games starting at or after Denim.
+    uint256 public immutable DENIM_BLOCK_INTERVAL;
+
+    /// @notice The block interval for intermediate proposals, for games starting at or after Denim.
+    /// @dev    DENIM_BLOCK_INTERVAL must be divisible by DENIM_INTERMEDIATE_BLOCK_INTERVAL, and their
+    ///         ratio must equal the pre-Denim one.
+    uint256 public immutable DENIM_INTERMEDIATE_BLOCK_INTERVAL;
 
     /// @notice The size of the initialize call data.
     uint256 internal immutable INITIALIZE_CALLDATA_SIZE;
@@ -230,6 +248,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @notice When the block interval or intermediate block interval is invalid.
     error InvalidBlockInterval(uint256 blockInterval, uint256 intermediateBlockInterval);
 
+    /// @notice When the pre-Denim and Denim intervals do not yield the same intermediate root count.
+    error MismatchedIntermediateRootCount(uint256 preDenimCount, uint256 denimCount);
+
     /// @notice When the block number is unexpected.
     error UnexpectedBlockNumber(uint256 expectedBlockNumber, uint256 actualBlockNumber);
 
@@ -302,8 +323,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     /// @param zkHashes The hashes of the ZK range and aggregate programs.
     /// @param configHash The hash of the rollup configuration.
     /// @param l2ChainId The chain ID of the L2 network.
-    /// @param blockInterval The block interval.
-    /// @param intermediateBlockInterval The intermediate block interval.
+    /// @param intervalConfig The pre-Denim and Denim proposal block intervals.
     /// @param scheduleConfig Upgrade registry and deterministic L2 timestamp configuration.
     constructor(
         GameType gameType_,
@@ -315,14 +335,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         ZkHashes memory zkHashes,
         bytes32 configHash,
         uint256 l2ChainId,
-        uint256 blockInterval,
-        uint256 intermediateBlockInterval,
+        IntervalConfig memory intervalConfig,
         ScheduleConfig memory scheduleConfig
     ) {
-        // Block interval and intermediate block interval must be positive and divisible.
-        if (blockInterval == 0 || intermediateBlockInterval == 0 || blockInterval % intermediateBlockInterval != 0) {
-            revert InvalidBlockInterval(blockInterval, intermediateBlockInterval);
-        }
+        _validateIntervals(intervalConfig);
         if (scheduleConfig.blockTime == 0) revert InvalidL2BlockTime();
 
         // Set up initial game state.
@@ -340,8 +356,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         L2_GENESIS_BLOCK_NUMBER = scheduleConfig.genesisBlockNumber;
         L2_GENESIS_TIMESTAMP = scheduleConfig.genesisTimestamp;
         L2_BLOCK_TIME = scheduleConfig.blockTime;
-        BLOCK_INTERVAL = blockInterval;
-        INTERMEDIATE_BLOCK_INTERVAL = intermediateBlockInterval;
+        BLOCK_INTERVAL = intervalConfig.blockInterval;
+        INTERMEDIATE_BLOCK_INTERVAL = intervalConfig.intermediateBlockInterval;
+        DENIM_BLOCK_INTERVAL = intervalConfig.denimBlockInterval;
+        DENIM_INTERMEDIATE_BLOCK_INTERVAL = intervalConfig.denimIntermediateBlockInterval;
         PROTOCOL_VERSIONS = scheduleConfig.protocolVersions;
 
         INITIALIZE_CALLDATA_SIZE = 0x8E + 0x20 * intermediateOutputRootsCount();
@@ -409,9 +427,11 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             startingOutputRoot = ANCHOR_STATE_REGISTRY.getStartingAnchorRoot();
         }
 
-        // The block number must be BLOCK_INTERVAL blocks after the starting block number.
-        if (l2SequenceNumber() != startingOutputRoot.l2SequenceNumber + BLOCK_INTERVAL) {
-            revert UnexpectedBlockNumber(startingOutputRoot.l2SequenceNumber + BLOCK_INTERVAL, l2SequenceNumber());
+        // The block number must be one block interval after the starting block number. The interval
+        // is selected on the starting block so the game chain stays contiguous across Denim.
+        (uint256 blockInterval,) = _intervals(startingOutputRoot.l2SequenceNumber);
+        if (l2SequenceNumber() != startingOutputRoot.l2SequenceNumber + blockInterval) {
+            revert UnexpectedBlockNumber(startingOutputRoot.l2SequenceNumber + blockInterval, l2SequenceNumber());
         }
 
         // Set the game as initialized.
@@ -767,8 +787,20 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         return expectedResolution.raw() <= block.timestamp;
     }
 
+    /// @notice Returns the proposal intervals that govern a game starting at `startingBlock`.
+    /// @dev    Offchain proposers and challengers must resolve intervals per game through this getter
+    ///         rather than reading `BLOCK_INTERVAL` / `INTERMEDIATE_BLOCK_INTERVAL`, which describe
+    ///         only games starting before Denim.
+    /// @param startingBlock The starting L2 block number of the game.
+    /// @return The block interval and the intermediate block interval governing that game.
+    function intervalsForStartingBlock(uint256 startingBlock) public view returns (uint256, uint256) {
+        return _intervals(startingBlock);
+    }
+
     /// @notice The number of intermediate output roots.
     /// @dev At least one as the proposal's root claim is considered an intermediate root.
+    ///      The constructor requires both interval pairs to yield the same count, so this is constant
+    ///      across the Denim activation and the CWIA `extraData` layout never changes.
     function intermediateOutputRootsCount() public view returns (uint256) {
         return (BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL);
     }
@@ -1101,39 +1133,86 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 startingRoot = intermediateRootIndex == 0
             ? startingOutputRoot.root.raw()
             : intermediateOutputRoot(intermediateRootIndex - 1);
+        (, uint256 intermediateBlockInterval) = _intervals(startingOutputRoot.l2SequenceNumber);
         uint64 startingL2SequenceNumber =
-            uint64(startingOutputRoot.l2SequenceNumber + intermediateRootIndex * INTERMEDIATE_BLOCK_INTERVAL);
-        uint64 endingL2SequenceNumber = startingL2SequenceNumber + uint64(INTERMEDIATE_BLOCK_INTERVAL);
+            uint64(startingOutputRoot.l2SequenceNumber + intermediateRootIndex * intermediateBlockInterval);
+        uint64 endingL2SequenceNumber = startingL2SequenceNumber + uint64(intermediateBlockInterval);
         return (startingRoot, startingL2SequenceNumber, endingL2SequenceNumber);
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.1.0
+    /// @custom:semver 0.2.0
     function version() public pure virtual returns (string memory) {
-        return "0.1.0";
+        return "0.2.0";
     }
 
     /// @notice Derives an L2 block timestamp using the legacy cadence before Denim and whole-second groups after it.
     function _l2Timestamp(uint256 claimBlock) private view returns (uint64) {
+        uint256 denimBlock = _denimActivationBlock();
+        if (claimBlock < denimBlock) return _legacyL2Timestamp(claimBlock);
+
+        uint256 claimTimestamp =
+            uint256(_legacyL2Timestamp(denimBlock)) + (claimBlock - denimBlock) / DENIM_BLOCKS_PER_SECOND;
+        if (claimTimestamp > type(uint64).max) revert L2TimestampOverflow(claimBlock);
+        return uint64(claimTimestamp);
+    }
+
+    /// @notice Reverts unless both interval pairs are positive, divisible, and yield the same
+    ///         intermediate root count.
+    function _validateIntervals(IntervalConfig memory intervalConfig) private pure {
+        uint256 blockInterval = intervalConfig.blockInterval;
+        uint256 intermediateBlockInterval = intervalConfig.intermediateBlockInterval;
+        uint256 denimBlockInterval = intervalConfig.denimBlockInterval;
+        uint256 denimIntermediateBlockInterval = intervalConfig.denimIntermediateBlockInterval;
+
+        if (blockInterval == 0 || intermediateBlockInterval == 0 || blockInterval % intermediateBlockInterval != 0) {
+            revert InvalidBlockInterval(blockInterval, intermediateBlockInterval);
+        }
+        if (
+            denimBlockInterval == 0 || denimIntermediateBlockInterval == 0
+                || denimBlockInterval % denimIntermediateBlockInterval != 0
+        ) {
+            revert InvalidBlockInterval(denimBlockInterval, denimIntermediateBlockInterval);
+        }
+
+        // The intermediate root count fixes the CWIA `extraData` layout, which is frozen for the
+        // lifetime of this implementation. Both interval pairs must therefore agree on it.
+        uint256 preDenimCount = blockInterval / intermediateBlockInterval;
+        uint256 denimCount = denimBlockInterval / denimIntermediateBlockInterval;
+        if (preDenimCount != denimCount) revert MismatchedIntermediateRootCount(preDenimCount, denimCount);
+    }
+
+    /// @notice Returns the first L2 block number governed by Denim, or `type(uint256).max` when Denim
+    ///         is not scheduled.
+    /// @dev    Reading the live schedule is safe despite it being mutable. `initializeWithInitData`
+    ///         rejects a game whose ending L2 timestamp has not yet been reached on L1, and
+    ///         `ProtocolVersions` requires any new activation to be at least `MIN_NOTICE` in the future
+    ///         and freezes one that has passed. A Denim timestamp that can still move is therefore
+    ///         always later than the ending timestamp of every initialized game, so no game can have
+    ///         its intervals reselected after creation.
+    function _denimActivationBlock() private view returns (uint256) {
         uint64[] memory schedule = PROTOCOL_VERSIONS.getSchedule();
-        if (schedule.length <= DENIM_UPGRADE_INDEX) return _legacyL2Timestamp(claimBlock);
+        if (schedule.length <= DENIM_UPGRADE_INDEX) return type(uint256).max;
 
         uint64 denimActivationTimestamp = schedule[DENIM_UPGRADE_INDEX];
-        if (denimActivationTimestamp == 0) return _legacyL2Timestamp(claimBlock);
+        if (denimActivationTimestamp == 0) return type(uint256).max;
 
         uint256 blocksUntilDenim;
         if (denimActivationTimestamp > L2_GENESIS_TIMESTAMP) {
             blocksUntilDenim = FixedPointMathLib.divUp(denimActivationTimestamp - L2_GENESIS_TIMESTAMP, L2_BLOCK_TIME);
         }
+        return L2_GENESIS_BLOCK_NUMBER + blocksUntilDenim;
+    }
 
-        uint256 blocksSinceGenesis = claimBlock - L2_GENESIS_BLOCK_NUMBER;
-        if (blocksSinceGenesis < blocksUntilDenim) return _legacyL2Timestamp(claimBlock);
-
-        uint256 denimBlock = L2_GENESIS_BLOCK_NUMBER + blocksUntilDenim;
-        uint256 claimTimestamp =
-            uint256(_legacyL2Timestamp(denimBlock)) + (claimBlock - denimBlock) / DENIM_BLOCKS_PER_SECOND;
-        if (claimTimestamp > type(uint64).max) revert L2TimestampOverflow(claimBlock);
-        return uint64(claimTimestamp);
+    /// @notice Selects the proposal intervals governing a game, from its starting block number.
+    /// @dev    Selection is on the starting block rather than the ending block so the game chain stays
+    ///         contiguous across the activation: every game satisfies
+    ///         `end == parent.end + blockInterval` for the interval its own start selects. Exactly one
+    ///         game straddles the activation and is proven under the pre-Denim interval, which is
+    ///         correct because provers apply fork rules per block by timestamp.
+    function _intervals(uint256 startingBlock) private view returns (uint256, uint256) {
+        if (startingBlock < _denimActivationBlock()) return (BLOCK_INTERVAL, INTERMEDIATE_BLOCK_INTERVAL);
+        return (DENIM_BLOCK_INTERVAL, DENIM_INTERMEDIATE_BLOCK_INTERVAL);
     }
 
     /// @notice Derives an L2 block timestamp using the pre-Denim block cadence.

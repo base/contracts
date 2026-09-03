@@ -52,6 +52,8 @@ contract DeployConfig is Script {
     uint256 public l2OutputOracleStartingBlockNumber;
     uint256 public l2OutputOracleStartingTimestamp;
     uint256 public multiproofBlockInterval;
+    uint256 public multiproofDenimBlockInterval;
+    uint256 public multiproofDenimIntermediateBlockInterval;
     uint256 public multiproofGameType;
     uint256 public multiproofGenesisBlockNumber;
     uint256 public multiproofIntermediateBlockInterval;
@@ -116,6 +118,8 @@ contract DeployConfig is Script {
         l2GenesisBlockNumber = _json.readUintOr("$.l2GenesisBlockNumber", 0);
         l2GenesisTimestamp = _json.readUintOr("$.l2GenesisTimestamp", 0);
         multiproofBlockInterval = _json.readUintOr("$.multiproofBlockInterval", 100);
+        multiproofDenimBlockInterval = _json.readUintOr("$.multiproofDenimBlockInterval", 1000);
+        multiproofDenimIntermediateBlockInterval = _json.readUintOr("$.multiproofDenimIntermediateBlockInterval", 100);
         multiproofGameType = _json.readUintOr("$.multiproofGameType", 621);
         multiproofGenesisBlockNumber = _json.readUintOr("$.multiproofGenesisBlockNumber", 0);
         multiproofIntermediateBlockInterval = _json.readUintOr("$.multiproofIntermediateBlockInterval", 10);
