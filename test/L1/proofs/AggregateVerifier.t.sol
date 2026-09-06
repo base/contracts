@@ -20,7 +20,7 @@ import { BaseTest } from "./BaseTest.t.sol";
 contract AggregateVerifierTest is BaseTest {
     using LibClone for address;
 
-    uint256 private constant FAST_BLOCK_UPGRADE_INDEX = 13;
+    uint256 private constant FAST_BLOCK_UPGRADE_INDEX = 12;
     uint256 private constant FAST_BLOCKS_PER_SECOND = 5;
 
     AggregateVerifier private aggregateVerifierImpl;

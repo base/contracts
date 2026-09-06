@@ -95,9 +95,9 @@ contract SeedGames is Script {
 
         // Read the proposal geometry off the deployment rather than restating it. AggregateVerifier
         // carries both the slow- and fast-block pairs and picks per game, so a hardcoded pair here
-        // would silently seed unopenable games on a devnet with Denim scheduled.
+        // would silently seed unopenable games on a devnet with Cobalt scheduled.
         // ponytail: resolved once from the anchor, so a chain seeded straight across the activation
-        // would be wrong for its later games. Seed before scheduling Denim, or seed each side
+        // would be wrong for its later games. Seed before scheduling Cobalt, or seed each side
         // separately; per-game resolution only matters if a devnet ever needs a straddling chain.
         AggregateVerifier gameImpl = AggregateVerifier(address(ctx.factory.gameImpls(ctx.gameType)));
         (ctx.slowBlockInterval,) = gameImpl.intervalsForStartingBlock(ctx.anchorBlock);
