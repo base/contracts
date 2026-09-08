@@ -12,7 +12,7 @@ import { Verifier } from "src/L1/proofs/Verifier.sol";
 import { BaseTest } from "./BaseTest.t.sol";
 
 contract ChallengeTest is BaseTest {
-    uint256 private constant LAST_INTERMEDIATE_ROOT_INDEX = BLOCK_INTERVAL / INTERMEDIATE_BLOCK_INTERVAL - 1;
+    uint256 private constant LAST_INTERMEDIATE_ROOT_INDEX = SLOW_BLOCK_INTERVAL / SLOW_INTERMEDIATE_BLOCK_INTERVAL - 1;
 
     function testChallengeTEEProofWithZKProof() public {
         AggregateVerifier game =
@@ -158,7 +158,7 @@ contract ChallengeTest is BaseTest {
         private
         returns (AggregateVerifier)
     {
-        currentL2BlockNumber += BLOCK_INTERVAL;
+        currentL2BlockNumber += SLOW_BLOCK_INTERVAL;
         Claim rootClaim = _claim(claimSalt);
         bytes memory proof = _generateProof(proofSalt, proofType);
         return _createAggregateVerifierGame(prover, rootClaim, currentL2BlockNumber, parent, proof);

@@ -50,7 +50,7 @@ abstract contract AnchorStateRegistry_TestInit is BaseTest {
 
         // Get the actual anchor roots
         (, uint256 l2BlockNumber) = anchorStateRegistry.getAnchorRoot();
-        validL2BlockNumber = l2BlockNumber + BLOCK_INTERVAL;
+        validL2BlockNumber = l2BlockNumber + SLOW_BLOCK_INTERVAL;
         Claim rootClaim = Claim.wrap(keccak256(abi.encode(validL2BlockNumber)));
         bytes memory proof = _generateProof("tee-proof", AggregateVerifier.ProofType.TEE);
         gameProxy = IDisputeGame(
