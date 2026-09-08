@@ -21,7 +21,7 @@
   },
   "src/L1/SystemConfig.sol:SystemConfig": {
     "initCodeHash": "0x4a83d1725257aee27f58f9874c543e55b89c3112e190c62ab4858e3c4dbf5bc3",
-    "sourceCodeHash": "0x2fc588be83bd1f91ff6cf0f7540c95eb08198c90d9df2a1eb3169361b8cdb03e"
+    "sourceCodeHash": "0x04fee741d6628c4b74ec5315e252e5f5e62bdd820740e9ba7bd98525820043da"
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0xc14998e269a6ad7e5c2b5d5beee0eabb68a68c3758e666a76822905c4f16575f",
