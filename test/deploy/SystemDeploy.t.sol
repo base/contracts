@@ -47,14 +47,18 @@ contract MockInvalidTEEProverRegistry {
 }
 
 contract MockLegacySuperchainConfig {
-    address internal immutable PAUSED_IDENTIFIER;
+    address internal immutable UNPAUSABLE_IDENTIFIER;
 
-    constructor(address _pausedIdentifier) {
-        PAUSED_IDENTIFIER = _pausedIdentifier;
+    constructor(address _unpausableIdentifier) {
+        UNPAUSABLE_IDENTIFIER = _unpausableIdentifier;
     }
 
-    function paused(address _identifier) external view returns (bool) {
-        return _identifier == PAUSED_IDENTIFIER;
+    function pausable(address _identifier) external view returns (bool) {
+        return _identifier != UNPAUSABLE_IDENTIFIER;
+    }
+
+    function paused(address) external pure returns (bool) {
+        return false;
     }
 }
 
@@ -321,13 +325,16 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         );
     }
 
-    function testFuzz_upgrade_activeLegacyPause_reverts(bool _globalPause) public {
+    function testFuzz_upgrade_expiredLegacyPause_reverts(bool _globalPause) public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
         address systemConfigProxy = address(output.opChain.systemConfigProxy);
         address pausedIdentifier = _globalPause ? address(0) : address(output.opChain.optimismPortalProxy);
         MockLegacySuperchainConfig legacySuperchainConfig = new MockLegacySuperchainConfig(pausedIdentifier);
         address systemConfigImpl = output.opChain.opChainProxyAdmin.getProxyImplementation(systemConfigProxy);
+
+        assertFalse(legacySuperchainConfig.paused(pausedIdentifier), "legacy pause inactive");
+        assertFalse(legacySuperchainConfig.pausable(pausedIdentifier), "legacy pause record remains");
 
         vm.mockCall(
             systemConfigProxy,

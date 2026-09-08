@@ -19,6 +19,7 @@ import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPort
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
+import { ILegacySuperchainConfig, ILegacySystemConfig } from "interfaces/legacy/ILegacySuperchainConfig.sol";
 import { IL1ChugSplashProxy } from "interfaces/legacy/IL1ChugSplashProxy.sol";
 import { IResolvedDelegateProxy } from "interfaces/legacy/IResolvedDelegateProxy.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
@@ -41,14 +42,6 @@ import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
-
-interface ILegacySuperchainConfig {
-    function paused(address _identifier) external view returns (bool);
-}
-
-interface ILegacySystemConfig {
-    function superchainConfig() external view returns (ILegacySuperchainConfig);
-}
 
 /// @title SystemDeploy
 /// @notice Script-level API for deploying or upgrading a complete OP Stack L1 system.
@@ -568,14 +561,14 @@ contract SystemDeploy is Script {
         emit Upgraded(l2ChainId, _systemConfigProxy, msg.sender);
     }
 
-    /// @notice Rejects a migration from SuperchainConfig while its global or chain-specific pause is active.
+    /// @notice Rejects a migration from SuperchainConfig until its global and chain-specific pause records are cleared.
     function _assertLegacySuperchainConfigNotPaused(ISystemConfig _systemConfigProxy) internal view {
         (bool success, bytes memory returndata) =
             address(_systemConfigProxy).staticcall(abi.encodeCall(ILegacySystemConfig.superchainConfig, ()));
         if (!success || returndata.length != 32) return;
 
         ILegacySuperchainConfig superchainConfig = ILegacySuperchainConfig(abi.decode(returndata, (address)));
-        if (superchainConfig.paused(address(0)) || superchainConfig.paused(_systemConfigProxy.optimismPortal())) {
+        if (!superchainConfig.pausable(address(0)) || !superchainConfig.pausable(_systemConfigProxy.optimismPortal())) {
             revert LegacySuperchainConfigPaused();
         }
     }

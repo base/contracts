@@ -22,7 +22,7 @@ import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 ///         the L2 chain. It also owns the pause state for the network, which the Guardian and
 ///         Incident Responder use to halt withdrawals and message relaying.
 /// @dev Upgrading a pre-merge deployment moves pause management from the legacy SuperchainConfig.
-///      Use SystemDeploy for that upgrade, which rejects an active legacy pause.
+///      Use SystemDeploy for that upgrade, which requires legacy pause records to be cleared.
 contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, ReinitializableBase, ISemver {
     /// @notice Enum representing different types of updates.
     /// @custom:value BATCHER              Represents an update to the batcher hash.
