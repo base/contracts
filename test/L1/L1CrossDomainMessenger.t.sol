@@ -125,33 +125,24 @@ contract L1CrossDomainMessenger_Initialize_Test is L1CrossDomainMessenger_TestIn
 /// @notice Tests for the `paused` functionality of the L1CrossDomainMessenger.
 contract L1CrossDomainMessenger_Paused_Test is L1CrossDomainMessenger_TestInit {
     /// @notice Tests that the superchain config is called by the messenger's paused function.
-    function test_pause_callsSuperchainConfig_succeeds() external {
+    function test_pause_callsSystemConfig_succeeds() external {
         // We use abi.encodeWithSignature because paused is overloaded.
         // nosemgrep: sol-style-use-abi-encodecall
-        vm.expectCall(address(superchainConfig), abi.encodeWithSignature("paused(address)", address(0)));
+        vm.expectCall(address(systemConfig), abi.encodeWithSignature("paused()"));
         l1CrossDomainMessenger.paused();
     }
 
     /// @notice Tests that changing the superchain config paused status changes the return value
     ///         of the messenger.
-    function test_pause_matchesSuperchainConfig_succeeds() external {
+    function test_pause_matchesSystemConfig_succeeds() external {
         assertFalse(l1CrossDomainMessenger.paused());
-        assertEq(l1CrossDomainMessenger.paused(), superchainConfig.paused(address(0)));
+        assertEq(l1CrossDomainMessenger.paused(), systemConfig.paused());
 
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(0));
+        vm.prank(systemConfig.guardian());
+        systemConfig.pause(address(0));
 
         assertTrue(l1CrossDomainMessenger.paused());
-        assertEq(l1CrossDomainMessenger.paused(), superchainConfig.paused(address(0)));
-    }
-}
-
-/// @title L1CrossDomainMessenger_SuperchainConfig_Test
-/// @notice Tests for the `superchainConfig` function of the L1CrossDomainMessenger.
-contract L1CrossDomainMessenger_SuperchainConfig_Test is L1CrossDomainMessenger_TestInit {
-    /// @notice Tests that `superchainConfig` returns the correct address.
-    function test_superchainConfig_succeeds() external view {
-        assertEq(address(l1CrossDomainMessenger.superchainConfig()), address(superchainConfig));
+        assertEq(l1CrossDomainMessenger.paused(), systemConfig.paused());
     }
 }
 
@@ -1035,8 +1026,8 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
 
     /// @notice Tests that relayMessage reverts while the messenger is paused.
     function test_relayMessage_paused_reverts() external {
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(0));
+        vm.prank(systemConfig.guardian());
+        systemConfig.pause(address(0));
         vm.expectRevert("CrossDomainMessenger: paused");
 
         l1CrossDomainMessenger.relayMessage(

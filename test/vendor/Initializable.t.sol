@@ -14,7 +14,6 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 
 // Interfaces
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
@@ -127,8 +126,7 @@ contract Initializer_Test is CommonTest {
                     optimismMintableERC20Factory: address(0),
                     delayedWETH: address(0)
                 }),
-                0,
-                ISuperchainConfig(address(0))
+                0
             )
         );
         contracts.push(

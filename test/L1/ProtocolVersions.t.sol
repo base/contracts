@@ -70,7 +70,7 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         // The owner is inherited from the shared ProxyAdmin; initialize records the incident
         // responder from config and seeds the hash chain (scheduleId == the bytes32(0) seed).
         assertEq(protocolVersions.proxyAdminOwner(), proxyAdminOwner);
-        assertEq(protocolVersions.incidentResponder(), deploy.cfg().superchainConfigIncidentResponder());
+        assertEq(protocolVersions.incidentResponder(), deploy.cfg().incidentResponder());
         assertEq(protocolVersions.minimumProtocolVersion(), deploy.cfg().protocolVersionsInitialMinimumVersion());
         assertEq(protocolVersions.scheduleId(), bytes32(0));
     }

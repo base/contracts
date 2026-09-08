@@ -25,7 +25,6 @@ import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 
 /// @custom:proxied true
 /// @title OptimismPortal2
@@ -203,9 +202,9 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     error OptimismPortal_Unproven();
 
     /// @notice Semantic version.
-    /// @custom:semver 5.2.0
+    /// @custom:semver 6.0.0
     function version() public pure virtual returns (string memory) {
-        return "5.2.0";
+        return "6.0.0";
     }
 
     /// @param _proofMaturityDelaySeconds The proof maturity delay in seconds.
@@ -254,12 +253,6 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     /// @notice Getter for the address of the DisputeGameFactory contract.
     function disputeGameFactory() public view returns (IDisputeGameFactory) {
         return anchorStateRegistry.disputeGameFactory();
-    }
-
-    /// @notice Returns the SuperchainConfig contract.
-    /// @return ISuperchainConfig The SuperchainConfig contract.
-    function superchainConfig() external view returns (ISuperchainConfig) {
-        return systemConfig.superchainConfig();
     }
 
     /// @custom:legacy

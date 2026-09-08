@@ -74,7 +74,6 @@ library Types {
 
     /// @notice The latest implementation contracts for the OP Stack.
     struct Implementations {
-        address superchainConfigImpl;
         address l1ERC721BridgeImpl;
         address optimismPortalImpl;
         address systemConfigImpl;

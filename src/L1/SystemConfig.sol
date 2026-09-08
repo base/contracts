@@ -14,13 +14,16 @@ import { Features } from "src/libraries/Features.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 
 /// @custom:proxied true
 /// @title SystemConfig
 /// @notice The SystemConfig contract is used to manage configuration of an Optimism network.
 ///         All configuration is stored on L1 and picked up by L2 as part of the derviation of
-///         the L2 chain.
+///         the L2 chain. It also owns the pause state for the network, which the Guardian and
+///         Incident Responder use to halt withdrawals and message relaying.
+/// @dev WARNING: When upgrading this contract, any active pause states will be lost as the pause
+///      state is stored in storage variables that are not preserved during upgrades. Therefore,
+///      this contract should not be upgraded while the system is paused.
 contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, ReinitializableBase, ISemver {
     /// @notice Enum representing different types of updates.
     /// @custom:value BATCHER              Represents an update to the batcher hash.
@@ -99,6 +102,18 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     ///         optimizations and improvements are made to the system at large.
     uint64 internal constant MAX_GAS_LIMIT = 500_000_000;
 
+    /// @notice The duration after which a pause expires. This value is set to exactly 3 months in
+    ///         seconds. Any duration longer than this value is incompatible with Stage 1.
+    uint256 internal constant PAUSE_EXPIRY = 7_884_000;
+
+    /// @notice The address of the guardian, which can pause and unpause withdrawals from the
+    ///         System. This is an immutable variable set at construction time.
+    address public immutable GUARDIAN;
+
+    /// @notice The address of the incident responder, which can pause the system.
+    ///         This is an immutable variable set at construction time.
+    address public immutable INCIDENT_RESPONDER;
+
     /// @notice Fixed L2 gas overhead. Used as part of the L2 fee calculation.
     ///         Deprecated since the Ecotone network upgrade
     uint256 public overhead;
@@ -145,14 +160,19 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     /// @notice The L2 chain ID that this SystemConfig configures.
     uint256 public l2ChainId;
 
-    /// @notice The SuperchainConfig contract that manages the pause state.
-    ISuperchainConfig public superchainConfig;
+    /// @custom:legacy
+    /// @custom:spacer superchainConfig
+    /// @notice Spacer taking up the legacy `superchainConfig` slot.
+    address private spacer_108_0_20;
 
     /// @notice The minimum base fee, in wei.
     uint64 public minBaseFee;
 
     /// @notice Bytes32 feature flag name to boolean enabled value.
     mapping(bytes32 => bool) public isFeatureEnabled;
+
+    /// @notice Mapping of pause identifiers to their pause timestamps.
+    mapping(address => uint256) public pauseTimestamps;
 
     /// @notice Emitted when configuration is updated.
     /// @param version    SystemConfig version.
@@ -165,20 +185,47 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     /// @param enabled Whether the feature is enabled.
     event FeatureSet(bytes32 indexed feature, bool indexed enabled);
 
+    /// @notice Emitted when the pause is triggered.
+    /// @param identifier An address helping to identify provenance of the pause transaction.
+    event Paused(address identifier);
+
+    /// @notice Emitted when the pause is lifted.
+    event Unpaused(address identifier);
+
+    /// @notice Emitted when a pause is extended.
+    /// @param identifier An address helping to identify provenance of the pause transaction.
+    event PauseExtended(address identifier);
+
     /// @notice Thrown when attempting to enable/disable a feature when already enabled/disabled,
     ///         respectively.
     error SystemConfig_InvalidFeatureState();
 
+    /// @notice Thrown when a caller is not the guardian but tries to call a guardian-only function
+    error SystemConfig_OnlyGuardian();
+
+    /// @notice Thrown when a caller is not the guardian or incident responder but tries to pause
+    error SystemConfig_OnlyGuardianOrIncidentResponder();
+
+    /// @notice Thrown when attempting to pause an identifier that is already paused
+    error SystemConfig_AlreadyPaused(address identifier);
+
+    /// @notice Thrown when attempting to extend a pause that is not already paused.
+    error SystemConfig_NotAlreadyPaused(address identifier);
+
     /// @notice Semantic version.
-    /// @custom:semver 3.13.2
+    /// @custom:semver 4.0.0
     function version() public pure virtual returns (string memory) {
-        return "3.13.2";
+        return "4.0.0";
     }
 
     /// @notice Constructs the SystemConfig contract.
     /// @dev    START_BLOCK_SLOT is set to type(uint256).max here so that it will be a dead value
     ///         in the singleton.
-    constructor() ReinitializableBase(4) {
+    /// @param _guardian          The address of the guardian, which can pause and unpause the system.
+    /// @param _incidentResponder The address of the incident responder, which can pause the system.
+    constructor(address _guardian, address _incidentResponder) ReinitializableBase(4) {
+        GUARDIAN = _guardian;
+        INCIDENT_RESPONDER = _incidentResponder;
         Storage.setUint(START_BLOCK_SLOT, type(uint256).max);
         _disableInitializers();
     }
@@ -196,7 +243,6 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     ///                           canonical data.
     /// @param _addresses         Set of L1 contract addresses. These should be the proxies.
     /// @param _l2ChainId         The L2 chain ID that this SystemConfig configures.
-    /// @param _superchainConfig  The SuperchainConfig contract address.
     function initialize(
         address _owner,
         uint32 _basefeeScalar,
@@ -207,8 +253,7 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         IResourceMetering.ResourceConfig memory _config,
         address _batchInbox,
         SystemConfig.Addresses memory _addresses,
-        uint256 _l2ChainId,
-        ISuperchainConfig _superchainConfig
+        uint256 _l2ChainId
     )
         public
         reinitializer(initVersion())
@@ -238,7 +283,6 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         _setResourceConfig(_config);
 
         l2ChainId = _l2ChainId;
-        superchainConfig = _superchainConfig;
     }
 
     /// @notice Returns the minimum L2 gas limit that can be safely set for the system to
@@ -553,16 +597,104 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         emit FeatureSet(_feature, _enabled);
     }
 
-    /// @notice Returns the current pause state for this network.
-    /// @return bool True if the system is paused, false otherwise.
-    function paused() public view returns (bool) {
-        return superchainConfig.paused(address(0)) || superchainConfig.paused(optimismPortal());
+    /// @notice Pauses the system for a specific superchain cluster identifier.
+    /// @param _identifier The address identifier for the pause.
+    function pause(address _identifier) external {
+        // Only the Guardian or Incident Responder can pause the system.
+        if (msg.sender != GUARDIAN && msg.sender != INCIDENT_RESPONDER) {
+            revert SystemConfig_OnlyGuardianOrIncidentResponder();
+        }
+
+        // Cannot pause if the identifier is already paused to prevent re-pausing without either
+        // unpausing, extending, or resetting the pause timestamp. Note that this check intentionally
+        // prevents re-pausing even after a pause has expired (when paused() returns false but the
+        // timestamp is still non-zero). This is a Stage 1 Decentralization requirement: the guardian
+        // must explicitly unpause before pausing again, ensuring deliberate action is taken.
+        if (pauseTimestamps[_identifier] != 0) {
+            revert SystemConfig_AlreadyPaused(_identifier);
+        }
+
+        // Set the pause timestamp.
+        pauseTimestamps[_identifier] = block.timestamp;
+        emit Paused(_identifier);
     }
 
-    /// @notice Returns the guardian address of the SuperchainConfig.
+    /// @notice Unpauses the system for a specific identifier.
+    /// @param _identifier The address identifier to unpause.
+    function unpause(address _identifier) external {
+        // Only the Guardian can unpause the system.
+        if (msg.sender != GUARDIAN) revert SystemConfig_OnlyGuardian();
+
+        // Unpause the system.
+        pauseTimestamps[_identifier] = 0;
+        emit Unpaused(_identifier);
+    }
+
+    /// @notice Extends the pause for a specific identifier by resetting the pause timestamp.
+    /// @param _identifier The address identifier to extend.
+    function extend(address _identifier) external {
+        // Only the Guardian can extend the pause.
+        if (msg.sender != GUARDIAN) revert SystemConfig_OnlyGuardian();
+
+        // Cannot extend the pause if not already paused.
+        if (pauseTimestamps[_identifier] == 0) {
+            revert SystemConfig_NotAlreadyPaused(_identifier);
+        }
+
+        // Reset the pause timestamp.
+        pauseTimestamps[_identifier] = block.timestamp;
+        emit PauseExtended(_identifier);
+    }
+
+    /// @notice Getter for the incident responder address.
+    /// @return The incident responder address.
+    function incidentResponder() external view returns (address) {
+        return INCIDENT_RESPONDER;
+    }
+
+    /// @notice Checks if the system can be paused for a specific identifier.
+    /// @param _identifier The address identifier to check.
+    /// @return True if the system can be paused for this identifier.
+    function pausable(address _identifier) external view returns (bool) {
+        return pauseTimestamps[_identifier] == 0;
+    }
+
+    /// @notice Gets the expiration timestamp for a specific pause identifier.
+    /// @param _identifier The address identifier to check.
+    /// @return The timestamp when the pause expires, or 0 if not paused.
+    function expiration(address _identifier) external view returns (uint256) {
+        uint256 timestamp = pauseTimestamps[_identifier];
+        if (timestamp == 0) return 0;
+        return timestamp + PAUSE_EXPIRY;
+    }
+
+    /// @notice Returns the duration after which a pause expires.
+    /// @return The duration after which a pause expires.
+    function pauseExpiry() external pure returns (uint256) {
+        return PAUSE_EXPIRY;
+    }
+
+    /// @notice Returns the current pause state for this network. The system is paused if either
+    ///         the global pause is active or the pause is active where the OptimismPortal address
+    ///         is used as the identifier.
+    /// @return bool True if the system is paused, false otherwise.
+    function paused() public view returns (bool) {
+        return paused(address(0)) || paused(optimismPortal());
+    }
+
+    /// @notice Checks if the system is currently paused for a specific identifier.
+    /// @param _identifier The address identifier to check.
+    /// @return True if the system is paused for this identifier and not expired.
+    function paused(address _identifier) public view returns (bool) {
+        uint256 timestamp = pauseTimestamps[_identifier];
+        if (timestamp == 0) return false;
+        return block.timestamp < timestamp + PAUSE_EXPIRY;
+    }
+
+    /// @notice Getter for the guardian address.
     /// @return address The guardian address.
     function guardian() public view returns (address) {
-        return superchainConfig.guardian();
+        return GUARDIAN;
     }
 
     /// @custom:legacy

@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import { IStandardBridge } from "interfaces/universal/IStandardBridge.sol";
 import { ICrossDomainMessenger } from "interfaces/universal/ICrossDomainMessenger.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
 interface IL1StandardBridge is IStandardBridge, IProxyAdminOwnedBase {
@@ -70,7 +69,6 @@ interface IL1StandardBridge is IStandardBridge, IProxyAdminOwnedBase {
     function l2TokenBridge() external view returns (address);
     function systemConfig() external view returns (ISystemConfig);
     function version() external view returns (string memory);
-    function superchainConfig() external view returns (ISuperchainConfig);
 
     function __constructor__() external;
 }

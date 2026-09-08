@@ -17,7 +17,6 @@ import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { IL1ChugSplashProxy } from "interfaces/legacy/IL1ChugSplashProxy.sol";
@@ -40,7 +39,6 @@ import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { Constants } from "src/libraries/Constants.sol";
-import { SemverComp } from "src/libraries/SemverComp.sol";
 import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
@@ -55,18 +53,6 @@ contract SystemDeploy is Script {
 
     uint256 internal constant ETH_MAINNET_CHAIN_ID = 1;
     uint256 internal constant ETH_SEPOLIA_CHAIN_ID = 11155111;
-
-    struct SuperchainInput {
-        address guardian;
-        address incidentResponder;
-        address superchainProxyAdminOwner;
-    }
-
-    struct SuperchainOutput {
-        ISuperchainConfig superchainConfigImpl;
-        ISuperchainConfig superchainConfigProxy;
-        IProxyAdmin superchainProxyAdmin;
-    }
 
     struct ImplementationInput {
         uint256 withdrawalDelaySeconds;
@@ -90,29 +76,24 @@ contract SystemDeploy is Script {
 
     struct DeployInput {
         bool saveArtifacts;
-        SuperchainInput superchainInput;
-        ISuperchainConfig superchainConfigProxy;
         ImplementationInput implementationsInput;
         Types.Implementations implementations;
         Types.DeployInput opChainInput;
     }
 
     struct DeployOutput {
-        SuperchainOutput superchain;
         Types.Implementations impls;
         Types.DeployOutput opChain;
     }
 
     struct UpgradeInput {
         bool saveArtifacts;
-        ISuperchainConfig superchainConfigProxy;
         Types.Implementations implementations;
         ISystemConfig systemConfigProxy;
         IProtocolVersions protocolVersionsProxy;
     }
 
     struct UpgradeOutput {
-        bool superchainConfigUpgraded;
         bool chainUpgraded;
     }
 
@@ -147,7 +128,6 @@ contract SystemDeploy is Script {
     error InvalidRoleAddress(string role);
     error InvalidStartingAnchorRoot();
     error MissingImplementations();
-    error SuperchainConfigNeedsUpgrade();
 
     /// @notice Sets up the shared deployment config and artifact registry.
     function setUp() public virtual {
@@ -187,7 +167,7 @@ contract SystemDeploy is Script {
 
     /// @notice Deploys a fresh OP Stack from the active deploy config.
     function run() public {
-        console.log("Deploying a fresh OP Stack including SuperchainConfig");
+        console.log("Deploying a fresh OP Stack");
         _runConfigured();
     }
 
@@ -202,15 +182,9 @@ contract SystemDeploy is Script {
         _saveUpgradeArtifacts(output_);
     }
 
-    /// @notice Deploys the shared Superchain proxy admin and SuperchainConfig proxy.
-    function deploySuperchain(SuperchainInput memory _input) public returns (SuperchainOutput memory output_) {
-        output_ = _deploySuperchain(_input);
-    }
-
     /// @notice Returns the latest implementation set saved by `deployImplementations` or `run`.
     function getImplementations() public view returns (Types.Implementations memory) {
         return Types.Implementations({
-            superchainConfigImpl: artifacts.mustGetAddress("SuperchainConfigImpl"),
             l1ERC721BridgeImpl: artifacts.mustGetAddress("L1ERC721BridgeImpl"),
             optimismPortalImpl: artifacts.mustGetAddress("OptimismPortalImpl"),
             systemConfigImpl: artifacts.mustGetAddress("SystemConfigImpl"),
@@ -231,7 +205,7 @@ contract SystemDeploy is Script {
     function _runConfigured() internal returns (DeployOutput memory output_) {
         output_ = deploy(_deployInput());
 
-        vm.startPrank(ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy")).guardian());
+        vm.startPrank(ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy")).guardian());
         IAnchorStateRegistry(artifacts.mustGetAddress("AnchorStateRegistryProxy"))
             .setRespectedGameType(GameType.wrap(uint32(cfg.respectedGameType())));
         vm.stopPrank();
@@ -243,12 +217,6 @@ contract SystemDeploy is Script {
         Types.Implementations memory emptyImpls;
         input_ = DeployInput({
             saveArtifacts: true,
-            superchainInput: SuperchainInput({
-                guardian: cfg.superchainConfigGuardian(),
-                incidentResponder: cfg.superchainConfigIncidentResponder(),
-                superchainProxyAdminOwner: cfg.finalSystemOwner()
-            }),
-            superchainConfigProxy: ISuperchainConfig(address(0)),
             implementationsInput: _configuredImplementationsInput(),
             implementations: emptyImpls,
             opChainInput: _configuredOPChainInput()
@@ -272,8 +240,8 @@ contract SystemDeploy is Script {
             sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
             teeProposer: cfg.teeProposer(),
             teeChallenger: cfg.teeChallenger(),
-            guardian: cfg.superchainConfigGuardian(),
-            incidentResponder: cfg.superchainConfigIncidentResponder()
+            guardian: cfg.guardian(),
+            incidentResponder: cfg.incidentResponder()
         });
     }
 
@@ -298,7 +266,7 @@ contract SystemDeploy is Script {
                 systemConfigOwner: cfg.finalSystemOwner(),
                 batcher: cfg.batchSenderAddress(),
                 unsafeBlockSigner: cfg.p2pSequencerAddress(),
-                incidentResponder: cfg.superchainConfigIncidentResponder()
+                incidentResponder: cfg.incidentResponder()
             }),
             basefeeScalar: cfg.basefeeScalar(),
             blobBasefeeScalar: cfg.blobbasefeeScalar(),
@@ -318,7 +286,6 @@ contract SystemDeploy is Script {
         // script.
         _assertValidOPChainInput(_input.opChainInput);
 
-        output_.superchain = _deployOrLoadSuperchain(_input);
         if (_implementationsEmpty(_input.implementations)) {
             output_.impls = _deployImplementations(_input.implementationsInput);
         } else {
@@ -328,10 +295,7 @@ contract SystemDeploy is Script {
 
         Types.Implementations memory implementations;
         (output_.opChain, implementations) = _deployOPChain({
-            _input: _input.opChainInput,
-            _superchainConfig: output_.superchain.superchainConfigProxy,
-            _impls: output_.impls,
-            _implementationsInput: _input.implementationsInput
+            _input: _input.opChainInput, _impls: output_.impls, _implementationsInput: _input.implementationsInput
         });
         output_.impls = implementations;
 
@@ -345,21 +309,9 @@ contract SystemDeploy is Script {
     function upgrade(UpgradeInput memory _input) public returns (UpgradeOutput memory output_) {
         _assertValidImplementations(_input.implementations);
 
-        if (address(_input.superchainConfigProxy) != address(0)) {
-            output_.superchainConfigUpgraded =
-                _upgradeSuperchainConfigIfNeeded(_input.superchainConfigProxy, _input.implementations);
-        }
-
         if (address(_input.systemConfigProxy) != address(0)) {
             ISystemConfig systemConfigProxy = _input.systemConfigProxy;
             DeployUtils.assertValidContractAddress(address(systemConfigProxy));
-
-            ISuperchainConfig superchainConfig = systemConfigProxy.superchainConfig();
-            if (SemverComp.lt(
-                    superchainConfig.version(), ISuperchainConfig(_input.implementations.superchainConfigImpl).version()
-                )) {
-                revert SuperchainConfigNeedsUpgrade();
-            }
 
             IProtocolVersions protocolVersionsProxy = _input.protocolVersionsProxy;
             if (address(protocolVersionsProxy) == address(0) && address(artifacts).code.length != 0) {
@@ -375,99 +327,13 @@ contract SystemDeploy is Script {
         }
     }
 
-    function _deployOrLoadSuperchain(DeployInput memory _input) internal returns (SuperchainOutput memory output_) {
-        if (address(_input.superchainConfigProxy) == address(0)) {
-            output_ = _deploySuperchain(_input.superchainInput);
-        } else {
-            DeployUtils.assertValidContractAddress(address(_input.superchainConfigProxy));
-            output_.superchainConfigProxy = _input.superchainConfigProxy;
-            output_.superchainProxyAdmin = _input.superchainConfigProxy.proxyAdmin();
-        }
-    }
-
-    function _deploySuperchain(SuperchainInput memory _input) internal returns (SuperchainOutput memory output_) {
-        _assertValidSuperchainInput(_input);
-
-        output_.superchainProxyAdmin = _deploySuperchainProxyAdmin();
-        output_.superchainConfigImpl = _deploySuperchainConfigImpl(_input.guardian, _input.incidentResponder);
-        output_.superchainConfigProxy =
-            _deploySuperchainConfigProxy(output_.superchainProxyAdmin, output_.superchainConfigImpl);
-
-        DeployUtils.assertValidContractAddress(address(output_.superchainProxyAdmin));
-        vm.broadcast(msg.sender);
-        output_.superchainProxyAdmin.transferOwnership(_input.superchainProxyAdminOwner);
-
-        _assertValidSuperchainOutput(_input, output_);
-    }
-
-    function _deploySuperchainProxyAdmin() internal returns (IProxyAdmin proxyAdmin_) {
-        vm.broadcast(msg.sender);
-        proxyAdmin_ = IProxyAdmin(
-            DeployUtils.create1({
-                _name: "ProxyAdmin",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxyAdmin.__constructor__, (msg.sender)))
-            })
-        );
-        vm.label(address(proxyAdmin_), "SuperchainProxyAdmin");
-    }
-
-    function _deploySuperchainConfigProxy(
-        IProxyAdmin _proxyAdmin,
-        ISuperchainConfig _impl
-    )
-        internal
-        returns (ISuperchainConfig proxy_)
-    {
-        vm.startBroadcast(msg.sender);
-        proxy_ = ISuperchainConfig(
-            DeployUtils.create1({
-                _name: "src/universal/Proxy.sol:Proxy",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(IProxy.__constructor__, (address(_proxyAdmin))))
-            })
-        );
-        _proxyAdmin.upgrade(payable(address(proxy_)), address(_impl));
-        vm.stopBroadcast();
-
-        vm.label(address(proxy_), "SuperchainConfigProxy");
-    }
-
-    function _assertValidSuperchainInput(SuperchainInput memory _input) internal pure {
-        if (_input.superchainProxyAdminOwner == address(0)) revert InvalidRoleAddress("superchainProxyAdminOwner");
-        if (_input.guardian == address(0)) revert InvalidRoleAddress("guardian");
-    }
-
-    function _assertValidSuperchainOutput(SuperchainInput memory _input, SuperchainOutput memory _output) internal {
-        address[] memory addrs = new address[](3);
-        addrs[0] = address(_output.superchainProxyAdmin);
-        addrs[1] = address(_output.superchainConfigImpl);
-        addrs[2] = address(_output.superchainConfigProxy);
-        DeployUtils.assertValidContractAddresses(addrs);
-
-        vm.startPrank(address(0));
-        require(
-            IProxy(payable(address(_output.superchainConfigProxy))).implementation()
-                == address(_output.superchainConfigImpl),
-            "SUPCON-30"
-        );
-        require(
-            IProxy(payable(address(_output.superchainConfigProxy))).admin() == address(_output.superchainProxyAdmin),
-            "SUPCON-40"
-        );
-        vm.stopPrank();
-
-        require(_output.superchainProxyAdmin.owner() == _input.superchainProxyAdminOwner, "SPA-10");
-        require(_output.superchainConfigProxy.guardian() == _input.guardian, "SUPCON-10");
-        require(_output.superchainConfigImpl.guardian() == _input.guardian, "SUPCON-50");
-    }
-
     function _deployImplementations(ImplementationInput memory _input)
         internal
         returns (Types.Implementations memory output_)
     {
         _assertValidImplementationInput(_input);
 
-        output_.superchainConfigImpl = address(_deploySuperchainConfigImpl(_input.guardian, _input.incidentResponder));
-        output_.systemConfigImpl = address(_deploySystemConfigImpl());
+        output_.systemConfigImpl = address(_deploySystemConfigImpl(_input.guardian, _input.incidentResponder));
         output_.l1CrossDomainMessengerImpl = address(_deployL1CrossDomainMessengerImpl());
         output_.l1ERC721BridgeImpl = address(_deployL1ERC721BridgeImpl());
         output_.l1StandardBridgeImpl = address(_deployL1StandardBridgeImpl());
@@ -481,7 +347,6 @@ contract SystemDeploy is Script {
 
     function _deployOPChain(
         Types.DeployInput memory _input,
-        ISuperchainConfig _superchainConfig,
         Types.Implementations memory _impls,
         ImplementationInput memory _implementationsInput
     )
@@ -548,7 +413,7 @@ contract SystemDeploy is Script {
         vm.broadcast(msg.sender);
         output_.opChainProxyAdmin.setImplementationName(address(output_.l1CrossDomainMessengerProxy), messengerName);
 
-        _initializeOPChain(_input, _superchainConfig, impls_, output_);
+        _initializeOPChain(_input, impls_, output_);
 
         _upgradeToAndCall(
             output_.opChainProxyAdmin,
@@ -577,7 +442,6 @@ contract SystemDeploy is Script {
 
     function _initializeOPChain(
         Types.DeployInput memory _input,
-        ISuperchainConfig _superchainConfig,
         Types.Implementations memory _impls,
         Types.DeployOutput memory _output
     )
@@ -594,7 +458,7 @@ contract SystemDeploy is Script {
             _output.opChainProxyAdmin,
             address(_output.systemConfigProxy),
             _impls.systemConfigImpl,
-            _encodeSystemConfigInitializer(_input, _output, _superchainConfig)
+            _encodeSystemConfigInitializer(_input, _output)
         );
 
         _upgradeToAndCall(
@@ -653,22 +517,6 @@ contract SystemDeploy is Script {
                 (_input.roles.incidentResponder, _input.initialUpgradeSchedule, _input.initialMinimumProtocolVersion)
             )
         );
-    }
-
-    function _upgradeSuperchainConfigIfNeeded(
-        ISuperchainConfig _superchainConfig,
-        Types.Implementations memory _impls
-    )
-        internal
-        returns (bool upgraded_)
-    {
-        if (SemverComp.gte(_superchainConfig.version(), ISuperchainConfig(_impls.superchainConfigImpl).version())) {
-            return false;
-        }
-
-        IProxyAdmin superchainProxyAdmin = _superchainConfig.proxyAdmin();
-        _upgradeTo(superchainProxyAdmin, address(_superchainConfig), _impls.superchainConfigImpl);
-        upgraded_ = true;
     }
 
     function _upgradeOPChain(
@@ -742,8 +590,7 @@ contract SystemDeploy is Script {
 
     function _encodeSystemConfigInitializer(
         Types.DeployInput memory _input,
-        Types.DeployOutput memory _output,
-        ISuperchainConfig _superchainConfig
+        Types.DeployOutput memory _output
     )
         internal
         pure
@@ -770,8 +617,7 @@ contract SystemDeploy is Script {
                 Constants.DEFAULT_RESOURCE_CONFIG(),
                 Types.chainIdToBatchInboxAddress(_input.l2ChainId),
                 opChainAddrs,
-                _input.l2ChainId,
-                _superchainConfig
+                _input.l2ChainId
             )
         );
     }
@@ -872,29 +718,13 @@ contract SystemDeploy is Script {
         IAddressManager(_target).transferOwnership(_newOwner);
     }
 
-    function _deploySuperchainConfigImpl(
-        address _guardian,
-        address _incidentResponder
-    )
-        internal
-        returns (ISuperchainConfig)
-    {
-        return ISuperchainConfig(
-            DeployUtils.createDeterministic({
-                _name: "SuperchainConfig",
-                _args: DeployUtils.encodeConstructor(
-                    abi.encodeCall(ISuperchainConfig.__constructor__, (_guardian, _incidentResponder))
-                ),
-                _salt: DeployUtils.DEFAULT_SALT
-            })
-        );
-    }
-
-    function _deploySystemConfigImpl() internal returns (ISystemConfig) {
+    function _deploySystemConfigImpl(address _guardian, address _incidentResponder) internal returns (ISystemConfig) {
         return ISystemConfig(
             DeployUtils.createDeterministic({
                 _name: "SystemConfig",
-                _args: DeployUtils.encodeConstructor(abi.encodeCall(ISystemConfig.__constructor__, ())),
+                _args: DeployUtils.encodeConstructor(
+                    abi.encodeCall(ISystemConfig.__constructor__, (_guardian, _incidentResponder))
+                ),
                 _salt: DeployUtils.DEFAULT_SALT
             })
         );
@@ -1110,6 +940,7 @@ contract SystemDeploy is Script {
         require(_input.withdrawalDelaySeconds != 0, "SystemDeploy: withdrawalDelaySeconds not set");
         require(_input.proofMaturityDelaySeconds != 0, "SystemDeploy: proofMaturityDelaySeconds not set");
         require(_input.disputeGameFinalityDelaySeconds != 0, "SystemDeploy: finality delay not set");
+        if (_input.guardian == address(0)) revert InvalidRoleAddress("guardian");
     }
 
     function _multiproofEnabled(ImplementationInput memory _input) internal pure returns (bool) {
@@ -1142,7 +973,6 @@ contract SystemDeploy is Script {
 
     function _assertValidImplementations(Types.Implementations memory _impls) internal view {
         if (_implementationsEmpty(_impls)) revert MissingImplementations();
-        DeployUtils.assertValidContractAddress(_impls.superchainConfigImpl);
         DeployUtils.assertValidContractAddress(_impls.l1ERC721BridgeImpl);
         DeployUtils.assertValidContractAddress(_impls.optimismPortalImpl);
         DeployUtils.assertValidContractAddress(_impls.systemConfigImpl);
@@ -1161,15 +991,11 @@ contract SystemDeploy is Script {
     }
 
     function _implementationsEmpty(Types.Implementations memory _impls) internal pure returns (bool) {
-        return _impls.superchainConfigImpl == address(0) && _impls.systemConfigImpl == address(0)
-            && _impls.l1CrossDomainMessengerImpl == address(0);
+        return _impls.systemConfigImpl == address(0) && _impls.l1CrossDomainMessengerImpl == address(0);
     }
 
     function _saveDeployArtifacts(DeployOutput memory _output) internal {
         _saveUpgradeArtifacts(_output.impls);
-
-        artifacts.save("SuperchainProxyAdmin", address(_output.superchain.superchainProxyAdmin));
-        artifacts.save("SuperchainConfigProxy", address(_output.superchain.superchainConfigProxy));
 
         Types.DeployOutput memory chain = _output.opChain;
         artifacts.save("ProxyAdmin", address(chain.opChainProxyAdmin));
@@ -1198,7 +1024,6 @@ contract SystemDeploy is Script {
     }
 
     function _saveUpgradeArtifacts(Types.Implementations memory _impls) internal {
-        artifacts.save("SuperchainConfigImpl", _impls.superchainConfigImpl);
         artifacts.save("L1ERC721BridgeImpl", _impls.l1ERC721BridgeImpl);
         artifacts.save("OptimismPortalImpl", _impls.optimismPortalImpl);
         artifacts.save("SystemConfigImpl", _impls.systemConfigImpl);

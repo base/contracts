@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
 interface ISystemConfig is IProxyAdminOwnedBase {
@@ -28,13 +27,22 @@ interface ISystemConfig is IProxyAdminOwnedBase {
 
     error ReinitializableBase_ZeroInitVersion();
     error SystemConfig_InvalidFeatureState();
+    error SystemConfig_OnlyGuardian();
+    error SystemConfig_OnlyGuardianOrIncidentResponder();
+    error SystemConfig_AlreadyPaused(address identifier);
+    error SystemConfig_NotAlreadyPaused(address identifier);
 
     event ConfigUpdate(uint256 indexed version, UpdateType indexed updateType, bytes data);
     event FeatureSet(bytes32 indexed feature, bool indexed enabled);
     event Initialized(uint8 version);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event Paused(address identifier);
+    event Unpaused(address identifier);
+    event PauseExtended(address identifier);
 
     function BATCH_INBOX_SLOT() external view returns (bytes32);
+    function GUARDIAN() external view returns (address);
+    function INCIDENT_RESPONDER() external view returns (address);
     function L1_CROSS_DOMAIN_MESSENGER_SLOT() external view returns (bytes32);
     function L1_ERC_721_BRIDGE_SLOT() external view returns (bytes32);
     function L1_STANDARD_BRIDGE_SLOT() external view returns (bytes32);
@@ -63,8 +71,7 @@ interface ISystemConfig is IProxyAdminOwnedBase {
         IResourceMetering.ResourceConfig memory _config,
         address _batchInbox,
         Addresses memory _addresses,
-        uint256 _l2ChainId,
-        ISuperchainConfig _superchainConfig
+        uint256 _l2ChainId
     )
         external;
     function initVersion() external view returns (uint8);
@@ -101,11 +108,19 @@ interface ISystemConfig is IProxyAdminOwnedBase {
     function unsafeBlockSigner() external view returns (address addr_);
     function version() external pure returns (string memory);
     function paused() external view returns (bool);
-    function superchainConfig() external view returns (ISuperchainConfig);
+    function paused(address _identifier) external view returns (bool);
     function guardian() external view returns (address);
+    function incidentResponder() external view returns (address);
+    function pause(address _identifier) external;
+    function unpause(address _identifier) external;
+    function extend(address _identifier) external;
+    function pausable(address _identifier) external view returns (bool);
+    function expiration(address _identifier) external view returns (uint256);
+    function pauseTimestamps(address) external view returns (uint256);
+    function pauseExpiry() external view returns (uint256);
     function setFeature(bytes32 _feature, bool _enabled) external;
     function isFeatureEnabled(bytes32) external view returns (bool);
     function isCustomGasToken() external view returns (bool);
 
-    function __constructor__() external;
+    function __constructor__(address _guardian, address _incidentResponder) external;
 }

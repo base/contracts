@@ -12,6 +12,7 @@ import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
+import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
@@ -68,64 +69,60 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         sp1Verifier = new MockSP1Verifier();
     }
 
-    function testFuzz_deploySuperchain_succeeds(
-        address _superchainProxyAdminOwner,
+    function testFuzz_deployImplementations_bindsGuardianRoles_succeeds(
         address _guardian,
         address _incidentResponder
     )
         public
     {
-        vm.assume(_superchainProxyAdminOwner != address(0));
         vm.assume(_guardian != address(0));
 
-        SystemDeploy.SuperchainOutput memory output = systemDeploy.deploySuperchain(
-            SystemDeploy.SuperchainInput({
-                guardian: _guardian,
-                incidentResponder: _incidentResponder,
-                superchainProxyAdminOwner: _superchainProxyAdminOwner
-            })
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.implementationsInput.guardian = _guardian;
+        input.implementationsInput.incidentResponder = _incidentResponder;
+
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+        ISystemConfig systemConfigProxy = output.opChain.systemConfigProxy;
+
+        assertEq(systemConfigProxy.guardian(), _guardian, "proxy guardian");
+        assertEq(ISystemConfig(output.impls.systemConfigImpl).guardian(), _guardian, "impl guardian");
+        assertEq(systemConfigProxy.incidentResponder(), _incidentResponder, "proxy incident responder");
+        assertEq(
+            ISystemConfig(output.impls.systemConfigImpl).incidentResponder(),
+            _incidentResponder,
+            "impl incident responder"
         );
 
-        assertEq(output.superchainProxyAdmin.owner(), _superchainProxyAdminOwner, "proxy admin owner");
-        assertEq(output.superchainConfigProxy.guardian(), _guardian, "proxy guardian");
-        assertEq(output.superchainConfigImpl.guardian(), _guardian, "impl guardian");
-        assertEq(output.superchainConfigProxy.incidentResponder(), _incidentResponder, "proxy incident responder");
-        assertEq(output.superchainConfigImpl.incidentResponder(), _incidentResponder, "impl incident responder");
-
         assertEq(
-            EIP1967Helper.getImplementation(address(output.superchainConfigProxy)),
-            address(output.superchainConfigImpl),
-            "implementation"
-        );
-        assertEq(
-            EIP1967Helper.getAdmin(address(output.superchainConfigProxy)), address(output.superchainProxyAdmin), "admin"
+            EIP1967Helper.getImplementation(address(systemConfigProxy)), output.impls.systemConfigImpl, "implementation"
         );
     }
 
-    function test_deploySuperchain_nullInput_reverts() public {
-        SystemDeploy.SuperchainInput memory input = SystemDeploy.SuperchainInput({
-            guardian: guardian, incidentResponder: incidentResponder, superchainProxyAdminOwner: address(0)
-        });
-        vm.expectRevert(abi.encodeWithSelector(SystemDeploy.InvalidRoleAddress.selector, "superchainProxyAdminOwner"));
-        systemDeploy.deploySuperchain(input);
+    function test_deployImplementations_nullGuardian_reverts() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        input.implementationsInput.guardian = address(0);
 
-        input = SystemDeploy.SuperchainInput({
-            guardian: address(0), incidentResponder: incidentResponder, superchainProxyAdminOwner: owner
-        });
         vm.expectRevert(abi.encodeWithSelector(SystemDeploy.InvalidRoleAddress.selector, "guardian"));
-        systemDeploy.deploySuperchain(input);
+        systemDeploy.deploy(input);
     }
 
-    function test_deploySuperchain_reuseAddresses_succeeds() public {
-        SystemDeploy.SuperchainInput memory input = SystemDeploy.SuperchainInput({
-            guardian: guardian, incidentResponder: incidentResponder, superchainProxyAdminOwner: owner
-        });
+    function test_deploy_reuseImplementationAddresses_succeeds() public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        SystemDeploy.DeployOutput memory output0 = systemDeploy.deploy(input);
 
-        SystemDeploy.SuperchainOutput memory output0 = systemDeploy.deploySuperchain(input);
-        SystemDeploy.SuperchainOutput memory output1 = systemDeploy.deploySuperchain(input);
+        // Implementations are deployed deterministically, so a second chain on the same
+        // implementation input reuses them while getting fresh proxies.
+        input.opChainInput.l2ChainId = l2ChainId + 1;
+        input.opChainInput.saltMixer = "system-deploy-reuse-impls-test";
+        SystemDeploy.DeployOutput memory output1 = systemDeploy.deploy(input);
 
-        assertEq(address(output0.superchainConfigImpl), address(output1.superchainConfigImpl), "implementation");
-        assertNotEq(address(output0.superchainConfigProxy), address(output1.superchainConfigProxy), "proxy");
+        assertEq(output0.impls.systemConfigImpl, output1.impls.systemConfigImpl, "system config impl");
+        assertEq(output0.impls.optimismPortalImpl, output1.impls.optimismPortalImpl, "portal impl");
+        assertNotEq(
+            address(output0.opChain.systemConfigProxy),
+            address(output1.opChain.systemConfigProxy),
+            "system config proxy"
+        );
     }
 
     function test_deploy_withoutManagerAddress_succeeds() public {
@@ -146,10 +143,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         assertEq(output.opChain.opChainProxyAdmin.owner(), owner, "op chain proxy admin owner");
         assertEq(output.opChain.systemConfigProxy.batchInbox(), Types.chainIdToBatchInboxAddress(l2ChainId), "inbox");
         _assertMultiproofDeployed(output, input);
+        assertEq(output.opChain.systemConfigProxy.guardian(), guardian, "system config guardian");
         assertEq(
-            address(output.opChain.systemConfigProxy.superchainConfig()),
-            address(output.superchain.superchainConfigProxy),
-            "superchain config"
+            output.opChain.systemConfigProxy.incidentResponder(), incidentResponder, "system config incident responder"
         );
         assertValidStandardSystem(_expected(output, input));
     }
@@ -186,30 +182,30 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         );
     }
 
-    /// @notice Pins ProtocolVersions input validation before superchain deployment can broadcast.
+    /// @notice Pins ProtocolVersions input validation before implementation deployment can broadcast.
     function test_deploy_initialScheduleWithoutMinimumProtocolVersion_reverts() public {
         uint64[] memory schedule = new uint64[](1);
         schedule[0] = 1;
 
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.opChainInput.initialUpgradeSchedule = schedule;
-        input.superchainInput.superchainProxyAdminOwner = address(0);
+        input.implementationsInput.guardian = address(0);
 
         vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
         systemDeploy.deploy(input);
     }
 
-    /// @notice Pins the packed-version bound check before superchain deployment can broadcast.
+    /// @notice Pins the packed-version bound check before implementation deployment can broadcast.
     function test_deploy_initialMinimumProtocolVersionTooLarge_reverts() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.opChainInput.initialMinimumProtocolVersion = uint256(type(uint128).max) + 1;
-        input.superchainInput.superchainProxyAdminOwner = address(0);
+        input.implementationsInput.guardian = address(0);
 
         vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
         systemDeploy.deploy(input);
     }
 
-    /// @notice Pins imported schedule ordering validation before superchain deployment can broadcast.
+    /// @notice Pins imported schedule ordering validation before implementation deployment can broadcast.
     function test_deploy_unorderedInitialSchedule_reverts() public {
         vm.warp(31);
         uint64[] memory schedule = new uint64[](3);
@@ -219,7 +215,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.opChainInput.initialUpgradeSchedule = schedule;
         input.opChainInput.initialMinimumProtocolVersion = 42;
-        input.superchainInput.superchainProxyAdminOwner = address(0);
+        input.implementationsInput.guardian = address(0);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -242,7 +238,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.opChainInput.initialUpgradeSchedule = schedule;
         input.opChainInput.initialMinimumProtocolVersion = 42;
-        input.superchainInput.superchainProxyAdminOwner = address(0);
+        input.implementationsInput.guardian = address(0);
 
         vm.expectRevert(
             abi.encodeWithSelector(IProtocolVersions.ProtocolVersions_InsufficientNotice.selector, activation)
@@ -306,7 +302,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         systemDeploy.upgrade(
             SystemDeploy.UpgradeInput({
                 saveArtifacts: false,
-                superchainConfigProxy: output.superchain.superchainConfigProxy,
                 implementations: implementations,
                 systemConfigProxy: output.opChain.systemConfigProxy,
                 protocolVersionsProxy: output.opChain.protocolVersionsProxy
@@ -324,21 +319,13 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         SystemDeploy.UpgradeOutput memory upgradeOutput = systemDeploy.upgrade(
             SystemDeploy.UpgradeInput({
                 saveArtifacts: false,
-                superchainConfigProxy: output.superchain.superchainConfigProxy,
                 implementations: implementations,
                 systemConfigProxy: output.opChain.systemConfigProxy,
                 protocolVersionsProxy: output.opChain.protocolVersionsProxy
             })
         );
 
-        assertFalse(upgradeOutput.superchainConfigUpgraded, "superchain already current");
         assertTrue(upgradeOutput.chainUpgraded, "chain upgraded");
-        assertEq(
-            output.superchain.superchainProxyAdmin
-                .getProxyImplementation(address(output.superchain.superchainConfigProxy)),
-            output.impls.superchainConfigImpl,
-            "superchain config impl"
-        );
         assertEq(
             output.opChain.opChainProxyAdmin.getProxyImplementation(address(output.opChain.protocolVersionsProxy)),
             address(protocolVersionsImpl),
@@ -368,7 +355,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         systemDeploy.upgrade(
             SystemDeploy.UpgradeInput({
                 saveArtifacts: false,
-                superchainConfigProxy: output.superchain.superchainConfigProxy,
                 implementations: implementations,
                 systemConfigProxy: output.opChain.systemConfigProxy,
                 protocolVersionsProxy: output.opChain.protocolVersionsProxy
@@ -403,14 +389,12 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         SystemDeploy.UpgradeOutput memory upgradeOutput = systemDeploy.upgrade(
             SystemDeploy.UpgradeInput({
                 saveArtifacts: false,
-                superchainConfigProxy: output.superchain.superchainConfigProxy,
                 implementations: implementations,
                 systemConfigProxy: output.opChain.systemConfigProxy,
                 protocolVersionsProxy: IProtocolVersions(address(0))
             })
         );
 
-        assertFalse(upgradeOutput.superchainConfigUpgraded, "superchain already current");
         assertTrue(upgradeOutput.chainUpgraded, "chain upgraded");
         assertEq(
             output.opChain.opChainProxyAdmin.getProxyImplementation(address(output.opChain.protocolVersionsProxy)),
@@ -424,7 +408,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
 
         input.saveArtifacts = true;
-        input.superchainConfigProxy = output.superchain.superchainConfigProxy;
         input.implementations = output.impls;
         input.opChainInput.l2ChainId = l2ChainId + 1;
         input.opChainInput.saltMixer = "system-deploy-reuse-test";
@@ -441,9 +424,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
 
     function _defaultDeployInput() internal view returns (SystemDeploy.DeployInput memory input_) {
         input_.saveArtifacts = false;
-        input_.superchainInput = SystemDeploy.SuperchainInput({
-            guardian: guardian, incidentResponder: incidentResponder, superchainProxyAdminOwner: owner
-        });
         input_.implementationsInput = SystemDeploy.ImplementationInput({
             withdrawalDelaySeconds: 100,
             proofMaturityDelaySeconds: 400,
@@ -558,7 +538,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         expected_ = SystemDeployAssertions.ExpectedSystemDeployState({
             systemConfig: _output.opChain.systemConfigProxy,
             anchorStateRegistry: _output.opChain.anchorStateRegistryProxy,
-            superchainConfig: _output.superchain.superchainConfigProxy,
             implementations: _output.impls,
             delayedWETH: _output.opChain.delayedWETHProxy,
             proxyAdminOwner: _input.opChainInput.roles.opChainProxyAdminOwner,

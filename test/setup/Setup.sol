@@ -4,7 +4,6 @@ pragma solidity 0.8.15;
 // Testing
 import { console2 as console } from "lib/forge-std/src/console2.sol";
 import { Vm, VmSafe } from "lib/forge-std/src/Vm.sol";
-import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { FeatureFlags } from "test/setup/FeatureFlags.sol";
 
 // Scripts
@@ -27,7 +26,6 @@ import { AddressAliasHelper } from "src/vendor/AddressAliasHelper.sol";
 import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPortal2.sol";
 import { IL1CrossDomainMessenger } from "interfaces/L1/IL1CrossDomainMessenger.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IL1ERC721Bridge } from "interfaces/L1/IL1ERC721Bridge.sol";
@@ -95,8 +93,6 @@ abstract contract Setup is FeatureFlags {
     // L1 contracts - core
     address proxyAdminOwner;
     IProxyAdmin proxyAdmin;
-    address superchainProxyAdminOwner;
-    IProxyAdmin superchainProxyAdmin;
     IOptimismPortal optimismPortal2;
     ISystemConfig systemConfig;
     IL1StandardBridge l1StandardBridge;
@@ -104,7 +100,6 @@ abstract contract Setup is FeatureFlags {
     IAddressManager addressManager;
     IL1ERC721Bridge l1ERC721Bridge;
     IOptimismMintableERC20Factory l1OptimismMintableERC20Factory;
-    ISuperchainConfig superchainConfig;
     IProtocolVersions protocolVersions;
 
     // L2 contracts
@@ -230,7 +225,6 @@ abstract contract Setup is FeatureFlags {
         l1ERC721Bridge = IL1ERC721Bridge(artifacts.mustGetAddress("L1ERC721BridgeProxy"));
         l1OptimismMintableERC20Factory =
             IOptimismMintableERC20Factory(artifacts.mustGetAddress("OptimismMintableERC20FactoryProxy"));
-        superchainConfig = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
         anchorStateRegistry = IAnchorStateRegistry(artifacts.mustGetAddress("AnchorStateRegistryProxy"));
         disputeGameFactory = IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
         delayedWeth = IDelayedWETH(artifacts.mustGetAddress("DelayedWETHProxy"));
@@ -239,8 +233,6 @@ abstract contract Setup is FeatureFlags {
         protocolVersions = IProtocolVersions(artifacts.getAddress("ProtocolVersionsProxy"));
         proxyAdmin = IProxyAdmin(artifacts.mustGetAddress("ProxyAdmin"));
         proxyAdminOwner = proxyAdmin.owner();
-        superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
-        superchainProxyAdminOwner = superchainProxyAdmin.owner();
         nitroValidator = INitroValidator(artifacts.getAddress("NitroValidator"));
         teeProverRegistry = TEEProverRegistry(artifacts.getAddress("TEEProverRegistry"));
 
