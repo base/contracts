@@ -133,7 +133,8 @@ abstract contract DeployDevBase is Script {
                     protocolVersions: IProtocolVersions(address(protocolVersionsProxy)),
                     genesisBlockNumber: cfg.l2GenesisBlockNumber(),
                     genesisTimestamp: uint64(cfg.l2GenesisTimestamp()),
-                    blockTime: uint64(cfg.l2BlockTime())
+                    blockTime: uint64(cfg.l2BlockTime()),
+                    fastBlockActivationTimestamp: 0
                 })
             )
         );

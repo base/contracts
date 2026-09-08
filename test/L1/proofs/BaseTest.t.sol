@@ -44,6 +44,10 @@ contract BaseTest is Test {
 
     uint256 internal currentL2BlockNumber;
 
+    /// @dev The fast-cadence activation baked into the verifier implementation under test. 0 leaves
+    ///      the speedup unscheduled, which is the default every test starts from.
+    uint64 internal fastBlockActivationTimestamp;
+
     address internal immutable TEE_PROVER = makeAddr("tee-prover");
     address internal immutable ZK_PROVER = makeAddr("zk-prover");
 
@@ -127,6 +131,14 @@ contract BaseTest is Test {
         _deployAndSetAggregateVerifier();
     }
 
+    /// @dev Rebinds the verifier to an implementation carrying `activationTimestamp` as its
+    ///      immutable speedup boundary. Unlike the schedule registry, this is fixed at construction,
+    ///      so it can only be changed by deploying again.
+    function _setFastBlockActivation(uint64 activationTimestamp) internal {
+        fastBlockActivationTimestamp = activationTimestamp;
+        _deployAndSetAggregateVerifier();
+    }
+
     function _deployAndSetAggregateVerifier() internal {
         AggregateVerifier aggregateVerifierImpl = new AggregateVerifier(
             GameTypes.AGGREGATE_VERIFIER,
@@ -148,7 +160,8 @@ contract BaseTest is Test {
                 protocolVersions: IProtocolVersions(address(protocolVersions)),
                 genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
                 genesisTimestamp: L2_GENESIS_TIMESTAMP,
-                blockTime: L2_BLOCK_TIME
+                blockTime: L2_BLOCK_TIME,
+                fastBlockActivationTimestamp: fastBlockActivationTimestamp
             })
         );
 

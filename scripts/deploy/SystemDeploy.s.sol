@@ -286,14 +286,19 @@ contract SystemDeploy is Script {
     function _configuredScheduleConfig() internal view returns (AggregateVerifier.ScheduleConfig memory config_) {
         uint256 genesisTimestamp = cfg.l2GenesisTimestamp();
         uint256 blockTime = cfg.l2BlockTime();
+        uint256 fastBlockActivationTimestamp = cfg.multiproofFastBlockActivationTimestamp();
         require(genesisTimestamp <= type(uint64).max, "SystemDeploy: L2 genesis timestamp overflow");
         require(blockTime <= type(uint64).max, "SystemDeploy: L2 block time overflow");
+        require(
+            fastBlockActivationTimestamp <= type(uint64).max, "SystemDeploy: fast block activation timestamp overflow"
+        );
 
         config_ = AggregateVerifier.ScheduleConfig({
             protocolVersions: IProtocolVersions(address(0)),
             genesisBlockNumber: cfg.l2GenesisBlockNumber(),
             genesisTimestamp: uint64(genesisTimestamp),
-            blockTime: uint64(blockTime)
+            blockTime: uint64(blockTime),
+            fastBlockActivationTimestamp: uint64(fastBlockActivationTimestamp)
         });
     }
 

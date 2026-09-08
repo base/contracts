@@ -117,6 +117,7 @@ contract AggregateVerifierTest is BaseTest {
         schedule[FAST_BLOCK_UPGRADE_INDEX + 1] = firstFastBlockTimestamp + 1;
         _importProtocolVersionsSchedule(schedule);
 
+        fastBlockActivationTimestamp = fastActivationTimestamp;
         _setSingleBlockAggregateVerifier(L2_GENESIS_TIMESTAMP);
 
         bytes32 speedupScheduleId = protocolVersions.scheduleId(FAST_BLOCK_UPGRADE_INDEX);
@@ -165,6 +166,28 @@ contract AggregateVerifierTest is BaseTest {
         _assertIntervals(firstFastBlock - 1, SLOW_BLOCK_INTERVAL, SLOW_INTERMEDIATE_BLOCK_INTERVAL);
         _assertIntervals(firstFastBlock, FAST_BLOCK_INTERVAL, FAST_INTERMEDIATE_BLOCK_INTERVAL);
         _assertIntervals(firstFastBlock + 1, FAST_BLOCK_INTERVAL, FAST_INTERMEDIATE_BLOCK_INTERVAL);
+    }
+
+    /// @notice The activation is an implementation immutable, so the speedup takes effect with the
+    ///         upgrade registry left empty at the speedup index. This is what lets the cadence switch
+    ///         land on a chain whose `ProtocolVersions` schedule is never written for it.
+    function test_intervalsForStartingBlock_activationIndependentOfRegistry_succeeds() public {
+        // A registry that stops short of the speedup index: nothing here can select fast intervals.
+        uint64[] memory schedule = new uint64[](FAST_BLOCK_UPGRADE_INDEX);
+        for (uint256 i; i < FAST_BLOCK_UPGRADE_INDEX; i++) {
+            schedule[i] = L2_GENESIS_TIMESTAMP;
+        }
+        _importProtocolVersionsSchedule(schedule);
+        assertEq(protocolVersions.getSchedule().length, FAST_BLOCK_UPGRADE_INDEX);
+
+        // divUp(86500 - L2_GENESIS_TIMESTAMP, L2_BLOCK_TIME) == 50.
+        _setFastBlockActivation(L2_GENESIS_TIMESTAMP + 100);
+        aggregateVerifierImpl = AggregateVerifier(address(factory.gameImpls(GameTypes.AGGREGATE_VERIFIER)));
+        uint256 firstFastBlock = 50;
+
+        assertEq(aggregateVerifierImpl.FAST_BLOCK_ACTIVATION_TIMESTAMP(), L2_GENESIS_TIMESTAMP + 100);
+        _assertIntervals(firstFastBlock - 1, SLOW_BLOCK_INTERVAL, SLOW_INTERMEDIATE_BLOCK_INTERVAL);
+        _assertIntervals(firstFastBlock, FAST_BLOCK_INTERVAL, FAST_INTERMEDIATE_BLOCK_INTERVAL);
     }
 
     function test_intervalsForStartingBlock_speedupUnscheduled_succeeds() public view {
@@ -295,7 +318,8 @@ contract AggregateVerifierTest is BaseTest {
             protocolVersions: IProtocolVersions(address(protocolVersions)),
             genesisBlockNumber: 0,
             genesisTimestamp: 0,
-            blockTime: 0
+            blockTime: 0,
+            fastBlockActivationTimestamp: 0
         });
 
         vm.expectRevert(AggregateVerifier.InvalidL2BlockTime.selector);
@@ -307,7 +331,8 @@ contract AggregateVerifierTest is BaseTest {
             protocolVersions: IProtocolVersions(address(protocolVersions)),
             genesisBlockNumber: SLOW_BLOCK_INTERVAL + 1,
             genesisTimestamp: 0,
-            blockTime: L2_BLOCK_TIME
+            blockTime: L2_BLOCK_TIME,
+            fastBlockActivationTimestamp: 0
         });
         AggregateVerifier implementation = _deployAggregateVerifierWithScheduleConfig(scheduleConfig);
         factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(implementation)));
@@ -332,7 +357,8 @@ contract AggregateVerifierTest is BaseTest {
             protocolVersions: IProtocolVersions(address(protocolVersions)),
             genesisBlockNumber: 0,
             genesisTimestamp: type(uint64).max,
-            blockTime: L2_BLOCK_TIME
+            blockTime: L2_BLOCK_TIME,
+            fastBlockActivationTimestamp: 0
         });
         AggregateVerifier implementation = _deployAggregateVerifierWithScheduleConfig(scheduleConfig);
         factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(implementation)));
@@ -356,6 +382,7 @@ contract AggregateVerifierTest is BaseTest {
         }
         schedule[FAST_BLOCK_UPGRADE_INDEX] = genesisTimestamp + 1;
         _importProtocolVersionsSchedule(schedule);
+        fastBlockActivationTimestamp = genesisTimestamp + 1;
         _setSingleBlockAggregateVerifier(genesisTimestamp);
 
         vm.warp(uint256(type(uint64).max) + 3);
@@ -630,7 +657,8 @@ contract AggregateVerifierTest is BaseTest {
                 protocolVersions: IProtocolVersions(address(protocolVersions)),
                 genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
                 genesisTimestamp: genesisTimestamp,
-                blockTime: L2_BLOCK_TIME
+                blockTime: L2_BLOCK_TIME,
+                fastBlockActivationTimestamp: fastBlockActivationTimestamp
             })
         );
         factory.setImplementation(GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(implementation)));
@@ -786,7 +814,8 @@ contract AggregateVerifierTest is BaseTest {
                 protocolVersions: IProtocolVersions(address(protocolVersions)),
                 genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
                 genesisTimestamp: L2_GENESIS_TIMESTAMP,
-                blockTime: L2_BLOCK_TIME
+                blockTime: L2_BLOCK_TIME,
+                fastBlockActivationTimestamp: fastBlockActivationTimestamp
             })
         );
     }
@@ -800,12 +829,16 @@ contract AggregateVerifierTest is BaseTest {
 
     /// @dev Registers a schedule whose only meaningful entry is the speedup activation, and rebinds
     ///      the implementation to it.
+    /// @dev Bakes the speedup activation into a fresh implementation. The registry entry is written
+    ///      alongside it only so `scheduleId` pinning still reflects a chain that reached the fork;
+    ///      interval and timestamp selection read the immutable, not the registry.
     function _importSpeedupSchedule(uint64 fastActivationTimestamp) private {
         uint64[] memory schedule = new uint64[](FAST_BLOCK_UPGRADE_INDEX + 1);
         for (uint256 i; i < FAST_BLOCK_UPGRADE_INDEX; i++) {
             schedule[i] = L2_GENESIS_TIMESTAMP;
         }
         schedule[FAST_BLOCK_UPGRADE_INDEX] = fastActivationTimestamp;
+        fastBlockActivationTimestamp = fastActivationTimestamp;
         _importProtocolVersionsSchedule(schedule);
         aggregateVerifierImpl = AggregateVerifier(address(factory.gameImpls(GameTypes.AGGREGATE_VERIFIER)));
     }
@@ -892,7 +925,8 @@ contract AggregateVerifierTest is BaseTest {
             protocolVersions: IProtocolVersions(address(protocolVersions)),
             genesisBlockNumber: L2_GENESIS_BLOCK_NUMBER,
             genesisTimestamp: L2_GENESIS_TIMESTAMP,
-            blockTime: L2_BLOCK_TIME
+            blockTime: L2_BLOCK_TIME,
+            fastBlockActivationTimestamp: fastBlockActivationTimestamp
         });
     }
 

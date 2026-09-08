@@ -96,7 +96,11 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
                 fastIntermediateBlockInterval: 100
             }),
             AggregateVerifier.ScheduleConfig({
-                protocolVersions: protocolVersions, genesisBlockNumber: 0, genesisTimestamp: 1, blockTime: 2
+                protocolVersions: protocolVersions,
+                genesisBlockNumber: 0,
+                genesisTimestamp: 1,
+                blockTime: 2,
+                fastBlockActivationTimestamp: 0
             })
         );
         disputeGameFactory.setImplementation(respectedGameType, IDisputeGame(address(gameImpl)));

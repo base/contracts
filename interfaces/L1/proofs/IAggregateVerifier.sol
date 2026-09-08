@@ -29,6 +29,7 @@ interface IAggregateVerifier is IDisputeGame {
     function L2_GENESIS_BLOCK_NUMBER() external view returns (uint256);
     function L2_GENESIS_TIMESTAMP() external view returns (uint64);
     function L2_BLOCK_TIME() external view returns (uint64);
+    function FAST_BLOCK_ACTIVATION_TIMESTAMP() external view returns (uint64);
     function SLOW_BLOCK_INTERVAL() external view returns (uint256);
     function SLOW_INTERMEDIATE_BLOCK_INTERVAL() external view returns (uint256);
     function FAST_BLOCK_INTERVAL() external view returns (uint256);

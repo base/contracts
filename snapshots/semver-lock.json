@@ -28,8 +28,8 @@
     "sourceCodeHash": "0x780ff372493ba9010bc0d13100ac896f2bf75730a9b17d4bb63aaf694dc3c634"
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0x0642919b493a739e0280ded0dab2123c0c0d569fb613203ad71f79eca25af8e4",
-    "sourceCodeHash": "0xa03d89648901890b4e2ab06a72578045f75d6dfa649dbac0ae9364fd20f0657d"
+    "initCodeHash": "0x7b12663e3d6891ad906be1ec99d5e962873344931faae6b79b2f8cc1e85b56fa",
+    "sourceCodeHash": "0x48a54be27a13e1037310c927fbc869cadf714ee22131bd004b1542fd6279b2d6"
   },
   "src/L1/proofs/AnchorStateRegistry.sol:AnchorStateRegistry": {
     "initCodeHash": "0x6f3afd2d0ef97a82ca3111976322b99343a270e54cd4a405028f2f29c75f7fb1",

@@ -269,7 +269,11 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.implementationsInput.multiproofConfigHash = bytes32(0);
         input.implementationsInput.scheduleConfig = AggregateVerifier.ScheduleConfig({
-            protocolVersions: IProtocolVersions(address(0)), genesisBlockNumber: 0, genesisTimestamp: 0, blockTime: 0
+            protocolVersions: IProtocolVersions(address(0)),
+            genesisBlockNumber: 0,
+            genesisTimestamp: 0,
+            blockTime: 0,
+            fastBlockActivationTimestamp: 0
         });
 
         SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
@@ -458,7 +462,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
                 protocolVersions: IProtocolVersions(address(0)),
                 genesisBlockNumber: 0,
                 genesisTimestamp: 1,
-                blockTime: 2
+                blockTime: 2,
+                fastBlockActivationTimestamp: 0
             }),
             multiproofSlowBlockInterval: 100,
             multiproofSlowIntermediateBlockInterval: 10,

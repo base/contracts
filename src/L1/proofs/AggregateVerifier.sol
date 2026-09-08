@@ -51,6 +51,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         uint256 genesisBlockNumber;
         uint64 genesisTimestamp;
         uint64 blockTime;
+        uint64 fastBlockActivationTimestamp;
     }
 
     /// @notice Proposal block intervals for each side of the block-speedup activation.
@@ -85,13 +86,6 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The minimum number of proofs required to resolve the game.
     uint256 public constant PROOF_THRESHOLD = 1;
-
-    /// @notice The ProtocolVersions upgrade index at which L2 blocks switch to the fast cadence.
-    /// @dev    This is the one place the contract is tied to a specific hardfork: index 12 is Cobalt,
-    ///         which drops the L2 block time from 2s to 200ms. Everything downstream is expressed as
-    ///         slow-vs-fast blocks, so a later cadence change is a new index and new interval pair
-    ///         rather than new machinery.
-    uint256 private constant FAST_BLOCK_UPGRADE_INDEX = 12;
 
     /// @notice The number of whole fast-cadence L2 blocks produced per second.
     uint256 private constant FAST_BLOCKS_PER_SECOND = 5;
@@ -136,6 +130,16 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice The legacy number of seconds between consecutive L2 blocks.
     uint64 public immutable L2_BLOCK_TIME;
+
+    /// @notice The L2 timestamp at which blocks switch to the fast cadence, or 0 when unscheduled.
+    /// @dev    This is the one place the contract is tied to a specific hardfork: it is Cobalt's
+    ///         activation, which drops the L2 block time from 2s to 200ms. Everything downstream is
+    ///         expressed as slow-vs-fast blocks, so a later cadence change is a new deployment with a
+    ///         new timestamp and interval pair rather than new machinery.
+    /// @dev    0 means the speedup is not scheduled, so every game uses the slow-block intervals.
+    ///         This lets the implementation be deployed before the activation time is agreed, at the
+    ///         cost of a redeploy once it is.
+    uint64 public immutable FAST_BLOCK_ACTIVATION_TIMESTAMP;
 
     /// @notice The block interval between each proposal, for games starting on slow blocks.
     /// @dev    The parent's block number + SLOW_BLOCK_INTERVAL = this proposal's block number.
@@ -360,6 +364,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         L2_GENESIS_BLOCK_NUMBER = scheduleConfig.genesisBlockNumber;
         L2_GENESIS_TIMESTAMP = scheduleConfig.genesisTimestamp;
         L2_BLOCK_TIME = scheduleConfig.blockTime;
+        FAST_BLOCK_ACTIVATION_TIMESTAMP = scheduleConfig.fastBlockActivationTimestamp;
         SLOW_BLOCK_INTERVAL = intervalConfig.slowBlockInterval;
         SLOW_INTERMEDIATE_BLOCK_INTERVAL = intervalConfig.slowIntermediateBlockInterval;
         FAST_BLOCK_INTERVAL = intervalConfig.fastBlockInterval;
@@ -431,8 +436,7 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
             startingOutputRoot = ANCHOR_STATE_REGISTRY.getStartingAnchorRoot();
         }
 
-        // Resolved once and threaded through both fork-sensitive decisions below, which would
-        // otherwise re-read the schedule from `PROTOCOL_VERSIONS` a second time.
+        // Resolved once and threaded through both fork-sensitive decisions below.
         uint256 firstFastBlock = _firstFastBlock();
 
         // The block number must be one block interval after the starting block number. The interval
@@ -1159,9 +1163,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.2.0
+    /// @custom:semver 0.3.0
     function version() public pure virtual returns (string memory) {
-        return "0.2.0";
+        return "0.3.0";
     }
 
     /// @notice Derives an L2 block timestamp: the slow cadence before the speedup, whole-second groups after it.
@@ -1206,37 +1210,26 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
     /// @notice Returns the first L2 block number produced at the fast cadence, or `type(uint256).max`
     ///         when the speedup is not scheduled.
-    /// @dev    Reading the live schedule is safe despite it being mutable, in both directions:
-    ///
-    ///         - A game that selected the fast-block intervals has a starting block at or past the
-    ///           activation, so the activation is in the past. `ProtocolVersions._assertNotFrozen`
-    ///           rejects every mutation of a passed activation, from `setTimestamp` and
-    ///           `delayTimestamp` alike, so that game's selection can never be revoked.
-    ///         - A game that selected the slow-block intervals cannot be pulled across the boundary
-    ///           either, including by the owner moving the activation *earlier* rather than later.
-    ///           `initializeWithInitData` rejects a game whose ending L2 timestamp L1 has not yet
-    ///           reached, so every initialized game satisfies `startingTimestamp < endingTimestamp <=
-    ///           block.timestamp`, while any new activation must clear `block.timestamp + MIN_NOTICE`.
-    ///           The activation therefore always lands after the game's starting block.
+    /// @dev    The activation is an immutable, so every game this implementation ever backs selects
+    ///         its intervals against the same boundary. There is no window in which one game reads a
+    ///         different activation than another, and no mutation that can move a game across the
+    ///         boundary after the fact. Changing the activation means a new implementation, which is
+    ///         a new game type in the factory and therefore never retroactive.
     function _firstFastBlock() private view returns (uint256) {
-        uint64[] memory schedule = PROTOCOL_VERSIONS.getSchedule();
-        if (schedule.length <= FAST_BLOCK_UPGRADE_INDEX) return type(uint256).max;
+        if (FAST_BLOCK_ACTIVATION_TIMESTAMP == 0) return type(uint256).max;
 
-        uint64 fastActivationTimestamp = schedule[FAST_BLOCK_UPGRADE_INDEX];
-        if (fastActivationTimestamp == 0) return type(uint256).max;
-
-        if (fastActivationTimestamp <= L2_GENESIS_TIMESTAMP) {
+        if (FAST_BLOCK_ACTIVATION_TIMESTAMP <= L2_GENESIS_TIMESTAMP) {
             return L2_GENESIS_BLOCK_NUMBER;
         }
 
         return L2_GENESIS_BLOCK_NUMBER
-            + FixedPointMathLib.divUp(fastActivationTimestamp - L2_GENESIS_TIMESTAMP, L2_BLOCK_TIME);
+            + FixedPointMathLib.divUp(FAST_BLOCK_ACTIVATION_TIMESTAMP - L2_GENESIS_TIMESTAMP, L2_BLOCK_TIME);
     }
 
     /// @notice Selects the proposal intervals governing a game, from its starting block number and an
     ///         already-resolved speedup activation block.
     /// @dev    Takes `firstFastBlock` rather than resolving it so a caller making more than one
-    ///         fork-sensitive decision pays for `PROTOCOL_VERSIONS.getSchedule()` once.
+    ///         fork-sensitive decision derives the activation block once.
     function _intervalsAt(uint256 startingBlock, uint256 firstFastBlock) private view returns (uint256, uint256) {
         if (startingBlock < firstFastBlock) return (SLOW_BLOCK_INTERVAL, SLOW_INTERMEDIATE_BLOCK_INTERVAL);
         return (FAST_BLOCK_INTERVAL, FAST_INTERMEDIATE_BLOCK_INTERVAL);

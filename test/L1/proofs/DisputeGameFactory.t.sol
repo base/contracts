@@ -238,7 +238,11 @@ contract DisputeGameFactory_Create_Test is DisputeGameFactory_TestInit {
                 fastIntermediateBlockInterval: AGGREGATE_FAST_INTERMEDIATE_BLOCK_INTERVAL
             }),
             AggregateVerifier.ScheduleConfig({
-                protocolVersions: protocolVersions, genesisBlockNumber: 0, genesisTimestamp: 0, blockTime: 2
+                protocolVersions: protocolVersions,
+                genesisBlockNumber: 0,
+                genesisTimestamp: 0,
+                blockTime: 2,
+                fastBlockActivationTimestamp: 0
             })
         );
         _setGame(address(gameImpl), GameTypes.AGGREGATE_VERIFIER);
