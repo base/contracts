@@ -562,6 +562,8 @@ contract SystemDeploy is Script {
     }
 
     /// @notice Rejects a migration from SuperchainConfig until its global and chain-specific pause records are cleared.
+    /// @dev A pause submitted after this check and before the upgrade can be lost; coordinate migrations with
+    /// guardians.
     function _assertLegacySuperchainConfigNotPaused(ISystemConfig _systemConfigProxy) internal view {
         (bool success, bytes memory returndata) =
             address(_systemConfigProxy).staticcall(abi.encodeCall(ILegacySystemConfig.superchainConfig, ()));
