@@ -29,16 +29,16 @@ interface ISystemConfig is IProxyAdminOwnedBase {
     error SystemConfig_InvalidFeatureState();
     error SystemConfig_OnlyGuardian();
     error SystemConfig_OnlyGuardianOrIncidentResponder();
-    error SystemConfig_AlreadyPaused(address identifier);
-    error SystemConfig_NotAlreadyPaused(address identifier);
+    error SystemConfig_AlreadyPaused();
+    error SystemConfig_NotAlreadyPaused();
 
     event ConfigUpdate(uint256 indexed version, UpdateType indexed updateType, bytes data);
     event FeatureSet(bytes32 indexed feature, bool indexed enabled);
     event Initialized(uint8 version);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-    event Paused(address identifier);
-    event Unpaused(address identifier);
-    event PauseExtended(address identifier);
+    event Paused();
+    event Unpaused();
+    event PauseExtended();
 
     function BATCH_INBOX_SLOT() external view returns (bytes32);
     function GUARDIAN() external view returns (address);
@@ -108,15 +108,14 @@ interface ISystemConfig is IProxyAdminOwnedBase {
     function unsafeBlockSigner() external view returns (address addr_);
     function version() external pure returns (string memory);
     function paused() external view returns (bool);
-    function paused(address _identifier) external view returns (bool);
     function guardian() external view returns (address);
     function incidentResponder() external view returns (address);
-    function pause(address _identifier) external;
-    function unpause(address _identifier) external;
-    function extend(address _identifier) external;
-    function pausable(address _identifier) external view returns (bool);
-    function expiration(address _identifier) external view returns (uint256);
-    function pauseTimestamps(address) external view returns (uint256);
+    function pause() external;
+    function unpause() external;
+    function extend() external;
+    function pausable() external view returns (bool);
+    function expiration() external view returns (uint256);
+    function pauseTimestamp() external view returns (uint256);
     function pauseExpiry() external view returns (uint256);
     function setFeature(bytes32 _feature, bool _enabled) external;
     function isFeatureEnabled(bytes32) external view returns (bool);

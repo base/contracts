@@ -241,7 +241,7 @@ contract L1StandardBridge_Paused_Test is L1StandardBridge_TestInit {
     /// @notice Pauses the bridge and mocks the xDomainMessageSender to return the other bridge.
     function _pauseBridge() internal {
         vm.startPrank(systemConfig.guardian());
-        systemConfig.pause(address(0));
+        systemConfig.pause();
         vm.stopPrank();
         assertTrue(l1StandardBridge.paused());
 
@@ -274,7 +274,7 @@ contract L1StandardBridge_Paused_Test is L1StandardBridge_TestInit {
         assertEq(l1StandardBridge.paused(), systemConfig.paused());
 
         vm.prank(systemConfig.guardian());
-        systemConfig.pause(address(0));
+        systemConfig.pause();
 
         assertTrue(l1StandardBridge.paused());
         assertEq(l1StandardBridge.paused(), systemConfig.paused());

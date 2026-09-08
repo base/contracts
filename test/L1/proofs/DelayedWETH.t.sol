@@ -118,7 +118,7 @@ contract DelayedWETH_Withdraw_Test is DelayedWETH_TestBase {
 
     function _pauseSuperchain() internal {
         vm.prank(systemConfig.guardian());
-        systemConfig.pause(address(0));
+        systemConfig.pause();
     }
 
     function _prepareUnlockedWithdrawal() internal returns (uint256 balanceAfterDeposit_) {

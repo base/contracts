@@ -289,13 +289,7 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_identifier",
-        "type": "address"
-      }
-    ],
+    "inputs": [],
     "name": "expiration",
     "outputs": [
       {
@@ -308,13 +302,7 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_identifier",
-        "type": "address"
-      }
-    ],
+    "inputs": [],
     "name": "extend",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -741,13 +729,7 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_identifier",
-        "type": "address"
-      }
-    ],
+    "inputs": [],
     "name": "pausable",
     "outputs": [
       {
@@ -760,13 +742,7 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_identifier",
-        "type": "address"
-      }
-    ],
+    "inputs": [],
     "name": "pause",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -786,38 +762,13 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "pauseTimestamps",
+    "inputs": [],
+    "name": "pauseTimestamp",
     "outputs": [
       {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_identifier",
-        "type": "address"
-      }
-    ],
-    "name": "paused",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -1122,13 +1073,7 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_identifier",
-        "type": "address"
-      }
-    ],
+    "inputs": [],
     "name": "unpause",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -1238,40 +1183,19 @@
   },
   {
     "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "identifier",
-        "type": "address"
-      }
-    ],
+    "inputs": [],
     "name": "PauseExtended",
     "type": "event"
   },
   {
     "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "identifier",
-        "type": "address"
-      }
-    ],
+    "inputs": [],
     "name": "Paused",
     "type": "event"
   },
   {
     "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "identifier",
-        "type": "address"
-      }
-    ],
+    "inputs": [],
     "name": "Unpaused",
     "type": "event"
   },
@@ -1311,13 +1235,7 @@
     "type": "error"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "identifier",
-        "type": "address"
-      }
-    ],
+    "inputs": [],
     "name": "SystemConfig_AlreadyPaused",
     "type": "error"
   },
@@ -1327,13 +1245,7 @@
     "type": "error"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "identifier",
-        "type": "address"
-      }
-    ],
+    "inputs": [],
     "name": "SystemConfig_NotAlreadyPaused",
     "type": "error"
   },

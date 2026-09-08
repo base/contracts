@@ -23,18 +23,18 @@ contract ExtendedPause_Test is CommonTest {
         _pauseSystem();
 
         vm.prank(systemConfig.guardian());
-        systemConfig.unpause(address(0));
+        systemConfig.unpause();
 
         _assertFullSystemPaused(false);
     }
 
     function _pauseSystem() internal {
         vm.prank(systemConfig.guardian());
-        systemConfig.pause(address(0));
+        systemConfig.pause();
     }
 
     function _assertFullSystemPaused(bool _paused) internal view {
-        assertEq(systemConfig.paused(address(0)), _paused);
+        assertEq(systemConfig.paused(), _paused);
         assertEq(optimismPortal2.paused(), _paused);
         assertEq(l1CrossDomainMessenger.paused(), _paused);
         assertEq(l1StandardBridge.paused(), _paused);

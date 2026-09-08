@@ -21,9 +21,8 @@ import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 ///         All configuration is stored on L1 and picked up by L2 as part of the derviation of
 ///         the L2 chain. It also owns the pause state for the network, which the Guardian and
 ///         Incident Responder use to halt withdrawals and message relaying.
-/// @dev WARNING: When upgrading this contract, any active pause states will be lost as the pause
-///      state is stored in storage variables that are not preserved during upgrades. Therefore,
-///      this contract should not be upgraded while the system is paused.
+/// @dev Upgrading a pre-merge deployment moves pause management from the legacy SuperchainConfig.
+///      Use SystemDeploy for that upgrade, which rejects an active legacy pause.
 contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, ReinitializableBase, ISemver {
     /// @notice Enum representing different types of updates.
     /// @custom:value BATCHER              Represents an update to the batcher hash.
@@ -171,8 +170,8 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     /// @notice Bytes32 feature flag name to boolean enabled value.
     mapping(bytes32 => bool) public isFeatureEnabled;
 
-    /// @notice Mapping of pause identifiers to their pause timestamps.
-    mapping(address => uint256) public pauseTimestamps;
+    /// @notice Timestamp at which the current pause was started.
+    uint256 public pauseTimestamp;
 
     /// @notice Emitted when configuration is updated.
     /// @param version    SystemConfig version.
@@ -186,15 +185,13 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     event FeatureSet(bytes32 indexed feature, bool indexed enabled);
 
     /// @notice Emitted when the pause is triggered.
-    /// @param identifier An address helping to identify provenance of the pause transaction.
-    event Paused(address identifier);
+    event Paused();
 
     /// @notice Emitted when the pause is lifted.
-    event Unpaused(address identifier);
+    event Unpaused();
 
     /// @notice Emitted when a pause is extended.
-    /// @param identifier An address helping to identify provenance of the pause transaction.
-    event PauseExtended(address identifier);
+    event PauseExtended();
 
     /// @notice Thrown when attempting to enable/disable a feature when already enabled/disabled,
     ///         respectively.
@@ -206,11 +203,11 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
     /// @notice Thrown when a caller is not the guardian or incident responder but tries to pause
     error SystemConfig_OnlyGuardianOrIncidentResponder();
 
-    /// @notice Thrown when attempting to pause an identifier that is already paused
-    error SystemConfig_AlreadyPaused(address identifier);
+    /// @notice Thrown when attempting to pause an already paused system.
+    error SystemConfig_AlreadyPaused();
 
     /// @notice Thrown when attempting to extend a pause that is not already paused.
-    error SystemConfig_NotAlreadyPaused(address identifier);
+    error SystemConfig_NotAlreadyPaused();
 
     /// @notice Semantic version.
     /// @custom:semver 4.0.0
@@ -597,53 +594,50 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         emit FeatureSet(_feature, _enabled);
     }
 
-    /// @notice Pauses the system for a specific superchain cluster identifier.
-    /// @param _identifier The address identifier for the pause.
-    function pause(address _identifier) external {
+    /// @notice Pauses the system.
+    function pause() external {
         // Only the Guardian or Incident Responder can pause the system.
         if (msg.sender != GUARDIAN && msg.sender != INCIDENT_RESPONDER) {
             revert SystemConfig_OnlyGuardianOrIncidentResponder();
         }
 
-        // Cannot pause if the identifier is already paused to prevent re-pausing without either
+        // Cannot pause if the system is already paused to prevent re-pausing without either
         // unpausing, extending, or resetting the pause timestamp. Note that this check intentionally
         // prevents re-pausing even after a pause has expired (when paused() returns false but the
         // timestamp is still non-zero). This is a Stage 1 Decentralization requirement: the guardian
         // must explicitly unpause before pausing again, ensuring deliberate action is taken.
-        if (pauseTimestamps[_identifier] != 0) {
-            revert SystemConfig_AlreadyPaused(_identifier);
+        if (pauseTimestamp != 0) {
+            revert SystemConfig_AlreadyPaused();
         }
 
         // Set the pause timestamp.
-        pauseTimestamps[_identifier] = block.timestamp;
-        emit Paused(_identifier);
+        pauseTimestamp = block.timestamp;
+        emit Paused();
     }
 
-    /// @notice Unpauses the system for a specific identifier.
-    /// @param _identifier The address identifier to unpause.
-    function unpause(address _identifier) external {
+    /// @notice Unpauses the system.
+    function unpause() external {
         // Only the Guardian can unpause the system.
         if (msg.sender != GUARDIAN) revert SystemConfig_OnlyGuardian();
 
         // Unpause the system.
-        pauseTimestamps[_identifier] = 0;
-        emit Unpaused(_identifier);
+        pauseTimestamp = 0;
+        emit Unpaused();
     }
 
-    /// @notice Extends the pause for a specific identifier by resetting the pause timestamp.
-    /// @param _identifier The address identifier to extend.
-    function extend(address _identifier) external {
+    /// @notice Extends the pause by resetting its timestamp.
+    function extend() external {
         // Only the Guardian can extend the pause.
         if (msg.sender != GUARDIAN) revert SystemConfig_OnlyGuardian();
 
         // Cannot extend the pause if not already paused.
-        if (pauseTimestamps[_identifier] == 0) {
-            revert SystemConfig_NotAlreadyPaused(_identifier);
+        if (pauseTimestamp == 0) {
+            revert SystemConfig_NotAlreadyPaused();
         }
 
         // Reset the pause timestamp.
-        pauseTimestamps[_identifier] = block.timestamp;
-        emit PauseExtended(_identifier);
+        pauseTimestamp = block.timestamp;
+        emit PauseExtended();
     }
 
     /// @notice Getter for the incident responder address.
@@ -652,20 +646,17 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         return INCIDENT_RESPONDER;
     }
 
-    /// @notice Checks if the system can be paused for a specific identifier.
-    /// @param _identifier The address identifier to check.
-    /// @return True if the system can be paused for this identifier.
-    function pausable(address _identifier) external view returns (bool) {
-        return pauseTimestamps[_identifier] == 0;
+    /// @notice Checks if the system can be paused.
+    /// @return True if the system can be paused.
+    function pausable() external view returns (bool) {
+        return pauseTimestamp == 0;
     }
 
-    /// @notice Gets the expiration timestamp for a specific pause identifier.
-    /// @param _identifier The address identifier to check.
+    /// @notice Gets the pause expiration timestamp.
     /// @return The timestamp when the pause expires, or 0 if not paused.
-    function expiration(address _identifier) external view returns (uint256) {
-        uint256 timestamp = pauseTimestamps[_identifier];
-        if (timestamp == 0) return 0;
-        return timestamp + PAUSE_EXPIRY;
+    function expiration() external view returns (uint256) {
+        if (pauseTimestamp == 0) return 0;
+        return pauseTimestamp + PAUSE_EXPIRY;
     }
 
     /// @notice Returns the duration after which a pause expires.
@@ -674,21 +665,10 @@ contract SystemConfig is ProxyAdminOwnedBase, OwnableUpgradeable, Reinitializabl
         return PAUSE_EXPIRY;
     }
 
-    /// @notice Returns the current pause state for this network. The system is paused if either
-    ///         the global pause is active or the pause is active where the OptimismPortal address
-    ///         is used as the identifier.
+    /// @notice Returns the current pause state for this network.
     /// @return bool True if the system is paused, false otherwise.
     function paused() public view returns (bool) {
-        return paused(address(0)) || paused(optimismPortal());
-    }
-
-    /// @notice Checks if the system is currently paused for a specific identifier.
-    /// @param _identifier The address identifier to check.
-    /// @return True if the system is paused for this identifier and not expired.
-    function paused(address _identifier) public view returns (bool) {
-        uint256 timestamp = pauseTimestamps[_identifier];
-        if (timestamp == 0) return false;
-        return block.timestamp < timestamp + PAUSE_EXPIRY;
+        return pauseTimestamp != 0 && block.timestamp < pauseTimestamp + PAUSE_EXPIRY;
     }
 
     /// @notice Getter for the guardian address.

@@ -222,7 +222,7 @@ contract L1ERC721Bridge_Paused_Test is L1ERC721Bridge_TestInit {
         assertEq(l1ERC721Bridge.paused(), systemConfig.paused());
 
         vm.prank(systemConfig.guardian());
-        systemConfig.pause(address(0));
+        systemConfig.pause();
 
         assertTrue(l1ERC721Bridge.paused());
         assertEq(l1ERC721Bridge.paused(), systemConfig.paused());
@@ -322,7 +322,7 @@ contract L1ERC721Bridge_FinalizeBridgeERC721_Test is L1ERC721Bridge_Bridge_TestI
     /// @notice Ensures that the `finalizeBridgeERC721` function reverts when the bridge is paused.
     function test_finalizeBridgeERC721_paused_reverts() external {
         vm.prank(systemConfig.guardian());
-        systemConfig.pause(address(0));
+        systemConfig.pause();
 
         assertTrue(l1ERC721Bridge.paused());
         _mockOtherBridge();

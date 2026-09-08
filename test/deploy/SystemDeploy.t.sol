@@ -46,6 +46,18 @@ contract MockInvalidTEEProverRegistry {
     }
 }
 
+contract MockLegacySuperchainConfig {
+    address internal immutable PAUSED_IDENTIFIER;
+
+    constructor(address _pausedIdentifier) {
+        PAUSED_IDENTIFIER = _pausedIdentifier;
+    }
+
+    function paused(address _identifier) external view returns (bool) {
+        return _identifier == PAUSED_IDENTIFIER;
+    }
+}
+
 contract SystemDeploy_Test is Test, SystemDeployAssertions {
     Artifacts internal constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
@@ -306,6 +318,37 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
                 systemConfigProxy: output.opChain.systemConfigProxy,
                 protocolVersionsProxy: output.opChain.protocolVersionsProxy
             })
+        );
+    }
+
+    function testFuzz_upgrade_activeLegacyPause_reverts(bool _globalPause) public {
+        SystemDeploy.DeployInput memory input = _defaultDeployInput();
+        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
+        address systemConfigProxy = address(output.opChain.systemConfigProxy);
+        address pausedIdentifier = _globalPause ? address(0) : address(output.opChain.optimismPortalProxy);
+        MockLegacySuperchainConfig legacySuperchainConfig = new MockLegacySuperchainConfig(pausedIdentifier);
+        address systemConfigImpl = output.opChain.opChainProxyAdmin.getProxyImplementation(systemConfigProxy);
+
+        vm.mockCall(
+            systemConfigProxy,
+            abi.encodeWithSelector(bytes4(keccak256("superchainConfig()"))),
+            abi.encode(address(legacySuperchainConfig))
+        );
+
+        vm.expectRevert(SystemDeploy.LegacySuperchainConfigPaused.selector);
+        systemDeploy.upgrade(
+            SystemDeploy.UpgradeInput({
+                saveArtifacts: false,
+                implementations: output.impls,
+                systemConfigProxy: output.opChain.systemConfigProxy,
+                protocolVersionsProxy: output.opChain.protocolVersionsProxy
+            })
+        );
+
+        assertEq(
+            output.opChain.opChainProxyAdmin.getProxyImplementation(systemConfigProxy),
+            systemConfigImpl,
+            "system config impl"
         );
     }
 

@@ -42,6 +42,14 @@ import { Constants } from "src/libraries/Constants.sol";
 import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
+interface ILegacySuperchainConfig {
+    function paused(address _identifier) external view returns (bool);
+}
+
+interface ILegacySystemConfig {
+    function superchainConfig() external view returns (ILegacySuperchainConfig);
+}
+
 /// @title SystemDeploy
 /// @notice Script-level API for deploying or upgrading a complete OP Stack L1 system.
 contract SystemDeploy is Script {
@@ -127,6 +135,7 @@ contract SystemDeploy is Script {
     error InvalidChainId();
     error InvalidRoleAddress(string role);
     error InvalidStartingAnchorRoot();
+    error LegacySuperchainConfigPaused();
     error MissingImplementations();
 
     /// @notice Sets up the shared deployment config and artifact registry.
@@ -529,6 +538,8 @@ contract SystemDeploy is Script {
         IProxyAdmin proxyAdmin = _systemConfigProxy.proxyAdmin();
         uint256 l2ChainId = _systemConfigProxy.l2ChainId();
 
+        _assertLegacySuperchainConfigNotPaused(_systemConfigProxy);
+
         _upgradeTo(proxyAdmin, address(_systemConfigProxy), _impls.systemConfigImpl);
 
         IOptimismPortal optimismPortal = IOptimismPortal(payable(_systemConfigProxy.optimismPortal()));
@@ -555,6 +566,18 @@ contract SystemDeploy is Script {
         }
 
         emit Upgraded(l2ChainId, _systemConfigProxy, msg.sender);
+    }
+
+    /// @notice Rejects a migration from SuperchainConfig while its global or chain-specific pause is active.
+    function _assertLegacySuperchainConfigNotPaused(ISystemConfig _systemConfigProxy) internal view {
+        (bool success, bytes memory returndata) =
+            address(_systemConfigProxy).staticcall(abi.encodeCall(ILegacySystemConfig.superchainConfig, ()));
+        if (!success || returndata.length != 32) return;
+
+        ILegacySuperchainConfig superchainConfig = ILegacySuperchainConfig(abi.decode(returndata, (address)));
+        if (superchainConfig.paused(address(0)) || superchainConfig.paused(_systemConfigProxy.optimismPortal())) {
+            revert LegacySuperchainConfigPaused();
+        }
     }
 
     function _upgradeMultiproofContracts(

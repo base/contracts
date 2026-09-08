@@ -20,8 +20,8 @@
     "sourceCodeHash": "0x53c8ad6dc42e61b43b3ef2a91e154a02e719c595c8d1481b4b738faa7ebdf13d"
   },
   "src/L1/SystemConfig.sol:SystemConfig": {
-    "initCodeHash": "0xda121e302e3e5f1ad7fe1bf76b166570390ccc100e54247fdf7a2fde65d7e498",
-    "sourceCodeHash": "0x61483e183e24364870d8d65dae7e5097b5961702a61d9addfb22df8a75cfc1a5"
+    "initCodeHash": "0x4a83d1725257aee27f58f9874c543e55b89c3112e190c62ab4858e3c4dbf5bc3",
+    "sourceCodeHash": "0x2fc588be83bd1f91ff6cf0f7540c95eb08198c90d9df2a1eb3169361b8cdb03e"
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0xc14998e269a6ad7e5c2b5d5beee0eabb68a68c3758e666a76822905c4f16575f",

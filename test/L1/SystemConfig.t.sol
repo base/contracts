@@ -55,9 +55,9 @@ abstract contract SystemConfig_TestInit is CommonTest {
         return uint8(uint256(slotVal) & 0xFF);
     }
 
-    function _pauseAsGuardian(address _identifier) internal {
+    function _pauseAsGuardian() internal {
         vm.prank(systemConfig.guardian());
-        systemConfig.pause(_identifier);
+        systemConfig.pause();
     }
 
     function _emptyAddresses() internal pure returns (ISystemConfig.Addresses memory) {
@@ -547,63 +547,26 @@ contract SystemConfig_SetResourceConfig_Test is SystemConfig_TestInit {
 /// @title SystemConfig_Paused_Test
 /// @notice Test contract for SystemConfig `paused` function.
 contract SystemConfig_Paused_Test is SystemConfig_TestInit {
-    /// @notice Tests that `paused()` returns false when no pauses are active.
-    function test_paused_noPauses_succeeds() external view {
+    /// @notice Tests that `paused()` returns false when no pause is active.
+    function test_paused_noPause_succeeds() external view {
         assertFalse(systemConfig.paused());
     }
 
-    /// @notice Tests that `paused()` returns true when global pause is active.
-    function test_paused_globalPause_succeeds() external {
-        // Initially not paused
-        assertFalse(systemConfig.paused());
+    /// @notice Tests that `paused()` returns true after the system is paused.
+    function test_paused_succeeds() external {
+        _pauseAsGuardian();
 
-        // Pause the system globally
-        _pauseAsGuardian(address(0));
-
-        // Verify paused state
         assertTrue(systemConfig.paused());
     }
 
-    /// @notice Tests that `paused()` returns true when the OptimismPortal identifier is paused.
-    function test_paused_optimismPortalIdentifier_succeeds() external {
-        // Initially not paused
+    /// @notice Tests that `paused()` returns false after the pause expires.
+    function test_paused_expired_succeeds() external {
+        _pauseAsGuardian();
+
+        vm.warp(block.timestamp + PAUSE_EXPIRY);
+
         assertFalse(systemConfig.paused());
-
-        // Pause the system with OptimismPortal identifier
-        _pauseAsGuardian(address(optimismPortal2));
-
-        // Verify paused state
-        assertTrue(systemConfig.paused());
-    }
-
-    /// @notice Tests that `paused()` returns true when both pauses are active.
-    function test_paused_bothPausesActive_succeeds() external {
-        assertFalse(systemConfig.paused());
-
-        // Pause both globally and with identifier
-        vm.startPrank(systemConfig.guardian());
-        systemConfig.pause(address(0));
-        systemConfig.pause(address(optimismPortal2));
-        vm.stopPrank();
-
-        // Verify paused state
-        assertTrue(systemConfig.paused());
-    }
-
-    /// @notice Tests that `paused()` returns false when any other address is paused.
-    /// @param _address The address to pause.
-    function testFuzz_paused_otherAddress_succeeds(address _address) external {
-        vm.assume(_address != address(0));
-        vm.assume(_address != address(optimismPortal2));
-
-        // Initially not paused
-        assertFalse(systemConfig.paused());
-
-        // Pause the system with a different address that's not global or identifier
-        _pauseAsGuardian(_address);
-
-        // Verify still not paused
-        assertFalse(systemConfig.paused());
+        assertFalse(systemConfig.pausable());
     }
 }
 
@@ -820,71 +783,24 @@ contract SystemConfig_PauseExpiry_Test is SystemConfig_TestInit {
     }
 }
 
-/// @title SystemConfig_PausedIdentifier_Test
-/// @notice Test contract for the SystemConfig `paused(address)` function.
-contract SystemConfig_PausedIdentifier_Test is SystemConfig_TestInit {
-    /// @notice Tests that `paused` returns true when the specific identifier is paused.
-    /// @param _identifier The identifier to test.
-    /// @param _other The unpaused identifier to test.
-    function testFuzz_paused_specificIdentifier_succeeds(address _identifier, address _other) external {
-        vm.assume(_identifier != address(0));
-        vm.assume(_other != _identifier);
-
-        _pauseAsGuardian(_identifier);
-        assertTrue(systemConfig.paused(_identifier));
-        assertFalse(systemConfig.paused(_other));
-    }
-
-    /// @notice Tests that `paused` returns true when the global pause is active.
-    function test_paused_global_succeeds() external {
-        _pauseAsGuardian(address(0));
-
-        assertTrue(systemConfig.paused());
-        assertTrue(systemConfig.paused(address(0)));
-        assertFalse(systemConfig.paused(address(1)));
-    }
-
-    /// @notice Tests that `paused` returns false after pause expires.
-    /// @param _identifier The identifier to test.
-    function testFuzz_paused_expired_succeeds(address _identifier) external {
-        _pauseAsGuardian(_identifier);
-        assertTrue(systemConfig.paused(_identifier));
-
-        vm.warp(block.timestamp + PAUSE_EXPIRY + 1);
-        assertFalse(systemConfig.paused(_identifier));
-    }
-
-    /// @notice Tests that `paused` returns true just before expiry.
-    /// @param _identifier The identifier to test.
-    function testFuzz_paused_beforeExpiry_succeeds(address _identifier) external {
-        _pauseAsGuardian(_identifier);
-
-        vm.warp(block.timestamp + PAUSE_EXPIRY - 1);
-        assertTrue(systemConfig.paused(_identifier));
-    }
-}
-
 /// @title SystemConfig_Pause_Test
 /// @notice Test contract for SystemConfig `pause` function.
 contract SystemConfig_Pause_Test is SystemConfig_TestInit {
-    /// @notice Tests that `pause` successfully pauses when called by the guardian.
-    /// @param _identifier The identifier to test.
-    function testFuzz_pause_succeeds(address _identifier) external {
-        assertFalse(systemConfig.paused(_identifier));
-
+    /// @notice Tests that the guardian can pause the system.
+    function test_pause_guardian_succeeds() external {
         vm.expectEmit(address(systemConfig));
-        emit Paused(_identifier);
+        emit Paused();
 
-        vm.prank(systemConfig.guardian());
-        systemConfig.pause(_identifier);
+        _pauseAsGuardian();
 
-        assertTrue(systemConfig.paused(_identifier));
+        assertTrue(systemConfig.paused());
+        assertFalse(systemConfig.pausable());
+        assertEq(systemConfig.pauseTimestamp(), block.timestamp);
     }
 
-    /// @notice Tests that `pause` succeeds when called by the incident responder.
+    /// @notice Tests that the incident responder can pause the system.
     /// @param _incidentResponder The incident responder to test.
-    /// @param _identifier        The identifier to test.
-    function testFuzz_pause_incidentResponder_succeeds(address _incidentResponder, address _identifier) external {
+    function testFuzz_pause_incidentResponder_succeeds(address _incidentResponder) external {
         // The incident responder is immutable and unset in the deploy config, so exercise the
         // role against a freshly deployed instance that has one.
         vm.assume(_incidentResponder != address(0) && _incidentResponder != systemConfig.guardian());
@@ -898,12 +814,12 @@ contract SystemConfig_Pause_Test is SystemConfig_TestInit {
         );
 
         vm.expectEmit(address(config));
-        emit Paused(_identifier);
+        emit Paused();
 
         vm.prank(_incidentResponder);
-        config.pause(_identifier);
+        config.pause();
 
-        assertTrue(config.paused(_identifier));
+        assertTrue(config.paused());
     }
 
     /// @notice Tests that `pause` reverts when called by a non-guardian and non-incident-responder.
@@ -913,180 +829,97 @@ contract SystemConfig_Pause_Test is SystemConfig_TestInit {
 
         vm.expectRevert(ISystemConfig.SystemConfig_OnlyGuardianOrIncidentResponder.selector);
         vm.prank(_caller);
-        systemConfig.pause(address(this));
+        systemConfig.pause();
     }
 
-    /// @notice Tests that `pause` reverts when the identifier is already used.
-    /// @param _identifier The identifier to test.
-    function testFuzz_pause_alreadyUsed_reverts(address _identifier) external {
-        _pauseAsGuardian(_identifier);
+    /// @notice Tests that `pause` reverts when the system was already paused.
+    function test_pause_alreadyPaused_reverts() external {
+        _pauseAsGuardian();
 
         vm.prank(systemConfig.guardian());
-        vm.expectRevert(abi.encodeWithSelector(ISystemConfig.SystemConfig_AlreadyPaused.selector, _identifier));
-        systemConfig.pause(_identifier);
+        vm.expectRevert(ISystemConfig.SystemConfig_AlreadyPaused.selector);
+        systemConfig.pause();
     }
 }
 
 /// @title SystemConfig_Unpause_Test
 /// @notice Test contract for SystemConfig `unpause` function.
 contract SystemConfig_Unpause_Test is SystemConfig_TestInit {
-    /// @notice Tests that `unpause` successfully unpauses when called by the guardian.
-    /// @param _identifier The identifier to test.
-    function testFuzz_unpause_succeeds(address _identifier) external {
-        _pauseAsGuardian(_identifier);
-        assertTrue(systemConfig.paused(_identifier));
+    /// @notice Tests that the guardian can unpause the system.
+    function test_unpause_succeeds() external {
+        _pauseAsGuardian();
 
         vm.expectEmit(address(systemConfig));
-        emit Unpaused(_identifier);
+        emit Unpaused();
         vm.prank(systemConfig.guardian());
-        systemConfig.unpause(_identifier);
+        systemConfig.unpause();
 
-        assertFalse(systemConfig.paused(_identifier));
+        assertFalse(systemConfig.paused());
+        assertTrue(systemConfig.pausable());
+        assertEq(systemConfig.pauseTimestamp(), 0);
     }
 
     /// @notice Tests that `unpause` reverts when called by a non-guardian.
     /// @param _caller The non-guardian caller to test.
     function testFuzz_unpause_notGuardian_reverts(address _caller) external {
         vm.assume(_caller != systemConfig.guardian());
-
-        _pauseAsGuardian(address(this));
-        assertTrue(systemConfig.paused(address(this)));
+        _pauseAsGuardian();
 
         vm.expectRevert(ISystemConfig.SystemConfig_OnlyGuardian.selector);
         vm.prank(_caller);
-        systemConfig.unpause(address(this));
+        systemConfig.unpause();
     }
 }
 
 /// @title SystemConfig_Extend_Test
 /// @notice Test contract for SystemConfig `extend` function.
 contract SystemConfig_Extend_Test is SystemConfig_TestInit {
-    /// @notice Tests that `extend` successfully resets and re-pauses an identifier.
-    /// @param _identifier The identifier to test.
-    function testFuzz_extend_succeeds(address _identifier) external {
-        _pauseAsGuardian(_identifier);
-        uint256 firstPauseTimestamp = block.timestamp;
-
+    /// @notice Tests that the guardian can extend a pause.
+    function test_extend_succeeds() external {
+        _pauseAsGuardian();
         vm.warp(block.timestamp + 1);
 
         vm.expectEmit(address(systemConfig));
-        emit PauseExtended(_identifier);
+        emit PauseExtended();
         vm.prank(systemConfig.guardian());
-        systemConfig.extend(_identifier);
-        assertTrue(systemConfig.pauseTimestamps(_identifier) > firstPauseTimestamp);
-        assertTrue(systemConfig.paused(_identifier));
+        systemConfig.extend();
+
+        assertTrue(systemConfig.paused());
+        assertEq(systemConfig.pauseTimestamp(), block.timestamp);
+        assertEq(systemConfig.expiration(), block.timestamp + PAUSE_EXPIRY);
     }
 
     /// @notice Tests that `extend` reverts when called by a non-guardian.
     /// @param _caller The non-guardian caller to test.
     function testFuzz_extend_notGuardian_reverts(address _caller) external {
         vm.assume(_caller != systemConfig.guardian());
-
-        _pauseAsGuardian(address(this));
+        _pauseAsGuardian();
 
         vm.expectRevert(ISystemConfig.SystemConfig_OnlyGuardian.selector);
         vm.prank(_caller);
-        systemConfig.extend(address(this));
+        systemConfig.extend();
     }
 
-    /// @notice Tests that `extend` reverts when the identifier is not already paused.
-    /// @param _identifier The identifier to test.
-    function testFuzz_extend_notAlreadyPaused_reverts(address _identifier) external {
+    /// @notice Tests that `extend` reverts when the system is not paused.
+    function test_extend_notAlreadyPaused_reverts() external {
         vm.prank(systemConfig.guardian());
-        vm.expectRevert(abi.encodeWithSelector(ISystemConfig.SystemConfig_NotAlreadyPaused.selector, _identifier));
-        systemConfig.extend(_identifier);
-    }
-}
-
-/// @title SystemConfig_Pausable_Test
-/// @notice Test contract for SystemConfig `pausable` function.
-contract SystemConfig_Pausable_Test is SystemConfig_TestInit {
-    /// @notice Tests that `pausable` returns true when the identifier is not paused.
-    /// @param _identifier The identifier to test.
-    function testFuzz_pausable_notPaused_succeeds(address _identifier) external view {
-        assertTrue(systemConfig.pausable(_identifier));
-    }
-
-    /// @notice Tests that `pausable` returns false when the identifier is paused.
-    /// @param _identifier The identifier to test.
-    function testFuzz_pausable_paused_succeeds(address _identifier) external {
-        _pauseAsGuardian(_identifier);
-        assertFalse(systemConfig.pausable(_identifier));
-    }
-
-    /// @notice Tests that `pausable` returns false even after pause expires.
-    /// @param _identifier The identifier to test.
-    function testFuzz_pausable_expired_succeeds(address _identifier) external {
-        _pauseAsGuardian(_identifier);
-
-        vm.warp(block.timestamp + PAUSE_EXPIRY + 1);
-
-        // Expired pauses remain unpausable because the timestamp stays set.
-        assertFalse(systemConfig.pausable(_identifier));
-        assertFalse(systemConfig.paused(_identifier));
-    }
-}
-
-/// @title SystemConfig_PauseTimestamps_Test
-/// @notice Test contract for SystemConfig `pauseTimestamps` getter function.
-contract SystemConfig_PauseTimestamps_Test is SystemConfig_TestInit {
-    /// @notice Tests that `pauseTimestamps` returns 0 for unpaused identifiers.
-    /// @param _identifier The identifier to test.
-    function testFuzz_pauseTimestamps_unpaused_succeeds(address _identifier) external view {
-        assertEq(systemConfig.pauseTimestamps(_identifier), 0);
-    }
-
-    /// @notice Tests that `pauseTimestamps` returns the correct timestamp for paused identifiers.
-    /// @param _identifier The identifier to test.
-    function testFuzz_pauseTimestamps_paused_succeeds(address _identifier) external {
-        _pauseAsGuardian(_identifier);
-        assertEq(systemConfig.pauseTimestamps(_identifier), block.timestamp);
-    }
-
-    /// @notice Tests that `pauseTimestamps` returns 0 after unpausing.
-    /// @param _identifier The identifier to test.
-    function testFuzz_pauseTimestamps_afterUnpause_succeeds(address _identifier) external {
-        _pauseAsGuardian(_identifier);
-        assertTrue(systemConfig.pauseTimestamps(_identifier) != 0);
-
-        vm.prank(systemConfig.guardian());
-        systemConfig.unpause(_identifier);
-        assertEq(systemConfig.pauseTimestamps(_identifier), 0);
+        vm.expectRevert(ISystemConfig.SystemConfig_NotAlreadyPaused.selector);
+        systemConfig.extend();
     }
 }
 
 /// @title SystemConfig_Expiration_Test
 /// @notice Test contract for SystemConfig `expiration` function.
 contract SystemConfig_Expiration_Test is SystemConfig_TestInit {
-    /// @notice Tests that `expiration` returns 0 when the identifier is not paused.
+    /// @notice Tests that `expiration` returns 0 when the system is not paused.
     function test_expiration_notPaused_succeeds() external view {
-        assertEq(systemConfig.expiration(address(this)), 0);
+        assertEq(systemConfig.expiration(), 0);
     }
 
-    /// @notice Tests that `expiration` returns the correct timestamp when the identifier is
-    ///         paused.
-    function test_expiration_paused_succeeds() external {
-        _pauseAsGuardian(address(this));
-        assertEq(systemConfig.expiration(address(this)), block.timestamp + PAUSE_EXPIRY);
-    }
+    /// @notice Tests that `expiration` returns the pause expiry timestamp.
+    function test_expiration_succeeds() external {
+        _pauseAsGuardian();
 
-    /// @notice Tests that `expiration` returns the updated timestamp after extending the pause.
-    function test_expiration_afterExtend_succeeds() external {
-        _pauseAsGuardian(address(this));
-        vm.warp(block.timestamp + 100);
-
-        vm.prank(systemConfig.guardian());
-        systemConfig.extend(address(this));
-
-        assertEq(systemConfig.expiration(address(this)), block.timestamp + PAUSE_EXPIRY);
-    }
-
-    /// @notice Tests that `expiration` works correctly with fuzzed identifiers.
-    /// @param _identifier The identifier to test.
-    function testFuzz_expiration_succeeds(address _identifier) external {
-        assertEq(systemConfig.expiration(_identifier), 0);
-
-        _pauseAsGuardian(_identifier);
-        assertEq(systemConfig.expiration(_identifier), block.timestamp + PAUSE_EXPIRY);
+        assertEq(systemConfig.expiration(), block.timestamp + PAUSE_EXPIRY);
     }
 }

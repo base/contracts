@@ -544,7 +544,7 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
     /// @notice Tests that `proveWithdrawalTransaction` reverts when paused.
     function test_proveWithdrawalTransaction_paused_reverts() external {
         vm.startPrank(optimismPortal2.guardian());
-        systemConfig.pause(address(0));
+        systemConfig.pause();
         vm.stopPrank();
 
         vm.expectRevert(IOptimismPortal.OptimismPortal_CallPaused.selector);
@@ -887,7 +887,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
     /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the contract is paused.
     function test_finalizeWithdrawalTransaction_paused_reverts() external {
         vm.prank(optimismPortal2.guardian());
-        systemConfig.pause(address(0));
+        systemConfig.pause();
 
         vm.expectRevert(IOptimismPortal.OptimismPortal_CallPaused.selector);
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);

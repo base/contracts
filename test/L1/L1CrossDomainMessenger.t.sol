@@ -139,7 +139,7 @@ contract L1CrossDomainMessenger_Paused_Test is L1CrossDomainMessenger_TestInit {
         assertEq(l1CrossDomainMessenger.paused(), systemConfig.paused());
 
         vm.prank(systemConfig.guardian());
-        systemConfig.pause(address(0));
+        systemConfig.pause();
 
         assertTrue(l1CrossDomainMessenger.paused());
         assertEq(l1CrossDomainMessenger.paused(), systemConfig.paused());
@@ -1027,7 +1027,7 @@ contract L1CrossDomainMessenger_Uncategorized_Test is L1CrossDomainMessenger_Tes
     /// @notice Tests that relayMessage reverts while the messenger is paused.
     function test_relayMessage_paused_reverts() external {
         vm.prank(systemConfig.guardian());
-        systemConfig.pause(address(0));
+        systemConfig.pause();
         vm.expectRevert("CrossDomainMessenger: paused");
 
         l1CrossDomainMessenger.relayMessage(
