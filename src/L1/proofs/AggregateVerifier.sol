@@ -87,11 +87,14 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     uint256 public constant PROOF_THRESHOLD = 1;
 
     /// @notice The ProtocolVersions upgrade index at which L2 blocks switch to the fast cadence.
-    /// @dev    This is the one place the contract is tied to a specific hardfork: index 12 is Cobalt,
+    /// @dev    This is the one place the contract is tied to a specific hardfork: index 13 is Denim,
     ///         which drops the L2 block time from 2s to 200ms. Everything downstream is expressed as
     ///         slow-vs-fast blocks, so a later cadence change is a new index and new interval pair
     ///         rather than new machinery.
-    uint256 private constant FAST_BLOCK_UPGRADE_INDEX = 12;
+    /// @dev    Index 13 is one past the end of the current Base mainnet schedule, so `getSchedule()`
+    ///         returns a shorter array until Denim is registered. `_firstFastBlock()` treats that as
+    ///         unscheduled, which is the same state an index-in-range zero timestamp produces.
+    uint256 private constant FAST_BLOCK_UPGRADE_INDEX = 13;
 
     /// @notice The number of whole fast-cadence L2 blocks produced per second.
     uint256 private constant FAST_BLOCKS_PER_SECOND = 5;
