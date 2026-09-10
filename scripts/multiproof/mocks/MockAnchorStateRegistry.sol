@@ -9,7 +9,7 @@ import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 /// @notice Minimal mock for testing - stores anchor state and factory reference.
 /// @dev We use a mock instead of the real AnchorStateRegistry because:
 ///      1. The real contract requires deploying the entire Optimism L1 stack
-///         (SystemConfig, SuperchainConfig, ProxyAdmin, Guardian roles, etc.)
+///         (SystemConfig, ProxyAdmin, Guardian roles, etc.)
 ///      2. The real contract has "stack too deep" compilation issues that require
 ///         special compiler settings (via-ir) which significantly slow builds
 contract MockAnchorStateRegistry {

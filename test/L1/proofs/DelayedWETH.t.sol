@@ -45,7 +45,7 @@ contract DelayedWETH_Initialize_Test is DelayedWETH_TestBase {
     function test_initialize_succeeds() public view {
         assertEq(delayedWeth.proxyAdminOwner(), proxyAdminOwner);
         assertEq(address(delayedWeth.systemConfig()), address(systemConfig));
-        assertEq(address(delayedWeth.config()), address(systemConfig.superchainConfig()));
+        assertEq(address(delayedWeth.systemConfig()), address(systemConfig));
     }
 
     /// @notice Tests that the initializer value is correct. Trivial test for normal initialization
@@ -117,8 +117,8 @@ contract DelayedWETH_Withdraw_Test is DelayedWETH_TestBase {
     }
 
     function _pauseSuperchain() internal {
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(0));
+        vm.prank(systemConfig.guardian());
+        systemConfig.pause();
     }
 
     function _prepareUnlockedWithdrawal() internal returns (uint256 balanceAfterDeposit_) {

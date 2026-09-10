@@ -163,7 +163,7 @@ contract L1ERC721Bridge_Initialize_Test is L1ERC721Bridge_TestInit {
         assertEq(address(l1ERC721Bridge.OTHER_BRIDGE()), Predeploys.L2_ERC721_BRIDGE);
         assertEq(address(l1ERC721Bridge.otherBridge()), Predeploys.L2_ERC721_BRIDGE);
         assertEq(address(l1ERC721Bridge.systemConfig()), address(systemConfig));
-        assertEq(address(l1ERC721Bridge.superchainConfig()), address(systemConfig.superchainConfig()));
+        assertEq(address(l1ERC721Bridge.systemConfig()), address(systemConfig));
     }
 
     /// @notice Tests that the initializer value is correct. Trivial test for normal
@@ -190,15 +190,6 @@ contract L1ERC721Bridge_Initialize_Test is L1ERC721Bridge_TestInit {
     }
 }
 
-/// @title L1ERC721Bridge_SuperchainConfig_Test
-/// @notice Test contract for L1ERC721Bridge `superchainConfig` function.
-contract L1ERC721Bridge_SuperchainConfig_Test is L1ERC721Bridge_TestInit {
-    /// @notice Verifies superchainConfig returns the correct contract address.
-    function test_superchainConfig_succeeds() external view {
-        assertEq(address(l1ERC721Bridge.superchainConfig()), address(systemConfig.superchainConfig()));
-    }
-}
-
 /// @title L1ERC721Bridge_Version_Test
 /// @notice Test contract for L1ERC721Bridge `version` constant.
 contract L1ERC721Bridge_Version_Test is L1ERC721Bridge_TestInit {
@@ -212,26 +203,26 @@ contract L1ERC721Bridge_Version_Test is L1ERC721Bridge_TestInit {
 /// @notice Test contract for L1ERC721Bridge `paused` functionality.
 contract L1ERC721Bridge_Paused_Test is L1ERC721Bridge_TestInit {
     /// @dev Verifies that the `paused` accessor returns the same value as the `paused` function of
-    ///      the `superchainConfig`.
+    ///      the `systemConfig`.
     function test_paused_succeeds() external view {
         assertEq(l1ERC721Bridge.paused(), systemConfig.paused());
     }
 
     /// @dev Ensures that the `paused` function of the bridge contract actually calls the `paused`
-    ///      function of the `superchainConfig`.
-    function test_pause_callsSuperchainConfig_succeeds() external {
-        vm.expectCall(address(systemConfig), abi.encodeCall(ISystemConfig.paused, ()));
+    ///      function of the `systemConfig`.
+    function test_pause_callsSystemConfig_succeeds() external {
+        vm.expectCall(address(systemConfig), abi.encodeWithSignature("paused()"));
         l1ERC721Bridge.paused();
     }
 
     /// @dev Checks that the `paused` state of the bridge matches the `paused` state of the
-    ///      `superchainConfig` after it's been changed.
-    function test_pause_matchesSuperchainConfig_succeeds() external {
+    ///      `systemConfig` after it's been changed.
+    function test_pause_matchesSystemConfig_succeeds() external {
         assertFalse(l1ERC721Bridge.paused());
         assertEq(l1ERC721Bridge.paused(), systemConfig.paused());
 
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(0));
+        vm.prank(systemConfig.guardian());
+        systemConfig.pause();
 
         assertTrue(l1ERC721Bridge.paused());
         assertEq(l1ERC721Bridge.paused(), systemConfig.paused());
@@ -330,8 +321,8 @@ contract L1ERC721Bridge_FinalizeBridgeERC721_Test is L1ERC721Bridge_Bridge_TestI
 
     /// @notice Ensures that the `finalizeBridgeERC721` function reverts when the bridge is paused.
     function test_finalizeBridgeERC721_paused_reverts() external {
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(0));
+        vm.prank(systemConfig.guardian());
+        systemConfig.pause();
 
         assertTrue(l1ERC721Bridge.paused());
         _mockOtherBridge();

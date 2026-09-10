@@ -241,7 +241,7 @@ contract L1StandardBridge_Paused_Test is L1StandardBridge_TestInit {
     /// @notice Pauses the bridge and mocks the xDomainMessageSender to return the other bridge.
     function _pauseBridge() internal {
         vm.startPrank(systemConfig.guardian());
-        systemConfig.superchainConfig().pause(address(0));
+        systemConfig.pause();
         vm.stopPrank();
         assertTrue(l1StandardBridge.paused());
 
@@ -255,26 +255,26 @@ contract L1StandardBridge_Paused_Test is L1StandardBridge_TestInit {
     }
 
     /// @notice Verifies that the `paused` accessor returns the same value as the `paused` function
-    ///         of the `superchainConfig`.
+    ///         of the `systemConfig`.
     function test_paused_succeeds() external view {
         assertEq(l1StandardBridge.paused(), systemConfig.paused());
     }
 
     /// @notice Ensures that the `paused` function of the bridge contract actually calls the
-    ///         `paused` function of the `superchainConfig`.
-    function test_paused_callsSuperchainConfig_succeeds() external {
-        vm.expectCall(address(systemConfig), abi.encodeCall(ISystemConfig.paused, ()));
+    ///         `paused` function of the `systemConfig`.
+    function test_paused_callsSystemConfig_succeeds() external {
+        vm.expectCall(address(systemConfig), abi.encodeWithSignature("paused()"));
         l1StandardBridge.paused();
     }
 
     /// @notice Checks that the `paused` state of the bridge matches the `paused` state of the
-    ///         `superchainConfig` after it's been changed.
-    function test_paused_matchesSuperchainConfig_succeeds() external {
+    ///         `systemConfig` after it's been changed.
+    function test_paused_matchesSystemConfig_succeeds() external {
         assertFalse(l1StandardBridge.paused());
         assertEq(l1StandardBridge.paused(), systemConfig.paused());
 
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(0));
+        vm.prank(systemConfig.guardian());
+        systemConfig.pause();
 
         assertTrue(l1StandardBridge.paused());
         assertEq(l1StandardBridge.paused(), systemConfig.paused());
@@ -710,7 +710,7 @@ contract L1StandardBridge_Uncategorized_Test is L1StandardBridge_TestInit {
         assertEq(address(l1StandardBridge.messenger()), address(l1CrossDomainMessenger));
         assertEq(address(l1StandardBridge.MESSENGER()), address(l1CrossDomainMessenger));
         assertEq(address(l1StandardBridge.systemConfig()), address(systemConfig));
-        assertEq(address(l1StandardBridge.superchainConfig()), address(systemConfig.superchainConfig()));
+        assertEq(address(l1StandardBridge.systemConfig()), address(systemConfig));
     }
 
     /// @notice Tests that bridging ETH succeeds.
