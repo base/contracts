@@ -16,8 +16,8 @@
     "sourceCodeHash": "0x811596e7486cab9ceeeb61405b9ae510d93fcbbdfa11949201a367506c53194a"
   },
   "src/L1/ProtocolVersions.sol:ProtocolVersions": {
-    "initCodeHash": "0x54c2a142728d60511fd15a7d6bb962b0f33d833ee727de16189fd18b6246b492",
-    "sourceCodeHash": "0x53c8ad6dc42e61b43b3ef2a91e154a02e719c595c8d1481b4b738faa7ebdf13d"
+    "initCodeHash": "0x131c2f08ce9665aa75f25c17a837266705e77ea70758d35a2d1f3d03428b4494",
+    "sourceCodeHash": "0xc4fa0cdadb464286fca2c087e8602dd99b936d6865dd9d13930d095bd7a3524f"
   },
   "src/L1/SuperchainConfig.sol:SuperchainConfig": {
     "initCodeHash": "0x9b1f3555b499709485d51d5d9665002c0eb1e5eb893be1fb978a30749e894858",

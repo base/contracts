@@ -196,7 +196,8 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @param timestamp Unix activation timestamp (must be >= block.timestamp + MIN_NOTICE), or 0 to
     ///                  leave the upgrade unscheduled.
     /// @param minProtocolVersion New minimum protocol version to set at registration, or 0 to leave
-    ///                  the current minimum unchanged. Must fit in 128 bits if non-zero.
+    ///                  the current minimum unchanged. Must fit in 128 bits if non-zero. A non-zero
+    ///                  `timestamp` requires a non-zero minimum to already be set or supplied here.
     /// @return The ascending id assigned to the newly registered upgrade.
     function registerUpgrade(uint64 timestamp, uint256 minProtocolVersion) external returns (uint256) {
         _assertOnlyProxyAdminOwner();
@@ -205,6 +206,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         if (timestamp != 0 && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
             revert ProtocolVersions_InsufficientNotice(timestamp);
         }
+        _assertMinimumProtocolVersionSet(timestamp, minProtocolVersion);
         _assertTimestampAfterPrevious(id, timestamp);
         _timestamps.push(0);
         // Reserve the link slot for this upgrade at index id + 1.
@@ -242,6 +244,10 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     ///      preexisting activation must still be more than FREEZE_WINDOW away. Pass 0 to remove a
     ///      scheduled timestamp; reverts if the upgrade has already activated or is inside its
     ///      freeze window, or if a later upgrade remains scheduled.
+    /// @dev Scheduling a non-zero timestamp requires `minimumProtocolVersion` to already be set. This
+    ///      path cannot set it in the same call, so a registry still at zero must call
+    ///      `setMinimumProtocolVersion` first; ordering it that way is what removes the window in
+    ///      which a live schedule would be unreadable to nodes.
     /// @param id         The upgrade to schedule.
     /// @param timestamp  Future Unix timestamp for L2 activation (must be >= block.timestamp + MIN_NOTICE), or 0 to
     /// clear.
@@ -254,6 +260,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         if (timestamp != 0 && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
             revert ProtocolVersions_InsufficientNotice(timestamp);
         }
+        _assertMinimumProtocolVersionSet(timestamp, 0);
         if (timestamp == 0 || current == 0) _assertNoScheduledSuccessor(id);
         if (timestamp != 0) {
             _assertTimestampAfterPrevious(id, timestamp);
@@ -380,6 +387,22 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         }
 
         emit ScheduleIdUpdated(prev);
+    }
+
+    /// @dev Requires a non-zero activation timestamp to be backed by a non-zero minimum protocol
+    ///      version, counting one supplied in the same call. Nodes attach the global minimum to every
+    ///      imported timestamp and reject any positive activation whose version is zero, so a schedule
+    ///      written without one is unreadable: strict modes abort startup and the runtime refresher
+    ///      declines to apply it. Enforcing this on every write path, not only the initializer's
+    ///      import, keeps the pairing an invariant rather than a deployment-time convention.
+    ///      `delayTimestamp` is deliberately exempt: it requires an already-scheduled activation, so it
+    ///      cannot introduce the pairing, and guarding it would strand the incident responder on a
+    ///      registry upgraded into this implementation while already holding a zero version.
+    function _assertMinimumProtocolVersionSet(uint64 timestamp, uint256 suppliedProtocolVersion) private view {
+        if (timestamp == 0) return;
+        if (suppliedProtocolVersion == 0 && minimumProtocolVersion == 0) {
+            revert ProtocolVersions_InvalidProtocolVersion();
+        }
     }
 
     /// @dev Requires upgrade `id`'s scheduled activation to still be more than FREEZE_WINDOW away,

@@ -74,12 +74,15 @@ contract DeployConfig_Test is Test {
         cfg.readMinimumVersion('{"protocolVersionsInitialMinimumVersion":340282366920938463463374607431768211456}');
     }
 
-    /// @notice The shipped configs describe chains without a recorded history, so they must keep the initial registry
-    /// state empty.
-    function test_read_localConfig_leavesProtocolVersionsStateEmpty_succeeds() public {
+    /// @notice The shipped configs describe chains without a recorded history, so the imported schedule stays empty.
+    /// The minimum protocol version must still ship non-zero: scheduling any activation requires one to already be
+    /// set, so publishing it at deploy time keeps the first hardfork a single owner transaction rather than an
+    /// ordered pair, and leaves no window in which the live schedule is unreadable to nodes.
+    function test_read_localConfig_leavesScheduleEmptyWithMinimumVersionSet_succeeds() public {
         cfg.read("deploy-config/local.json");
 
         assertEq(cfg.protocolVersionsInitialSchedule().length, 0);
-        assertEq(cfg.protocolVersionsInitialMinimumVersion(), 0);
+        assertGt(cfg.protocolVersionsInitialMinimumVersion(), 0);
+        assertLe(cfg.protocolVersionsInitialMinimumVersion(), type(uint128).max);
     }
 }
