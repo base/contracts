@@ -82,7 +82,7 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         vm.expectEmit(true, true, false, false, address(uninitialized));
         emit IncidentResponderUpdated(address(0), _incidentResponder);
         vm.prank(EIP1967Helper.getAdmin(address(uninitialized)));
-        uninitialized.initialize(_incidentResponder, new uint64[](0), 0);
+        uninitialized.initialize(_incidentResponder, new uint64[](0), 1);
         assertEq(uninitialized.incidentResponder(), _incidentResponder);
     }
 
@@ -92,7 +92,7 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         IProtocolVersions uninitialized = _deployUninitializedProxy();
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
         vm.prank(_nonOwner);
-        uninitialized.initialize(_incidentResponder, new uint64[](0), 0);
+        uninitialized.initialize(_incidentResponder, new uint64[](0), 1);
     }
 
     /// @notice Tests that the initializer imports a preexisting schedule, building the same hash
@@ -170,27 +170,12 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         imported.initialize(address(0), schedule, 42);
     }
 
-    /// @notice Tests that an imported activation cannot omit the minimum protocol version required by nodes.
-    function test_initialize_importWithoutMinimumProtocolVersion_reverts() external {
-        uint64[] memory schedule = new uint64[](1);
-        schedule[0] = 1;
-
+    /// @notice Tests that the initial minimum protocol version is required even with an empty schedule.
+    function test_initialize_zeroMinimumProtocolVersion_reverts() external {
         IProtocolVersions imported = _deployUninitializedProxy();
         vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
         vm.prank(EIP1967Helper.getAdmin(address(imported)));
-        imported.initialize(address(0), schedule, 0);
-    }
-
-    /// @notice Tests that zero-only imports may leave the minimum protocol version unset.
-    function test_initialize_zeroOnlyScheduleWithoutMinimumProtocolVersion_succeeds() external {
-        uint64[] memory schedule = new uint64[](1);
-
-        IProtocolVersions imported = _deployUninitializedProxy();
-        vm.prank(EIP1967Helper.getAdmin(address(imported)));
-        imported.initialize(address(0), schedule, 0);
-
-        assertEq(imported.getSchedule().length, 1);
-        assertEq(imported.minimumProtocolVersion(), 0);
+        imported.initialize(address(0), new uint64[](0), 0);
     }
 
     /// @notice Tests that the initial minimum protocol version must fit in the node's 128-bit packed semver layout.
@@ -205,14 +190,14 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
     function test_initialize_alreadyInitialized_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
         vm.prank(EIP1967Helper.getAdmin(address(protocolVersions)));
-        protocolVersions.initialize(address(0), new uint64[](0), 0);
+        protocolVersions.initialize(address(0), new uint64[](0), 1);
     }
 
     /// @notice Tests that the implementation itself cannot be initialized (initializers disabled).
     function test_initialize_implementationDisabled_reverts() external {
         IProtocolVersions impl = IProtocolVersions(EIP1967Helper.getImplementation(address(protocolVersions)));
         vm.expectRevert("Initializable: contract is already initialized");
-        impl.initialize(address(0), new uint64[](0), 0);
+        impl.initialize(address(0), new uint64[](0), 1);
     }
 }
 

@@ -128,16 +128,15 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     ///      already has a hardfork history can be represented faithfully at deployment, while it is
     ///      still impossible for any proof game to have pinned a commitment from this registry.
     ///      Future activations must provide MIN_NOTICE, matching every post-initialization write path.
-    /// @dev Any non-zero imported timestamp requires a non-zero packed protocol version so nodes can
-    ///      validate the schedule immediately after deployment.
+    /// @dev A non-zero packed protocol version is required so nodes can validate the registry
+    ///      immediately after deployment.
     ///
     /// @param _incidentResponder Initial incidentResponder allowed to delay activations, or address(0) to leave unset.
     /// @param _initialSchedule   Activation timestamps for already-known upgrades, ordered by ascending
     ///                           upgrade id, using 0 for an upgrade that is registered but unscheduled.
     ///                           Future timestamps must be at least MIN_NOTICE from block.timestamp.
     ///                           Pass an empty array for a chain with no upgrade history.
-    /// @param _initialMinimumProtocolVersion Packed semver required by an imported activation, or 0 when
-    ///                                       the initial schedule has no non-zero timestamps.
+    /// @param _initialMinimumProtocolVersion Packed semver required by nodes. Must be non-zero and fit in 128 bits.
     function initialize(
         address _incidentResponder,
         uint64[] calldata _initialSchedule,
@@ -148,7 +147,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     {
         // Initialization transactions must come from the ProxyAdmin or its owner.
         _assertOnlyProxyAdminOrProxyAdminOwner();
-        if (_initialMinimumProtocolVersion > type(uint128).max) {
+        if (_initialMinimumProtocolVersion == 0 || _initialMinimumProtocolVersion > type(uint128).max) {
             revert ProtocolVersions_InvalidProtocolVersion();
         }
 
@@ -159,9 +158,6 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
 
         for (uint256 id = 0; id < _initialSchedule.length; id++) {
             uint64 timestamp = _initialSchedule[id];
-            if (timestamp != 0 && _initialMinimumProtocolVersion == 0) {
-                revert ProtocolVersions_InvalidProtocolVersion();
-            }
             if (timestamp > uint64(block.timestamp) && timestamp < uint64(block.timestamp) + MIN_NOTICE) {
                 revert ProtocolVersions_InsufficientNotice(timestamp);
             }
@@ -177,9 +173,7 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
         // pass. With an empty import this just re-emits the seed as the current commitment.
         _refreshScheduleId(0);
 
-        if (_initialMinimumProtocolVersion != 0) {
-            _writeMinimumProtocolVersion(_initialMinimumProtocolVersion);
-        }
+        _writeMinimumProtocolVersion(_initialMinimumProtocolVersion);
 
         incidentResponder = _incidentResponder;
         emit IncidentResponderUpdated(address(0), _incidentResponder);
@@ -232,8 +226,9 @@ contract ProtocolVersions is ProxyAdminOwnedBase, Initializable, Reinitializable
     /// @param protocolVersion Packed semver uint256 (must be non-zero and fit in 128 bits).
     function setMinimumProtocolVersion(uint256 protocolVersion) external {
         _assertOnlyProxyAdminOwner();
-        if (protocolVersion == 0) revert ProtocolVersions_InvalidProtocolVersion();
-        if (protocolVersion > type(uint128).max) revert ProtocolVersions_InvalidProtocolVersion();
+        if (protocolVersion == 0 || protocolVersion > type(uint128).max) {
+            revert ProtocolVersions_InvalidProtocolVersion();
+        }
         _writeMinimumProtocolVersion(protocolVersion);
     }
 

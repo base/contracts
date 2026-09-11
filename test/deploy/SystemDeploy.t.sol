@@ -187,12 +187,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     }
 
     /// @notice Pins ProtocolVersions input validation before superchain deployment can broadcast.
-    function test_deploy_initialScheduleWithoutMinimumProtocolVersion_reverts() public {
-        uint64[] memory schedule = new uint64[](1);
-        schedule[0] = 1;
-
+    function test_deploy_zeroInitialMinimumProtocolVersion_reverts() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
-        input.opChainInput.initialUpgradeSchedule = schedule;
+        input.opChainInput.initialMinimumProtocolVersion = 0;
         input.superchainInput.superchainProxyAdminOwner = address(0);
 
         vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
@@ -485,7 +482,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             saltMixer: "system-deploy-test",
             gasLimit: 60_000_000,
             initialUpgradeSchedule: new uint64[](0),
-            initialMinimumProtocolVersion: 0
+            initialMinimumProtocolVersion: 1
         });
     }
 
