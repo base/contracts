@@ -114,7 +114,7 @@ contract BaseTest is Test {
         );
         factory.initialize(address(this));
         delayedWETH.initialize(systemConfig);
-        protocolVersions.initialize(address(0), new uint64[](0), 0);
+        protocolVersions.initialize(address(0), new uint64[](0), 1);
     }
 
     /// @dev Rebuilds the schedule registry around a preset schedule and rebinds the verifier to it.

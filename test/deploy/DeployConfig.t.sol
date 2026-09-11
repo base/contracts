@@ -63,10 +63,9 @@ contract DeployConfig_Test is Test {
         assertEq(cfg.protocolVersionsInitialMinimumVersion(), 42);
     }
 
-    function test_readMinimumVersion_omitted_defaultsToZero_succeeds() public {
+    function test_readMinimumVersion_omitted_reverts() public {
+        vm.expectRevert("DeployConfig: initial minimum protocol version must be non-zero");
         cfg.readMinimumVersion('{"l1ChainId":1}');
-
-        assertEq(cfg.protocolVersionsInitialMinimumVersion(), 0);
     }
 
     function test_readMinimumVersion_aboveUint128_reverts() public {
@@ -75,9 +74,7 @@ contract DeployConfig_Test is Test {
     }
 
     /// @notice The shipped configs describe chains without a recorded history, so the imported schedule stays empty.
-    /// The minimum protocol version must still ship non-zero: scheduling any activation requires one to already be
-    /// set, so publishing it at deploy time keeps the first hardfork a single owner transaction rather than an
-    /// ordered pair, and leaves no window in which the live schedule is unreadable to nodes.
+    /// The minimum protocol version is required even without recorded upgrade history.
     function test_read_localConfig_leavesScheduleEmptyWithMinimumVersionSet_succeeds() public {
         cfg.read("deploy-config/local.json");
 

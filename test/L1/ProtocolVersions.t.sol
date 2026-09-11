@@ -59,18 +59,6 @@ abstract contract ProtocolVersions_TestInit is CommonTest {
         proxy.upgradeTo(impl);
         return IProtocolVersions(address(proxy));
     }
-
-    /// @dev Deploys a registry initialized with an empty schedule and no minimum protocol version,
-    ///      which is the state a chain with no upgrade history is allowed to start in. The shared
-    ///      `protocolVersions` instance carries the version from deploy config, so the write-path
-    ///      guard against pairing an activation with a zero version needs this instance to exercise.
-    function _deployZeroVersionRegistry() internal returns (IProtocolVersions) {
-        IProtocolVersions registry = _deployUninitializedProxy();
-        vm.prank(EIP1967Helper.getAdmin(address(registry)));
-        registry.initialize(_incidentResponder, new uint64[](0), 0);
-        assertEq(registry.minimumProtocolVersion(), 0);
-        return registry;
-    }
 }
 
 /// @title ProtocolVersions_Initialize_Test
@@ -94,7 +82,7 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         vm.expectEmit(true, true, false, false, address(uninitialized));
         emit IncidentResponderUpdated(address(0), _incidentResponder);
         vm.prank(EIP1967Helper.getAdmin(address(uninitialized)));
-        uninitialized.initialize(_incidentResponder, new uint64[](0), 0);
+        uninitialized.initialize(_incidentResponder, new uint64[](0), 1);
         assertEq(uninitialized.incidentResponder(), _incidentResponder);
     }
 
@@ -104,7 +92,7 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         IProtocolVersions uninitialized = _deployUninitializedProxy();
         vm.expectRevert(IProxyAdminOwnedBase.ProxyAdminOwnedBase_NotProxyAdminOrProxyAdminOwner.selector);
         vm.prank(_nonOwner);
-        uninitialized.initialize(_incidentResponder, new uint64[](0), 0);
+        uninitialized.initialize(_incidentResponder, new uint64[](0), 1);
     }
 
     /// @notice Tests that the initializer imports a preexisting schedule, building the same hash
@@ -182,27 +170,12 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
         imported.initialize(address(0), schedule, 42);
     }
 
-    /// @notice Tests that an imported activation cannot omit the minimum protocol version required by nodes.
-    function test_initialize_importWithoutMinimumProtocolVersion_reverts() external {
-        uint64[] memory schedule = new uint64[](1);
-        schedule[0] = 1;
-
+    /// @notice Tests that the initial minimum protocol version is required even with an empty schedule.
+    function test_initialize_zeroMinimumProtocolVersion_reverts() external {
         IProtocolVersions imported = _deployUninitializedProxy();
         vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
         vm.prank(EIP1967Helper.getAdmin(address(imported)));
-        imported.initialize(address(0), schedule, 0);
-    }
-
-    /// @notice Tests that zero-only imports may leave the minimum protocol version unset.
-    function test_initialize_zeroOnlyScheduleWithoutMinimumProtocolVersion_succeeds() external {
-        uint64[] memory schedule = new uint64[](1);
-
-        IProtocolVersions imported = _deployUninitializedProxy();
-        vm.prank(EIP1967Helper.getAdmin(address(imported)));
-        imported.initialize(address(0), schedule, 0);
-
-        assertEq(imported.getSchedule().length, 1);
-        assertEq(imported.minimumProtocolVersion(), 0);
+        imported.initialize(address(0), new uint64[](0), 0);
     }
 
     /// @notice Tests that the initial minimum protocol version must fit in the node's 128-bit packed semver layout.
@@ -217,14 +190,14 @@ contract ProtocolVersions_Initialize_Test is ProtocolVersions_TestInit {
     function test_initialize_alreadyInitialized_reverts() external {
         vm.expectRevert("Initializable: contract is already initialized");
         vm.prank(EIP1967Helper.getAdmin(address(protocolVersions)));
-        protocolVersions.initialize(address(0), new uint64[](0), 0);
+        protocolVersions.initialize(address(0), new uint64[](0), 1);
     }
 
     /// @notice Tests that the implementation itself cannot be initialized (initializers disabled).
     function test_initialize_implementationDisabled_reverts() external {
         IProtocolVersions impl = IProtocolVersions(EIP1967Helper.getImplementation(address(protocolVersions)));
         vm.expectRevert("Initializable: contract is already initialized");
-        impl.initialize(address(0), new uint64[](0), 0);
+        impl.initialize(address(0), new uint64[](0), 1);
     }
 }
 
@@ -423,41 +396,6 @@ contract ProtocolVersions_RegisterUpgrade_Test is ProtocolVersions_TestInit {
         vm.prank(_owner);
         protocolVersions.registerUpgrade(0, type(uint128).max);
         assertEq(protocolVersions.minimumProtocolVersion(), type(uint128).max);
-    }
-
-    /// @notice Tests that scheduling at registration requires a minimum protocol version, since nodes
-    ///         reject a positive activation timestamp paired with version zero.
-    function test_registerUpgrade_scheduleWithoutMinimumProtocolVersion_reverts() external {
-        IProtocolVersions registry = _deployZeroVersionRegistry();
-        uint64 activation = uint64(block.timestamp) + registry.MIN_NOTICE();
-
-        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
-        vm.prank(_owner);
-        registry.registerUpgrade(activation, 0);
-    }
-
-    /// @notice Tests that registering without scheduling still needs no minimum protocol version.
-    function test_registerUpgrade_registerOnlyWithoutMinimumProtocolVersion_succeeds() external {
-        IProtocolVersions registry = _deployZeroVersionRegistry();
-
-        vm.prank(_owner);
-        registry.registerUpgrade(0, 0);
-
-        assertEq(registry.getSchedule()[0], 0);
-        assertEq(registry.minimumProtocolVersion(), 0);
-    }
-
-    /// @notice Tests that a version supplied in the same call satisfies the guard, so a first
-    ///         activation can be scheduled atomically without a preparatory transaction.
-    function test_registerUpgrade_scheduleWithSuppliedMinimumProtocolVersion_succeeds() external {
-        IProtocolVersions registry = _deployZeroVersionRegistry();
-        uint64 activation = uint64(block.timestamp) + registry.MIN_NOTICE();
-
-        vm.prank(_owner);
-        registry.registerUpgrade(activation, 42);
-
-        assertEq(registry.getSchedule()[0], activation);
-        assertEq(registry.minimumProtocolVersion(), 42);
     }
 }
 
@@ -844,48 +782,6 @@ contract ProtocolVersions_SetTimestamp_Test is ProtocolVersions_TestInit {
         bytes32 link1 = keccak256(abi.encode(link0, uint256(1), ts2));
 
         assertEq(protocolVersions.scheduleId(), link1);
-    }
-
-    /// @notice Tests that scheduling an activation requires a minimum protocol version to already be
-    ///         set, since this path cannot supply one and nodes reject a positive timestamp at zero.
-    function test_setTimestamp_withoutMinimumProtocolVersion_reverts() external {
-        IProtocolVersions registry = _deployZeroVersionRegistry();
-        vm.prank(_owner);
-        registry.registerUpgrade(0, 0);
-        uint64 activation = uint64(block.timestamp) + registry.MIN_NOTICE();
-
-        vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
-        vm.prank(_owner);
-        registry.setTimestamp(CANYON, activation);
-    }
-
-    /// @notice Tests that setting the minimum protocol version first unblocks scheduling, which is the
-    ///         ordering that keeps a live schedule readable by nodes at every point in between.
-    function test_setTimestamp_afterMinimumProtocolVersionSet_succeeds() external {
-        IProtocolVersions registry = _deployZeroVersionRegistry();
-        vm.prank(_owner);
-        registry.registerUpgrade(0, 0);
-        vm.prank(_owner);
-        registry.setMinimumProtocolVersion(42);
-
-        uint64 activation = uint64(block.timestamp) + registry.MIN_NOTICE();
-        vm.prank(_owner);
-        registry.setTimestamp(CANYON, activation);
-
-        assertEq(registry.getSchedule()[CANYON], activation);
-    }
-
-    /// @notice Tests that clearing a timestamp is unaffected by the guard: a zero activation carries
-    ///         no minimum version requirement, so a registry at zero can still clear.
-    function test_setTimestamp_clearWithoutMinimumProtocolVersion_succeeds() external {
-        IProtocolVersions registry = _deployZeroVersionRegistry();
-        vm.prank(_owner);
-        registry.registerUpgrade(0, 0);
-
-        vm.prank(_owner);
-        registry.setTimestamp(CANYON, 0);
-
-        assertEq(registry.getSchedule()[CANYON], 0);
     }
 }
 

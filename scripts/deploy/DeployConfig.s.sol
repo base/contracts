@@ -136,6 +136,7 @@ contract DeployConfig is Script {
 
     function _readProtocolVersionsInitialMinimumVersion(string memory _json) internal {
         uint256 minimumVersion = _json.readUintOr("$.protocolVersionsInitialMinimumVersion", 0);
+        require(minimumVersion != 0, "DeployConfig: initial minimum protocol version must be non-zero");
         require(minimumVersion <= type(uint128).max, "DeployConfig: initial minimum protocol version exceeds uint128");
         protocolVersionsInitialMinimumVersion = minimumVersion;
     }
