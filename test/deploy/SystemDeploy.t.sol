@@ -457,10 +457,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
                 genesisTimestamp: 1,
                 blockTime: 2
             }),
-            multiproofSlowBlockInterval: 100,
-            multiproofSlowIntermediateBlockInterval: 10,
-            multiproofFastBlockInterval: 1000,
-            multiproofFastIntermediateBlockInterval: 100,
+            multiproofBlockInterval: 100,
+            multiproofIntermediateBlockInterval: 10,
             sp1Verifier: ISP1Verifier(address(sp1Verifier)),
             teeProposer: proposer,
             teeChallenger: challenger,
@@ -570,12 +568,8 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             l2GenesisBlockNumber: _input.implementationsInput.scheduleConfig.genesisBlockNumber,
             l2GenesisTimestamp: _input.implementationsInput.scheduleConfig.genesisTimestamp,
             l2BlockTime: _input.implementationsInput.scheduleConfig.blockTime,
-            multiproofSlowBlockInterval: _input.implementationsInput.multiproofSlowBlockInterval,
-            multiproofSlowIntermediateBlockInterval: _input.implementationsInput
-            .multiproofSlowIntermediateBlockInterval,
-            multiproofFastBlockInterval: _input.implementationsInput.multiproofFastBlockInterval,
-            multiproofFastIntermediateBlockInterval: _input.implementationsInput
-            .multiproofFastIntermediateBlockInterval,
+            multiproofBlockInterval: _input.implementationsInput.multiproofBlockInterval,
+            multiproofIntermediateBlockInterval: _input.implementationsInput.multiproofIntermediateBlockInterval,
             withdrawalDelaySeconds: _input.implementationsInput.withdrawalDelaySeconds
         });
     }

@@ -79,10 +79,8 @@ contract SystemDeploy is Script {
         uint256 multiproofGameType;
         address nitroValidator;
         AggregateVerifier.ScheduleConfig scheduleConfig;
-        uint256 multiproofSlowBlockInterval;
-        uint256 multiproofSlowIntermediateBlockInterval;
-        uint256 multiproofFastBlockInterval;
-        uint256 multiproofFastIntermediateBlockInterval;
+        uint256 multiproofBlockInterval;
+        uint256 multiproofIntermediateBlockInterval;
         ISP1Verifier sp1Verifier;
         address teeProposer;
         address teeChallenger;
@@ -130,10 +128,8 @@ contract SystemDeploy is Script {
         bytes32 multiproofConfigHash;
         uint256 l2ChainId;
         AggregateVerifier.ScheduleConfig scheduleConfig;
-        uint256 multiproofSlowBlockInterval;
-        uint256 multiproofSlowIntermediateBlockInterval;
-        uint256 multiproofFastBlockInterval;
-        uint256 multiproofFastIntermediateBlockInterval;
+        uint256 multiproofBlockInterval;
+        uint256 multiproofIntermediateBlockInterval;
     }
 
     struct MultiproofOutput {
@@ -271,10 +267,8 @@ contract SystemDeploy is Script {
             multiproofGameType: cfg.multiproofGameType(),
             nitroValidator: cfg.nitroValidator(),
             scheduleConfig: _configuredScheduleConfig(),
-            multiproofSlowBlockInterval: cfg.multiproofSlowBlockInterval(),
-            multiproofSlowIntermediateBlockInterval: cfg.multiproofSlowIntermediateBlockInterval(),
-            multiproofFastBlockInterval: cfg.multiproofFastBlockInterval(),
-            multiproofFastIntermediateBlockInterval: cfg.multiproofFastIntermediateBlockInterval(),
+            multiproofBlockInterval: cfg.multiproofBlockInterval(),
+            multiproofIntermediateBlockInterval: cfg.multiproofIntermediateBlockInterval(),
             sp1Verifier: ISP1Verifier(cfg.sp1Verifier()),
             teeProposer: cfg.teeProposer(),
             teeChallenger: cfg.teeChallenger(),
@@ -1061,10 +1055,8 @@ contract SystemDeploy is Script {
                 multiproofConfigHash: _input.multiproofConfigHash,
                 l2ChainId: _opChainInput.l2ChainId,
                 scheduleConfig: scheduleConfig,
-                multiproofSlowBlockInterval: _input.multiproofSlowBlockInterval,
-                multiproofSlowIntermediateBlockInterval: _input.multiproofSlowIntermediateBlockInterval,
-                multiproofFastBlockInterval: _input.multiproofFastBlockInterval,
-                multiproofFastIntermediateBlockInterval: _input.multiproofFastIntermediateBlockInterval
+                multiproofBlockInterval: _input.multiproofBlockInterval,
+                multiproofIntermediateBlockInterval: _input.multiproofIntermediateBlockInterval
             })
         );
 
@@ -1092,12 +1084,8 @@ contract SystemDeploy is Script {
                     AggregateVerifier.ZkHashes(_input.zkRangeHash, _input.zkAggregationHash),
                     _input.multiproofConfigHash,
                     _input.l2ChainId,
-                    AggregateVerifier.IntervalConfig({
-                        slowBlockInterval: _input.multiproofSlowBlockInterval,
-                        slowIntermediateBlockInterval: _input.multiproofSlowIntermediateBlockInterval,
-                        fastBlockInterval: _input.multiproofFastBlockInterval,
-                        fastIntermediateBlockInterval: _input.multiproofFastIntermediateBlockInterval
-                    }),
+                    _input.multiproofBlockInterval,
+                    _input.multiproofIntermediateBlockInterval,
                     _input.scheduleConfig
                 )
             )
@@ -1140,13 +1128,12 @@ contract SystemDeploy is Script {
         require(address(_input.sp1Verifier) != address(0), "SystemDeploy: sp1Verifier not set");
         DeployUtils.assertValidContractAddress(_input.nitroValidator);
         DeployUtils.assertValidContractAddress(address(_input.sp1Verifier));
-        require(_input.multiproofSlowBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
+        require(_input.multiproofBlockInterval != 0, "SystemDeploy: multiproof block interval not set");
         require(
-            _input.multiproofSlowIntermediateBlockInterval != 0,
-            "SystemDeploy: multiproof intermediate interval not set"
+            _input.multiproofIntermediateBlockInterval != 0, "SystemDeploy: multiproof intermediate interval not set"
         );
         require(
-            _input.multiproofSlowBlockInterval % _input.multiproofSlowIntermediateBlockInterval == 0,
+            _input.multiproofBlockInterval % _input.multiproofIntermediateBlockInterval == 0,
             "SystemDeploy: invalid multiproof block intervals"
         );
         require(_input.teeProposer != address(0), "SystemDeploy: teeProposer not set");

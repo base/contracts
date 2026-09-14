@@ -89,12 +89,8 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
             AggregateVerifier.ZkHashes(bytes32(uint256(2)), bytes32(uint256(3))),
             bytes32(uint256(4)),
             deploy.cfg().l2ChainId(),
-            AggregateVerifier.IntervalConfig({
-                slowBlockInterval: 100,
-                slowIntermediateBlockInterval: 10,
-                fastBlockInterval: 1000,
-                fastIntermediateBlockInterval: 100
-            }),
+            100,
+            10,
             AggregateVerifier.ScheduleConfig({
                 protocolVersions: protocolVersions, genesisBlockNumber: 0, genesisTimestamp: 1, blockTime: 2
             })
@@ -103,8 +99,7 @@ abstract contract OptimismPortal2_TestInit is DisputeGameFactory_TestInit {
         disputeGameFactory.setInitBond(respectedGameType, 0);
 
         Proposal memory startingRoot = anchorStateRegistry.getStartingAnchorRoot();
-        (uint256 slowBlockInterval,) = gameImpl.intervalsForStartingBlock(startingRoot.l2SequenceNumber);
-        _proposedBlockNumber = startingRoot.l2SequenceNumber + slowBlockInterval;
+        _proposedBlockNumber = startingRoot.l2SequenceNumber + gameImpl.BLOCK_INTERVAL();
 
         depositor = makeAddr("depositor");
 
