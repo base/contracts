@@ -12,8 +12,8 @@
     "sourceCodeHash": "0xd9f576a79e97bc541b3d7a2ee928f34223edaaecb074eeb9e6e2ecee857ce6a0"
   },
   "src/L1/OptimismPortal2.sol:OptimismPortal2": {
-    "initCodeHash": "0x1b9441d11e2a206d6b7c018b910502194bfbdcaa75d42f809e6965281f224a2a",
-    "sourceCodeHash": "0x811596e7486cab9ceeeb61405b9ae510d93fcbbdfa11949201a367506c53194a"
+    "initCodeHash": "0x994a20599b0d306697061f0c3347a823ed85dbc68017c4f94381c6f3df1ddf32",
+    "sourceCodeHash": "0x118080b9a02e661e237df1f1c3227b82fe1c0403bbcc0d43709e0e69511da496"
   },
   "src/L1/ProtocolVersions.sol:ProtocolVersions": {
     "initCodeHash": "0xbca4c0d69dcb7a196a9ebfcc8cb77162fa090377c5dda99831d61c6c68ba4352",
@@ -28,8 +28,8 @@
     "sourceCodeHash": "0x780ff372493ba9010bc0d13100ac896f2bf75730a9b17d4bb63aaf694dc3c634"
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0x84c6bf00e337c889993c409f18b17986f9d9546ac6754f7730962459d301c21d",
-    "sourceCodeHash": "0x15952c01559b5c8e08faba110a49da9fb8c20e7bd4a62f7884c902847783e201"
+    "initCodeHash": "0xf4587525d85e020e7045b587ac858e47b9425292ed8bcbb99a493de86741b251",
+    "sourceCodeHash": "0x9265368bfd89aef67dacc91137240e67651d1a1a660be8311734eaf92d197cd3"
   },
   "src/L1/proofs/AnchorStateRegistry.sol:AnchorStateRegistry": {
     "initCodeHash": "0x6f3afd2d0ef97a82ca3111976322b99343a270e54cd4a405028f2f29c75f7fb1",
@@ -40,8 +40,8 @@
     "sourceCodeHash": "0x7a1a6d240844c8e90e89a582d8d7b43e14c87ec22ec697cb3828682cfceb8470"
   },
   "src/L1/proofs/DisputeGameFactory.sol:DisputeGameFactory": {
-    "initCodeHash": "0x17bd83cfb6911f7f7f74880249e6bf4e2b2884aed611f6fec8b589d5083f22d1",
-    "sourceCodeHash": "0x62ff0209cffa08e5aaaaac47e0f22d89ea1fa6a0ea8773a162ab7230e50806ee"
+    "initCodeHash": "0x4b451a7de6befb16149d1de3e75c767d30a40f943d0fa0c775701947ea9cfd34",
+    "sourceCodeHash": "0x7f3c5c00b0eaca0a6f475a70fb5401f7db9bfaaf634849aec79202a40c30253b"
   },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
     "initCodeHash": "0x380af47d78626bd0af4bb45769a9c184d6ea22adf60877ea9765129a28a3ffd6",

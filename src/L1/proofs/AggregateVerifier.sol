@@ -1110,8 +1110,8 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 0.1.0
+    /// @custom:semver 0.2.0
     function version() public pure virtual returns (string memory) {
-        return "0.1.0";
+        return "0.2.0";
     }
 }
