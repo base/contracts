@@ -46,3 +46,5 @@ just semver-lock
 - If you don't have foundry installed, run `just install-foundry`.
 - `just deps`
 - Test contracts: `just test`
+
+- Export offline devnet allocations: [genesis scripts](scripts/GENESIS.md).
