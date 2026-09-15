@@ -24,8 +24,8 @@
     "sourceCodeHash": "0x79f0c771fc5f6d222d89b05addedc08ce40a7a42423fbd66f7cbb6cde3c2e74f"
   },
   "src/L1/SystemConfig.sol:SystemConfig": {
-    "initCodeHash": "0xb91123c7a4c051f2c9af220a5981301499d43c7740892db4ea8abce183437a8c",
-    "sourceCodeHash": "0x780ff372493ba9010bc0d13100ac896f2bf75730a9b17d4bb63aaf694dc3c634"
+    "initCodeHash": "0x7d4e5da17f066ebcd6b0918c49182315fd3333a429fbe96a052375bafa04d51f",
+    "sourceCodeHash": "0x7d2d93cb800dceb69ab29c3787df525dab0e6ead9161d65101c1dc0225d5e786"
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0x91a51808e37fa282a974cb5028e0ba517e04c903ce594b393cfda9dcc5408188",
