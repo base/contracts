@@ -3,6 +3,17 @@ pragma solidity ^0.8.0;
 
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 
+/// @title IProxyAdmin
+/// @notice Interface for the ProxyAdmin contract that manages proxy upgrades
+///         and administrative functions across ERC1967, Chugsplash, and Resolved proxies.
+/// @dev Security Note: All implementers of this interface MUST ensure that
+///      the `__constructor__` function can only be called ONCE during initialization.
+///      Use OpenZeppelin's Initializable pattern with `_disableInitializers()` in
+///      the constructor to prevent reinitialization attacks.
+///
+/// @custom:risk Reinitialization Attack
+/// If `__constructor__` is not protected against multiple calls, an attacker
+/// could reinitialize the contract after deployment, potentially hijacking ownership.
 interface IProxyAdmin {
     enum ProxyType {
         ERC1967,
@@ -30,5 +41,10 @@ interface IProxyAdmin {
     function upgrade(address payable _proxy, address _implementation) external;
     function upgradeAndCall(address payable _proxy, address _implementation, bytes memory _data) external payable;
 
+    /// @notice One-time initialization function.
+    /// @dev    IMPORTANT: This function MUST be protected so it can only be called once.
+    ///         Implementers should use OpenZeppelin's Initializable pattern.
+    /// @param _owner The initial owner address for the ProxyAdmin contract.
+    /// @custom:risk Calling this function more than once can lead to ownership hijacking.
     function __constructor__(address _owner) external;
 }
