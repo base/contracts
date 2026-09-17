@@ -45,7 +45,6 @@ contract DelayedWETH_Initialize_Test is DelayedWETH_TestBase {
     function test_initialize_succeeds() public view {
         assertEq(delayedWeth.proxyAdminOwner(), proxyAdminOwner);
         assertEq(address(delayedWeth.systemConfig()), address(systemConfig));
-        assertEq(address(delayedWeth.systemConfig()), address(systemConfig));
     }
 
     /// @notice Tests that the initializer value is correct. Trivial test for normal initialization

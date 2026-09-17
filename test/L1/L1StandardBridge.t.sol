@@ -710,7 +710,6 @@ contract L1StandardBridge_Uncategorized_Test is L1StandardBridge_TestInit {
         assertEq(address(l1StandardBridge.messenger()), address(l1CrossDomainMessenger));
         assertEq(address(l1StandardBridge.MESSENGER()), address(l1CrossDomainMessenger));
         assertEq(address(l1StandardBridge.systemConfig()), address(systemConfig));
-        assertEq(address(l1StandardBridge.systemConfig()), address(systemConfig));
     }
 
     /// @notice Tests that bridging ETH succeeds.
