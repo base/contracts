@@ -14,6 +14,7 @@ import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
+import { SystemConfig } from "src/L1/SystemConfig.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
@@ -467,6 +468,43 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         SystemDeploy.DeployOutput memory reuseOutput = systemDeploy.deploy(input);
 
         _assertMultiproofDeployed(reuseOutput, input);
+    }
+
+    /// @notice The Guardian is immutable on the SystemConfig implementation, so a supplied implementation would
+    /// otherwise install a pause authority that the deploy input never asked for.
+    function test_deploy_suppliedSystemConfigImplWithWrongGuardian_reverts() public {
+        SystemDeploy.DeployInput memory input = _reuseImplementationsInput();
+        input.implementations.systemConfigImpl = address(new SystemConfig(makeAddr("otherGuardian"), incidentResponder));
+
+        vm.expectRevert("SystemDeploy: SystemConfig guardian mismatch");
+        systemDeploy.deploy(input);
+    }
+
+    /// @notice Same hazard as the Guardian, for the second role that can pause the system.
+    function test_deploy_suppliedSystemConfigImplWithWrongIncidentResponder_reverts() public {
+        SystemDeploy.DeployInput memory input = _reuseImplementationsInput();
+        input.implementations.systemConfigImpl = address(new SystemConfig(guardian, makeAddr("otherIncidentResponder")));
+
+        vm.expectRevert("SystemDeploy: SystemConfig incident responder mismatch");
+        systemDeploy.deploy(input);
+    }
+
+    /// @notice Supplied implementations must clear the same Guardian check as freshly deployed ones, otherwise the
+    /// chain deploys with nobody able to unpause it.
+    function test_deploy_suppliedImplementationsWithoutGuardian_reverts() public {
+        SystemDeploy.DeployInput memory input = _reuseImplementationsInput();
+        input.implementationsInput.guardian = address(0);
+
+        vm.expectRevert(abi.encodeWithSelector(SystemDeploy.InvalidRoleAddress.selector, "guardian"));
+        systemDeploy.deploy(input);
+    }
+
+    /// @notice Returns a deploy input for a second chain that reuses the implementations of a completed deploy.
+    function _reuseImplementationsInput() internal returns (SystemDeploy.DeployInput memory input_) {
+        input_ = _defaultDeployInput();
+        input_.implementations = systemDeploy.deploy(input_).impls;
+        input_.opChainInput.l2ChainId = l2ChainId + 1;
+        input_.opChainInput.saltMixer = "system-deploy-supplied-impls-test";
     }
 
     function _defaultDeployInput() internal view returns (SystemDeploy.DeployInput memory input_) {

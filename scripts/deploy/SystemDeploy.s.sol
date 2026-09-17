@@ -298,6 +298,7 @@ contract SystemDeploy is Script {
             output_.impls = _deployImplementations(_input.implementationsInput);
         } else {
             _assertValidImplementations(_input.implementations);
+            _assertValidSystemConfigRoles(_input.implementations.systemConfigImpl, _input.implementationsInput);
             output_.impls = _input.implementations;
         }
 
@@ -1019,6 +1020,20 @@ contract SystemDeploy is Script {
             DeployUtils.assertValidContractAddress(address(teeProverRegistryImpl));
             DeployUtils.assertValidContractAddress(address(teeProverRegistryImpl.NITRO_VALIDATOR()));
         }
+    }
+
+    /// @notice Rejects a supplied SystemConfig implementation that does not carry the configured pause authorities.
+    /// @dev The Guardian and Incident Responder are constructor immutables, so an implementation that the script did
+    /// not build itself silently replaces the roles the deploy input asks for.
+    function _assertValidSystemConfigRoles(address _systemConfigImpl, ImplementationInput memory _input) internal view {
+        if (_input.guardian == address(0)) revert InvalidRoleAddress("guardian");
+
+        ISystemConfig systemConfigImpl = ISystemConfig(_systemConfigImpl);
+        require(systemConfigImpl.GUARDIAN() == _input.guardian, "SystemDeploy: SystemConfig guardian mismatch");
+        require(
+            systemConfigImpl.INCIDENT_RESPONDER() == _input.incidentResponder,
+            "SystemDeploy: SystemConfig incident responder mismatch"
+        );
     }
 
     function _implementationsEmpty(Types.Implementations memory _impls) internal pure returns (bool) {
