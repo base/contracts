@@ -63,10 +63,9 @@ contract DeployConfig_Test is Test {
         assertEq(cfg.protocolVersionsInitialMinimumVersion(), 42);
     }
 
-    function test_readMinimumVersion_omitted_defaultsToZero_succeeds() public {
+    function test_readMinimumVersion_omitted_reverts() public {
+        vm.expectRevert("DeployConfig: initial minimum protocol version must be non-zero");
         cfg.readMinimumVersion('{"l1ChainId":1}');
-
-        assertEq(cfg.protocolVersionsInitialMinimumVersion(), 0);
     }
 
     function test_readMinimumVersion_aboveUint128_reverts() public {
@@ -74,12 +73,13 @@ contract DeployConfig_Test is Test {
         cfg.readMinimumVersion('{"protocolVersionsInitialMinimumVersion":340282366920938463463374607431768211456}');
     }
 
-    /// @notice The shipped configs describe chains without a recorded history, so they must keep the initial registry
-    /// state empty.
-    function test_read_localConfig_leavesProtocolVersionsStateEmpty_succeeds() public {
+    /// @notice The shipped configs describe chains without a recorded history, so the imported schedule stays empty.
+    /// The minimum protocol version is required even without recorded upgrade history.
+    function test_read_localConfig_leavesScheduleEmptyWithMinimumVersionSet_succeeds() public {
         cfg.read("deploy-config/local.json");
 
         assertEq(cfg.protocolVersionsInitialSchedule().length, 0);
-        assertEq(cfg.protocolVersionsInitialMinimumVersion(), 0);
+        assertGt(cfg.protocolVersionsInitialMinimumVersion(), 0);
+        assertLe(cfg.protocolVersionsInitialMinimumVersion(), type(uint128).max);
     }
 }

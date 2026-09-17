@@ -36,8 +36,7 @@ library Types {
     ///              upgrade in the node's fork order, zero for unscheduled ones. Seeds
     ///              `ProtocolVersions` at initialization, which is the only way to enter
     ///              activations that are already in the past.
-    /// @custom:field initialMinimumProtocolVersion Packed semver required by non-zero timestamps in the initial
-    /// schedule.
+    /// @custom:field initialMinimumProtocolVersion Non-zero packed semver required by nodes.
     struct DeployInput {
         Roles roles;
         uint32 basefeeScalar;

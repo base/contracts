@@ -7,6 +7,8 @@ import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.so
 import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
 
+import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
+
 import { DeployDevBase } from "./DeployDevBase.s.sol";
 
 /// @title DeployDevWithNitro
@@ -17,18 +19,21 @@ import { DeployDevBase } from "./DeployDevBase.s.sol";
 ///      then set `nitroValidator` in the deploy config. AWS Nitro attestations are only valid
 ///      for 60 minutes, and the certificate chain must be cached before registerSigner() is called.
 contract DeployDevWithNitro is DeployDevBase {
-    uint256 public constant BLOCK_INTERVAL = 600;
-    uint256 public constant INTERMEDIATE_BLOCK_INTERVAL = 30;
+    uint256 public constant SLOW_BLOCK_INTERVAL = 600;
+    uint256 public constant SLOW_INTERMEDIATE_BLOCK_INTERVAL = 30;
+    uint256 public constant FAST_BLOCK_INTERVAL = 6000;
+    uint256 public constant FAST_INTERMEDIATE_BLOCK_INTERVAL = 300;
     uint256 public constant INIT_BOND = 0.00001 ether;
 
     address public nitroValidatorAddr;
 
-    function _blockInterval() internal pure override returns (uint256) {
-        return BLOCK_INTERVAL;
-    }
-
-    function _intermediateBlockInterval() internal pure override returns (uint256) {
-        return INTERMEDIATE_BLOCK_INTERVAL;
+    function _intervalConfig() internal pure override returns (AggregateVerifier.IntervalConfig memory) {
+        return AggregateVerifier.IntervalConfig({
+            slowBlockInterval: SLOW_BLOCK_INTERVAL,
+            slowIntermediateBlockInterval: SLOW_INTERMEDIATE_BLOCK_INTERVAL,
+            fastBlockInterval: FAST_BLOCK_INTERVAL,
+            fastIntermediateBlockInterval: FAST_INTERMEDIATE_BLOCK_INTERVAL
+        });
     }
 
     function _initBond() internal pure override returns (uint256) {

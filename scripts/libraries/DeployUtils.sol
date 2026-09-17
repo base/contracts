@@ -106,7 +106,7 @@ library DeployUtils {
         internal
         view
     {
-        if (_minimumProtocolVersion > type(uint128).max) {
+        if (_minimumProtocolVersion == 0 || _minimumProtocolVersion > type(uint128).max) {
             revert IProtocolVersions.ProtocolVersions_InvalidProtocolVersion();
         }
 
@@ -117,9 +117,6 @@ library DeployUtils {
         uint64 previousTimestamp;
         for (uint256 id = 0; id < _schedule.length; id++) {
             uint64 timestamp = _schedule[id];
-            if (timestamp != 0 && _minimumProtocolVersion == 0) {
-                revert IProtocolVersions.ProtocolVersions_InvalidProtocolVersion();
-            }
             if (timestamp > currentTimestamp && timestamp < minimumFutureTimestamp) {
                 revert IProtocolVersions.ProtocolVersions_InsufficientNotice(timestamp);
             }

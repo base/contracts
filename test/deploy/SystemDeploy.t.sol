@@ -199,12 +199,9 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
     }
 
     /// @notice Pins ProtocolVersions input validation before implementation deployment can broadcast.
-    function test_deploy_initialScheduleWithoutMinimumProtocolVersion_reverts() public {
-        uint64[] memory schedule = new uint64[](1);
-        schedule[0] = 1;
-
+    function test_deploy_zeroInitialMinimumProtocolVersion_reverts() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
-        input.opChainInput.initialUpgradeSchedule = schedule;
+        input.opChainInput.initialMinimumProtocolVersion = 0;
         input.implementationsInput.guardian = address(0);
 
         vm.expectRevert(IProtocolVersions.ProtocolVersions_InvalidProtocolVersion.selector);
@@ -490,8 +487,10 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
                 genesisTimestamp: 1,
                 blockTime: 2
             }),
-            multiproofBlockInterval: 100,
-            multiproofIntermediateBlockInterval: 10,
+            multiproofSlowBlockInterval: 100,
+            multiproofSlowIntermediateBlockInterval: 10,
+            multiproofFastBlockInterval: 1000,
+            multiproofFastIntermediateBlockInterval: 100,
             sp1Verifier: ISP1Verifier(address(sp1Verifier)),
             teeProposer: proposer,
             teeChallenger: challenger,
@@ -513,7 +512,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             saltMixer: "system-deploy-test",
             gasLimit: 60_000_000,
             initialUpgradeSchedule: new uint64[](0),
-            initialMinimumProtocolVersion: 0
+            initialMinimumProtocolVersion: 1
         });
     }
 
@@ -600,8 +599,12 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             l2GenesisBlockNumber: _input.implementationsInput.scheduleConfig.genesisBlockNumber,
             l2GenesisTimestamp: _input.implementationsInput.scheduleConfig.genesisTimestamp,
             l2BlockTime: _input.implementationsInput.scheduleConfig.blockTime,
-            multiproofBlockInterval: _input.implementationsInput.multiproofBlockInterval,
-            multiproofIntermediateBlockInterval: _input.implementationsInput.multiproofIntermediateBlockInterval,
+            multiproofSlowBlockInterval: _input.implementationsInput.multiproofSlowBlockInterval,
+            multiproofSlowIntermediateBlockInterval: _input.implementationsInput
+            .multiproofSlowIntermediateBlockInterval,
+            multiproofFastBlockInterval: _input.implementationsInput.multiproofFastBlockInterval,
+            multiproofFastIntermediateBlockInterval: _input.implementationsInput
+            .multiproofFastIntermediateBlockInterval,
             withdrawalDelaySeconds: _input.implementationsInput.withdrawalDelaySeconds
         });
     }

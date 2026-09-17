@@ -16,16 +16,16 @@
     "sourceCodeHash": "0x09bb427f79a40312a5cb6df4d4132c73290a492d2dbc7357412b4a2be866480b"
   },
   "src/L1/ProtocolVersions.sol:ProtocolVersions": {
-    "initCodeHash": "0x54c2a142728d60511fd15a7d6bb962b0f33d833ee727de16189fd18b6246b492",
-    "sourceCodeHash": "0x53c8ad6dc42e61b43b3ef2a91e154a02e719c595c8d1481b4b738faa7ebdf13d"
+    "initCodeHash": "0xbca4c0d69dcb7a196a9ebfcc8cb77162fa090377c5dda99831d61c6c68ba4352",
+    "sourceCodeHash": "0x411f2590b43bf6fe9d70f393c8e0349192a1aa895ec0fbe0d7695831d3b6cb94"
   },
   "src/L1/SystemConfig.sol:SystemConfig": {
     "initCodeHash": "0x4a83d1725257aee27f58f9874c543e55b89c3112e190c62ab4858e3c4dbf5bc3",
     "sourceCodeHash": "0x04fee741d6628c4b74ec5315e252e5f5e62bdd820740e9ba7bd98525820043da"
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
-    "initCodeHash": "0xc14998e269a6ad7e5c2b5d5beee0eabb68a68c3758e666a76822905c4f16575f",
-    "sourceCodeHash": "0x04921678f197a1dbe20b04696822c02c22e528112900616aeeb78fd9649b28ef"
+    "initCodeHash": "0x91a51808e37fa282a974cb5028e0ba517e04c903ce594b393cfda9dcc5408188",
+    "sourceCodeHash": "0x360867cf77ce89209c177d55c286fdca1309924cd36c23b7b5da2971089bcef2"
   },
   "src/L1/proofs/AnchorStateRegistry.sol:AnchorStateRegistry": {
     "initCodeHash": "0xedf834940e0e600739722d1548955d6888e85144d165ad738353e136da000190",
@@ -36,8 +36,8 @@
     "sourceCodeHash": "0x777858389ef4d25cb8780ed2f74ae1e32db18de694c47704a6a5104f3a70f3d8"
   },
   "src/L1/proofs/DisputeGameFactory.sol:DisputeGameFactory": {
-    "initCodeHash": "0x17bd83cfb6911f7f7f74880249e6bf4e2b2884aed611f6fec8b589d5083f22d1",
-    "sourceCodeHash": "0x62ff0209cffa08e5aaaaac47e0f22d89ea1fa6a0ea8773a162ab7230e50806ee"
+    "initCodeHash": "0x4b451a7de6befb16149d1de3e75c767d30a40f943d0fa0c775701947ea9cfd34",
+    "sourceCodeHash": "0x7f3c5c00b0eaca0a6f475a70fb5401f7db9bfaaf634849aec79202a40c30253b"
   },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
     "initCodeHash": "0x380af47d78626bd0af4bb45769a9c184d6ea22adf60877ea9765129a28a3ffd6",
