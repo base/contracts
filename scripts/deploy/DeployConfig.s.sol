@@ -13,6 +13,8 @@ contract DeployConfig is Script {
     address public baseFeeVaultRecipient;
     address public batchSenderAddress;
     address public finalSystemOwner;
+    address public guardian;
+    address public incidentResponder;
     address public l1FeeVaultRecipient;
     address public nitroValidator;
     address public operatorFeeVaultRecipient;
@@ -20,8 +22,6 @@ contract DeployConfig is Script {
     address public proxyAdminOwner;
     address public sequencerFeeVaultRecipient;
     address public sp1Verifier;
-    address public superchainConfigGuardian;
-    address public superchainConfigIncidentResponder;
     address public teeChallenger;
     address public teeProposer;
 
@@ -80,6 +80,8 @@ contract DeployConfig is Script {
         baseFeeVaultRecipient = _json.readAddress("$.baseFeeVaultRecipient");
         batchSenderAddress = _json.readAddress("$.batchSenderAddress");
         finalSystemOwner = _json.readAddress("$.finalSystemOwner");
+        guardian = _json.readAddress("$.guardian");
+        incidentResponder = _json.readAddress("$.incidentResponder");
         l1FeeVaultRecipient = _json.readAddress("$.l1FeeVaultRecipient");
         nitroValidator = _json.readAddress("$.nitroValidator");
         operatorFeeVaultRecipient = _json.readAddress("$.operatorFeeVaultRecipient");
@@ -87,8 +89,6 @@ contract DeployConfig is Script {
         proxyAdminOwner = _json.readAddress("$.proxyAdminOwner");
         sequencerFeeVaultRecipient = _json.readAddress("$.sequencerFeeVaultRecipient");
         sp1Verifier = _json.readAddress("$.sp1Verifier");
-        superchainConfigGuardian = _json.readAddress("$.superchainConfigGuardian");
-        superchainConfigIncidentResponder = _json.readAddress("$.superchainConfigIncidentResponder");
         teeChallenger = _json.readAddress("$.teeChallenger");
         teeProposer = _json.readAddress("$.teeProposer");
 

@@ -5,6 +5,7 @@ pragma solidity 0.8.15;
 import { CommonTest } from "test/setup/CommonTest.sol";
 
 // Scripts
+import { DeployUtils } from "scripts/libraries/DeployUtils.sol";
 
 // Libraries
 import { Constants } from "src/libraries/Constants.sol";
@@ -13,7 +14,6 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 // Interfaces
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
 /// @title SystemConfig Test Init
@@ -23,6 +23,7 @@ abstract contract SystemConfig_TestInit is CommonTest {
 
     bytes32 public constant EXAMPLE_FEATURE = "EXAMPLE_FEATURE";
     bytes32 internal constant INITIALIZED_SLOT = bytes32(0);
+    uint256 internal constant PAUSE_EXPIRY = 7_884_000;
 
     address owner;
     bytes32 batcherHash;
@@ -54,6 +55,11 @@ abstract contract SystemConfig_TestInit is CommonTest {
         return uint8(uint256(slotVal) & 0xFF);
     }
 
+    function _pauseAsGuardian() internal {
+        vm.prank(systemConfig.guardian());
+        systemConfig.pause();
+    }
+
     function _emptyAddresses() internal pure returns (ISystemConfig.Addresses memory) {
         return ISystemConfig.Addresses({
             l1CrossDomainMessenger: address(0),
@@ -76,8 +82,7 @@ abstract contract SystemConfig_TestInit is CommonTest {
             _config: _config,
             _batchInbox: address(0),
             _addresses: _emptyAddresses(),
-            _l2ChainId: 1234,
-            _superchainConfig: ISuperchainConfig(address(0))
+            _l2ChainId: 1234
         });
     }
 }
@@ -534,8 +539,7 @@ contract SystemConfig_SetResourceConfig_Test is SystemConfig_TestInit {
             _config: config,
             _batchInbox: address(0),
             _addresses: _emptyAddresses(),
-            _l2ChainId: 1234,
-            _superchainConfig: ISuperchainConfig(address(0))
+            _l2ChainId: 1234
         });
     }
 }
@@ -543,66 +547,26 @@ contract SystemConfig_SetResourceConfig_Test is SystemConfig_TestInit {
 /// @title SystemConfig_Paused_Test
 /// @notice Test contract for SystemConfig `paused` function.
 contract SystemConfig_Paused_Test is SystemConfig_TestInit {
-    /// @notice Tests that `paused()` returns false when no pauses are active.
-    function test_paused_noPauses_succeeds() external view {
+    /// @notice Tests that `paused()` returns false when no pause is active.
+    function test_paused_noPause_succeeds() external view {
         assertFalse(systemConfig.paused());
     }
 
-    /// @notice Tests that `paused()` returns true when global pause is active.
-    function test_paused_globalPause_succeeds() external {
-        // Initially not paused
-        assertFalse(systemConfig.paused());
+    /// @notice Tests that `paused()` returns true after the system is paused.
+    function test_paused_succeeds() external {
+        _pauseAsGuardian();
 
-        // Pause the system globally
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(0));
-
-        // Verify paused state
         assertTrue(systemConfig.paused());
     }
 
-    /// @notice Tests that `paused()` returns true when the OptimismPortal identifier is paused.
-    function test_paused_optimismPortalIdentifier_succeeds() external {
-        // Initially not paused
+    /// @notice Tests that `paused()` returns false after the pause expires.
+    function test_paused_expired_succeeds() external {
+        _pauseAsGuardian();
+
+        vm.warp(block.timestamp + PAUSE_EXPIRY);
+
         assertFalse(systemConfig.paused());
-
-        // Pause the system with OptimismPortal identifier
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(address(optimismPortal2));
-
-        // Verify paused state
-        assertTrue(systemConfig.paused());
-    }
-
-    /// @notice Tests that `paused()` returns true when both pauses are active.
-    function test_paused_bothPausesActive_succeeds() external {
-        assertFalse(systemConfig.paused());
-
-        // Pause both globally and with identifier
-        vm.startPrank(superchainConfig.guardian());
-        superchainConfig.pause(address(0));
-        superchainConfig.pause(address(optimismPortal2));
-        vm.stopPrank();
-
-        // Verify paused state
-        assertTrue(systemConfig.paused());
-    }
-
-    /// @notice Tests that `paused()` returns false when any other address is paused.
-    /// @param _address The address to pause.
-    function testFuzz_paused_otherAddress_succeeds(address _address) external {
-        vm.assume(_address != address(0));
-        vm.assume(_address != address(optimismPortal2));
-
-        // Initially not paused
-        assertFalse(systemConfig.paused());
-
-        // Pause the system with a different address that's not global or identifier
-        vm.prank(superchainConfig.guardian());
-        superchainConfig.pause(_address);
-
-        // Verify still not paused
-        assertFalse(systemConfig.paused());
+        assertFalse(systemConfig.pausable());
     }
 }
 
@@ -738,18 +702,26 @@ contract SystemConfig_IsFeatureEnabled_Test is SystemConfig_TestInit {
 /// @title SystemConfig_Guardian_Test
 /// @notice Test contract for SystemConfig `guardian` function.
 contract SystemConfig_Guardian_Test is SystemConfig_TestInit {
-    /// @notice Tests that `guardian()` returns the correct address.
+    /// @notice Tests that `guardian()` returns the configured guardian address.
     function test_guardian_succeeds() external view {
-        assertEq(systemConfig.guardian(), superchainConfig.guardian());
+        assertEq(systemConfig.guardian(), systemConfig.GUARDIAN());
+
+        returnIfForkTest("SystemConfig_Guardian_Test: guardian does not match local.json on forked networks");
+        assertEq(systemConfig.guardian(), deploy.cfg().guardian());
     }
 }
 
-/// @title SystemConfig_SuperchainConfig_Test
-/// @notice Test contract for SystemConfig `superchainConfig` function.
-contract SystemConfig_SuperchainConfig_Test is SystemConfig_TestInit {
-    /// @notice Tests that `superchainConfig()` returns the correct address.
-    function test_superchainConfig_succeeds() external view {
-        assertEq(address(systemConfig.superchainConfig()), address(superchainConfig));
+/// @title SystemConfig_IncidentResponder_Test
+/// @notice Test contract for SystemConfig `incidentResponder` function.
+contract SystemConfig_IncidentResponder_Test is SystemConfig_TestInit {
+    /// @notice Tests that `incidentResponder()` returns the configured incident responder.
+    function test_incidentResponder_succeeds() external view {
+        assertEq(systemConfig.incidentResponder(), systemConfig.INCIDENT_RESPONDER());
+
+        returnIfForkTest(
+            "SystemConfig_IncidentResponder_Test: incident responder does not match local.json on forked networks"
+        );
+        assertEq(systemConfig.incidentResponder(), deploy.cfg().incidentResponder());
     }
 }
 
@@ -799,5 +771,155 @@ contract SystemConfig_IsCustomGasToken_Test is SystemConfig_TestInit {
     /// @notice Tests that `isCustomGasToken` returns the correct value.
     function test_isCustomGasToken_disabled_succeeds() external view {
         assertFalse(systemConfig.isCustomGasToken());
+    }
+}
+
+/// @title SystemConfig_PauseExpiry_Test
+/// @notice Test contract for SystemConfig `pauseExpiry` function.
+contract SystemConfig_PauseExpiry_Test is SystemConfig_TestInit {
+    /// @notice Tests that `pauseExpiry` returns the correct constant value.
+    function test_pauseExpiry_succeeds() external view {
+        assertEq(systemConfig.pauseExpiry(), PAUSE_EXPIRY);
+    }
+}
+
+/// @title SystemConfig_Pause_Test
+/// @notice Test contract for SystemConfig `pause` function.
+contract SystemConfig_Pause_Test is SystemConfig_TestInit {
+    /// @notice Tests that the guardian can pause the system.
+    function test_pause_guardian_succeeds() external {
+        vm.expectEmit(address(systemConfig));
+        emit Paused();
+
+        _pauseAsGuardian();
+
+        assertTrue(systemConfig.paused());
+        assertFalse(systemConfig.pausable());
+        assertEq(systemConfig.pauseTimestamp(), block.timestamp);
+    }
+
+    /// @notice Tests that the incident responder can pause the system.
+    /// @param _incidentResponder The incident responder to test.
+    function testFuzz_pause_incidentResponder_succeeds(address _incidentResponder) external {
+        // The incident responder is immutable and unset in the deploy config, so exercise the
+        // role against a freshly deployed instance that has one.
+        vm.assume(_incidentResponder != address(0) && _incidentResponder != systemConfig.guardian());
+        ISystemConfig config = ISystemConfig(
+            DeployUtils.create1({
+                _name: "SystemConfig",
+                _args: DeployUtils.encodeConstructor(
+                    abi.encodeCall(ISystemConfig.__constructor__, (systemConfig.guardian(), _incidentResponder))
+                )
+            })
+        );
+
+        vm.expectEmit(address(config));
+        emit Paused();
+
+        vm.prank(_incidentResponder);
+        config.pause();
+
+        assertTrue(config.paused());
+    }
+
+    /// @notice Tests that `pause` reverts when called by a non-guardian and non-incident-responder.
+    /// @param _caller The unauthorized caller to test.
+    function testFuzz_pause_notGuardianOrIncidentResponder_reverts(address _caller) external {
+        vm.assume(_caller != systemConfig.guardian() && _caller != systemConfig.incidentResponder());
+
+        vm.expectRevert(ISystemConfig.SystemConfig_OnlyGuardianOrIncidentResponder.selector);
+        vm.prank(_caller);
+        systemConfig.pause();
+    }
+
+    /// @notice Tests that `pause` reverts when the system was already paused.
+    function test_pause_alreadyPaused_reverts() external {
+        _pauseAsGuardian();
+
+        vm.prank(systemConfig.guardian());
+        vm.expectRevert(ISystemConfig.SystemConfig_AlreadyPaused.selector);
+        systemConfig.pause();
+    }
+}
+
+/// @title SystemConfig_Unpause_Test
+/// @notice Test contract for SystemConfig `unpause` function.
+contract SystemConfig_Unpause_Test is SystemConfig_TestInit {
+    /// @notice Tests that the guardian can unpause the system.
+    function test_unpause_succeeds() external {
+        _pauseAsGuardian();
+
+        vm.expectEmit(address(systemConfig));
+        emit Unpaused();
+        vm.prank(systemConfig.guardian());
+        systemConfig.unpause();
+
+        assertFalse(systemConfig.paused());
+        assertTrue(systemConfig.pausable());
+        assertEq(systemConfig.pauseTimestamp(), 0);
+    }
+
+    /// @notice Tests that `unpause` reverts when called by a non-guardian.
+    /// @param _caller The non-guardian caller to test.
+    function testFuzz_unpause_notGuardian_reverts(address _caller) external {
+        vm.assume(_caller != systemConfig.guardian());
+        _pauseAsGuardian();
+
+        vm.expectRevert(ISystemConfig.SystemConfig_OnlyGuardian.selector);
+        vm.prank(_caller);
+        systemConfig.unpause();
+    }
+}
+
+/// @title SystemConfig_Extend_Test
+/// @notice Test contract for SystemConfig `extend` function.
+contract SystemConfig_Extend_Test is SystemConfig_TestInit {
+    /// @notice Tests that the guardian can extend a pause.
+    function test_extend_succeeds() external {
+        _pauseAsGuardian();
+        vm.warp(block.timestamp + 1);
+
+        vm.expectEmit(address(systemConfig));
+        emit PauseExtended();
+        vm.prank(systemConfig.guardian());
+        systemConfig.extend();
+
+        assertTrue(systemConfig.paused());
+        assertEq(systemConfig.pauseTimestamp(), block.timestamp);
+        assertEq(systemConfig.expiration(), block.timestamp + PAUSE_EXPIRY);
+    }
+
+    /// @notice Tests that `extend` reverts when called by a non-guardian.
+    /// @param _caller The non-guardian caller to test.
+    function testFuzz_extend_notGuardian_reverts(address _caller) external {
+        vm.assume(_caller != systemConfig.guardian());
+        _pauseAsGuardian();
+
+        vm.expectRevert(ISystemConfig.SystemConfig_OnlyGuardian.selector);
+        vm.prank(_caller);
+        systemConfig.extend();
+    }
+
+    /// @notice Tests that `extend` reverts when the system is not paused.
+    function test_extend_notAlreadyPaused_reverts() external {
+        vm.prank(systemConfig.guardian());
+        vm.expectRevert(ISystemConfig.SystemConfig_NotAlreadyPaused.selector);
+        systemConfig.extend();
+    }
+}
+
+/// @title SystemConfig_Expiration_Test
+/// @notice Test contract for SystemConfig `expiration` function.
+contract SystemConfig_Expiration_Test is SystemConfig_TestInit {
+    /// @notice Tests that `expiration` returns 0 when the system is not paused.
+    function test_expiration_notPaused_succeeds() external view {
+        assertEq(systemConfig.expiration(), 0);
+    }
+
+    /// @notice Tests that `expiration` returns the pause expiry timestamp.
+    function test_expiration_succeeds() external {
+        _pauseAsGuardian();
+
+        assertEq(systemConfig.expiration(), block.timestamp + PAUSE_EXPIRY);
     }
 }

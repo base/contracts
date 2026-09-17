@@ -10,7 +10,6 @@ import { ProxyAdminOwnedBase } from "src/universal/ProxyAdminOwnedBase.sol";
 // Interfaces
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 
 /// @custom:proxied true
 /// @title DelayedWETH
@@ -30,8 +29,8 @@ contract DelayedWETH is Initializable, ProxyAdminOwnedBase, ReinitializableBase,
     }
 
     /// @notice Semantic version.
-    /// @custom:semver 1.5.0
-    string public constant version = "1.5.0";
+    /// @custom:semver 2.0.0
+    string public constant version = "2.0.0";
 
     /// @notice Returns a withdrawal request for the given address.
     mapping(address => mapping(address => WithdrawalRequest)) public withdrawals;
@@ -62,12 +61,6 @@ contract DelayedWETH is Initializable, ProxyAdminOwnedBase, ReinitializableBase,
     /// @return The withdrawal delay in seconds.
     function delay() external view returns (uint256) {
         return DELAY_SECONDS;
-    }
-
-    /// @notice Returns the SuperchainConfig contract.
-    /// @return ISuperchainConfig The SuperchainConfig contract.
-    function config() public view returns (ISuperchainConfig) {
-        return systemConfig.superchainConfig();
     }
 
     /// @notice Unlocks withdrawals for the sender's account, after a time delay.

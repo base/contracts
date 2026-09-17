@@ -13,7 +13,6 @@ import { Predeploys } from "src/libraries/Predeploys.sol";
 import { IERC721 } from "lib/openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { ICrossDomainMessenger } from "interfaces/universal/ICrossDomainMessenger.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IL2ERC721Bridge } from "interfaces/L2/IL2ERC721Bridge.sol";
 
@@ -33,8 +32,8 @@ contract L1ERC721Bridge is ERC721Bridge, ProxyAdminOwnedBase, ReinitializableBas
     address private spacer_50_0_20;
 
     /// @notice Semantic version.
-    /// @custom:semver 2.9.0
-    string public constant version = "2.9.0";
+    /// @custom:semver 3.0.0
+    string public constant version = "3.0.0";
 
     /// @notice Address of the SystemConfig contract.
     ISystemConfig public systemConfig;
@@ -67,12 +66,6 @@ contract L1ERC721Bridge is ERC721Bridge, ProxyAdminOwnedBase, ReinitializableBas
     /// @inheritdoc ERC721Bridge
     function paused() public view override returns (bool) {
         return systemConfig.paused();
-    }
-
-    /// @notice Returns the SuperchainConfig contract.
-    /// @return ISuperchainConfig The SuperchainConfig contract.
-    function superchainConfig() public view returns (ISuperchainConfig) {
-        return systemConfig.superchainConfig();
     }
 
     /// @notice Completes an ERC721 bridge from the other domain and sends the ERC721 token to the

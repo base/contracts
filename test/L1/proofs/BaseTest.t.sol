@@ -78,7 +78,7 @@ contract BaseTest is Test {
     function _deployContractsAndProxies() internal {
         systemConfig = ISystemConfig(makeAddr("system-config"));
         vm.mockCall(address(systemConfig), abi.encodeCall(ISystemConfig.guardian, ()), abi.encode(address(this)));
-        vm.mockCall(address(systemConfig), abi.encodeCall(ISystemConfig.paused, ()), abi.encode(false));
+        vm.mockCall(address(systemConfig), abi.encodeWithSignature("paused()"), abi.encode(false));
 
         AnchorStateRegistry _anchorStateRegistry = new AnchorStateRegistry(FINALITY_DELAY);
         DelayedWETH _delayedWETH = new DelayedWETH(DELAYED_WETH_DELAY);

@@ -21,7 +21,6 @@ import { IL1StandardBridge } from "interfaces/L1/IL1StandardBridge.sol";
 import { IOptimismPortal2 } from "interfaces/L1/IOptimismPortal2.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 import { IResourceMetering } from "interfaces/L1/IResourceMetering.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IOptimismMintableERC20Factory } from "interfaces/universal/IOptimismMintableERC20Factory.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
@@ -31,7 +30,6 @@ abstract contract SystemDeployAssertions is Test {
     struct ExpectedSystemDeployState {
         ISystemConfig systemConfig;
         IAnchorStateRegistry anchorStateRegistry;
-        ISuperchainConfig superchainConfig;
         Types.Implementations implementations;
         IDelayedWETH delayedWETH;
         address proxyAdminOwner;
@@ -54,16 +52,11 @@ abstract contract SystemDeployAssertions is Test {
     function assertValidStandardSystem(ExpectedSystemDeployState memory _expected) internal view {
         IProxyAdmin proxyAdmin = _expected.systemConfig.proxyAdmin();
 
-        _assertSuperchainConfig(_expected);
         _assertProxyAdmin(_expected, proxyAdmin);
         _assertSystemConfig(_expected, proxyAdmin);
         _assertBridgeAndPortalWiring(_expected, proxyAdmin);
         _assertDisputeGameFactory(_expected, proxyAdmin);
         _assertGame(_expected, proxyAdmin, _expected.multiproofGameType);
-    }
-
-    function _assertSuperchainConfig(ExpectedSystemDeployState memory _expected) private view {
-        assertFalse(_expected.superchainConfig.paused(address(0)), "SPRCFG-10");
     }
 
     function _assertProxyAdmin(ExpectedSystemDeployState memory _expected, IProxyAdmin _proxyAdmin) private view {
@@ -89,7 +82,7 @@ abstract contract SystemDeployAssertions is Test {
         assertEq(outputConfig.maximumBaseFee, expectedConfig.maximumBaseFee, "SYSCON-100");
         assertEq(sysCfg.operatorFeeScalar(), 0, "SYSCON-110");
         assertEq(sysCfg.operatorFeeConstant(), 0, "SYSCON-120");
-        assertEq(address(sysCfg.superchainConfig()), address(_expected.superchainConfig), "SYSCON-130");
+        assertFalse(sysCfg.paused(), "SYSCON-130");
         assertEq(sysCfg.batchInbox(), Types.chainIdToBatchInboxAddress(_expected.l2ChainId), "SYSCON-140");
         assertEq(sysCfg.l2ChainId(), _expected.l2ChainId, "SYSCON-150");
         assertEq(sysCfg.delayedWETH(), address(_expected.delayedWETH), "SYSCON-160");

@@ -13,7 +13,6 @@ import { Predeploys } from "src/libraries/Predeploys.sol";
 import { ISemver } from "interfaces/universal/ISemver.sol";
 import { ICrossDomainMessenger } from "interfaces/universal/ICrossDomainMessenger.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 
 /// @custom:proxied true
 /// @title L1StandardBridge
@@ -77,8 +76,8 @@ contract L1StandardBridge is StandardBridge, ProxyAdminOwnedBase, Reinitializabl
     );
 
     /// @notice Semantic version.
-    /// @custom:semver 2.8.0
-    string public constant version = "2.8.0";
+    /// @custom:semver 3.0.0
+    string public constant version = "3.0.0";
 
     /// @custom:legacy
     /// @custom:spacer superchainConfig
@@ -121,12 +120,6 @@ contract L1StandardBridge is StandardBridge, ProxyAdminOwnedBase, Reinitializabl
     /// @inheritdoc StandardBridge
     function paused() public view override returns (bool) {
         return systemConfig.paused();
-    }
-
-    /// @notice Returns the SuperchainConfig contract.
-    /// @return ISuperchainConfig The SuperchainConfig contract.
-    function superchainConfig() public view returns (ISuperchainConfig) {
-        return systemConfig.superchainConfig();
     }
 
     /// @notice Allows EOAs to bridge ETH by sending directly to the bridge.

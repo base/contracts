@@ -5,7 +5,6 @@ import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
 interface IAnchorStateRegistry is IProxyAdminOwnedBase {
@@ -51,7 +50,6 @@ interface IAnchorStateRegistry is IProxyAdminOwnedBase {
     function systemConfig() external view returns (ISystemConfig);
     function updateRetirementTimestamp() external;
     function version() external view returns (string memory);
-    function superchainConfig() external view returns (ISuperchainConfig);
 
     function __constructor__(
         uint256 _disputeGameFinalityDelaySeconds

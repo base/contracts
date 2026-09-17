@@ -40,9 +40,8 @@ contract RelayActor {
         // For the failure case, we use an impossibly large minGasLimit so that the hasMinGas
         // check always fails regardless of available gas. We provide baseGas-level gas (enough
         // for relayMessage's overhead) to avoid OOG reverts. Limiting gas directly is fragile
-        // because the proxy-to-proxy call overhead (SystemConfig → SuperchainConfig,
-        // OptimismPortal) leaves a razor-thin window between "enough to not OOG" and
-        // "not enough for hasMinGas to pass".
+        // because the proxy-to-proxy call overhead (SystemConfig, OptimismPortal) leaves a
+        // razor-thin window between "enough to not OOG" and "not enough for hasMinGas to pass".
         uint32 relayMinGasLimit = shouldFail ? type(uint32).max : minGasLimit;
 
         // `relayMessage` always re-encodes as a v1 hash after checking the v0 hash hasn't been

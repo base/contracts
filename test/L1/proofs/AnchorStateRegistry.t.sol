@@ -14,7 +14,6 @@ import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 
 // Contracts
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
@@ -27,7 +26,6 @@ abstract contract AnchorStateRegistry_TestInit is BaseTest {
         0xDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF;
 
     IDisputeGameFactory disputeGameFactory;
-    ISuperchainConfig superchainConfig;
     IDisputeGame gameProxy;
 
     /// @dev A valid l2BlockNumber that comes after the current anchor root block.
@@ -42,11 +40,7 @@ abstract contract AnchorStateRegistry_TestInit is BaseTest {
         super.setUp();
 
         disputeGameFactory = IDisputeGameFactory(address(factory));
-        superchainConfig = ISuperchainConfig(makeAddr("superchain-config"));
-        vm.mockCall(address(superchainConfig), abi.encodeCall(superchainConfig.guardian, ()), abi.encode(address(this)));
-        vm.mockCall(
-            address(systemConfig), abi.encodeCall(systemConfig.superchainConfig, ()), abi.encode(superchainConfig)
-        );
+        vm.mockCall(address(systemConfig), abi.encodeCall(systemConfig.guardian, ()), abi.encode(address(this)));
 
         // Get the actual anchor roots
         (, uint256 l2BlockNumber) = anchorStateRegistry.getAnchorRoot();
@@ -63,7 +57,7 @@ abstract contract AnchorStateRegistry_TestInit is BaseTest {
     }
 
     function _setPaused(bool _paused) internal {
-        vm.mockCall(address(systemConfig), abi.encodeCall(systemConfig.paused, ()), abi.encode(_paused));
+        vm.mockCall(address(systemConfig), abi.encodeWithSignature("paused()"), abi.encode(_paused));
     }
 
     function _mockGameStatus(GameStatus _status) internal {
@@ -112,7 +106,7 @@ abstract contract AnchorStateRegistry_TestInit is BaseTest {
     }
 
     function _assumeNotGuardian(address _caller) internal view {
-        vm.assume(_caller != superchainConfig.guardian());
+        vm.assume(_caller != systemConfig.guardian());
     }
 
     function _expectUnauthorizedGuardianRevert(address _caller) internal {
@@ -122,12 +116,12 @@ abstract contract AnchorStateRegistry_TestInit is BaseTest {
     }
 
     function _updateRetirementTimestampAsGuardian() internal {
-        vm.prank(superchainConfig.guardian());
+        vm.prank(systemConfig.guardian());
         anchorStateRegistry.updateRetirementTimestamp();
     }
 
     function _blacklistDisputeGameAsGuardian(IDisputeGame _game) internal {
-        vm.prank(superchainConfig.guardian());
+        vm.prank(systemConfig.guardian());
         anchorStateRegistry.blacklistDisputeGame(_game);
     }
 
@@ -208,7 +202,6 @@ contract AnchorStateRegistry_Initialize_Test is AnchorStateRegistry_TestInit {
         // Verify contract addresses.
         assertEq(address(anchorStateRegistry.systemConfig()), address(systemConfig));
         assertEq(address(anchorStateRegistry.disputeGameFactory()), address(disputeGameFactory));
-        assertEq(address(anchorStateRegistry.superchainConfig()), address(superchainConfig));
     }
 
     /// @notice Tests that the initializer value is correct. Trivial test for normal
@@ -327,7 +320,7 @@ contract AnchorStateRegistry_SetRespectedGameType_Test is AnchorStateRegistry_Te
     /// @param _gameType The game type to set as respected
     function testFuzz_setRespectedGameType_succeeds(GameType _gameType) public {
         // Call as guardian
-        vm.prank(superchainConfig.guardian());
+        vm.prank(systemConfig.guardian());
         vm.expectEmit(address(anchorStateRegistry));
         emit RespectedGameTypeSet(_gameType);
         anchorStateRegistry.setRespectedGameType(_gameType);
@@ -402,7 +395,7 @@ contract AnchorStateRegistry_BlacklistDisputeGame_Test is AnchorStateRegistry_Te
         IDisputeGame secondGame = IDisputeGame(makeAddr("second-game"));
 
         // Blacklist both games
-        vm.startPrank(superchainConfig.guardian());
+        vm.startPrank(systemConfig.guardian());
         anchorStateRegistry.blacklistDisputeGame(gameProxy);
         anchorStateRegistry.blacklistDisputeGame(secondGame);
         vm.stopPrank();
@@ -422,7 +415,7 @@ contract AnchorStateRegistry_BlacklistDisputeGame_Test is AnchorStateRegistry_Te
     /// @notice Tests that blacklisting a game twice succeeds but doesn't change state
     function test_blacklistDisputeGame_twice_succeeds() public {
         // Blacklist the game
-        vm.startPrank(superchainConfig.guardian());
+        vm.startPrank(systemConfig.guardian());
         anchorStateRegistry.blacklistDisputeGame(gameProxy);
 
         // Blacklist again - should emit event but not change state
@@ -907,7 +900,7 @@ contract AnchorStateRegistry_SetAnchorState_Test is AnchorStateRegistry_TestInit
 
         _mockGameNotRegistered();
 
-        _expectSetAnchorStateInvalid(gameProxy, superchainConfig.guardian());
+        _expectSetAnchorStateInvalid(gameProxy, systemConfig.guardian());
 
         _assertCurrentAnchorRootEq(root, l2BlockNumber);
     }

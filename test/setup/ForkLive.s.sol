@@ -16,7 +16,6 @@ import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
 import { Types } from "scripts/libraries/Types.sol";
 
 // Interfaces
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
@@ -48,7 +47,6 @@ contract ForkLive is Script {
 
     struct SystemAddresses {
         address systemConfig;
-        address superchainConfig;
     }
 
     struct GameAddresses {
@@ -62,19 +60,11 @@ contract ForkLive is Script {
     /// @notice Returns the production entrypoints for the current L1 fork.
     function forkSystemAddresses() internal view returns (SystemAddresses memory system_) {
         if (block.chainid == 1) {
-            system_ = SystemAddresses({
-                systemConfig: 0x73a79Fab69143498Ed3712e519A88a918e1f4072,
-                superchainConfig: 0xb535ff7F118260a952CE65e7fF41B1743De8EE6c
-            });
+            system_ = SystemAddresses({ systemConfig: 0x73a79Fab69143498Ed3712e519A88a918e1f4072 });
         } else if (block.chainid == 11155111) {
-            system_ = SystemAddresses({
-                systemConfig: 0xf272670eb55e895584501d564AfEB048bEd26194,
-                superchainConfig: 0xE4401EB53AE90a5335a51fe1828d7BeCf7a63508
-            });
+            system_ = SystemAddresses({ systemConfig: 0xf272670eb55e895584501d564AfEB048bEd26194 });
         } else if (block.chainid == 560048) {
-            system_ = SystemAddresses({
-                systemConfig: 0xcC7c76564bea74A963A0Bd75E0bC9BcE3FF0EA80, superchainConfig: address(0)
-            });
+            system_ = SystemAddresses({ systemConfig: 0xcC7c76564bea74A963A0Bd75E0bC9BcE3FF0EA80 });
         } else {
             revert UnsupportedChainId();
         }
@@ -122,16 +112,6 @@ contract ForkLive is Script {
 
         // Slightly hacky, we encode the uint chainId as an address to save it in Artifacts
         artifacts.save("L2ChainId", address(uint160(systemConfig.l2ChainId())));
-        // Superchain shared contracts
-        address superchainConfig = system.superchainConfig;
-        if (superchainConfig == address(0)) {
-            try systemConfig.superchainConfig() returns (ISuperchainConfig superchainConfig_) {
-                superchainConfig = address(superchainConfig_);
-            } catch { }
-        }
-        if (superchainConfig != address(0)) {
-            _saveProxyAndImpl("SuperchainConfig", superchainConfig);
-        }
         // Core contracts
         artifacts.save("ProxyAdmin", EIP1967Helper.getAdmin(address(systemConfig)));
         _saveProxyAndImpl("SystemConfig", address(systemConfig));
@@ -176,31 +156,13 @@ contract ForkLive is Script {
     function _doUpgrade(address _upgrader, ISystemConfig _systemConfigProxy) internal {
         SystemDeploy systemDeploy = new SystemDeploy();
         Types.Implementations memory implementations = _latestImplementations();
-
-        ISuperchainConfig superchainConfig = ISuperchainConfig(artifacts.mustGetAddress("SuperchainConfigProxy"));
-        IProxyAdmin superchainProxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(superchainConfig)));
-        address superchainPAO = superchainProxyAdmin.owner();
         IProtocolVersions protocolVersionsProxy = IProtocolVersions(artifacts.getAddress("ProtocolVersionsProxy"));
-
-        // Run the shared SuperchainConfig upgrade as the Superchain ProxyAdmin owner. The script
-        // skips this step when the proxy is already at or above the target implementation version.
-        vm.prank(superchainPAO);
-        systemDeploy.upgrade(
-            SystemDeploy.UpgradeInput({
-                saveArtifacts: false,
-                superchainConfigProxy: superchainConfig,
-                implementations: implementations,
-                systemConfigProxy: ISystemConfig(address(0)),
-                protocolVersionsProxy: IProtocolVersions(address(0))
-            })
-        );
 
         // Run the per-chain upgrade as the OP Chain ProxyAdmin owner.
         vm.prank(_upgrader);
         systemDeploy.upgrade(
             SystemDeploy.UpgradeInput({
                 saveArtifacts: false,
-                superchainConfigProxy: ISuperchainConfig(address(0)),
                 implementations: implementations,
                 systemConfigProxy: _systemConfigProxy,
                 protocolVersionsProxy: protocolVersionsProxy

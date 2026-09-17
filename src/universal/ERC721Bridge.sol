@@ -100,7 +100,7 @@ abstract contract ERC721Bridge is Initializable {
     }
 
     /// @notice This function should return true if the contract is paused.
-    ///         On L1 this function will check the SuperchainConfig for its paused status.
+    ///         On L1 this function will check the SystemConfig for its paused status.
     ///         On L2 this function should be a no-op.
     /// @return Whether or not the contract is paused.
     function paused() public view virtual returns (bool) {

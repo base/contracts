@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import { IERC721Bridge } from "interfaces/universal/IERC721Bridge.sol";
 import { ICrossDomainMessenger } from "interfaces/universal/ICrossDomainMessenger.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 import { IProxyAdminOwnedBase } from "interfaces/L1/IProxyAdminOwnedBase.sol";
 
 interface IL1ERC721Bridge is IERC721Bridge, IProxyAdminOwnedBase {
@@ -42,7 +41,6 @@ interface IL1ERC721Bridge is IERC721Bridge, IProxyAdminOwnedBase {
     function paused() external view returns (bool);
     function systemConfig() external view returns (ISystemConfig);
     function version() external view returns (string memory);
-    function superchainConfig() external view returns (ISuperchainConfig);
 
     function __constructor__() external;
 }

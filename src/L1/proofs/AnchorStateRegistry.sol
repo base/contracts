@@ -15,7 +15,6 @@ import { ISemver } from "interfaces/universal/ISemver.sol";
 import { IDisputeGame } from "interfaces/L1/proofs/IDisputeGame.sol";
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 
 /// @custom:proxied true
 /// @title AnchorStateRegistry
@@ -25,8 +24,8 @@ import { ISuperchainConfig } from "interfaces/L1/ISuperchainConfig.sol";
 ///         reduces the amount of required offchain computation.
 contract AnchorStateRegistry is ProxyAdminOwnedBase, Initializable, ReinitializableBase, ISemver {
     /// @notice Semantic version.
-    /// @custom:semver 3.7.0
-    string public constant version = "3.7.0";
+    /// @custom:semver 4.0.0
+    string public constant version = "4.0.0";
 
     /// @notice The dispute game finality delay in seconds.
     uint256 internal immutable DISPUTE_GAME_FINALITY_DELAY_SECONDS;
@@ -118,12 +117,6 @@ contract AnchorStateRegistry is ProxyAdminOwnedBase, Initializable, Reinitializa
     /// @notice Returns whether the contract is paused.
     function paused() public view returns (bool) {
         return systemConfig.paused();
-    }
-
-    /// @notice Returns the SuperchainConfig contract.
-    /// @return ISuperchainConfig The SuperchainConfig contract.
-    function superchainConfig() public view returns (ISuperchainConfig) {
-        return systemConfig.superchainConfig();
     }
 
     /// @notice Returns the dispute game finality delay in seconds.
