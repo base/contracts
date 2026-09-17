@@ -12,11 +12,11 @@
     "sourceCodeHash": "0x12df1f137e66f1c023d0496f6ecd300c3cf54926de7af4fd4720f1fc8ce82689"
   },
   "src/L1/OptimismPortal2.sol:OptimismPortal2": {
-    "initCodeHash": "0xcab0c2d66158a0145fa4806c579593b53f611a9c448e5efb8471f94d642d595a",
-    "sourceCodeHash": "0x09bb427f79a40312a5cb6df4d4132c73290a492d2dbc7357412b4a2be866480b"
+    "initCodeHash": "0x121346929ba2c2fc47a18a863c8dde6ecea27a70e7d0182910fbe3199e9ee71d",
+    "sourceCodeHash": "0x4bdaf6c4018e104b13f43676a5a389c9ac18181438a9100298bb0050a2319bd7"
   },
   "src/L1/ProtocolVersions.sol:ProtocolVersions": {
-    "initCodeHash": "0xbca4c0d69dcb7a196a9ebfcc8cb77162fa090377c5dda99831d61c6c68ba4352",
+    "initCodeHash": "0x9d16cb82573db226e892642934419f572ad260b3b4c2dcd2dd4b1ca1a42a3683",
     "sourceCodeHash": "0x411f2590b43bf6fe9d70f393c8e0349192a1aa895ec0fbe0d7695831d3b6cb94"
   },
   "src/L1/SystemConfig.sol:SystemConfig": {
@@ -40,7 +40,7 @@
     "sourceCodeHash": "0x7f3c5c00b0eaca0a6f475a70fb5401f7db9bfaaf634849aec79202a40c30253b"
   },
   "src/L1/proofs/tee/TEEProverRegistry.sol:TEEProverRegistry": {
-    "initCodeHash": "0x380af47d78626bd0af4bb45769a9c184d6ea22adf60877ea9765129a28a3ffd6",
+    "initCodeHash": "0x9e25c6e26c76d10d209f82bdc2ad27c22f8d5c35a87c7a87a52bb4e75461197c",
     "sourceCodeHash": "0x463d71d1cd9a4e912a936d2e329959c89a2f37e76b8cf9e759a2457f12909c1b"
   },
   "src/L1/proofs/tee/TEEVerifier.sol:TEEVerifier": {
