@@ -440,9 +440,9 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
 
         // The block number must be one block interval after the starting block number. The interval
         // is selected on the starting block so the game chain stays contiguous across the speedup.
-        (uint256 slowBlockInterval,) = _intervalsAt(startingOutputRoot.l2SequenceNumber, firstFastBlock);
-        if (l2SequenceNumber() != startingOutputRoot.l2SequenceNumber + slowBlockInterval) {
-            revert UnexpectedBlockNumber(startingOutputRoot.l2SequenceNumber + slowBlockInterval, l2SequenceNumber());
+        (uint256 blockInterval,) = _intervalsAt(startingOutputRoot.l2SequenceNumber, firstFastBlock);
+        if (l2SequenceNumber() != startingOutputRoot.l2SequenceNumber + blockInterval) {
+            revert UnexpectedBlockNumber(startingOutputRoot.l2SequenceNumber + blockInterval, l2SequenceNumber());
         }
 
         // Set the game as initialized.
@@ -1154,10 +1154,10 @@ contract AggregateVerifier is Clone, ReentrancyGuard, ISemver {
         bytes32 startingRoot = intermediateRootIndex == 0
             ? startingOutputRoot.root.raw()
             : intermediateOutputRoot(intermediateRootIndex - 1);
-        (, uint256 slowIntermediateBlockInterval) = intervalsForStartingBlock(startingOutputRoot.l2SequenceNumber);
+        (, uint256 intermediateBlockInterval) = intervalsForStartingBlock(startingOutputRoot.l2SequenceNumber);
         uint64 startingL2SequenceNumber =
-            uint64(startingOutputRoot.l2SequenceNumber + intermediateRootIndex * slowIntermediateBlockInterval);
-        uint64 endingL2SequenceNumber = startingL2SequenceNumber + uint64(slowIntermediateBlockInterval);
+            uint64(startingOutputRoot.l2SequenceNumber + intermediateRootIndex * intermediateBlockInterval);
+        uint64 endingL2SequenceNumber = startingL2SequenceNumber + uint64(intermediateBlockInterval);
         return (startingRoot, startingL2SequenceNumber, endingL2SequenceNumber);
     }
 
