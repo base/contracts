@@ -25,7 +25,7 @@
   },
   "src/L1/proofs/AggregateVerifier.sol:AggregateVerifier": {
     "initCodeHash": "0x91a51808e37fa282a974cb5028e0ba517e04c903ce594b393cfda9dcc5408188",
-    "sourceCodeHash": "0x360867cf77ce89209c177d55c286fdca1309924cd36c23b7b5da2971089bcef2"
+    "sourceCodeHash": "0xdace3db84a70b9fd9bc4dd508184bc01af55568e78974381188fde5ddbb3509a"
   },
   "src/L1/proofs/AnchorStateRegistry.sol:AnchorStateRegistry": {
     "initCodeHash": "0xedf834940e0e600739722d1548955d6888e85144d165ad738353e136da000190",
