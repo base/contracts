@@ -168,6 +168,9 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     /// @notice Thrown when a CGT withdrawal is not allowed.
     error OptimismPortal_NotAllowedOnCGTMode();
 
+    /// @notice Thrown when the call to the target of a withdrawal fails and the target is a 7702 delegated EOA.
+    error OptimismPortal_DelegatedTargetCallFailed();
+
     /// @notice Thrown when a gas estimation transaction is being executed.
     error OptimismPortal_GasEstimation();
 
@@ -202,9 +205,9 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
     error OptimismPortal_Unproven();
 
     /// @notice Semantic version.
-    /// @custom:semver 7.0.0
+    /// @custom:semver 7.0.1
     function version() public pure virtual returns (string memory) {
-        return "7.0.0";
+        return "7.0.1";
     }
 
     /// @param _proofMaturityDelaySeconds The proof maturity delay in seconds.
@@ -472,7 +475,13 @@ contract OptimismPortal2 is Initializable, ResourceMetering, ReinitializableBase
         // Reset the l2Sender back to the default value.
         l2Sender = Constants.DEFAULT_L2_SENDER;
 
-        // All withdrawals are immediately finalized. Replayability can
+        // Revert if the call failed and the target is a 7702 delegated EOA. The withdrawal is not
+        // finalized, so it can be finalized once the target accepts the call.
+        if (!success && EOA.isDelegated(_tx.target)) {
+            revert OptimismPortal_DelegatedTargetCallFailed();
+        }
+
+        // All other withdrawals are immediately finalized. Replayability can
         // be achieved through contracts built on top of this contract
         emit WithdrawalFinalized(withdrawalHash, success);
 

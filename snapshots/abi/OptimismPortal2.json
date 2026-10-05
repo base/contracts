@@ -750,6 +750,11 @@
   },
   {
     "inputs": [],
+    "name": "OptimismPortal_DelegatedTargetCallFailed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "OptimismPortal_GasEstimation",
     "type": "error"
   },

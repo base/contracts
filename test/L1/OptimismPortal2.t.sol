@@ -981,6 +981,61 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
         assertEq(address(optimismPortal2).balance, portalBalanceBefore);
     }
 
+    /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the target is a 7702 delegated
+    ///         EOA that rejects the call, and finalizes the withdrawal once the delegation is
+    ///         cleared.
+    function test_finalizeWithdrawalTransaction_delegatedTargetFails_reverts() external {
+        // Delegate bob to a contract with just the invalid opcode.
+        address delegate = makeAddr("delegate");
+        vm.etch(delegate, hex"fe");
+        vm.etch(bob, abi.encodePacked(hex"EF0100", delegate));
+
+        _proveDefaultWithdrawal();
+        _resolveGameAndWarpPastProofMaturity(game);
+
+        uint256 bobBalanceBefore = address(bob).balance;
+        uint256 portalBalanceBefore = address(optimismPortal2).balance;
+
+        vm.expectRevert(IOptimismPortal.OptimismPortal_DelegatedTargetCallFailed.selector);
+        optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
+
+        // The withdrawal is not finalized and the ETH is still in the portal.
+        assertFalse(optimismPortal2.finalizedWithdrawals(_withdrawalHash));
+        assertEq(address(bob).balance, bobBalanceBefore);
+        assertEq(address(optimismPortal2).balance, portalBalanceBefore);
+
+        // Clear the delegation of bob.
+        vm.etch(bob, hex"");
+
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawalFinalized(_withdrawalHash, true);
+        optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
+
+        assertTrue(optimismPortal2.finalizedWithdrawals(_withdrawalHash));
+        assertEq(address(bob).balance, bobBalanceBefore + _defaultTx.value);
+    }
+
+    /// @notice Tests that `finalizeWithdrawalTransaction` succeeds if the target is a 7702 delegated
+    ///         EOA that accepts the call.
+    function test_finalizeWithdrawalTransaction_delegatedTargetAccepts_succeeds() external {
+        // Delegate bob to a contract with just the stop opcode.
+        address delegate = makeAddr("delegate");
+        vm.etch(delegate, hex"00");
+        vm.etch(bob, abi.encodePacked(hex"EF0100", delegate));
+
+        _proveDefaultWithdrawal();
+        _resolveGameAndWarpPastProofMaturity(game);
+
+        uint256 bobBalanceBefore = address(bob).balance;
+
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawalFinalized(_withdrawalHash, true);
+        optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
+
+        assertTrue(optimismPortal2.finalizedWithdrawals(_withdrawalHash));
+        assertEq(address(bob).balance, bobBalanceBefore + _defaultTx.value);
+    }
+
     /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the withdrawal has already
     ///         been finalized.
     function test_finalizeWithdrawalTransaction_onReplay_reverts() external {
