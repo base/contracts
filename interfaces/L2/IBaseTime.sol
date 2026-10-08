@@ -17,7 +17,7 @@ interface IBaseTime is ISemver {
     function timestampMillisPart() external view returns (uint16);
 
     /// @notice Returns the current L2 block timestamp in milliseconds.
-    function timestampMs() external view returns (uint64 timestampMs_);
+    function timestampMs() external view returns (uint64);
 
     /// @notice Updates the millisecond component of the current L2 block timestamp.
     function setTimestampMillisPart(uint16 _timestampMillisPart) external;

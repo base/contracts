@@ -31,7 +31,7 @@
     "outputs": [
       {
         "internalType": "uint64",
-        "name": "timestampMs_",
+        "name": "",
         "type": "uint64"
       }
     ],
