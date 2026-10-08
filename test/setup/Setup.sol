@@ -46,6 +46,7 @@ import { IL1FeeVault } from "interfaces/L2/IL1FeeVault.sol";
 import { IOperatorFeeVault } from "interfaces/L2/IOperatorFeeVault.sol";
 import { IGasPriceOracle } from "interfaces/L2/IGasPriceOracle.sol";
 import { IL1Block } from "interfaces/L2/IL1Block.sol";
+import { IBaseTime } from "interfaces/L2/IBaseTime.sol";
 import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 import { IWETH98 } from "interfaces/universal/IWETH98.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
@@ -119,6 +120,7 @@ abstract contract Setup is FeatureFlags {
     IGasPriceOracle gasPriceOracle = IGasPriceOracle(Predeploys.GAS_PRICE_ORACLE);
     IL1Block l1Block = IL1Block(Predeploys.L1_BLOCK_ATTRIBUTES);
     IWETH98 weth = IWETH98(payable(Predeploys.WETH));
+    IBaseTime baseTime = IBaseTime(Predeploys.BASE_TIME);
     INitroValidator nitroValidator;
     TEEProverRegistry teeProverRegistry;
 
