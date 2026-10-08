@@ -20,8 +20,8 @@ contract BaseTime is IBaseTime {
     uint16 public timestampMillisPart;
 
     /// @inheritdoc IBaseTime
-    function timestampMs() external view returns (uint64 timestampMs_) {
-        timestampMs_ = uint64(block.timestamp * 1000 + timestampMillisPart);
+    function timestampMs() external view returns (uint64) {
+        return uint64(block.timestamp * 1000 + timestampMillisPart);
     }
 
     /// @inheritdoc IBaseTime
