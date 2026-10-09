@@ -264,12 +264,13 @@ contract GasPriceOracle is ISemver {
     function _getCalldataGas(bytes memory _data) internal pure returns (uint256) {
         uint256 total = 0;
         uint256 length = _data.length;
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i = 0; i < length;) {
             if (_data[i] == 0) {
                 total += 4;
             } else {
                 total += 16;
             }
+            unchecked { ++i; }
         }
         return total + (68 * 16);
     }
