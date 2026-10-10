@@ -88,15 +88,22 @@ func processFile(file string) (*SemverLockResult, []error) {
 		return nil, []error{fmt.Errorf("failed to read source file: %w", err)}
 	}
 
-	trimmedSourceCode := bytes.TrimSuffix(sourceCode, []byte("\n"))
+	normalizedSourceCode := normalizeSourceCode(sourceCode)
 
 	return &SemverLockResult{
 		ContractKey: contractKey,
 		SemverLockOutput: SemverLockOutput{
 			InitCodeHash:   crypto.Keccak256Hash(initCodeBytes).Hex(),
-			SourceCodeHash: crypto.Keccak256Hash(trimmedSourceCode).Hex(),
+			SourceCodeHash: crypto.Keccak256Hash(normalizedSourceCode).Hex(),
 		},
 	}, nil
+}
+
+// normalizeSourceCode makes source hashes independent of the checkout's line-ending
+// configuration while preserving the existing behavior of ignoring one trailing newline.
+func normalizeSourceCode(sourceCode []byte) []byte {
+	sourceCode = bytes.ReplaceAll(sourceCode, []byte("\r\n"), []byte("\n"))
+	return bytes.TrimSuffix(sourceCode, []byte("\n"))
 }
 
 func hasSemverVersion(artifact *solc.ForgeArtifact, contractName string) bool {
