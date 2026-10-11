@@ -148,18 +148,39 @@ contract MultisigScriptTest is Test, MultisigScript {
 
         bool addressNonceWasSet = vm.envExists({ name: addressEnvVar });
         string memory originalAddressNonce = addressNonceWasSet ? vm.envString({ name: addressEnvVar }) : "";
+        bool generalNonceWasSet = vm.envExists({ name: "SAFE_NONCE" });
+        uint256 baselineNonce = safeNonce;
 
-        if (!addressNonceWasSet) {
+        if (!addressNonceWasSet && !generalNonceWasSet) {
             assertEq(
                 _getNonce({ safe: nonceTestSafe }),
-                vm.envOr({ name: "SAFE_NONCE", defaultValue: safeNonce }),
-                "General override or Safe nonce should be used when no address override is set"
+                safeNonce,
+                "Safe nonce should be used when no override is set"
             );
+        } else if (generalNonceWasSet) {
+            try vm.envUint({ name: "SAFE_NONCE" }) returns (uint256 configuredNonce) {
+                baselineNonce = configuredNonce;
+                if (!addressNonceWasSet) {
+                    assertEq(
+                        _getNonce({ safe: nonceTestSafe }),
+                        configuredNonce,
+                        "General override should be used when no address-specific override is set"
+                    );
+                }
+            } catch {
+                if (!addressNonceWasSet) {
+                    vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
+                    this.getNonceForTest(nonceTestSafe);
+                }
+            }
         }
 
+        uint256 addressOverrideNonce = baselineNonce == type(uint256).max ? baselineNonce - 1 : baselineNonce + 1;
         // Keep this override isolated from the Safe fixtures used by other tests.
-        vm.setEnv({ name: addressEnvVar, value: "9" });
-        assertEq(_getNonce({ safe: nonceTestSafe }), 9, "Address-specific override should take precedence");
+        vm.setEnv({ name: addressEnvVar, value: vm.toString({ value: addressOverrideNonce }) });
+        assertEq(
+            _getNonce({ safe: nonceTestSafe }), addressOverrideNonce, "Address-specific override should take precedence"
+        );
 
         vm.setEnv({ name: addressEnvVar, value: "invalid" });
         vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
