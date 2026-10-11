@@ -762,7 +762,9 @@ abstract contract MultisigScript is Script {
         if (vm.envExists({ name: envVarName })) {
             nonce = vm.envUint({ name: envVarName });
         } else {
-            nonce = vm.envOr({ name: "SAFE_NONCE", defaultValue: safeNonce });
+            nonce = vm.envExists({ name: "SAFE_NONCE" })
+                ? vm.envUint({ name: "SAFE_NONCE" })
+                : safeNonce;
         }
         // print if any override
         if (nonce != safeNonce) {
