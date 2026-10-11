@@ -179,6 +179,7 @@ contract MultisigScriptTest is Test, MultisigScript {
         vm.setEnv({
             name: addressEnvVar, value: addressNonceWasSet ? originalAddressNonce : vm.toString({ value: safeNonce })
         });
+    }
 
     function _signDigest(Vm.Wallet memory wallet, bytes32 digest) internal returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(wallet, digest);
