@@ -75,9 +75,9 @@ abstract contract Events {
         bytes data
     );
 
-    event Paused();
+    event Paused(address identifier);
 
-    event Unpaused();
+    event Unpaused(address identifier);
 
-    event PauseExtended();
+    event PauseExtended(address identifier);
 }

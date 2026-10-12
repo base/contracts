@@ -276,6 +276,7 @@ contract OptimismPortal2_Initialize_Test is OptimismPortal2_TestInit {
     function test_initialize_succeeds() public view {
         assertEq(address(optimismPortal2.anchorStateRegistry()), address(anchorStateRegistry));
         assertEq(address(optimismPortal2.disputeGameFactory()), address(disputeGameFactory));
+        assertEq(address(optimismPortal2.superchainConfig()), address(superchainConfig));
         assertEq(optimismPortal2.l2Sender(), Constants.DEFAULT_L2_SENDER);
         assertEq(optimismPortal2.paused(), false);
         assertEq(address(optimismPortal2.systemConfig()), address(systemConfig));
@@ -283,10 +284,10 @@ contract OptimismPortal2_Initialize_Test is OptimismPortal2_TestInit {
         returnIfForkTest(
             "OptimismPortal2_Initialize_Test: Do not check guardian and respectedGameType on forked networks"
         );
-        address guardian = systemConfig.guardian();
+        address guardian = superchainConfig.guardian();
 
         // This check is not valid for forked tests, as the guardian is not the same as the one in local.json
-        assertEq(guardian, deploy.cfg().guardian());
+        assertEq(guardian, deploy.cfg().superchainConfigGuardian());
 
         // This check is not valid on forked tests as the respectedGameType varies between OP Chains.
         assertEq(optimismPortal2.respectedGameType().raw(), deploy.cfg().respectedGameType());
@@ -379,6 +380,15 @@ contract OptimismPortal2_DisputeGameFactory_Test is OptimismPortal2_TestInit {
     /// @notice Tests that `disputeGameFactory` returns the correct address.
     function test_disputeGameFactory_succeeds() external view {
         assertEq(address(optimismPortal2.disputeGameFactory()), address(disputeGameFactory));
+    }
+}
+
+/// @title OptimismPortal2_SuperchainConfig_Test
+/// @notice Test contract for OptimismPortal2 `superchainConfig` function.
+contract OptimismPortal2_SuperchainConfig_Test is OptimismPortal2_TestInit {
+    /// @notice Tests that `superchainConfig` returns the correct address.
+    function test_superchainConfig_succeeds() external view {
+        assertEq(address(optimismPortal2.superchainConfig()), address(superchainConfig));
     }
 }
 
@@ -549,7 +559,7 @@ contract OptimismPortal2_ProveWithdrawalTransaction_Test is OptimismPortal2_Test
     /// @notice Tests that `proveWithdrawalTransaction` reverts when paused.
     function test_proveWithdrawalTransaction_paused_reverts() external {
         vm.startPrank(optimismPortal2.guardian());
-        systemConfig.pause();
+        systemConfig.superchainConfig().pause(address(0));
         vm.stopPrank();
 
         vm.expectRevert(IOptimismPortal.OptimismPortal_CallPaused.selector);
@@ -892,7 +902,7 @@ contract OptimismPortal2_FinalizeWithdrawalTransaction_Test is OptimismPortal2_T
     /// @notice Tests that `finalizeWithdrawalTransaction` reverts if the contract is paused.
     function test_finalizeWithdrawalTransaction_paused_reverts() external {
         vm.prank(optimismPortal2.guardian());
-        systemConfig.pause();
+        superchainConfig.pause(address(0));
 
         vm.expectRevert(IOptimismPortal.OptimismPortal_CallPaused.selector);
         optimismPortal2.finalizeWithdrawalTransaction(_defaultTx);
