@@ -127,10 +127,10 @@
   },
   {
     "bytes": "20",
-    "label": "spacer_108_0_20",
+    "label": "superchainConfig",
     "offset": 0,
     "slot": "108",
-    "type": "address"
+    "type": "contract ISuperchainConfig"
   },
   {
     "bytes": "8",
@@ -145,12 +145,5 @@
     "offset": 0,
     "slot": "109",
     "type": "mapping(bytes32 => bool)"
-  },
-  {
-    "bytes": "32",
-    "label": "pauseTimestamp",
-    "offset": 0,
-    "slot": "110",
-    "type": "uint256"
   }
 ]
