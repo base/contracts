@@ -26,7 +26,6 @@ contract DeployConfig is Script {
     address public teeProposer;
 
     bool public fundDevAccounts;
-    bool public useUpgradedFork;
 
     bytes32 public multiproofConfigHash;
     bytes32 public multiproofGenesisOutputRoot;
@@ -151,16 +150,5 @@ contract DeployConfig is Script {
             require(schedule[i] <= type(uint64).max, "DeployConfig: initial schedule timestamp exceeds uint64");
             _protocolVersionsInitialSchedule.push(uint64(schedule[i]));
         }
-    }
-
-    /// @notice Allow the `useUpgradedFork` config to be overridden in testing environments
-    /// @dev When true, the forked system WILL be upgraded in setUp().
-    ///      When false, the forked system WILL NOT be upgraded in setUp().
-    ///      This function does nothing when not testing in a forked environment.
-    ///      Generally the only time you should call this function is if you want to
-    ///      call the upgrade script in the test itself, rather than have the upgraded
-    ///      system be deployed in setUp().
-    function setUseUpgradedFork(bool _useUpgradedFork) public {
-        useUpgradedFork = _useUpgradedFork;
     }
 }

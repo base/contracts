@@ -12,8 +12,6 @@ import { FFIInterface } from "test/setup/FFIInterface.sol";
 // Contracts
 import { ERC20 } from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-import { console2 as console } from "lib/forge-std/src/console2.sol";
-
 // Interfaces
 import { IOptimismMintableERC20Full } from "interfaces/universal/IOptimismMintableERC20Full.sol";
 
@@ -26,12 +24,6 @@ abstract contract CommonTest is Test, Setup, Events {
     uint256 constant DEFAULT_TEST_BALANCE = 10_000 ether;
 
     FFIInterface constant ffi = FFIInterface(address(uint160(uint256(keccak256(abi.encode("optimism.ffi"))))));
-
-    /// @dev This value is only used in forked tests. During forked tests, the default is to perform the upgrade before
-    ///      running the tests.
-    ///      This value should only be set to false in forked tests which are specifically testing the upgrade path
-    ///      itself, rather than simply ensuring that the tests pass after the upgrade.
-    bool useUpgradedFork = true;
 
     ERC20 L1Token;
     ERC20 BadL1Token;
@@ -54,11 +46,6 @@ abstract contract CommonTest is Test, Setup, Events {
         bob = makeAddr("bob");
         vm.deal(alice, DEFAULT_TEST_BALANCE);
         vm.deal(bob, DEFAULT_TEST_BALANCE);
-
-        // Override the config after the deploy script initialized the config
-        if (useUpgradedFork) {
-            deploy.cfg().setUseUpgradedFork(true);
-        }
 
         if (!isForkTest()) {
             // Modifying these values on a fork test causes issues.
@@ -127,25 +114,5 @@ abstract contract CommonTest is Test, Setup, Events {
         internal
     {
         emit TransactionDeposited(_from, _to, 0, abi.encodePacked(_mint, _value, _gasLimit, _isCreation, _data));
-    }
-
-    /// @dev Checks if the system has already been deployed, based off of the heuristic that alice and bob have not been
-    ///      set by the `setUp` function yet.
-    function _checkNotDeployed(string memory _feature) internal view {
-        if (alice != address(0) && bob != address(0)) {
-            revert(
-                string.concat("CommonTest: Cannot enable ", _feature, " after deployment. Consider overriding `setUp`.")
-            );
-        }
-        console.log("CommonTest: enabling", _feature);
-    }
-
-    /// @dev Disables upgrade mode for testing. By default the fork testing env will be upgraded to the latest
-    ///      implementation. This can be used to disable the upgrade, which is useful for tests targeting the upgrade
-    ///      process itself.
-    function disableUpgradedFork() internal {
-        _checkNotDeployed("non-upgraded fork");
-
-        useUpgradedFork = false;
     }
 }

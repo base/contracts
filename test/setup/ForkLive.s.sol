@@ -6,22 +6,17 @@ import { Script } from "lib/forge-std/src/Script.sol";
 
 // Scripts
 import { Artifacts } from "scripts/Artifacts.s.sol";
-import { DeployConfig } from "scripts/deploy/DeployConfig.s.sol";
-import { SystemDeploy } from "scripts/deploy/SystemDeploy.s.sol";
 import { Config } from "scripts/libraries/Config.sol";
 
 // Libraries
 import { GameTypes } from "src/libraries/bridge/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
-import { Types } from "scripts/libraries/Types.sol";
 
 // Interfaces
 import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { IAggregateVerifier } from "interfaces/L1/proofs/IAggregateVerifier.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
-import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 
 /// @title ForkLive
 /// @notice This script is called by Setup.sol as a preparation step for the foundry test suite, and is run as an
@@ -34,14 +29,8 @@ import { IProxyAdmin } from "interfaces/universal/IProxyAdmin.sol";
 ///         This contract must not have constructor logic because it is set into state using `etch`.
 
 contract ForkLive is Script {
-    DeployConfig internal constant cfg =
-        DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
-
     Artifacts internal constant artifacts =
         Artifacts(address(uint160(uint256(keccak256(abi.encode("optimism.artifacts"))))));
-
-    SystemDeploy internal constant deploy =
-        SystemDeploy(address(uint160(uint256(keccak256(abi.encode("optimism.deploy"))))));
 
     bool public useOpsRepo;
 
@@ -70,39 +59,20 @@ contract ForkLive is Script {
         }
     }
 
-    /// @dev This function sets up the system to test it as follows:
-    ///      1. Check if the SUPERCHAIN_OPS_ALLOCS_PATH environment variable was set from superchain ops.
-    ///      2. If set, load the state from the given path.
-    ///      3. Derive the live system addresses from the configured fork entrypoints.
-    ///      4. If the environment variable wasn't set, deploy the updated implementations of the contracts.
-    ///      5. Upgrade the system using SystemDeploy.upgrade() if useUpgradedFork is true.
+    /// @notice Loads simulated superchain-ops upgrade state and derives the system addresses from it.
     function run() public {
         string memory superchainOpsAllocsPath = Config.superchainOpsAllocsPath();
 
-        useOpsRepo = bytes(superchainOpsAllocsPath).length > 0;
-        if (useOpsRepo) {
-            console.log("ForkLive: loading state from %s", superchainOpsAllocsPath);
-            // Load the simulated post-upgrade state before deriving implementation addresses.
-            vm.loadAllocs(superchainOpsAllocsPath);
-        }
+        require(bytes(superchainOpsAllocsPath).length > 0, "ForkLive: SUPERCHAIN_OPS_ALLOCS_PATH must be set");
+        console.log("ForkLive: loading state from %s", superchainOpsAllocsPath);
+        // Load the simulated post-upgrade state before deriving implementation addresses.
+        vm.loadAllocs(superchainOpsAllocsPath);
+        useOpsRepo = true;
 
         _readForkAddresses();
-        if (!useOpsRepo) {
-            _deployNewImplementations();
-        }
-
-        if (useOpsRepo) {
-            console.log("ForkLive: using ops repo to upgrade");
-        } else if (cfg.useUpgradedFork()) {
-            console.log("ForkLive: upgrading");
-            _upgrade();
-        }
     }
 
-    /// @notice Reads the live fork system and saves the addresses to disk.
-    /// @dev During development of an upgrade which adds a new contract, the contract will not yet be derivable from
-    ///      the live fork. In this case, the contract will be deployed by the upgrade process, and will need to be
-    ///      stored by artifacts.save() after the call to SystemDeploy.upgrade().
+    /// @notice Reads the loaded fork system and saves its addresses to the artifact registry.
     function _readForkAddresses() internal {
         SystemAddresses memory system = forkSystemAddresses();
         ISystemConfig systemConfig = ISystemConfig(system.systemConfig);
@@ -144,72 +114,12 @@ contract ForkLive is Script {
         artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(gameAddresses.weth));
     }
 
-    /// @notice Calls to the SystemDeploy.s.sol contract etched by Setup.sol to a deterministic address, sets up the
-    /// environment, and deploys new implementations.
-    function _deployNewImplementations() internal {
-        deploy.deployImplementations();
-    }
-
-    /// @notice Performs a script-level upgrade without a manager delegatecall.
-    /// @param _upgrader The address of the OP Chain ProxyAdmin owner to use for the chain upgrade.
-    /// @param _systemConfigProxy The OP Chain SystemConfig proxy to upgrade.
-    function _doUpgrade(address _upgrader, ISystemConfig _systemConfigProxy) internal {
-        SystemDeploy systemDeploy = new SystemDeploy();
-        Types.Implementations memory implementations = _latestImplementations();
-        IProtocolVersions protocolVersionsProxy = IProtocolVersions(artifacts.getAddress("ProtocolVersionsProxy"));
-
-        // Run the per-chain upgrade as the OP Chain ProxyAdmin owner.
-        vm.prank(_upgrader);
-        systemDeploy.upgrade(
-            SystemDeploy.UpgradeInput({
-                saveArtifacts: false,
-                implementations: implementations,
-                systemConfigProxy: _systemConfigProxy,
-                protocolVersionsProxy: protocolVersionsProxy
-            })
-        );
-    }
-
-    /// @notice Upgrades the contracts using the script-level upgrade API.
-    function _upgrade() internal {
-        ISystemConfig systemConfig = ISystemConfig(artifacts.mustGetAddress("SystemConfigProxy"));
-        IProxyAdmin proxyAdmin = IProxyAdmin(EIP1967Helper.getAdmin(address(systemConfig)));
-
-        address upgrader = proxyAdmin.owner();
-        vm.label(upgrader, "ProxyAdmin Owner");
-
-        if (block.chainid != 1) {
-            revert UnsupportedChainId();
-        }
-
-        _doUpgrade(upgrader, systemConfig);
-
-        console.log("ForkLive: Saving newly deployed contracts");
-
-        // A new ASR and new dispute games were deployed, so we need to update them
-        IDisputeGameFactory disputeGameFactory =
-            IDisputeGameFactory(artifacts.mustGetAddress("DisputeGameFactoryProxy"));
-        IAggregateVerifier aggregateVerifier =
-            IAggregateVerifier(address(disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER)));
-        artifacts.save("AggregateVerifier", address(aggregateVerifier));
-
-        GameAddresses memory gameAddresses = _aggregateVerifierAddresses(aggregateVerifier);
-        artifacts.save("AnchorStateRegistryProxy", gameAddresses.anchorStateRegistry);
-        artifacts.save("DelayedWETHProxy", gameAddresses.weth);
-        artifacts.save("DelayedWETHImpl", EIP1967Helper.getImplementation(gameAddresses.weth));
-    }
-
-    /// @notice Returns the latest implementation set saved by deployImplementations.
-    function _latestImplementations() internal view returns (Types.Implementations memory) {
-        return deploy.getImplementations();
-    }
-
     /// @notice Saves the proxy and implementation addresses for a contract name.
     function _saveProxyAndImpl(string memory _contractName, address _proxy) internal {
         artifacts.save(string.concat(_contractName, "Proxy"), _proxy);
 
         address impl = EIP1967Helper.getImplementation(_proxy);
-        require(impl != address(0), "Upgrade: Implementation address is zero");
+        require(impl != address(0), "ForkLive: Implementation address is zero");
         artifacts.save(string.concat(_contractName, "Impl"), impl);
     }
 
