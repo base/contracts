@@ -118,7 +118,6 @@ contract SystemDeploy is Script {
     error InvalidChainId();
     error InvalidRoleAddress(string role);
     error InvalidStartingAnchorRoot();
-    error MissingImplementations();
 
     /// @notice Sets up the shared deployment config and artifact registry.
     function setUp() public virtual {
@@ -851,7 +850,6 @@ contract SystemDeploy is Script {
     }
 
     function _assertValidImplementations(Types.Implementations memory _impls) internal view {
-        if (_implementationsEmpty(_impls)) revert MissingImplementations();
         DeployUtils.assertValidContractAddress(_impls.l1ERC721BridgeImpl);
         DeployUtils.assertValidContractAddress(_impls.optimismPortalImpl);
         DeployUtils.assertValidContractAddress(_impls.systemConfigImpl);
