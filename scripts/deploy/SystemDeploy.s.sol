@@ -19,7 +19,6 @@ import { IOptimismPortal2 as IOptimismPortal } from "interfaces/L1/IOptimismPort
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
 import { IAddressManager } from "interfaces/legacy/IAddressManager.sol";
-import { ILegacySuperchainConfig, ILegacySystemConfig } from "interfaces/legacy/ILegacySuperchainConfig.sol";
 import { IL1ChugSplashProxy } from "interfaces/legacy/IL1ChugSplashProxy.sol";
 import { IResolvedDelegateProxy } from "interfaces/legacy/IResolvedDelegateProxy.sol";
 import { IAnchorStateRegistry } from "interfaces/L1/proofs/IAnchorStateRegistry.sol";
@@ -41,10 +40,9 @@ import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { Constants } from "src/libraries/Constants.sol";
 import { GameType, GameTypes, Hash, Proposal } from "src/libraries/bridge/Types.sol";
-import { Claim } from "src/libraries/bridge/LibUDT.sol";
 
 /// @title SystemDeploy
-/// @notice Script-level API for deploying or upgrading a complete OP Stack L1 system.
+/// @notice Script-level API for deploying a complete OP Stack L1 system.
 contract SystemDeploy is Script {
     DeployConfig public constant cfg =
         DeployConfig(address(uint160(uint256(keccak256(abi.encode("optimism.deployconfig"))))));
@@ -89,17 +87,6 @@ contract SystemDeploy is Script {
         Types.DeployOutput opChain;
     }
 
-    struct UpgradeInput {
-        bool saveArtifacts;
-        Types.Implementations implementations;
-        ISystemConfig systemConfigProxy;
-        IProtocolVersions protocolVersionsProxy;
-    }
-
-    struct UpgradeOutput {
-        bool chainUpgraded;
-    }
-
     struct AggregateVerifierInput {
         GameType multiproofGameType;
         IAnchorStateRegistry anchorStateRegistry;
@@ -127,12 +114,10 @@ contract SystemDeploy is Script {
     }
 
     event Deployed(uint256 indexed l2ChainId, address indexed deployer, bytes deployOutput);
-    event Upgraded(uint256 indexed l2ChainId, ISystemConfig indexed systemConfig, address indexed upgrader);
 
     error InvalidChainId();
     error InvalidRoleAddress(string role);
     error InvalidStartingAnchorRoot();
-    error LegacySuperchainConfigPaused();
     error MissingImplementations();
 
     /// @notice Sets up the shared deployment config and artifact registry.
@@ -180,32 +165,6 @@ contract SystemDeploy is Script {
     /// @notice Deploys a fresh OP Stack and writes the state diff for Kontrol summaries.
     function runWithStateDiff() public stateDiff {
         _runConfigured();
-    }
-
-    /// @notice Deploys implementation contracts from the active deploy config and saves their artifact names.
-    function deployImplementations() public returns (Types.Implementations memory output_) {
-        output_ = _deployImplementations(_configuredImplementationsInput());
-        _saveUpgradeArtifacts(output_);
-    }
-
-    /// @notice Returns the latest implementation set saved by `deployImplementations` or `run`.
-    function getImplementations() public view returns (Types.Implementations memory) {
-        return Types.Implementations({
-            l1ERC721BridgeImpl: artifacts.mustGetAddress("L1ERC721BridgeImpl"),
-            optimismPortalImpl: artifacts.mustGetAddress("OptimismPortalImpl"),
-            systemConfigImpl: artifacts.mustGetAddress("SystemConfigImpl"),
-            optimismMintableERC20FactoryImpl: artifacts.mustGetAddress("OptimismMintableERC20FactoryImpl"),
-            l1CrossDomainMessengerImpl: artifacts.mustGetAddress("L1CrossDomainMessengerImpl"),
-            l1StandardBridgeImpl: artifacts.mustGetAddress("L1StandardBridgeImpl"),
-            disputeGameFactoryImpl: artifacts.mustGetAddress("DisputeGameFactoryImpl"),
-            anchorStateRegistryImpl: artifacts.mustGetAddress("AnchorStateRegistryImpl"),
-            delayedWETHImpl: artifacts.mustGetAddress("DelayedWETHImpl"),
-            protocolVersionsImpl: artifacts.mustGetAddress("ProtocolVersionsImpl"),
-            aggregateVerifierImpl: artifacts.getAddress("AggregateVerifier"),
-            teeProverRegistryImpl: artifacts.getAddress("TEEProverRegistryImpl"),
-            teeVerifierImpl: artifacts.getAddress("TEEVerifier"),
-            zkVerifierImpl: artifacts.getAddress("ZKVerifier")
-        });
     }
 
     function _runConfigured() internal returns (DeployOutput memory output_) {
@@ -313,27 +272,6 @@ contract SystemDeploy is Script {
         }
 
         emit Deployed(_input.opChainInput.l2ChainId, msg.sender, abi.encode(output_.opChain));
-    }
-
-    function upgrade(UpgradeInput memory _input) public returns (UpgradeOutput memory output_) {
-        _assertValidImplementations(_input.implementations);
-
-        if (address(_input.systemConfigProxy) != address(0)) {
-            ISystemConfig systemConfigProxy = _input.systemConfigProxy;
-            DeployUtils.assertValidContractAddress(address(systemConfigProxy));
-
-            IProtocolVersions protocolVersionsProxy = _input.protocolVersionsProxy;
-            if (address(protocolVersionsProxy) == address(0) && address(artifacts).code.length != 0) {
-                protocolVersionsProxy = IProtocolVersions(artifacts.getAddress("ProtocolVersionsProxy"));
-            }
-
-            _upgradeOPChain(systemConfigProxy, _input.implementations, protocolVersionsProxy);
-            output_.chainUpgraded = true;
-        }
-
-        if (_input.saveArtifacts) {
-            _saveUpgradeArtifacts(_input.implementations);
-        }
     }
 
     function _deployImplementations(ImplementationInput memory _input)
@@ -528,91 +466,6 @@ contract SystemDeploy is Script {
         );
     }
 
-    function _upgradeOPChain(
-        ISystemConfig _systemConfigProxy,
-        Types.Implementations memory _impls,
-        IProtocolVersions _protocolVersionsProxy
-    )
-        internal
-    {
-        IProxyAdmin proxyAdmin = _systemConfigProxy.proxyAdmin();
-        uint256 l2ChainId = _systemConfigProxy.l2ChainId();
-
-        _assertLegacySuperchainConfigNotPaused(_systemConfigProxy);
-
-        _upgradeTo(proxyAdmin, address(_systemConfigProxy), _impls.systemConfigImpl);
-
-        IOptimismPortal optimismPortal = IOptimismPortal(payable(_systemConfigProxy.optimismPortal()));
-        _upgradeTo(proxyAdmin, address(optimismPortal), _impls.optimismPortalImpl);
-        _upgradeTo(proxyAdmin, address(optimismPortal.anchorStateRegistry()), _impls.anchorStateRegistryImpl);
-        _upgradeTo(
-            proxyAdmin, _systemConfigProxy.optimismMintableERC20Factory(), _impls.optimismMintableERC20FactoryImpl
-        );
-
-        IDisputeGameFactory disputeGameFactory = IDisputeGameFactory(_systemConfigProxy.disputeGameFactory());
-        _upgradeTo(proxyAdmin, address(disputeGameFactory), _impls.disputeGameFactoryImpl);
-        _upgradeMultiproofContracts(_systemConfigProxy, disputeGameFactory, _impls);
-
-        ISystemConfig.Addresses memory opChainAddrs = _systemConfigProxy.getAddresses();
-        _upgradeTo(proxyAdmin, opChainAddrs.l1CrossDomainMessenger, _impls.l1CrossDomainMessengerImpl);
-        _upgradeTo(proxyAdmin, opChainAddrs.l1StandardBridge, _impls.l1StandardBridgeImpl);
-        _upgradeTo(proxyAdmin, opChainAddrs.l1ERC721Bridge, _impls.l1ERC721BridgeImpl);
-        if (opChainAddrs.delayedWETH != address(0)) {
-            _upgradeTo(proxyAdmin, opChainAddrs.delayedWETH, _impls.delayedWETHImpl);
-        }
-
-        if (address(_protocolVersionsProxy) != address(0)) {
-            _upgradeTo(proxyAdmin, address(_protocolVersionsProxy), _impls.protocolVersionsImpl);
-        }
-
-        emit Upgraded(l2ChainId, _systemConfigProxy, msg.sender);
-    }
-
-    /// @notice Rejects a migration from SuperchainConfig until its global and chain-specific pause records are cleared.
-    /// @dev A pause submitted after this check and before the upgrade can be lost. Either the Guardian or the
-    /// Incident Responder can pause during that window, so coordinate migrations with both.
-    function _assertLegacySuperchainConfigNotPaused(ISystemConfig _systemConfigProxy) internal view {
-        (bool success, bytes memory returndata) =
-            address(_systemConfigProxy).staticcall(abi.encodeCall(ILegacySystemConfig.superchainConfig, ()));
-        if (!success || returndata.length != 32) return;
-
-        ILegacySuperchainConfig superchainConfig = ILegacySuperchainConfig(abi.decode(returndata, (address)));
-        if (!superchainConfig.pausable(address(0)) || !superchainConfig.pausable(_systemConfigProxy.optimismPortal())) {
-            revert LegacySuperchainConfigPaused();
-        }
-    }
-
-    function _upgradeMultiproofContracts(
-        ISystemConfig _systemConfigProxy,
-        IDisputeGameFactory _disputeGameFactory,
-        Types.Implementations memory _impls
-    )
-        internal
-    {
-        IDisputeGame currentGameImpl = _disputeGameFactory.gameImpls(GameTypes.AGGREGATE_VERIFIER);
-        if (address(currentGameImpl) == address(0)) return;
-
-        if (_impls.teeProverRegistryImpl != address(0)) {
-            TEEProverRegistry newTEEProverRegistry = TEEProverRegistry(_impls.teeProverRegistryImpl);
-            require(
-                address(newTEEProverRegistry.DISPUTE_GAME_FACTORY()) == address(_disputeGameFactory),
-                "SystemDeploy: TEEProverRegistry factory mismatch"
-            );
-            AggregateVerifier currentAggregateVerifier = AggregateVerifier(address(currentGameImpl));
-            TEEProverRegistry teeProverRegistry =
-                TEEVerifier(address(currentAggregateVerifier.TEE_VERIFIER())).TEE_PROVER_REGISTRY();
-            _upgradeTo(_systemConfigProxy.proxyAdmin(), address(teeProverRegistry), _impls.teeProverRegistryImpl);
-        }
-
-        if (_impls.aggregateVerifierImpl != address(0) && address(currentGameImpl) != _impls.aggregateVerifierImpl) {
-            DeployUtils.assertValidContractAddress(_impls.aggregateVerifierImpl);
-            vm.broadcast(msg.sender);
-            _disputeGameFactory.setImplementation(
-                GameTypes.AGGREGATE_VERIFIER, IDisputeGame(address(_impls.aggregateVerifierImpl))
-            );
-        }
-    }
-
     function _encodeSystemConfigInitializer(
         Types.DeployInput memory _input,
         Types.DeployOutput memory _output
@@ -707,12 +560,6 @@ contract SystemDeploy is Script {
         DeployUtils.assertValidContractAddress(_implementation);
         vm.broadcast(msg.sender);
         _proxyAdmin.upgradeAndCall(payable(_target), _implementation, _data);
-    }
-
-    function _upgradeTo(IProxyAdmin _proxyAdmin, address _target, address _implementation) internal {
-        DeployUtils.assertValidContractAddress(_implementation);
-        vm.broadcast(msg.sender);
-        _proxyAdmin.upgrade(payable(_target), _implementation);
     }
 
     function _deployAddressManager(
@@ -1041,7 +888,7 @@ contract SystemDeploy is Script {
     }
 
     function _saveDeployArtifacts(DeployOutput memory _output) internal {
-        _saveUpgradeArtifacts(_output.impls);
+        _saveImplementationArtifacts(_output.impls);
 
         Types.DeployOutput memory chain = _output.opChain;
         artifacts.save("ProxyAdmin", address(chain.opChainProxyAdmin));
@@ -1069,7 +916,7 @@ contract SystemDeploy is Script {
         }
     }
 
-    function _saveUpgradeArtifacts(Types.Implementations memory _impls) internal {
+    function _saveImplementationArtifacts(Types.Implementations memory _impls) internal {
         artifacts.save("L1ERC721BridgeImpl", _impls.l1ERC721BridgeImpl);
         artifacts.save("OptimismPortalImpl", _impls.optimismPortalImpl);
         artifacts.save("SystemConfigImpl", _impls.systemConfigImpl);

@@ -108,6 +108,7 @@ print-pinned-block-number:
 # Prepares the environment for upgrade path variant of contract tests and coverage.
 # Env Vars:
 # - ETH_RPC_URL must be set to a production (Sepolia or Mainnet) RPC URL.
+# - SUPERCHAIN_OPS_ALLOCS_PATH must point to simulated post-upgrade state from superchain-ops.
 # - FORK_BLOCK_NUMBER can be set in the env, or else will fallback to the default block number.
 #   Reusing the default block number greatly speeds up the test execution time by caching the
 #   rpc call responses in ~/.foundry/cache/rpc. The default block will need to be updated
@@ -136,6 +137,7 @@ anvil-fork:
   anvil --fork-url $ETH_RPC_URL
 
 # Use anvil-fork in a separate terminal before running this command.
+# Requires SUPERCHAIN_OPS_ALLOCS_PATH with simulated post-upgrade state from superchain-ops.
 # Helpful for debugging.
 test-upgrade-against-anvil *ARGS: build-go-ffi
   #!/bin/bash

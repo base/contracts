@@ -9,11 +9,9 @@ import { Types } from "scripts/libraries/Types.sol";
 import { SystemDeployAssertions } from "test/deploy/SystemDeployAssertions.sol";
 
 import { ISP1Verifier } from "interfaces/L1/proofs/zk/ISP1Verifier.sol";
-import { IDisputeGameFactory } from "interfaces/L1/proofs/IDisputeGameFactory.sol";
 import { INitroValidator } from "interfaces/L1/proofs/tee/INitroValidator.sol";
 import { IProtocolVersions } from "interfaces/L1/IProtocolVersions.sol";
 import { ISystemConfig } from "interfaces/L1/ISystemConfig.sol";
-import { ProtocolVersions } from "src/L1/ProtocolVersions.sol";
 import { SystemConfig } from "src/L1/SystemConfig.sol";
 import { AggregateVerifier } from "src/L1/proofs/AggregateVerifier.sol";
 import { TEEProverRegistry } from "src/L1/proofs/tee/TEEProverRegistry.sol";
@@ -21,25 +19,7 @@ import { TEEVerifier } from "src/L1/proofs/tee/TEEVerifier.sol";
 import { ZKVerifier } from "src/L1/proofs/zk/ZKVerifier.sol";
 import { GameType, Hash, Proposal } from "src/libraries/bridge/Types.sol";
 import { EIP1967Helper } from "test/mocks/EIP1967Helper.sol";
-import { DevTEEProverRegistry } from "test/mocks/MockDevTEEProverRegistry.sol";
 import { MockNitroValidator } from "test/mocks/MockNitroValidator.sol";
-
-contract MockLegacyTEEProverRegistry is DevTEEProverRegistry {
-    constructor(
-        INitroValidator nitroValidator,
-        IDisputeGameFactory factory
-    )
-        DevTEEProverRegistry(nitroValidator, factory)
-    { }
-
-    function version() public pure override returns (string memory) {
-        return "0.5.0";
-    }
-}
-
-contract MockSP1Verifier {
-    function verifyProof(bytes32, bytes calldata, bytes calldata) external pure { }
-}
 
 contract MockInvalidTEEProverRegistry {
     function NITRO_VALIDATOR() external pure returns (INitroValidator) {
@@ -47,20 +27,8 @@ contract MockInvalidTEEProverRegistry {
     }
 }
 
-contract MockLegacySuperchainConfig {
-    address internal immutable UNPAUSABLE_IDENTIFIER;
-
-    constructor(address _unpausableIdentifier) {
-        UNPAUSABLE_IDENTIFIER = _unpausableIdentifier;
-    }
-
-    function pausable(address _identifier) external view returns (bool) {
-        return _identifier != UNPAUSABLE_IDENTIFIER;
-    }
-
-    function paused(address) external pure returns (bool) {
-        return false;
-    }
+contract MockSP1Verifier {
+    function verifyProof(bytes32, bytes calldata, bytes calldata) external pure { }
 }
 
 contract SystemDeploy_Test is Test, SystemDeployAssertions {
@@ -86,12 +54,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         sp1Verifier = new MockSP1Verifier();
     }
 
-    function testFuzz_deployImplementations_bindsGuardianRoles_succeeds(
-        address _guardian,
-        address _incidentResponder
-    )
-        public
-    {
+    function testFuzz_deploy_bindsGuardianRoles_succeeds(address _guardian, address _incidentResponder) public {
         vm.assume(_guardian != address(0));
 
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
@@ -115,7 +78,7 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         );
     }
 
-    function test_deployImplementations_nullGuardian_reverts() public {
+    function test_deploy_nullGuardian_reverts() public {
         SystemDeploy.DeployInput memory input = _defaultDeployInput();
         input.implementationsInput.guardian = address(0);
 
@@ -306,149 +269,12 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
         systemDeploy.deploy(input);
     }
 
-    function test_upgrade_registryWithInvalidNitroValidator_reverts() public {
-        SystemDeploy.DeployInput memory input = _defaultDeployInput();
-        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
-        Types.Implementations memory implementations = output.impls;
-        implementations.teeProverRegistryImpl = address(new MockInvalidTEEProverRegistry());
+    function test_deploy_suppliedRegistryWithInvalidNitroValidator_reverts() public {
+        SystemDeploy.DeployInput memory input = _reuseImplementationsInput();
+        input.implementations.teeProverRegistryImpl = address(new MockInvalidTEEProverRegistry());
 
         vm.expectRevert("DeployUtils: zero address");
-        systemDeploy.upgrade(
-            SystemDeploy.UpgradeInput({
-                saveArtifacts: false,
-                implementations: implementations,
-                systemConfigProxy: output.opChain.systemConfigProxy,
-                protocolVersionsProxy: output.opChain.protocolVersionsProxy
-            })
-        );
-    }
-
-    function testFuzz_upgrade_expiredLegacyPause_reverts(bool _globalPause) public {
-        SystemDeploy.DeployInput memory input = _defaultDeployInput();
-        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
-        address systemConfigProxy = address(output.opChain.systemConfigProxy);
-        address pausedIdentifier = _globalPause ? address(0) : address(output.opChain.optimismPortalProxy);
-        MockLegacySuperchainConfig legacySuperchainConfig = new MockLegacySuperchainConfig(pausedIdentifier);
-        address systemConfigImpl = output.opChain.opChainProxyAdmin.getProxyImplementation(systemConfigProxy);
-
-        assertFalse(legacySuperchainConfig.paused(pausedIdentifier), "legacy pause inactive");
-        assertFalse(legacySuperchainConfig.pausable(pausedIdentifier), "legacy pause record remains");
-
-        vm.mockCall(
-            systemConfigProxy,
-            abi.encodeWithSelector(bytes4(keccak256("superchainConfig()"))),
-            abi.encode(address(legacySuperchainConfig))
-        );
-
-        vm.expectRevert(SystemDeploy.LegacySuperchainConfigPaused.selector);
-        systemDeploy.upgrade(
-            SystemDeploy.UpgradeInput({
-                saveArtifacts: false,
-                implementations: output.impls,
-                systemConfigProxy: output.opChain.systemConfigProxy,
-                protocolVersionsProxy: output.opChain.protocolVersionsProxy
-            })
-        );
-
-        assertEq(
-            output.opChain.opChainProxyAdmin.getProxyImplementation(systemConfigProxy),
-            systemConfigImpl,
-            "system config impl"
-        );
-    }
-
-    function test_upgrade_withoutManagerDelegatecall_succeeds() public {
-        SystemDeploy.DeployInput memory input = _defaultDeployInput();
-        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
-        Types.Implementations memory implementations = output.impls;
-        ProtocolVersions protocolVersionsImpl = new ProtocolVersions();
-        implementations.protocolVersionsImpl = address(protocolVersionsImpl);
-
-        SystemDeploy.UpgradeOutput memory upgradeOutput = systemDeploy.upgrade(
-            SystemDeploy.UpgradeInput({
-                saveArtifacts: false,
-                implementations: implementations,
-                systemConfigProxy: output.opChain.systemConfigProxy,
-                protocolVersionsProxy: output.opChain.protocolVersionsProxy
-            })
-        );
-
-        assertTrue(upgradeOutput.chainUpgraded, "chain upgraded");
-        assertEq(
-            output.opChain.opChainProxyAdmin.getProxyImplementation(address(output.opChain.protocolVersionsProxy)),
-            address(protocolVersionsImpl),
-            "protocol versions impl"
-        );
-        assertValidStandardSystem(_expected(output, input));
-    }
-
-    function test_upgrade_predeployedTEEProverRegistryImplementation_succeeds() public {
-        SystemDeploy.DeployInput memory input = _defaultDeployInput();
-        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
-        TEEProverRegistry registry = TEEProverRegistry(address(output.opChain.teeProverRegistryProxy));
-        MockLegacyTEEProverRegistry legacyImpl = new MockLegacyTEEProverRegistry({
-            nitroValidator: INitroValidator(address(nitroValidator)), factory: registry.DISPUTE_GAME_FACTORY()
-        });
-        output.opChain.opChainProxyAdmin.upgrade(payable(address(registry)), address(legacyImpl));
-
-        address signer = makeAddr("existing-signer");
-        bytes32 imageHash = keccak256("existing-image");
-        DevTEEProverRegistry(address(registry)).addDevSigner(signer, imageHash);
-
-        TEEProverRegistry newImpl = new TEEProverRegistry({
-            nitroValidator: INitroValidator(address(nitroValidator)), factory: registry.DISPUTE_GAME_FACTORY()
-        });
-        Types.Implementations memory implementations = output.impls;
-        implementations.teeProverRegistryImpl = address(newImpl);
-        systemDeploy.upgrade(
-            SystemDeploy.UpgradeInput({
-                saveArtifacts: false,
-                implementations: implementations,
-                systemConfigProxy: output.opChain.systemConfigProxy,
-                protocolVersionsProxy: output.opChain.protocolVersionsProxy
-            })
-        );
-
-        assertEq(
-            output.opChain.opChainProxyAdmin.getProxyImplementation(address(registry)),
-            address(newImpl),
-            "tee registry impl"
-        );
-        assertEq(registry.version(), "0.6.1");
-        assertEq(registry.owner(), owner);
-        assertEq(registry.manager(), owner);
-        assertEq(GameType.unwrap(registry.gameType()), uint32(input.implementationsInput.multiproofGameType));
-        assertTrue(registry.isValidProposer(proposer));
-        assertTrue(registry.isValidProposer(challenger));
-        assertTrue(registry.isRegisteredSigner(signer));
-        assertEq(registry.signerImageHash(signer), imageHash);
-        assertEq(address(registry.NITRO_VALIDATOR()), address(nitroValidator));
-    }
-
-    function test_upgrade_discoversProtocolVersionsProxyFromArtifacts_succeeds() public {
-        SystemDeploy.DeployInput memory input = _defaultDeployInput();
-        SystemDeploy.DeployOutput memory output = systemDeploy.deploy(input);
-        Types.Implementations memory implementations = output.impls;
-        ProtocolVersions protocolVersionsImpl = new ProtocolVersions();
-        implementations.protocolVersionsImpl = address(protocolVersionsImpl);
-
-        _saveArtifact("ProtocolVersionsProxy", address(output.opChain.protocolVersionsProxy));
-
-        SystemDeploy.UpgradeOutput memory upgradeOutput = systemDeploy.upgrade(
-            SystemDeploy.UpgradeInput({
-                saveArtifacts: false,
-                implementations: implementations,
-                systemConfigProxy: output.opChain.systemConfigProxy,
-                protocolVersionsProxy: IProtocolVersions(address(0))
-            })
-        );
-
-        assertTrue(upgradeOutput.chainUpgraded, "chain upgraded");
-        assertEq(
-            output.opChain.opChainProxyAdmin.getProxyImplementation(address(output.opChain.protocolVersionsProxy)),
-            address(protocolVersionsImpl),
-            "protocol versions impl"
-        );
+        systemDeploy.deploy(input);
     }
 
     function test_deploy_reusingImplementations_doesNotSaveZeroImplementationOnlyArtifacts() public {
@@ -605,13 +431,6 @@ contract SystemDeploy_Test is Test, SystemDeployAssertions {
             address(_input.implementationsInput.sp1Verifier),
             "zk verifier sp1"
         );
-    }
-
-    function _saveArtifact(string memory _name, address _addr) internal {
-        vm.etch(address(artifacts), vm.getDeployedCode("Artifacts.s.sol:Artifacts"));
-        bytes32 slot = keccak256(abi.encodePacked(_name, uint256(0)));
-        vm.store(address(artifacts), slot, bytes32(uint256(uint160(_addr))));
-        assertEq(artifacts.getAddress(_name), _addr, "artifact saved");
     }
 
     function _expected(
