@@ -25,6 +25,24 @@ get_latest_final_version() {
     return 1
 }
 
+# Release notes need this explicitly: final tags live on release branches, so the
+# previous one is often missing from the new tag's history and GitHub falls back further.
+get_previous_final_tag() {
+    local version="$1" tag major minor patch t_major t_minor t_patch
+    IFS='.' read -r major minor patch <<< "$version"
+    while IFS= read -r tag; do
+        if [[ "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            t_major=$((10#${BASH_REMATCH[1]})); t_minor=$((10#${BASH_REMATCH[2]})); t_patch=$((10#${BASH_REMATCH[3]}))
+            if (( t_major < 10#$major
+                || (t_major == 10#$major && t_minor < 10#$minor)
+                || (t_major == 10#$major && t_minor == 10#$minor && t_patch < 10#$patch) )); then
+                echo "$tag"
+                return 0
+            fi
+        fi
+    done < <(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname)
+}
+
 get_next_version() {
     local bump_type="$1" current_version major minor patch
     if [[ "$bump_type" != major && "$bump_type" != minor && "$bump_type" != patch ]]; then

@@ -87,6 +87,10 @@ test_version_bumps() {
     assert_equal 8.11.0 "$(get_next_version minor)" 'minor bumps reset a nonzero patch'
     assert_equal 8.10.5 "$(get_next_version patch)" 'patch bumps retain major and minor'
     assert_rejected 'bump_type must be' get_next_version invalid
+    assert_equal v8.10.4 "$(get_previous_final_tag 8.11.0)" 'previous final tag skips RCs and uses version order'
+    assert_equal v8.10.0 "$(get_previous_final_tag 8.10.4)" 'previous final tag excludes the version being released'
+    assert_equal v8.9.0 "$(get_previous_final_tag 8.9.1)" 'a patch on an older line ignores newer releases'
+    assert_equal '' "$(get_previous_final_tag 8.9.0)" 'the first release has no previous final tag'
 
     git tag -d v8.9.0 v8.10.0 v8.10.4 >/dev/null
     assert_rejected 'No final release tags found' get_latest_final_version
