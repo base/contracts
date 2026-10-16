@@ -73,7 +73,8 @@ release branch head, a retry reuses it. A final tag at a different commit causes
 a failure; the workflow never moves it. If a GitHub release already exists,
 the workflow leaves its notes and draft or published state unchanged.
 
-On pull request events, **Release Branch CI** checks the repository's tags using
+When a pull request is opened, reopened, updated, or edited (including
+retargeting its base branch), **Release Branch CI** checks the repository's tags using
 tools from `main`. Its Finalized Release check fails for a `releases/vX.Y.Z`
 target once `vX.Y.Z` exists, even if the GitHub release is still a draft. Keep
 this check required in branch protection. Creating the final tag does not rerun

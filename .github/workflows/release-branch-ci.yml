@@ -2,6 +2,8 @@ name: Release Branch CI
 
 on:
   pull_request:
+    # `edited` covers retargeting the PR to another base branch.
+    types: [opened, synchronize, reopened, edited]
     branches:
       - 'releases/v*'
 
