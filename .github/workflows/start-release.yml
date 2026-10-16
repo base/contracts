@@ -40,16 +40,10 @@ jobs:
         # Patch bases can predate the release scripts.
         run: cp -R scripts/release "$RUNNER_TEMP/release-scripts"
 
-      - name: Create release branch
+      - name: Create release branch and first RC
         env:
           BUMP_TYPE: ${{ inputs.bump_type }}
         run: bash "$RUNNER_TEMP/release-scripts/start-release.sh" "$BUMP_TYPE"
-
-      # GITHUB_TOKEN branch pushes do not trigger Create RC.
-      - name: Create first RC
-        run: |
-          BRANCH=$(cat "$RUNNER_TEMP/release_branch")
-          bash "$RUNNER_TEMP/release-scripts/create-tag.sh" "$BRANCH" rc
 
       - name: Summary
         run: |

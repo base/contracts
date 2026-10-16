@@ -21,10 +21,11 @@ highest existing `releases/vX.Y.*` branch for the latest final tag's major and
 minor version. Starting a release fails if the new branch already exists or if
 a patch release has no matching base branch.
 
-Start Release pushes `releases/vX.Y.Z`, then creates the first RC at its head in
-the same workflow. Branch pushes made with `GITHUB_TOKEN` do not trigger other
-workflows, so it cannot rely on Create RC to make that first tag. There is no
-version-sync step.
+Start Release pushes `releases/vX.Y.Z` and an annotated first RC tag at its head
+atomically. Both refs become available together, before subsequent Create RC jobs
+can allocate a tag. Branch pushes made with `GITHUB_TOKEN` do not trigger other
+workflows, so Start Release cannot rely on Create RC to make that first tag.
+There is no version-sync step.
 
 ## Create release candidates
 
@@ -37,7 +38,8 @@ version. For example, with `v8.4.0.rc1` and `v8.4.0.rc2` present, the next RC is
 `v8.4.0-rc.3`. Numbering is numeric, so `rc.10` follows `rc.9`. Tags for other
 versions do not affect the count.
 
-Tag allocation is serialized per release branch with `cancel-in-progress: false`
+Subsequent RC tag allocation is serialized per release branch with
+`cancel-in-progress: false`
 and `queue: max`. GitHub allows up to 100 pending jobs in that queue. A full
 queue cancels additional jobs. Jobs enter the queue when they start waiting,
 which need not match commit order. Each job still tags its own triggering commit.
@@ -49,21 +51,10 @@ points at the triggering commit, the script reuses the highest such tag instead
 of allocating another number. Legacy tags at that commit count toward numbering
 but are not reused.
 
-Start Release refuses to reuse an existing release branch, including after a
-partial failure. If the branch was pushed but the initial RC failed, check for
-an RC tag at that branch head. To finish the tagging step without rerunning
-Start Release, use an up-to-date local clone containing the release scripts:
-
-```sh
-git fetch origin --tags
-git checkout --detach origin/releases/v8.5.0
-./scripts/release/create-tag.sh releases/v8.5.0 rc
-```
-
-Substitute the release version. The script pushes a new tag if needed and reuses
-a new-format tag already at HEAD. For a historical branch without the scripts,
-keep a copy of `scripts/release/` outside the checkout before switching to it.
-Do not move an existing tag to repair a failed run.
+Start Release refuses to reuse an existing release branch. Its atomic push
+publishes neither the branch nor the first RC if either ref is rejected. If the
+workflow fails after the push succeeds, verify the branch and tag rather than
+rerunning Start Release. Do not move an existing tag to repair a failed run.
 
 ## Publish the final release
 
@@ -82,10 +73,14 @@ release branch head, a retry reuses it. A final tag at a different commit causes
 a failure; the workflow never moves it. If a GitHub release already exists,
 the workflow leaves its notes and draft or published state unchanged.
 
-A final tag freezes the release branch. **Release Branch CI** rejects pull
-requests targeting a `releases/vX.Y.Z` branch once `vX.Y.Z` exists, even if its
-GitHub release is still a draft. Keep this check required in branch protection
-to enforce the freeze on merges. The check does not prevent direct pushes.
+On pull request events, **Release Branch CI** checks the repository's tags using
+tools from `main`. Its Finalized Release check fails for a `releases/vX.Y.Z`
+target once `vX.Y.Z` exists, even if the GitHub release is still a draft. Keep
+this check required in branch protection. Creating the final tag does not rerun
+checks on open pull requests, so an earlier passing check can stay green. After
+finalizing, rerun checks on open pull requests into that branch or lock the
+branch via branch protection to prevent merges. The check does not prevent
+direct pushes.
 
 ## Existing release branches
 
@@ -98,8 +93,10 @@ creates their initial RC using the tools from `main`.
 
 To adopt automatic RCs and the finalized-release check on an active branch,
 backport the release workflows and `scripts/release/`. Existing queued or running
-workflows keep the configuration they started with. Publish Release runs with
-tools from `main`, so it can tag an existing branch without that backport.
+workflows keep the configuration they started with. Release Branch CI loads its
+tools from `main`, so the backport can pass even when the target branch has no
+release scripts. Publish Release also uses tools from `main` and can tag an
+existing branch without that backport.
 
 ## Quick reference
 
@@ -111,4 +108,5 @@ tools from `main`, so it can tag an existing branch without that backport.
 | Guard a finalized branch | Release Branch CI | Pull request to `releases/v*` | Fails if the final tag exists |
 
 Run `just test-release` to test version selection, legacy RC numbering, retry
-behavior, and final-tag protection locally without network access or pushes.
+behavior, atomic branch and first-RC publication, and final-tag protection using
+temporary local repositories without network access.

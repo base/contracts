@@ -20,7 +20,7 @@ main() {
     NEW_VERSION=$(get_next_version "$BUMP_TYPE")
     RELEASE_BRANCH="releases/v${NEW_VERSION}"
 
-    local base=main major minor
+    local base=main major minor tag
     if [[ "$BUMP_TYPE" == patch ]]; then
         IFS='.' read -r major minor _ <<< "$CURRENT_VERSION"
         base=$(git ls-remote --heads origin "releases/v${major}.${minor}.*" \
@@ -47,15 +47,18 @@ main() {
     configure_git
     git fetch origin "refs/heads/$base:refs/remotes/origin/$base"
     git checkout -b "$RELEASE_BRANCH" "origin/$base"
-    git push origin "refs/heads/$RELEASE_BRANCH"
+    tag="v${NEW_VERSION}-rc.$(get_next_rc_number "$NEW_VERSION")"
+    git tag -a "$tag" -m "Release $tag"
+    git push --atomic origin "refs/heads/$RELEASE_BRANCH" "refs/tags/$tag"
 
     if [[ -n "${RUNNER_TEMP:-}" ]]; then
         echo "$CURRENT_VERSION" > "${RUNNER_TEMP}/current_version"
         echo "$NEW_VERSION" > "${RUNNER_TEMP}/new_version"
         echo "$RELEASE_BRANCH" > "${RUNNER_TEMP}/release_branch"
+        echo "$tag" > "${RUNNER_TEMP}/release_tag"
     fi
 
-    echo "=== Branch $RELEASE_BRANCH created (v$CURRENT_VERSION to v$NEW_VERSION) ==="
+    echo "=== Branch $RELEASE_BRANCH and tag $tag created (v$CURRENT_VERSION to v$NEW_VERSION) ==="
 }
 
 main

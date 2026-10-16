@@ -105,15 +105,53 @@ test_final_tags() {
     assert_rejected 'not HEAD' bash "$SCRIPT_DIR/create-tag.sh" releases/v8.4.0 final
 }
 
+test_start_release() (
+    local remote="$TEMP_DIR/start-origin.git"
+    git init -q --bare "$remote"
+    git init -q -b main "$TEMP_DIR/start-repo"
+    cd "$TEMP_DIR/start-repo"
+    configure_git
+    git commit --allow-empty -qm 'Initial release base'
+    git tag v8.4.0
+    git tag v8.4.1.rc2
+    git remote add origin "$remote"
+    git push -q origin main main:refs/heads/releases/v8.4.0 --tags
+    local base_sha
+    base_sha=$(git rev-parse HEAD)
+
+    bash "$SCRIPT_DIR/start-release.sh" minor
+    assert_equal v8.5.0-rc.1 "$(cat "$RUNNER_TEMP/release_tag")" 'a fresh release starts at RC one'
+    assert_equal "$base_sha" "$(git --git-dir="$remote" rev-parse refs/heads/releases/v8.5.0)" 'the release branch is published at its base'
+    assert_equal "$base_sha" "$(git --git-dir="$remote" rev-parse 'refs/tags/v8.5.0-rc.1^{}')" 'the first RC is published at the release head'
+    assert_equal tag "$(git --git-dir="$remote" cat-file -t refs/tags/v8.5.0-rc.1)" 'the first RC is annotated'
+
+    bash "$SCRIPT_DIR/start-release.sh" patch
+    assert_equal v8.4.1-rc.3 "$(cat "$RUNNER_TEMP/release_tag")" 'the first RC continues legacy numbering'
+    assert_equal "$base_sha" "$(git --git-dir="$remote" rev-parse 'refs/tags/v8.4.1-rc.3^{}')" 'a patch RC is published from a branch without release tools'
+
+    tee "$remote/hooks/update" >/dev/null <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == refs/tags/* ]]; then
+    echo 'Tag rejected' >&2
+    exit 1
+fi
+EOF
+    chmod +x "$remote/hooks/update"
+    assert_rejected 'Tag rejected' bash "$SCRIPT_DIR/start-release.sh" major
+    assert_equal '' "$(git ls-remote origin refs/heads/releases/v9.0.0 refs/tags/v9.0.0-rc.1)" 'a rejected atomic push publishes neither the branch nor its first RC'
+)
+
 case "${1:-all}" in
     rc) test_rc_numbering ;;
     version) test_version_bumps ;;
+    start) test_start_release ;;
     all)
         test_version_bumps
         test_rc_numbering
         test_final_tags
+        test_start_release
         ;;
-    *) echo "Usage: $0 [rc|version|all]" >&2; exit 1 ;;
+    *) echo "Usage: $0 [rc|version|start|all]" >&2; exit 1 ;;
 esac
 
 echo 'Release tests passed.'
