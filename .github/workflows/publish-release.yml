@@ -1,0 +1,79 @@
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (X.Y.Z, without a v prefix)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout release tools
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Preserve release tools
+        # Existing release branches may not contain the release scripts.
+        run: cp -R scripts/release "$RUNNER_TEMP/release-scripts"
+
+      - name: Validate and checkout release branch
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version format: $VERSION (expected X.Y.Z)"
+            exit 1
+          fi
+          RELEASE_BRANCH="releases/v${VERSION}"
+          git fetch origin "refs/heads/$RELEASE_BRANCH" || {
+            echo "::error::Branch $RELEASE_BRANCH not found. Run Start Release first."
+            exit 1
+          }
+          git checkout --detach FETCH_HEAD
+
+      - name: Create or reuse final tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: bash "$RUNNER_TEMP/release-scripts/create-tag.sh" "releases/v${VERSION}" final
+
+      - name: Create or reuse draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          TAG=$(cat "$RUNNER_TEMP/release_tag")
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists; reusing it."
+          else
+            gh release create "$TAG" --draft --generate-notes --title "$TAG" --verify-tag
+          fi
+
+      - name: Summary
+        run: |
+          TAG=$(cat "$RUNNER_TEMP/release_tag")
+          {
+            echo "## Release ready"
+            echo ""
+            echo "**Tag**: \`${TAG}\`"
+            echo ""
+            echo "Review the generated notes and publish the draft on GitHub. An existing release is left unchanged."
+          } >> "$GITHUB_STEP_SUMMARY"

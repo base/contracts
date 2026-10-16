@@ -4,6 +4,7 @@
 
 This repo contains the contracts and scripts for Base.
 For contract deployment artifacts, see [base-org/contract-deployments](https://github.com/base-org/contract-deployments).
+For branches, release candidates, and publishing, see the [release process](docs/RELEASE.md).
 
 <!-- Badge row 1 - status -->
 
