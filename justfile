@@ -81,6 +81,10 @@ clean:
 #                         TEST                         #
 ########################################################
 
+# Tests release versioning and tag safety without network access.
+test-release:
+  ./scripts/release/test-release.sh
+
 # Runs standard contract tests.
 test *ARGS: build-go-ffi
   forge test {{ARGS}}

@@ -1,0 +1,46 @@
+name: Create RC
+
+on:
+  push:
+    branches:
+      - 'releases/v*'
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    # The default pending slot cancels older queued RCs on rapid pushes.
+    concurrency:
+      group: release-${{ github.ref_name }}
+      cancel-in-progress: false
+      queue: max
+
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Tag the triggering commit even if the branch advances while queued.
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Create or reuse RC tag
+        env:
+          RELEASE_BRANCH: ${{ github.ref_name }}
+        run: ./scripts/release/create-tag.sh "$RELEASE_BRANCH" rc
+
+      - name: Summary
+        run: |
+          TAG=$(cat "$RUNNER_TEMP/release_tag")
+          {
+            echo "## RC tag ready"
+            echo ""
+            echo "**Tag**: \`${TAG}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

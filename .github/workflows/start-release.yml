@@ -1,0 +1,62 @@
+name: Start Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: Version bump type
+        required: true
+        type: choice
+        options:
+          - minor
+          - patch
+          - major
+        default: minor
+
+permissions:
+  contents: write
+
+concurrency:
+  group: start-release
+  cancel-in-progress: false
+
+jobs:
+  start:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout release tools
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Preserve release tools
+        # Patch bases can predate the release scripts.
+        run: cp -R scripts/release "$RUNNER_TEMP/release-scripts"
+
+      - name: Create release branch and first RC
+        env:
+          BUMP_TYPE: ${{ inputs.bump_type }}
+        run: bash "$RUNNER_TEMP/release-scripts/start-release.sh" "$BUMP_TYPE"
+
+      - name: Summary
+        run: |
+          CURRENT=$(cat "$RUNNER_TEMP/current_version")
+          NEW=$(cat "$RUNNER_TEMP/new_version")
+          BRANCH=$(cat "$RUNNER_TEMP/release_branch")
+          TAG=$(cat "$RUNNER_TEMP/release_tag")
+          {
+            echo "## Release branch created"
+            echo ""
+            echo "**Version**: v${CURRENT} to v${NEW}"
+            echo "**Branch**: \`${BRANCH}\`"
+            echo "**First RC**: \`${TAG}\`"
+            echo ""
+            echo "Next: test the RC, then run **Publish Release**."
+          } >> "$GITHUB_STEP_SUMMARY"
