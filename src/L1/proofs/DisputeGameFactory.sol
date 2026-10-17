@@ -150,8 +150,10 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
         returns (IDisputeGame proxy_)
     {
         proxy_ = _createGameImpl(_gameType, _rootClaim, _extraData);
-        proxy_.initialize{ value: msg.value }();
+        // EFFECT: Register state first (CEI pattern)
         _finalizeGameCreation(_gameType, _rootClaim, _extraData, proxy_);
+        // INTERACTION: External call last
+        proxy_.initialize{ value: msg.value }();
     }
 
     function createWithInitData(
@@ -165,8 +167,10 @@ contract DisputeGameFactory is ProxyAdminOwnedBase, ReinitializableBase, Ownable
         returns (IDisputeGame proxy_)
     {
         proxy_ = _createGameImpl(_gameType, _rootClaim, _extraData);
-        proxy_.initializeWithInitData{ value: msg.value }(_initData);
+        // EFFECT: Register state first (CEI pattern)
         _finalizeGameCreation(_gameType, _rootClaim, _extraData, proxy_);
+        // INTERACTION: External call last
+        proxy_.initializeWithInitData{ value: msg.value }(_initData);
     }
 
     /// @notice Creates a new DisputeGame proxy contract.
