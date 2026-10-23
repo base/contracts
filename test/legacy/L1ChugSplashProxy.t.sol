@@ -242,3 +242,12 @@ contract L1ChugSplashProxy_Upgrading_Test is L1ChugSplashProxy_WithImplementatio
         _proxyAsImplementation().setCode(RETURN_42_BYTECODE);
     }
 }
+       /// @notice Tests that the owner cannot set the owner to the zero address
+       function test_setOwner_whenOwnerZeroAddress_reverts() public {
+           vm.prank(owner);
+           vm.expectRevert(); 
+           proxy.setOwner(address(0));
+           
+           vm.prank(owner);
+           assertEq(proxy.getOwner(), owner);
+       }
