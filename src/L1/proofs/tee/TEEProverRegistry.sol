@@ -243,11 +243,12 @@ contract TEEProverRegistry is OwnableManagedUpgradeable, ISemver {
         transferOwnership(initialOwner);
         transferManagement(initialManager);
         gameType = gameType_;
-        for (uint256 i = 0; i < initialProposers.length; i++) {
+        for (uint256 i = 0; i < initialProposers.length;) {
             if (initialProposers[i] != address(0)) {
                 isValidProposer[initialProposers[i]] = true;
                 emit ProposerSet(initialProposers[i], true);
             }
+            unchecked { ++i; }
         }
     }
 
