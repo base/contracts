@@ -275,10 +275,15 @@ contract L2Genesis is Script {
     }
 
     /// @notice This predeploy is following the safety invariant #1.
-    ///         This contract is NOT proxied and the state that is set
-    ///         in the constructor is set manually.
+    ///         This contract is NOT proxied. vm.getDeployedCode with vm.etch is used
+    ///         because WETH98 has no immutables and no constructor-side effects.
+    ///         decimals is a constant (compiled into bytecode), name/symbol are
+    ///         pure/virtual functions, and the only storage slots are _balanceOf
+    ///         (slot 0) and _allowance (slot 1) mappings which correctly start empty.
     function setWETH() internal {
         vm.etch(Predeploys.WETH, vm.getDeployedCode("WETH.sol:WETH"));
+        // WETH98 uses constants and pure functions for name/symbol/decimals,
+        // so there are no constructor-side effects to reinitialize via vm.store.
     }
 
     /// @notice This predeploy is following the safety invariant #2.
