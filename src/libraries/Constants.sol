@@ -42,6 +42,21 @@ library Constants {
     ///         transactions.
     address internal constant DEPOSITOR_ACCOUNT = 0xDeaDDEaDDeAdDeAdDEAdDEaddeAddEAdDEAd0001;
 
+    /// @notice ERC-165 interface ID of OptimismMintableERC721 tokens built from source between
+    ///         September 2022 and Bedrock. Those tokens can't be upgraded, so this ID must be
+    ///         accepted forever.
+    bytes4 internal constant PRE_BEDROCK_OPTIMISM_MINTABLE_ERC721_INTERFACE_ID = 0xe49bc7f8;
+
+    /// @notice ERC-165 interface ID of OptimismMintableERC721 tokens built from source between
+    ///         Bedrock and op-contracts v1.8.0. Those tokens can't be upgraded, so this ID must be
+    ///         accepted forever. Newer tokens answer it too, so that older bridges accept them.
+    bytes4 internal constant BEDROCK_OPTIMISM_MINTABLE_ERC721_INTERFACE_ID = 0x74259ebf;
+
+    /// @notice ERC-165 interface ID answered by OptimismMintableERC721 tokens built from
+    ///         op-contracts v1.8.0 source onwards. Written as a literal because
+    ///         type(IOptimismMintableERC721) changes whenever the contract's ABI does.
+    bytes4 internal constant OPTIMISM_MINTABLE_ERC721_INTERFACE_ID = 0xaecafc23;
+
     /// @notice Returns the default values for the ResourceConfig. These are the recommended values
     ///         for a production network.
     function DEFAULT_RESOURCE_CONFIG() internal pure returns (IResourceMetering.ResourceConfig memory) {

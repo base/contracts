@@ -6,7 +6,7 @@ import { IERC721Enumerable } from "lib/openzeppelin-contracts/contracts/token/ER
 import { IERC165 } from "lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol";
 import { Strings } from "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import { CommonTest } from "test/setup/CommonTest.sol";
-import { OptimismMintableERC721, IOptimismMintableERC721 } from "src/L2/OptimismMintableERC721.sol";
+import { OptimismMintableERC721 } from "src/L2/OptimismMintableERC721.sol";
 
 /// @title OptimismMintableERC721_TestInit
 /// @notice Reusable test initialization for `OptimismMintableERC721` tests.
@@ -133,10 +133,12 @@ contract OptimismMintableERC721_Burn_Test is OptimismMintableERC721_TestInit {
 /// @title OptimismMintableERC721_SupportsInterface_Test
 /// @notice Tests the `supportsInterface` function of the `OptimismMintableERC721` contract.
 contract OptimismMintableERC721_SupportsInterface_Test is OptimismMintableERC721_TestInit {
-    /// @notice Tests that the `supportsInterface` function returns true for
-    ///         IOptimismMintableERC721, IERC721Enumerable, IERC721 and IERC165 interfaces.
+    /// @notice Tests that the `supportsInterface` function returns true for both
+    ///         IOptimismMintableERC721 interface IDs, IERC721Enumerable, IERC721 and IERC165.
     function test_supportsInterface_succeeds() external view {
-        assertTrue(L2NFT.supportsInterface(type(IOptimismMintableERC721).interfaceId));
+        // Bridges check tokens against these IDs, so they must never change.
+        assertTrue(L2NFT.supportsInterface(0x74259ebf));
+        assertTrue(L2NFT.supportsInterface(0xaecafc23));
         assertTrue(L2NFT.supportsInterface(type(IERC721Enumerable).interfaceId));
         assertTrue(L2NFT.supportsInterface(type(IERC721).interfaceId));
         assertTrue(L2NFT.supportsInterface(type(IERC165).interfaceId));

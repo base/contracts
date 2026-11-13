@@ -5,6 +5,7 @@ pragma solidity 0.8.15;
 import { CommonTest } from "test/setup/CommonTest.sol";
 
 // Contracts
+import { ERC721 } from "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 import { OptimismMintableERC721 } from "src/L2/OptimismMintableERC721.sol";
 
 // Interfaces
@@ -20,6 +21,31 @@ contract L2ERC721Bridge_TestMintableERC721_Harness is OptimismMintableERC721 {
 
     function mint(address to, uint256 tokenId) public {
         _mint(to, tokenId);
+    }
+}
+
+/// @title L2ERC721Bridge_FixedInterfaceIdERC721_Harness
+/// @notice An OptimismMintableERC721 stand-in that answers a single, fixed interface ID, like a
+///         token deployed by an earlier factory that can't be upgraded.
+contract L2ERC721Bridge_FixedInterfaceIdERC721_Harness is ERC721 {
+    address internal immutable REMOTE_TOKEN;
+    bytes4 internal immutable INTERFACE_ID;
+
+    constructor(address _remoteToken, bytes4 _interfaceId) ERC721("Test", "TST") {
+        REMOTE_TOKEN = _remoteToken;
+        INTERFACE_ID = _interfaceId;
+    }
+
+    function remoteToken() external view returns (address) {
+        return REMOTE_TOKEN;
+    }
+
+    function safeMint(address _to, uint256 _tokenId) external {
+        _safeMint(_to, _tokenId);
+    }
+
+    function supportsInterface(bytes4 _interfaceId) public view override returns (bool) {
+        return _interfaceId == INTERFACE_ID || super.supportsInterface(_interfaceId);
     }
 }
 
@@ -164,6 +190,35 @@ contract L2ERC721Bridge_FinalizeBridgeERC721_Test is L2ERC721Bridge_Bridge_TestI
         l2ERC721Bridge.finalizeBridgeERC721(address(localToken), remoteToken, alice, alice, tokenId, EXTRA_DATA);
 
         _assertTokenOwnedBy(alice);
+    }
+
+    /// @notice Tests that `finalizeBridgeERC721` mints a token that only answers the interface ID
+    ///         of tokens built from source between Bedrock and op-contracts v1.8.0.
+    function test_finalizeBridgeERC721_bedrockInterfaceId_succeeds() external {
+        _finalizeBridgeERC721ToFixedInterfaceIdToken(0x74259ebf);
+    }
+
+    /// @notice Tests that `finalizeBridgeERC721` mints a token that only answers the interface ID
+    ///         of tokens built from source between September 2022 and Bedrock.
+    function test_finalizeBridgeERC721_preBedrockInterfaceId_succeeds() external {
+        _finalizeBridgeERC721ToFixedInterfaceIdToken(0xe49bc7f8);
+    }
+
+    /// @notice Tests that `finalizeBridgeERC721` mints a token that only answers the interface ID
+    ///         of tokens built from op-contracts v1.8.0 source onwards.
+    function test_finalizeBridgeERC721_currentInterfaceId_succeeds() external {
+        _finalizeBridgeERC721ToFixedInterfaceIdToken(0xaecafc23);
+    }
+
+    function _finalizeBridgeERC721ToFixedInterfaceIdToken(bytes4 _interfaceId) internal {
+        L2ERC721Bridge_FixedInterfaceIdERC721_Harness token =
+            new L2ERC721Bridge_FixedInterfaceIdERC721_Harness(remoteToken, _interfaceId);
+
+        _mockOtherBridge();
+        vm.prank(address(l2ERC721Bridge.messenger()));
+        l2ERC721Bridge.finalizeBridgeERC721(address(token), remoteToken, alice, alice, tokenId, EXTRA_DATA);
+
+        assertEq(token.ownerOf(tokenId), alice);
     }
 
     /// @notice Tests that `finalizeBridgeERC721` reverts if the token is not compliant with the
