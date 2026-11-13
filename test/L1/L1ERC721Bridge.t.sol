@@ -103,6 +103,23 @@ abstract contract L1ERC721Bridge_TestInit is CommonTest {
         assertFalse(l1ERC721Bridge.deposits(address(localToken), address(remoteToken), tokenId));
         assertEq(localToken.ownerOf(tokenId), _owner);
     }
+
+    /// @dev Bridges the token, then moves it out of the bridge back to alice while leaving the
+    ///      deposit flag set, as a non-standard token with forced transfers could.
+    function _bridgeAndReleaseToken() internal {
+        _bridgeToken();
+
+        vm.prank(address(l1ERC721Bridge));
+        localToken.transferFrom(address(l1ERC721Bridge), alice, tokenId);
+
+        vm.prank(alice);
+        localToken.approve(address(l1ERC721Bridge), tokenId);
+    }
+
+    function _assertDepositFlaggedButReleased() internal view {
+        assertTrue(l1ERC721Bridge.deposits(address(localToken), address(remoteToken), tokenId));
+        assertEq(localToken.ownerOf(tokenId), alice);
+    }
 }
 
 abstract contract L1ERC721Bridge_Bridge_TestInit is L1ERC721Bridge_TestInit {
@@ -422,6 +439,20 @@ contract L1ERC721Bridge_Uncategorized_Test is L1ERC721Bridge_Bridge_TestInit {
         _assertTokenNotEscrowed(alice);
     }
 
+    /// @notice Tests that the ERC721 bridge reverts when the token ID is already escrowed for the
+    ///         same L1/L2 token pair.
+    function test_bridgeERC721_alreadyEscrowed_reverts() external {
+        _bridgeAndReleaseToken();
+
+        vm.prank(alice, alice);
+        vm.expectRevert("L1ERC721Bridge: Token ID is already escrowed");
+        l1ERC721Bridge.bridgeERC721(
+            address(localToken), address(remoteToken), tokenId, DEFAULT_MIN_GAS_LIMIT, EXTRA_DATA
+        );
+
+        _assertDepositFlaggedButReleased();
+    }
+
     /// @notice Tests that the ERC721 bridge successfully sends a token to a different address than
     ///         the owner.
     function test_bridgeERC721To_succeeds() external {
@@ -466,6 +497,20 @@ contract L1ERC721Bridge_Uncategorized_Test is L1ERC721Bridge_Bridge_TestInit {
         );
 
         _assertTokenNotEscrowed(alice);
+    }
+
+    /// @notice Tests that the ERC721 bridge reverts when the token ID is already escrowed for the
+    ///         same L1/L2 token pair when sending to a different address than the owner.
+    function test_bridgeERC721To_alreadyEscrowed_reverts() external {
+        _bridgeAndReleaseToken();
+
+        vm.prank(alice);
+        vm.expectRevert("L1ERC721Bridge: Token ID is already escrowed");
+        l1ERC721Bridge.bridgeERC721To(
+            address(localToken), address(remoteToken), bob, tokenId, DEFAULT_MIN_GAS_LIMIT, EXTRA_DATA
+        );
+
+        _assertDepositFlaggedButReleased();
     }
 
     /// @notice Tests that `bridgeERC721To` reverts if the to address is the zero address.

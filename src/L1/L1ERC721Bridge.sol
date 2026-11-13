@@ -32,8 +32,8 @@ contract L1ERC721Bridge is ERC721Bridge, ProxyAdminOwnedBase, ReinitializableBas
     address private spacer_50_0_20;
 
     /// @notice Semantic version.
-    /// @custom:semver 3.0.0
-    string public constant version = "3.0.0";
+    /// @custom:semver 3.0.1
+    string public constant version = "3.0.1";
 
     /// @notice Address of the SystemConfig contract.
     ISystemConfig public systemConfig;
@@ -131,6 +131,7 @@ contract L1ERC721Bridge is ERC721Bridge, ProxyAdminOwnedBase, ReinitializableBas
         );
 
         // Lock token into bridge
+        require(deposits[_localToken][_remoteToken][_tokenId] == false, "L1ERC721Bridge: Token ID is already escrowed");
         deposits[_localToken][_remoteToken][_tokenId] = true;
         IERC721(_localToken).transferFrom({ from: _from, to: address(this), tokenId: _tokenId });
 

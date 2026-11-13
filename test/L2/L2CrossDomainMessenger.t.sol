@@ -271,7 +271,7 @@ contract L2CrossDomainMessenger_Uncategorized_Test is L2CrossDomainMessenger_Tes
         skipIfForkTest("L2CrossDomainMessenger doesn't exist on L1 in forked test");
 
         // Using smaller uint so the fuzzer doesn't give as many massive values that get bounded.
-        // TODO: Known issue, messages above 34k can actually OOG on the receiving side if the
+        // TODO: Known issue, messages above 34k (13k with delegated account) can actually OOG on the receiving side if the
         // target uses all available gas. Can be resolved by capping data sizes on the XDM or by
         // increasing the amount of available relay gas to ~100k. If increasing relay gas, should
         // have the relay gas only increase when the calldata size is large to avoid disrupting
