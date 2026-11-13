@@ -86,6 +86,13 @@ contract OptimismMintableERC20_SupportsInterface_Test is OptimismMintableERC20_T
         assertTrue(L2Token.supportsInterface(type(IERC165).interfaceId));
         assertTrue(L2Token.supportsInterface(type(ILegacyMintableERC20).interfaceId));
         assertTrue(L2Token.supportsInterface(type(IOptimismMintableERC20).interfaceId));
+
+        // Bridges check deployed tokens against these two IDs, so changing either one strands
+        // every existing token.
+        // l1Token() ^ mint(address,uint256) ^ burn(address,uint256)
+        assertEq(type(ILegacyMintableERC20).interfaceId, bytes4(0x1d1d8b63));
+        // remoteToken() ^ bridge() ^ mint(address,uint256) ^ burn(address,uint256)
+        assertEq(type(IOptimismMintableERC20).interfaceId, bytes4(0xec4fc8e3));
     }
 }
 

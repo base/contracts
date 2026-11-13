@@ -24,8 +24,12 @@ func normalizeInternalType(internalType string) string {
 var excludeContracts = []string{
 	"IProxy", "IEIP712", "IEAS", "ISchemaResolver", "ISchemaRegistry",
 
+	// ERC-165 interfaces that bridges check deployed tokens against. Must never become ABI mirrors,
+	// since any change to their functions changes the interface ID and strands existing tokens.
+	"IOptimismMintableERC20",
+
 	// TODO: Interfaces that need to be fixed
-	"IInitializable", "IOptimismMintableERC20", "IResolvedDelegateProxy",
+	"IInitializable", "IResolvedDelegateProxy",
 }
 
 // excludeSourceContracts is a list of contracts that are allowed to not have interfaces
