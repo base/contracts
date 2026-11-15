@@ -133,6 +133,65 @@ contract MultisigScriptTest is Test, MultisigScript {
         return _encodeTransactionData(_ownerSafe(), _buildAggregatedScriptCall({ scriptCalls: _buildCalls() }));
     }
 
+    function getNonceForTest(address safeAddress) external view returns (uint256) {
+        return _getNonce({ safe: safeAddress });
+    }
+
+    /// @notice Tests nonce override precedence and rejects malformed configured values.
+    function test_getNonce_envOverrides_followDocumentedPrecedence() external {
+        address nonceTestSafe = makeAddr("nonce-override-test-safe");
+        vm.etch(nonceTestSafe, Preinstalls.getDeployedCode(Preinstalls.Safe_v130, block.chainid));
+
+        uint256 safeNonce = IGnosisSafe(nonceTestSafe).nonce();
+        string memory addressEnvVar =
+            string.concat("SAFE_NONCE_", vm.toUppercase({ input: vm.toString({ value: nonceTestSafe }) }));
+
+        bool addressNonceWasSet = vm.envExists({ name: addressEnvVar });
+        string memory originalAddressNonce = addressNonceWasSet ? vm.envString({ name: addressEnvVar }) : "";
+        bool generalNonceWasSet = vm.envExists({ name: "SAFE_NONCE" });
+        uint256 baselineNonce = safeNonce;
+
+        if (!addressNonceWasSet && !generalNonceWasSet) {
+            assertEq(
+                _getNonce({ safe: nonceTestSafe }),
+                safeNonce,
+                "Safe nonce should be used when no override is set"
+            );
+        } else if (generalNonceWasSet) {
+            try vm.envUint({ name: "SAFE_NONCE" }) returns (uint256 configuredNonce) {
+                baselineNonce = configuredNonce;
+                if (!addressNonceWasSet) {
+                    assertEq(
+                        _getNonce({ safe: nonceTestSafe }),
+                        configuredNonce,
+                        "General override should be used when no address-specific override is set"
+                    );
+                }
+            } catch {
+                if (!addressNonceWasSet) {
+                    vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
+                    this.getNonceForTest(nonceTestSafe);
+                }
+            }
+        }
+
+        uint256 addressOverrideNonce = baselineNonce == type(uint256).max ? baselineNonce - 1 : baselineNonce + 1;
+        // Keep this override isolated from the Safe fixtures used by other tests.
+        vm.setEnv({ name: addressEnvVar, value: vm.toString({ value: addressOverrideNonce }) });
+        assertEq(
+            _getNonce({ safe: nonceTestSafe }), addressOverrideNonce, "Address-specific override should take precedence"
+        );
+
+        vm.setEnv({ name: addressEnvVar, value: "invalid" });
+        vm.expectRevert(); // nosemgrep: sol-safety-expectrevert-no-args
+        this.getNonceForTest(nonceTestSafe);
+
+        vm.setEnv({
+            name: addressEnvVar,
+            value: addressNonceWasSet ? originalAddressNonce : vm.toString({ value: safeNonce })
+        });
+    }
+
     function _signDigest(Vm.Wallet memory wallet, bytes32 digest) internal returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(wallet, digest);
         return abi.encodePacked(r, s, v);

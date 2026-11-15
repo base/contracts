@@ -757,19 +757,15 @@ abstract contract MultisigScript is Script {
     //   4. Otherwise we fallback to the safe's current nonce (no override).
     function _getNonce(address safe) internal view virtual returns (uint256 nonce) {
         uint256 safeNonce = IGnosisSafe(safe).nonce();
-        nonce = safeNonce;
-
-        // first try SAFE_NONCE
-        try vm.envUint({ name: "SAFE_NONCE" }) {
-            nonce = vm.envUint({ name: "SAFE_NONCE" });
-        } catch { }
-
-        // then try SAFE_NONCE_{UPPERCASE_SAFE_ADDRESS}
         string memory envVarName = string.concat("SAFE_NONCE_", vm.toUppercase({ input: vm.toString({ value: safe }) }));
-        try vm.envUint({ name: envVarName }) {
-            nonce = vm.envUint({ name: envVarName });
-        } catch { }
 
+        if (vm.envExists({ name: envVarName })) {
+            nonce = vm.envUint({ name: envVarName });
+        } else {
+            nonce = vm.envExists({ name: "SAFE_NONCE" })
+                ? vm.envUint({ name: "SAFE_NONCE" })
+                : safeNonce;
+        }
         // print if any override
         if (nonce != safeNonce) {
             console.log("Overriding nonce for safe %s: %d -> %d", safe, safeNonce, nonce);
