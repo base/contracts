@@ -58,6 +58,7 @@ contract Proxy {
     ///         when this contract is called.
     /// @param _implementation Address of the implementation contract.
     function upgradeTo(address _implementation) public virtual proxyCallIfNotAdmin {
+        require(_implementation != address(0), "Proxy: implementation cannot be address(0)");
         _setImplementation(_implementation);
     }
 
